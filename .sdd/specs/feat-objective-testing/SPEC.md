@@ -35,12 +35,67 @@ Dựa trên cấu trúc chuẩn từ phương pháp Spec-Driven Development (SDD
 - **UI/UX:** Responsive hoạt động tốt trên Tablet và Desktop (Tạm thời không tối ưu cho Mobile vì tính chất chia đôi màn hình bài Reading).
 
 ## 5. Data Model (Mô hình Dữ liệu)
-*Cơ sở dữ liệu: PostgreSQL (Giả định)*
+Cơ sở dữ liệu: PostgreSQL 
 
-- **Table `exams`:** `id` (UUID), `title`, `type` (READING/LISTENING), `duration_minutes`, `version`, `is_active`, `created_by`.
-- **Table `questions`:** `id` (UUID), `exam_id` (FK), `question_type` (MULTIPLE_CHOICE, FILL_BLANK), `content`, `correct_answer`, `explanation`.
-- **Table `student_attempts`:** `id` (UUID), `student_id` (FK), `exam_id` (FK - trỏ đúng vào version), `start_time`, `end_time`, `raw_score`, `band_score`, `answers_submitted` (JSONB).
-- **Table `audit_logs`:** `id` (UUID), `entity_type` (EXAM/QUESTION), `entity_id`, `action`, `changed_by`, `changes` (JSONB - lưu before/after), `created_at`.
+- **Table `mock_tests` (Đề thi):**
+  - `id` (UUID, PK)
+  - `title` (VARCHAR)
+  - `description` (TEXT)
+  - `skill` (Enum: 'reading', 'listening', 'writing', 'speaking')
+  - `difficulty` (Enum: 'beginner', 'intermediate', 'advanced')
+  - `duration_minutes` (INT, NULL nếu là untimed)
+  - `is_published` (BOOLEAN, default FALSE)
+  - `publish_at` (TIMESTAMPTZ - dùng cho scheduled publish)
+  - `created_by` (UUID, FK -> users.id)
+  - `created_at`, `updated_at` (TIMESTAMPTZ)
+
+- **Table `questions` (Câu hỏi):**
+  - `id` (UUID, PK)
+  - `test_id` (UUID, FK -> mock_tests.id)
+  - `question_order` (INT)
+  - `question_text` (TEXT)
+  - `options` (JSONB) - *Lưu mảng lựa chọn (VD: `[{"label":"A", "text":"..."}]`), NULL nếu là câu điền khuyết*
+  - `correct_answer` (TEXT) - *Lưu "A" hoặc chuỗi text chính xác*
+  - `explanation` (TEXT)
+  - `created_at`, `updated_at` (TIMESTAMPTZ)
+
+- **Table `test_attempts` (Lịch sử làm bài):**
+  - `id` (UUID, PK)
+  - `user_id` (UUID, FK -> users.id)
+  - `test_id` (UUID, FK -> mock_tests.id)
+  - `mode` (Enum: 'timed', 'untimed')
+  - `started_at` (TIMESTAMPTZ)
+  - `submitted_at` (TIMESTAMPTZ)
+  - `band_score` (NUMERIC 3,1)
+  - `created_at` (TIMESTAMPTZ)
+
+- **Table `Youtubes` (Chi tiết đáp án học viên nộp):**
+  - `id` (UUID, PK)
+  - `attempt_id` (UUID, FK -> test_attempts.id)
+  - `question_id` (UUID, FK -> questions.id)
+  - `given_answer` (TEXT)
+  - `is_correct` (BOOLEAN)
+  - `created_at` (TIMESTAMPTZ)
+
+- **Table `audit_logs` (Nhật ký hệ thống/Kiểm toán):**
+  - `id` (UUID, PK)
+  - `actor_id` (UUID, FK -> users.id)
+  - `action` (Enum: log_action)
+  - `target_table` (VARCHAR)
+  - `target_id` (UUID)
+  - `old_value` (JSONB)
+  - `new_value` (JSONB)
+  - `ip_address` (INET)
+  - `created_at` (TIMESTAMPTZ)
+
+- **Table `ai_explain_requests` (Yêu cầu AI giải thích câu hỏi):**
+  - `id` (UUID, PK)
+  - `user_id` (UUID, FK -> users.id)
+  - `question_id` (UUID, FK -> questions.id)
+  - `tutor_explanation` (TEXT)
+  - `ai_response` (TEXT)
+  - `tokens_used` (INT)
+  - `created_at` (TIMESTAMPTZ)
 
 ## 6. Error Handling (Xử lý Ngoại lệ)
 - **Mất kết nối mạng:** Hệ thống lưu nháp tạm thời xuống LocalStorage của trình duyệt mỗi phút 1 lần. Khi có mạng sẽ tự động sync lên.
