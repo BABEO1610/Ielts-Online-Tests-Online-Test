@@ -430,6 +430,7 @@ const resetPassword = async (rawToken, newPassword, ipAddress) => {
 const loginWithGoogle = async (googleProfile, ipAddress, userAgent) => {
     // 1. Upsert Google User
     const { id: userId, is_new, user } = await upsertGoogleUser({
+        provider_user_id: googleProfile.provider_user_id,
         email: googleProfile.email,
         full_name: googleProfile.full_name,
         avatar_url: googleProfile.avatar_url
@@ -545,8 +546,9 @@ const handleGoogleCallback = async (code, { ip, userAgent }) => {
     const profileData = await profileResponse.json();
 
     const googleProfile = {
+        provider_user_id: profileData.id || profileData.sub,
         email: profileData.email,
-        full_name: profileData.name,
+        full_name: profileData.name || profileData.given_name || profileData.email.split('@')[0],
         avatar_url: profileData.picture,
     };
 

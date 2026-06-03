@@ -55,7 +55,7 @@ describe('API Service (Axios Interceptors)', () => {
     mock.onGet('/protected-route').replyOnce(200, successData);
 
     // Setup global axios for the refresh call
-    axiosMock.onPost(`${api.defaults.baseURL}/auth/refresh`).reply(200, { success: true });
+    axiosMock.onPost(`${api.defaults.baseURL}/auth/refresh-token`).reply(200, { success: true });
 
     const response = await api.get('/protected-route');
 
@@ -64,7 +64,7 @@ describe('API Service (Axios Interceptors)', () => {
     
     // Ensure that /refresh was called
     expect(axiosMock.history.post.length).toBe(1);
-    expect(axiosMock.history.post[0].url).toBe(`${api.defaults.baseURL}/auth/refresh`);
+    expect(axiosMock.history.post[0].url).toBe(`${api.defaults.baseURL}/auth/refresh-token`);
     expect(axiosMock.history.post[0].withCredentials).toBe(true);
   });
 
@@ -73,7 +73,7 @@ describe('API Service (Axios Interceptors)', () => {
     mock.onGet('/protected-route').replyOnce(401, { error: 'Unauthorized' });
 
     // Setup the refresh endpoint to also fail (e.g., token expired)
-    axiosMock.onPost(`${api.defaults.baseURL}/auth/refresh`).reply(401, { error: 'Session Expired' });
+    axiosMock.onPost(`${api.defaults.baseURL}/auth/refresh-token`).reply(401, { error: 'Session Expired' });
 
     await expect(api.get('/protected-route')).rejects.toThrow();
 

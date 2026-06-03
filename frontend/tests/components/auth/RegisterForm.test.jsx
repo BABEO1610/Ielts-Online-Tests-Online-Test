@@ -2,6 +2,7 @@ import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { describe, test, expect, vi, beforeEach } from 'vitest';
+import { BrowserRouter } from 'react-router-dom';
 import RegisterForm from '../../../src/components/auth/RegisterForm';
 import api from '../../../src/services/api';
 
@@ -18,7 +19,7 @@ describe('RegisterForm Component', () => {
   });
 
   test('renders form fields and Google login button', () => {
-    render(<RegisterForm />);
+    render(<BrowserRouter><RegisterForm /></BrowserRouter>);
     expect(screen.getByTestId('fullname-input')).toBeInTheDocument();
     expect(screen.getByTestId('email-input')).toBeInTheDocument();
     expect(screen.getByTestId('password-input')).toBeInTheDocument();
@@ -29,7 +30,7 @@ describe('RegisterForm Component', () => {
   });
 
   test('validates confirm password in real-time', () => {
-    render(<RegisterForm />);
+    render(<BrowserRouter><RegisterForm /></BrowserRouter>);
     
     const passwordInput = screen.getByTestId('password-input');
     const confirmPasswordInput = screen.getByTestId('confirm-password-input');
@@ -52,7 +53,7 @@ describe('RegisterForm Component', () => {
   test('handles successful registration (USER-03, USER-04)', async () => {
     api.post.mockResolvedValueOnce({ data: { success: true } });
     
-    render(<RegisterForm />);
+    render(<BrowserRouter><RegisterForm /></BrowserRouter>);
     
     fireEvent.change(screen.getByTestId('fullname-input'), { target: { name: 'full_name', value: 'Test User' } });
     fireEvent.change(screen.getByTestId('email-input'), { target: { name: 'email', value: 'test@example.com' } });
@@ -81,7 +82,7 @@ describe('RegisterForm Component', () => {
       response: { data: { error: errorMsg } }
     });
     
-    render(<RegisterForm />);
+    render(<BrowserRouter><RegisterForm /></BrowserRouter>);
     
     fireEvent.change(screen.getByTestId('fullname-input'), { target: { name: 'full_name', value: 'Test User' } });
     fireEvent.change(screen.getByTestId('email-input'), { target: { name: 'email', value: 'test@example.com' } });

@@ -130,22 +130,51 @@ const updateStatus = async (id, status) => {
  * @param {string} [data.avatar_url]
  * @returns {Promise<Object>} An object containing the id, is_new boolean, and the user object
  */
-const upsertGoogleUser = async ({ email, full_name, avatar_url }) => {
-  const result = await pool.query(
-    `INSERT INTO users (email, full_name, avatar_url, password_hash, status, role)
-     VALUES ($1, $2, $3, NULL, 'active', 'student')
-     ON CONFLICT (email) DO UPDATE 
-     SET full_name = EXCLUDED.full_name,
-         avatar_url = COALESCE(EXCLUDED.avatar_url, users.avatar_url),
-         status = CASE WHEN users.status = 'pending' THEN 'active'::account_status ELSE users.status END
-     RETURNING *, (xmax = 0) AS is_new`,
-    [email, full_name, avatar_url]
-  );
-  return {
-    id: result.rows[0].id,
-    is_new: result.rows[0].is_new,
-    user: result.rows[0]
-  };
+const upsertGoogleUser = async ({ provider_user_id, email, full_name, avatar_url }) => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    
+    // 1. Upsert users
+    const result = await client.query(
+      `INSERT INTO users (email, full_name, avatar_url, password_hash, status, role)
+       VALUES ($1, $2, $3, NULL, 'active', 'student')
+       ON CONFLICT (email) DO UPDATE 
+       SET full_name = COALESCE(EXCLUDED.full_name, users.full_name),
+           avatar_url = COALESCE(EXCLUDED.avatar_url, users.avatar_url),
+           status = CASE WHEN users.status = 'pending' THEN 'active'::account_status ELSE users.status END
+       RETURNING *, (xmax = 0) AS is_new`,
+      [email, full_name, avatar_url]
+    );
+
+    const user = result.rows[0];
+    const is_new = user.is_new;
+
+    // 2. Upsert oauth_accounts
+    if (provider_user_id) {
+      await client.query(
+        `INSERT INTO oauth_accounts (user_id, provider, provider_user_id, provider_email, linked_at, updated_at)
+         VALUES ($1, 'google', $2, $3, NOW(), NOW())
+         ON CONFLICT (provider, provider_user_id) DO UPDATE 
+         SET provider_email = EXCLUDED.provider_email,
+             updated_at = NOW()`,
+        [user.id, provider_user_id, email]
+      );
+    }
+
+    await client.query('COMMIT');
+    
+    return {
+      id: user.id,
+      is_new,
+      user
+    };
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
 };
 
 module.exports = {
