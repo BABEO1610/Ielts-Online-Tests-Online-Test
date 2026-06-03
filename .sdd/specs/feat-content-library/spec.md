@@ -1,350 +1,593 @@
-# SPEC.md — Đặc tả thư viện tài liệu học tập (feat-content-library)
+# Đặc tả tính năng: Thư viện Tài liệu (feat-content-library) — FULL SPECIFICATION
 
-Version: 0.1 DRAFT | Le Tien Thanh | Date: 2026-05-25
-
----
-
-## 1. Context & Goal
-
-Feature `feat-content-library` hỗ trợ quản lý thư viện tài liệu học IELTS trong hệ thống IELTS Online Test.
-
-Hệ thống cung cấp:
-
-- Document Library cho Student.
-- Preview tài liệu công khai cho Guest.
-- Upload/Edit/Delete tài liệu cho Tutor hoặc Content Manager.
-- Kiểm soát loại file, dung lượng file và quyền download.
-
-Feature này giúp Student tải PDF/audio để luyện IELTS offline, đồng thời giúp Tutor cập nhật và quản lý tài liệu học tập.
-
-Feature này tập trung vào:
-
-- file size limit,
-- supported material types,
-- download mechanism.
+Trạng thái: **DRAFT** | Cần review  
+Tác giả: Thành viên 4 | Ngày: 2026-06-03  
+Mức độ rủi ro: **Trung bình** (File Upload, Kiểm soát truy cập, Lưu trữ)  
+Spec liên quan: `.sdd/global/constitution.md`, `.sdd/shared_context.md`, `feat-auth-and-users`
 
 ---
 
-## 2. Actors & Roles
+## 1. Bối cảnh nghiệp vụ & Mục tiêu
 
-### Guest
+Tính năng này cung cấp **Thư viện Tài liệu** cho nền tảng IELTS Online Test.
 
-Guest là người chưa đăng nhập.
+Thư viện Tài liệu cho phép Student truy cập các tài liệu luyện thi IELTS như tài liệu PDF và file audio để tự học offline. Đồng thời cho phép Tutor / Admin upload, cập nhật, publish/unpublish và xóa tài nguyên học tập.
 
-Guest có thể xem tài liệu published nếu hệ thống cho phép public preview, nhưng không được upload/edit/delete tài liệu và không được download tài liệu yêu cầu đăng nhập.
+Tính năng này tập trung vào ba quyết định chính:
 
-### Student
+* Các loại tài liệu được hỗ trợ.
+* Giới hạn dung lượng file.
+* Cơ chế tải xuống an toàn.
 
-Student là người học đã đăng nhập.
+Mục tiêu:
 
-Student có thể xem Document Library và download tài liệu PDF/audio đã được publish.
-
-### Tutor / Content Manager
-
-Tutor / Content Manager là người quản lý tài liệu.
-
-Tutor có thể upload, edit, publish/unpublish và delete tài liệu trong thư viện.
-
-### Admin
-
-Admin có thể quản lý tài liệu nếu được cấp quyền và xem audit log liên quan đến upload/delete resource.
+* Cung cấp thư viện tập trung các tài liệu luyện thi IELTS (PDF/Audio).
+* Cho phép Student tải tài liệu đã published sau khi xác thực.
+* Cho phép Tutor quản lý tài nguyên một cách an toàn.
+* Cho phép Admin quản lý toàn bộ tài nguyên và xem audit log.
+* Ngăn chặn upload file không hợp lệ, quá dung lượng, giả mạo hoặc nguy hiểm.
+* Đảm bảo mọi thay đổi tài nguyên đều có thể truy vết qua audit log.
+* Sử dụng schema PostgreSQL hiện có, đặc biệt là bảng `library_resources`.
 
 ---
 
-## 3. Functional Requirements
+## 2. Các bên liên quan & Personas
 
-### 3.1 View Content Library
-
-WHEN Guest hoặc Student mở Content Library,  
-THE SYSTEM SHALL hiển thị danh sách tài liệu có `is_published = TRUE`.
-
-Mỗi tài liệu hiển thị tối thiểu:
-
-- title
-- description
-- resource_type
-- file_size_bytes
-- created_at
+* **User / Guest:** Khách chưa đăng nhập. Có thể xem metadata tài liệu public/published nếu preview được cho phép, nhưng không thể quản lý tài nguyên và không thể tải tài liệu chỉ dành cho Student.
+* **Student:** Học viên đã đăng nhập. Có thể xem và tải tài liệu PDF/Audio đã published để luyện IELTS offline.
+* **Tutor / Content Manager:** Chủ sở hữu nội dung. Có thể upload, chỉnh sửa, publish/unpublish và xóa tài nguyên thư viện.
+* **Admin:** Quản trị hệ thống. Có thể quản lý toàn bộ tài nguyên thư viện và xem audit log cho các thay đổi tài nguyên.
+* **System:** Xác thực file, lưu metadata tài nguyên, kiểm soát quyền hạn và phục vụ response tải xuống.
 
 ---
 
-### 3.2 Student Download Resource
+## 3. User Stories
 
-WHEN Student click Download trên một tài liệu,  
-THE SYSTEM SHALL kiểm tra Student đã đăng nhập và tài liệu có `is_published = TRUE`.
-
-WHEN điều kiện hợp lệ,  
-THE SYSTEM SHALL trả file download response.
-
----
-
-### 3.3 Guest Access Limitation
-
-WHEN Guest truy cập Content Library,  
-THE SYSTEM SHALL chỉ hiển thị tài liệu public/published.
-
-WHEN Guest cố download tài liệu yêu cầu đăng nhập,  
-THE SYSTEM SHALL từ chối request và yêu cầu login/register.
+* **STU-10:** Là một Student, tôi muốn truy cập Thư viện Tài liệu để tải PDF và file audio luyện thi IELTS, để có thể tự luyện tập độc lập offline.
+* **TUT-07:** Là một Tutor, tôi muốn upload, chỉnh sửa và xóa tài liệu PDF và file audio trong Thư viện, để học viên luôn có tài nguyên cập nhật để tải về.
+* **ADM-06:** Là một Admin, tôi muốn xem và lọc nhật ký hoạt động hệ thống cho các hành động nhạy cảm, để có thể kiểm tra và điều tra các thay đổi nội dung.
+* **Luồng Preview của Guest:** Là một Guest, tôi muốn xem tài nguyên học tập đã published hoặc thông tin tài nguyên giới hạn, để hiểu nền tảng cung cấp tài liệu học tập gì trước khi đăng ký.
 
 ---
 
-### 3.4 Tutor Manage Resource
+## 4. Yêu cầu chức năng
 
-WHEN Tutor upload tài liệu mới,  
-THE SYSTEM SHALL kiểm tra file extension, MIME type thật, file size và metadata bắt buộc.
+### FR-01 — Xem danh sách tài nguyên đã published
 
-WHEN file hợp lệ,  
-THE SYSTEM SHALL lưu file vào storage và insert metadata vào bảng `library_resources`.
+KHI Guest hoặc Student mở trang Thư viện Tài liệu, HỆ THỐNG SẼ hiển thị tất cả tài nguyên có `is_published = TRUE`.
 
-WHEN Tutor edit tài liệu,  
-THE SYSTEM SHALL cho phép cập nhật title, description và is_published.
+Thông tin hiển thị BẮT BUỘC bao gồm:
 
-WHEN Tutor delete tài liệu,  
-THE SYSTEM SHALL soft delete bằng cách cập nhật:
+* `id`
+* `title`
+* `description`
+* `resource_type`
+* `file_size_bytes`
+* `created_at`
+
+Hệ thống KHÔNG ĐƯỢC hiển thị tài nguyên chưa published cho Guest hoặc Student.
+
+---
+
+### FR-02 — Lọc tài nguyên thư viện
+
+KHI Guest hoặc Student lọc tài nguyên theo `resource_type`, HỆ THỐNG SẼ chỉ trả về tài nguyên đã published khớp với bộ lọc.
+
+Giá trị lọc được phép trong sprint này:
+
+* `pdf`
+* `audio`
+
+TRONG TRƯỜNG HỢP giá trị lọc là `video` hoặc `other`, HỆ THỐNG SẼ không trả về tài nguyên nào có thể upload trong phạm vi sprint này.
+
+---
+
+### FR-03 — Xem chi tiết tài nguyên
+
+KHI Guest hoặc Student mở trang chi tiết tài nguyên, HỆ THỐNG SẼ hiển thị metadata của tài nguyên được chọn nếu `is_published = TRUE`.
+
+TRONG TRƯỜNG HỢP tài nguyên không tồn tại hoặc `is_published = FALSE`, HỆ THỐNG SẼ trả về HTTP 404 Not Found.
+
+---
+
+### FR-04 — Student tải tài nguyên đã published
+
+KHI Student đã xác thực nhấn Download trên một tài nguyên đã published, HỆ THỐNG SẼ xác minh rằng:
+
+* Người dùng đã được xác thực,
+* Role người dùng là `student`,
+* Tài nguyên tồn tại,
+* Tài nguyên có `is_published = TRUE`,
+* File tồn tại trong storage.
+
+KHI tất cả điều kiện hợp lệ, HỆ THỐNG SẼ trả về response tải xuống file hoặc URL tải xuống bảo mật.
+
+---
+
+### FR-05 — Hạn chế tải xuống với Guest
+
+KHI Guest cố tải tài nguyên chỉ dành cho Student, HỆ THỐNG SẼ từ chối yêu cầu và trả về HTTP 401 Unauthorized.
+
+Trong sprint này, Guest chỉ có thể xem metadata tài nguyên đã published. Tải xuống đầy đủ yêu cầu đăng nhập bằng tài khoản Student.
+
+Hệ thống NÊN hướng dẫn Guest đăng nhập hoặc đăng ký trước khi tải tài nguyên đầy đủ.
+
+---
+
+### FR-06 — Tutor upload tài nguyên
+
+KHI Tutor upload tài nguyên mới vào thư viện, HỆ THỐNG SẼ kiểm tra:
+
+* Metadata bắt buộc,
+* Role người dùng,
+* Extension file,
+* MIME type thật,
+* Kích thước file,
+* Loại tài nguyên.
+
+Metadata bắt buộc bao gồm:
+
+* `title`
+* `resource_type`
+* File đã upload
+* `is_published`
+
+KHI validation thành công, HỆ THỐNG SẼ lưu file vào storage và insert metadata vào `library_resources`.
+
+---
+
+### FR-07 — Kiểm tra loại file
+
+KHI Tutor upload file, HỆ THỐNG CHỈ CHẤP NHẬN các loại file sau:
+
+| Loại tài nguyên | Extension |
+|---|---|
+| PDF | `.pdf` |
+| Audio | `.mp3`, `.wav`, `.m4a` |
+
+TRONG TRƯỜNG HỢP file upload có extension không được hỗ trợ, HỆ THỐNG SẼ từ chối yêu cầu với HTTP 415 Unsupported Media Type.
+
+---
+
+### FR-08 — Kiểm tra MIME type
+
+KHI Tutor upload file, HỆ THỐNG SẼ kiểm tra MIME type thật của file upload.
+
+MIME type được phép:
+
+| Loại file | MIME Type |
+|---|---|
+| PDF | `application/pdf` |
+| MP3 | `audio/mpeg` |
+| WAV | `audio/wav`, `audio/x-wav` |
+| M4A | `audio/mp4`, `audio/m4a` |
+
+TRONG TRƯỜNG HỢP extension file hợp lệ nhưng MIME type không hợp lệ hoặc bị giả mạo, HỆ THỐNG SẼ từ chối yêu cầu với HTTP 400 Bad Request.
+
+---
+
+### FR-09 — Kiểm tra kích thước file
+
+KHI Tutor upload file, HỆ THỐNG SẼ kiểm tra kích thước file dựa theo `resource_type`.
+
+| Loại tài nguyên | Kích thước tối đa |
+|---|---:|
+| PDF | 20MB |
+| Audio | 100MB |
+
+TRONG TRƯỜNG HỢP file PDF vượt quá 20MB, HỆ THỐNG SẼ từ chối yêu cầu với HTTP 413 Payload Too Large.
+
+TRONG TRƯỜNG HỢP file audio vượt quá 100MB, HỆ THỐNG SẼ từ chối yêu cầu với HTTP 413 Payload Too Large.
+
+---
+
+### FR-10 — Lưu metadata tài nguyên
+
+KHI upload tài nguyên thành công, HỆ THỐNG SẼ insert một bản ghi mới vào `library_resources`.
+
+Metadata được insert BẮT BUỘC bao gồm:
+
+* `title`
+* `description`
+* `resource_type`
+* `file_url`
+* `file_size_bytes`
+* `uploaded_by`
+* `is_published`
+* `created_at`
+* `updated_at`
+
+Hệ thống SẼ lưu file thật trong local/cloud storage và KHÔNG ĐƯỢC lưu nội dung binary file trực tiếp trong PostgreSQL.
+
+---
+
+### FR-11 — Tutor chỉnh sửa tài nguyên
+
+KHI Tutor chỉnh sửa tài nguyên thư viện hiện có, HỆ THỐNG SẼ cho phép cập nhật:
+
+* `title`
+* `description`
+* `is_published`
+
+KHI cập nhật thành công, HỆ THỐNG SẼ trả về metadata tài nguyên đã cập nhật.
+
+Trường `updated_at` SẼ được cập nhật tự động bởi database trigger.
+
+Trong sprint này, hành động chỉnh sửa không bắt buộc phải ghi log trừ khi team thêm `resource_updated` vào enum `log_action`.
+
+---
+
+### FR-12 — Tutor Publish / Unpublish tài nguyên
+
+KHI Tutor thay đổi trạng thái publish của tài nguyên, HỆ THỐNG SẼ cập nhật `is_published`.
+
+TRONG TRƯỜNG HỢP `is_published = TRUE`, tài nguyên SẼ hiển thị với Guest/Student.
+
+TRONG TRƯỜNG HỢP `is_published = FALSE`, tài nguyên SẼ bị ẩn khỏi Guest/Student.
+
+---
+
+### FR-13 — Tutor xóa tài nguyên
+
+KHI Tutor xóa một tài nguyên, HỆ THỐNG SẼ soft delete tài nguyên bằng cách set:
 
 ```text
 is_published = FALSE
-3.5 Resource Type Control
+```
 
-WHEN Tutor upload tài liệu,
-THE SYSTEM SHALL chỉ chấp nhận:
+Hệ thống KHÔNG ĐƯỢC xóa vĩnh viễn bản ghi database trong sprint này.
 
-pdf
-audio
-
-Dù database enum có hỗ trợ video và other, trong sprint này hệ thống SHALL NOT cho phép upload video hoặc other.
-
-3.6 Audit Log
-
-WHEN Tutor/Admin upload hoặc delete tài liệu,
-THE SYSTEM SHOULD ghi log vào audit_logs với action tương ứng:
-
-resource_uploaded
-resource_deleted
-4. Non-functional Requirements
-4.1 Performance
-
-Content Library page SHALL load danh sách tài liệu trong tối đa 3 giây khi số lượng tài liệu published nhỏ hơn 1000.
-
-Download request SHOULD start responding trong tối đa 5 giây nếu file tồn tại và user có quyền truy cập.
-
-4.2 Security
-
-Backend SHALL kiểm tra cả extension và MIME type thật của file upload.
-
-Backend SHALL sanitize file name trước khi lưu.
-
-Backend SHALL NOT expose physical server path trực tiếp cho frontend.
-
-Backend SHALL reject executable files hoặc file giả mạo extension.
-
-Backend SHALL NOT lưu file binary trực tiếp trong PostgreSQL.
-
-4.3 Authorization
-
-Upload, edit và delete tài liệu SHALL require role:
-
-tutor
-admin
-
-Download tài liệu đầy đủ SHALL require authenticated Student account nếu tài liệu không được mở public download.
-
-Student và Guest SHALL NOT được truy cập API quản lý tài liệu.
-
-4.4 File Size Limit
-Resource Type	Max Size
-PDF	20MB
-Audio	100MB
-4.5 Supported File Types
-Resource Type	Extensions
-PDF	.pdf
-Audio	.mp3, .wav, .m4a
-## 5. Data Model
-
-### 5.1 library_resources
-
-Lưu metadata của tài liệu trong Document Library.
-
-| Field | Type |
-|---|---|
-| id | UUID |
-| title | VARCHAR(500) |
-| description | TEXT |
-| resource_type | resource_type |
-| file_url | TEXT |
-| file_size_bytes | BIGINT |
-| uploaded_by | UUID |
-| is_published | BOOLEAN |
-| created_at | TIMESTAMPTZ |
-| updated_at | TIMESTAMPTZ |
-
-#### Relationships
-
-`uploaded_by -> users.id`
-
-#### Constraints
-
-- `title` không được để trống.
-- `resource_type` không được để trống.
-- `file_url` không được để trống.
-- `is_published = TRUE`: tài liệu được hiển thị.
-- `is_published = FALSE`: tài liệu bị ẩn hoặc soft delete.
-- File thật không lưu trong PostgreSQL, chỉ lưu đường dẫn ở `file_url`.
+Việc xóa file vật lý nằm ngoài phạm vi sprint đầu tiên trừ khi team phê duyệt việc dọn dẹp storage.
 
 ---
 
-### 5.2 resource_type
+### FR-14 — Quản lý tài nguyên của Admin
 
-Định nghĩa loại tài liệu.
+KHI Admin truy cập API quản lý Thư viện Tài liệu, HỆ THỐNG SẼ cho phép quyền upload/edit/delete với tất cả tài nguyên.
 
-| Value | Meaning |
-|---|---|
-| pdf | Tài liệu PDF |
-| audio | File âm thanh |
-| video | Video tài liệu |
-| other | Loại khác |
-
-#### Sprint Scope
-
-Trong sprint này chỉ dùng:
-
-- pdf
-- audio
-
-Không dùng:
-
-- video
-- other
+Admin SẼ có thể xem cả tài nguyên đã published và chưa published trong giao diện quản lý.
 
 ---
 
-### 5.3 users
+### FR-15 — Audit Log khi upload tài nguyên
 
-Quản lý người upload tài liệu.
+KHI Tutor/Admin upload tài nguyên thành công, HỆ THỐNG NÊN insert bản ghi audit vào `audit_logs`.
 
-| Field | Type |
-|---|---|
-| id | UUID |
-| email | VARCHAR(255) |
-| role | user_role |
-| status | account_status |
-| full_name | VARCHAR(255) |
+Dữ liệu audit NÊN bao gồm:
 
-#### Relationships
-
-`users.id -> library_resources.uploaded_by`
-
-#### Constraints
-
-Chỉ các role sau được upload/edit/delete tài liệu:
-
-- tutor
-- admin
-
-Student và Guest không có quyền quản lý tài liệu.
+* `actor_id`
+* `action = resource_uploaded`
+* `target_table = library_resources`
+* `target_id`
+* `new_value`
+* `ip_address`
+* `created_at`
 
 ---
 
-### 5.4 audit_logs
+### FR-16 — Audit Log khi xóa tài nguyên
 
-Lưu lịch sử thao tác upload/delete tài liệu nếu bật audit log.
+KHI Tutor/Admin xóa hoặc unpublish tài nguyên, HỆ THỐNG NÊN insert bản ghi audit vào `audit_logs`.
 
-| Field | Type |
-|---|---|
-| id | UUID |
-| actor_id | UUID |
-| action | log_action |
-| target_table | VARCHAR(100) |
-| target_id | UUID |
-| old_value | JSONB |
-| new_value | JSONB |
-| created_at | TIMESTAMPTZ |
+Dữ liệu audit NÊN bao gồm:
 
-#### Relationships
-
-`actor_id -> users.id`
-
-`target_id -> library_resources.id`
-
-#### Related Actions
-
-- resource_uploaded
-- resource_deleted
+* `actor_id`
+* `action = resource_deleted`
+* `target_table = library_resources`
+* `target_id`
+* `old_value`
+* `new_value`
+* `ip_address`
+* `created_at`
 
 ---
 
-### 5.5 File Rules
+### FR-17 — Ngăn chặn quản lý trái phép
 
-| Rule | Value |
-|---|---|
-| PDF max size | 20MB |
-| Audio max size | 100MB |
-| PDF extension | .pdf |
-| Audio extensions | .mp3, .wav, .m4a |
+TRONG TRƯỜNG HỢP Student hoặc Guest gọi API upload/edit/delete, HỆ THỐNG SẼ từ chối yêu cầu với HTTP 403 Forbidden.
 
-#### Constraints
-
-- Backend phải kiểm tra extension và MIME type thật.
-- File giả mạo extension phải bị từ chối.
-- File binary không được lưu trực tiếp trong PostgreSQL.
-## 6. Error Handling
-
-### ERR-01 — Invalid File Upload
-
-WHERE Tutor/Admin upload file sai định dạng, giả mạo MIME type, thiếu metadata, hoặc vượt dung lượng,  
-THE SYSTEM SHALL reject request with proper HTTP error code.
-
-- Unsupported file type → HTTP 415
-- Fake MIME type → HTTP 400
-- Missing title/resource_type → HTTP 400
-- File too large → HTTP 413
+TRONG TRƯỜNG HỢP người dùng chưa xác thực, HỆ THỐNG SẼ từ chối truy cập API quản lý với HTTP 401 Unauthorized.
 
 ---
 
-### ERR-02 — Unauthorized or Forbidden Access
+### FR-18 — Xử lý lỗi Storage
 
-WHERE user chưa đăng nhập cố download tài liệu yêu cầu login,  
-THE SYSTEM SHALL return HTTP 401 Unauthorized.
+TRONG TRƯỜNG HỢP lưu trữ file thất bại trong quá trình upload, HỆ THỐNG KHÔNG ĐƯỢC insert metadata vào `library_resources`.
 
-WHERE Student hoặc Guest cố upload/edit/delete tài liệu,  
-THE SYSTEM SHALL return HTTP 403 Forbidden.
+TRONG TRƯỜNG HỢP lưu trữ file thành công nhưng insert metadata thất bại, HỆ THỐNG NÊN xóa file đã upload khỏi storage để tránh file mồ côi (orphan file).
 
 ---
 
-### ERR-03 — Resource Not Found
+## 5. Tiêu chí chấp nhận (EARS)
 
-WHERE user truy cập tài liệu không tồn tại hoặc `is_published = FALSE`,  
-THE SYSTEM SHALL return HTTP 404 Not Found.
+### Ubiquitous — Luôn đúng
+
+* HỆ THỐNG SẼ dùng `library_resources` là nguồn dữ liệu duy nhất (single source of truth) cho metadata Thư viện Tài liệu.
+* HỆ THỐNG KHÔNG ĐƯỢC lưu dữ liệu binary file trực tiếp trong PostgreSQL.
+* HỆ THỐNG SẼ chỉ lưu metadata file và `file_url` trong database.
+* HỆ THỐNG SẼ chỉ cho phép loại tài nguyên `pdf` và `audio` trong sprint này.
+* HỆ THỐNG SẼ từ chối loại tài nguyên `video` và `other` trong sprint này, dù enum database có hỗ trợ.
+* HỆ THỐNG SẼ yêu cầu role `tutor` hoặc `admin` cho các hành động upload, edit, publish/unpublish và delete tài nguyên.
+* HỆ THỐNG KHÔNG ĐƯỢC cho phép `student` hoặc người dùng chưa xác thực gọi API quản lý tài nguyên.
+* HỆ THỐNG SẼ chỉ hiển thị tài nguyên có `is_published = TRUE` cho Guest/Student trong giao diện thư viện.
+* HỆ THỐNG SẼ coi `is_published = FALSE` là ẩn/unpublished/soft-deleted với Student và Guest.
+* HỆ THỐNG SẼ cho phép Admin quản lý toàn bộ tài nguyên thư viện.
+
+### Event-driven — Kích hoạt bởi sự kiện
+
+* KHI Student mở Thư viện Tài liệu, HỆ THỐNG SẼ trả về danh sách tài nguyên có `is_published = TRUE`.
+* KHI Guest mở trang preview thư viện public, HỆ THỐNG SẼ chỉ trả về metadata tài nguyên public/published và KHÔNG ĐƯỢC expose URL tải xuống bị hạn chế nếu cần đăng nhập.
+* KHI Student nhấn Download trên tài nguyên đã published, HỆ THỐNG SẼ xác minh xác thực và khả dụng tài nguyên trước khi trả về response tải xuống.
+* KHI Tutor upload tài nguyên mới, HỆ THỐNG SẼ kiểm tra metadata bắt buộc, extension, MIME type, kích thước file và quyền role trước khi lưu.
+* KHI upload tài nguyên thành công, HỆ THỐNG SẼ lưu file vào storage và insert metadata vào `library_resources`.
+* KHI upload tài nguyên thành công, HỆ THỐNG NÊN insert bản ghi audit vào `audit_logs` với action `resource_uploaded`.
+* KHI Tutor chỉnh sửa tài nguyên, HỆ THỐNG SẼ cho phép cập nhật `title`, `description` và `is_published`.
+* KHI Tutor xóa tài nguyên, HỆ THỐNG SẼ soft delete bằng cách set `is_published = FALSE`.
+* KHI Tutor/Admin xóa tài nguyên, HỆ THỐNG NÊN insert bản ghi audit vào `audit_logs` với action `resource_deleted`.
+* KHI tài nguyên được cập nhật, trigger database `set_updated_at()` SẼ tự động cập nhật timestamp `updated_at`.
+
+### State-driven — Điều kiện liên tục
+
+* KHI tài nguyên có `is_published = FALSE`, HỆ THỐNG KHÔNG ĐƯỢC hiển thị tài liệu đó trong danh sách của Guest hoặc Student.
+* KHI người dùng chưa xác thực, HỆ THỐNG SẼ từ chối truy cập endpoint tải xuống chỉ dành cho Student.
+* KHI role người dùng không phải `tutor` hoặc `admin`, HỆ THỐNG SẼ từ chối truy cập endpoint upload/edit/delete.
+* KHI đang xử lý upload file, HỆ THỐNG SẼ kiểm tra extension và MIME type trước khi insert metadata vào database.
+* KHI đang xử lý upload file, HỆ THỐNG SẼ áp dụng giới hạn kích thước file theo loại tài nguyên.
+
+### Unwanted — Xử lý lỗi
+
+* TRONG TRƯỜNG HỢP extension file không được hỗ trợ, HỆ THỐNG SẼ trả về HTTP 415 Unsupported Media Type.
+* TRONG TRƯỜNG HỢP extension file hợp lệ nhưng MIME type không hợp lệ hoặc bị giả mạo, HỆ THỐNG SẼ trả về HTTP 400 Bad Request.
+* TRONG TRƯỜNG HỢP file PDF vượt quá 20MB, HỆ THỐNG SẼ trả về HTTP 413 Payload Too Large.
+* TRONG TRƯỜNG HỢP file audio vượt quá 100MB, HỆ THỐNG SẼ trả về HTTP 413 Payload Too Large.
+* TRONG TRƯỜNG HỢP thiếu metadata bắt buộc, HỆ THỐNG SẼ trả về HTTP 400 Bad Request.
+* TRONG TRƯỜNG HỢP người dùng chưa xác thực cố tải tài nguyên yêu cầu đăng nhập, HỆ THỐNG SẼ trả về HTTP 401 Unauthorized.
+* TRONG TRƯỜNG HỢP Student hoặc Guest cố upload/edit/delete, HỆ THỐNG SẼ trả về HTTP 403 Forbidden.
+* TRONG TRƯỜNG HỢP tài nguyên được yêu cầu không tồn tại hoặc chưa published với Student/Guest, HỆ THỐNG SẼ trả về HTTP 404 Not Found.
+* TRONG TRƯỜNG HỢP lưu file thành công nhưng insert database thất bại, HỆ THỐNG NÊN xóa file đã upload khỏi storage để tránh file mồ côi.
 
 ---
 
-### ERR-04 — Storage or Database Failure
+## 6. API Contracts
 
-WHERE file storage hoặc database persistence thất bại,  
-THE SYSTEM SHALL return HTTP 500 Internal Server Error.
-## 7. Acceptance Criteria
+Tính năng này sử dụng API Library thống nhất. Kiểm soát truy cập theo role được xử lý bởi middleware xác thực và phân quyền thay vì tạo nhóm route riêng cho Student/Tutor.
 
-- [ ] Guest có thể xem danh sách tài liệu published.
-- [ ] Student đăng nhập có thể xem và download tài liệu published.
-- [ ] Guest không thể download tài liệu yêu cầu đăng nhập.
-- [ ] Tutor/Admin có thể upload PDF dưới 20MB.
-- [ ] Tutor/Admin có thể upload audio dưới 100MB.
-- [ ] File sai định dạng, giả mạo MIME type hoặc vượt dung lượng bị từ chối.
-- [ ] Tutor/Admin có thể edit title, description và is_published.
-- [ ] Tutor/Admin có thể soft delete tài liệu bằng `is_published = FALSE`.
-- [ ] Tài liệu unpublished không hiển thị cho Guest/Student.
-- [ ] Student/Guest không thể gọi API upload/edit/delete.
-- [ ] Metadata tài liệu được lưu đúng vào bảng `library_resources`.
-- [ ] File binary không được lưu trực tiếp trong PostgreSQL.
-## 8. Out of Scope
+### Xem tài nguyên
 
-Các phần sau KHÔNG làm trong sprint này:
+* `GET /api/v1/library/resources`  
+  Query: `resource_type`, `page`, `limit`  
+  Response: 200 OK  
+  Mục đích: Trả về metadata tài nguyên đã published cho Guest/Student.
 
-- Không làm video library.
-- Không làm payment hoặc premium material access.
-- Không làm AI tự tạo tài liệu.
-- Không làm OCR hoặc preview toàn bộ PDF/audio trên trình duyệt.
-- Không làm recommendation system.
-- Không làm copyright/license management nâng cao.
-- Không lưu file binary trực tiếp trong PostgreSQL.
-- Không dùng `resource_type = video` hoặc `resource_type = other`.
+* `GET /api/v1/library/resources/:id`  
+  Response: 200 OK / 404 Not Found  
+  Mục đích: Trả về metadata của một tài nguyên đã published.
+
+### Tải xuống tài nguyên
+
+* `GET /api/v1/library/resources/:id/download`  
+  Response: 200 OK / 401 / 404  
+  Mục đích: Tải xuống tài nguyên PDF/Audio đã published. Tải đầy đủ yêu cầu Student đã xác thực.
+
+### Quản lý tài nguyên
+
+* `GET /api/v1/library/resources/manage`  
+  Query: `resource_type`, `is_published`, `uploaded_by`, `page`, `limit`  
+  Response: 200 OK  
+  Role: Tutor/Admin  
+  Mục đích: Trả về tài nguyên để quản lý, bao gồm cả tài nguyên chưa published.
+
+* `POST /api/v1/library/resources`  
+  Body: `title`, `description`, `resource_type`, `is_published`, `file`  
+  Response: 201 Created  
+  Role: Tutor/Admin  
+  Mục đích: Upload tài nguyên PDF/Audio mới.
+
+* `PATCH /api/v1/library/resources/:id`  
+  Body: `title`, `description`, `is_published`  
+  Response: 200 OK  
+  Role: Tutor/Admin  
+  Mục đích: Cập nhật metadata tài nguyên hoặc trạng thái publish/unpublish.
+
+* `DELETE /api/v1/library/resources/:id`  
+  Response: 204 No Content  
+  Role: Tutor/Admin  
+  Mục đích: Soft delete tài nguyên bằng cách set `is_published = FALSE`.
+
+---
+
+## 7. Mô hình dữ liệu & Thay đổi DB Schema
+
+Hệ thống sử dụng schema PostgreSQL v2 hiện có. AI Agent BẮT BUỘC tuân thủ nghiêm ngặt tên bảng, loại enum, kiểu dữ liệu và ràng buộc hiện tại.
+
+### Các Enum Types
+
+* `resource_type`: `pdf`, `audio`, `video`, `other`
+* `user_role`: `user`, `student`, `tutor`, `admin`
+* `account_status`: `pending`, `active`, `inactive`, `banned`
+* `log_action`: bao gồm `resource_uploaded`, `resource_deleted`
+
+Quyết định sprint:
+
+* Chỉ cho phép `resource_type = 'pdf'` và `resource_type = 'audio'`.
+* `resource_type = 'video'` và `resource_type = 'other'` nằm ngoài phạm vi.
+
+### Bảng chính: `library_resources`
+
+Bảng `library_resources` lưu metadata cho tất cả tài nguyên Thư viện Tài liệu.
+
+| Trường | Kiểu | Quy tắc |
+|---|---|---|
+| `id` | UUID | Primary key, mặc định `gen_random_uuid()` |
+| `title` | VARCHAR(500) | Bắt buộc |
+| `description` | TEXT | Tùy chọn |
+| `resource_type` | resource_type | Bắt buộc |
+| `file_url` | TEXT | Bắt buộc |
+| `file_size_bytes` | BIGINT | Tùy chọn nhưng bắt buộc bởi validation ứng dụng |
+| `uploaded_by` | UUID | Tham chiếu `users(id)` với `ON DELETE SET NULL` |
+| `is_published` | BOOLEAN | Bắt buộc, mặc định `TRUE` |
+| `created_at` | TIMESTAMPTZ | Mặc định `NOW()` |
+| `updated_at` | TIMESTAMPTZ | Tự động cập nhật bởi trigger |
+
+Ràng buộc:
+
+* `title` KHÔNG ĐƯỢC để trống.
+* `resource_type` PHẢI là `pdf` hoặc `audio` trong sprint này.
+* `file_url` KHÔNG ĐƯỢC để trống.
+* `file_size_bytes` NÊN lưu theo đơn vị bytes.
+* `is_published = TRUE` nghĩa là hiển thị với người dùng được phép.
+* `is_published = FALSE` nghĩa là chưa published hoặc soft-deleted.
+* File binary thật BẮT BUỘC lưu trong local/cloud storage, không lưu trong PostgreSQL.
+
+### Bảng liên quan: `users`
+
+Dùng để xác định người upload thông qua `library_resources.uploaded_by`.
+
+| Trường | Kiểu | Mục đích |
+|---|---|---|
+| `id` | UUID | Liên kết qua `uploaded_by` |
+| `email` | VARCHAR(255) | Xác định tài khoản |
+| `role` | user_role | Phân quyền |
+| `status` | account_status | Chỉ người dùng active mới được quản lý tài nguyên |
+| `full_name` | VARCHAR(255) | Hiển thị tên người upload nếu cần |
+
+Quy tắc phân quyền:
+
+* Chỉ người dùng active với role `tutor` hoặc `admin` mới được upload/edit/delete tài nguyên.
+
+### Bảng liên quan: `audit_logs`
+
+Dùng để truy vết các hành động upload/delete.
+
+| Trường | Kiểu | Mục đích |
+|---|---|---|
+| `id` | UUID | Primary key |
+| `actor_id` | UUID | Tutor/Admin đã thực hiện hành động |
+| `action` | log_action | `resource_uploaded` hoặc `resource_deleted` |
+| `target_table` | VARCHAR(100) | `library_resources` |
+| `target_id` | UUID | ID tài nguyên |
+| `old_value` | JSONB | Metadata cũ khi xóa/cập nhật nếu có |
+| `new_value` | JSONB | Metadata mới khi upload/cập nhật nếu có |
+| `ip_address` | INET | IP request (tùy chọn) |
+| `created_at` | TIMESTAMPTZ | Timestamp ghi log |
+
+Quyết định audit:
+
+* Hành động Upload/Delete NÊN được ghi log trong sprint này.
+* Hành động Edit NÊN được ghi log chỉ khi team thêm `resource_updated` vào enum `log_action`.
+* Schema hiện tại không yêu cầu migration database cho việc implement Content Library cơ bản.
+
+### Quy tắc File
+
+| Loại tài nguyên | Extension | MIME Types | Kích thước tối đa |
+|---|---|---|---:|
+| PDF | `.pdf` | `application/pdf` | 20MB |
+| Audio | `.mp3` | `audio/mpeg` | 100MB |
+| Audio | `.wav` | `audio/wav`, `audio/x-wav` | 100MB |
+| Audio | `.m4a` | `audio/mp4`, `audio/m4a` | 100MB |
+
+Thay đổi database:
+
+* Không cần thay đổi schema database bắt buộc cho việc implement sprint.
+* Các cột tùy chọn trong tương lai: `mime_type`, `original_file_name`, `stored_file_name`, `download_count`, `category`, `deleted_at`, `deleted_by`.
+
+---
+
+## 8. Yêu cầu phi chức năng
+
+* **Hiệu năng:** API danh sách thư viện phải có thời gian phản hồi < 300ms p95 khi có ít hơn 1000 tài nguyên đã published.
+* **Hiệu năng tải xuống:** Endpoint tải xuống nên bắt đầu streaming hoặc redirect trong vòng 5 giây nếu file tồn tại và quyền hợp lệ.
+* **Bảo mật:** Backend BẮT BUỘC kiểm tra extension và MIME type thật. Chỉ kiểm tra extension là không đủ.
+* **Bảo mật storage:** Backend KHÔNG ĐƯỢC expose đường dẫn server vật lý trực tiếp cho frontend.
+* **Phân quyền:** API quản lý yêu cầu `tutor` hoặc `admin`. Phải từ chối Student/Guest truy cập.
+* **An toàn dữ liệu:** Thao tác insert metadata file và lưu file phải được xử lý an toàn. Nếu insert metadata thất bại sau khi lưu file thành công, backend NÊN dọn dẹp file mồ côi.
+* **Khả năng mở rộng:** File thật nên lưu trong local/cloud object storage. PostgreSQL chỉ lưu metadata.
+* **Khả năng kiểm tra:** Hành động upload và delete NÊN được ghi lại trong `audit_logs`.
+
+---
+
+## 9. Ma trận xử lý lỗi
+
+| Mã lỗi | HTTP Status | Thông báo (Client) | Hành vi retry |
+|---|---:|---|---|
+| `LIB_UPLOAD_001` | 400 | "Thiếu thông tin tài nguyên bắt buộc." | Thử lại với metadata đầy đủ. |
+| `LIB_UPLOAD_002` | 415 | "Loại file không được hỗ trợ." | Thử lại với file PDF hoặc audio được hỗ trợ. |
+| `LIB_UPLOAD_003` | 400 | "Nội dung file upload không khớp với extension." | Thử lại với file hợp lệ. |
+| `LIB_UPLOAD_004` | 413 | "Kích thước file vượt quá giới hạn cho phép." | Thử lại với file nhỏ hơn. |
+| `LIB_AUTH_001` | 401 | "Vui lòng đăng nhập để tải tài nguyên này." | Đăng nhập và thử lại. |
+| `LIB_PERM_001` | 403 | "Bạn không có quyền quản lý tài nguyên thư viện." | Không retry nếu không có role phù hợp. |
+| `LIB_RES_001` | 404 | "Không tìm thấy tài nguyên." | Kiểm tra ID tài nguyên hoặc trạng thái published. |
+| `LIB_STORE_001` | 500 | "Không thể lưu file đã upload. Vui lòng thử lại sau." | Thử lại sau. |
+| `LIB_DB_001` | 500 | "Không thể lưu metadata tài nguyên." | Thử lại sau; dọn file mồ côi nếu cần. |
+
+---
+
+## 10. Các trường hợp ngoại lệ (Edge Cases)
+
+* **File giả mạo extension:** File đặt tên `material.pdf` nhưng thực chất là file executable. Backend phải kiểm tra MIME type thật.
+* **Tải xuống tài nguyên đã unpublish:** Student có thể dùng URL tải xuống cũ sau khi Tutor unpublish tài nguyên. Backend phải kiểm tra lại `is_published = TRUE`.
+* **Tài khoản người upload bị xóa:** Nếu tài khoản người upload bị xóa, `uploaded_by` trở thành NULL. Tài nguyên vẫn nên khả dụng nếu còn published.
+* **File mồ côi trong storage:** File lưu thành công nhưng insert DB thất bại. Backend nên xóa file khỏi storage.
+* **Tiêu đề trùng lặp:** Nhiều tài nguyên có thể có cùng tiêu đề. Hệ thống không nên dùng tiêu đề làm định danh duy nhất.
+* **Upload audio dung lượng lớn:** File audio có thể lớn hơn nhiều so với PDF. Hệ thống phải áp dụng giới hạn kích thước khác nhau theo loại tài nguyên.
+* **Cập nhật/xóa đồng thời:** Nếu Tutor A chỉnh sửa trong khi Tutor B xóa cùng một tài nguyên, backend phải xử lý trạng thái cuối nhất quán.
+* **Lộ metadata với Guest:** Response cho Guest không nên expose URL tải xuống bị hạn chế nếu tải xuống yêu cầu xác thực.
+
+---
+
+## 11. Các phụ thuộc & điểm tích hợp
+
+* **Xác thực / RBAC:** Phụ thuộc vào `feat-auth-and-users` để có danh tính người dùng, role và trạng thái tài khoản active.
+* **Lưu trữ file:** Cần local storage hoặc cloud storage cho file PDF/Audio thật.
+* **Database:** Sử dụng bảng PostgreSQL `library_resources` và các bảng liên quan `users` / `audit_logs`.
+* **Audit Log:** Tích hợp với audit logging cho các hành động upload/delete tài nguyên.
+* **Frontend:** Trang thư viện Student, trang preview Guest, trang quản lý thư viện Tutor.
+
+---
+
+## 12. Yêu cầu kiểm thử
+
+### Unit Tests
+
+* Kiểm tra extension được phép: `.pdf`, `.mp3`, `.wav`, `.m4a`.
+* Kiểm tra extension bị từ chối: `.exe`, `.js`, `.zip`, các file nguy hiểm được đổi tên.
+* Kiểm tra giới hạn kích thước: PDF > 20MB bị từ chối; audio > 100MB bị từ chối.
+* Kiểm tra role guard: Student/Guest không thể upload/edit/delete.
+* Kiểm tra `resource_type` guard: `video` và `other` bị từ chối trong sprint này.
+
+### Integration Tests
+
+* Tutor upload PDF hợp lệ → file lưu + metadata insert vào `library_resources`.
+* Tutor upload audio hợp lệ → file lưu + metadata insert.
+* Student tải tài nguyên đã published → thành công.
+* Guest cố tải tài nguyên yêu cầu đăng nhập → HTTP 401.
+* Student cố truy cập tài nguyên chưa published → HTTP 404.
+* Tutor soft delete tài nguyên → `is_published = FALSE`.
+* Upload/delete tạo audit log nếu audit được bật.
+
+### Mục tiêu coverage
+
+* >= 80% cho module Content Library.
+* Tất cả các đường dẫn validation bảo mật phải có test.
+
+---
+
+## 13. Kế hoạch triển khai
+
+* Sử dụng schema PostgreSQL v2 hiện có.
+* Không cần migration nếu bảng `library_resources` hiện có được sử dụng cho sprint đầu tiên.
+* Cấu hình đường dẫn storage hoặc bucket trước khi bật upload.
+* Triển khai lên Staging với tài nguyên test trước.
+* Xác minh luồng upload/download/soft-delete/audit trước khi phát hành lên production.
+
+---
+
+## 14. Câu hỏi mở
+
+* **Q1: Quy tắc tải xuống Guest** — Guest có thể tải file mẫu, hay chỉ xem metadata?
+* **Q2: Quyết định Storage** — File được lưu trong local server storage hay cloud object storage?
+* **Q3: Trường Category** — Có nên phân loại tài nguyên theo loại kỹ năng IELTS: Reading, Listening, Writing, Speaking?
+* **Q4: Theo dõi lượt tải** — Hệ thống có nên thêm `download_count` cho analytics không?
+* **Q5: Quy tắc xóa vật lý** — Khi Tutor xóa tài nguyên, file vật lý có nên ở lại trong storage hay bị xóa?
+* **Q6: Preview công khai vs chỉ Student** — `is_published` có đủ không, hay hệ thống cần thêm trường visibility riêng?
+* **Q7: Audit hành động Edit** — Có nên thêm `resource_updated` vào enum database cho thao tác chỉnh sửa?
