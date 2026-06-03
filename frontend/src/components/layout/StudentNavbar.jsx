@@ -9,7 +9,7 @@ const StudentNavbar = () => {
   const handleLogout = async () => {
     try {
       await logout();
-      navigate('/login');
+      navigate('/');
     } catch (error) {
       console.error('Logout failed', error);
     }
@@ -47,10 +47,10 @@ const StudentNavbar = () => {
 
           <div className="d-flex align-items-center gap-3 mt-3 mt-lg-0">
             <div className="dropdown">
-              <button 
-                className="btn btn-light rounded-pill px-4 py-2 fw-medium border-0 d-flex align-items-center gap-2" 
-                type="button" 
-                data-bs-toggle="dropdown" 
+              <button
+                className="btn btn-light rounded-pill px-4 py-2 fw-medium border-0 d-flex align-items-center gap-2"
+                type="button"
+                data-bs-toggle="dropdown"
                 style={{ backgroundColor: '#efefef' }}
               >
                 {user?.avatar_url ? (

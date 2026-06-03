@@ -177,6 +177,56 @@ const upsertGoogleUser = async ({ provider_user_id, email, full_name, avatar_url
   }
 };
 
+/**
+ * Lists users with pagination and optional filters.
+ * EARS[Event]: WHEN listUsers is called, THE system SHALL return paginated users based on query parameters.
+ * @param {Object} filters
+ * @param {number} filters.page
+ * @param {number} filters.limit
+ * @param {string} [filters.role]
+ * @param {string} [filters.status]
+ * @returns {Promise<Object>} An object containing rows (users) and total (count)
+ */
+const listUsers = async ({ page, limit, role, status }) => {
+  const offset = (page - 1) * limit;
+  const values = [];
+  let whereClause = 'WHERE 1=1';
+  let paramIndex = 1;
+
+  if (role) {
+    whereClause += ` AND role = $${paramIndex}`;
+    values.push(role);
+    paramIndex++;
+  }
+
+  if (status) {
+    whereClause += ` AND status = $${paramIndex}`;
+    values.push(status);
+    paramIndex++;
+  }
+
+  const countQuery = `SELECT COUNT(*)::int AS total FROM users ${whereClause}`;
+  const dataQuery = `
+    SELECT * FROM users 
+    ${whereClause} 
+    ORDER BY created_at DESC 
+    LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
+  `;
+  
+  const countValues = [...values];
+  values.push(limit, offset);
+
+  const [countResult, dataResult] = await Promise.all([
+    pool.query(countQuery, countValues),
+    pool.query(dataQuery, values)
+  ]);
+
+  return {
+    rows: dataResult.rows,
+    total: countResult.rows[0].total
+  };
+};
+
 module.exports = {
   findUserByEmail,
   findUserById,
@@ -185,4 +235,5 @@ module.exports = {
   updateRole,
   updateStatus,
   upsertGoogleUser,
+  listUsers,
 };
