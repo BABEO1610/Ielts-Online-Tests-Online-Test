@@ -1,158 +1,160 @@
-# Phân hệ Tài khoản & Phân quyền (feat-auth-and-users) Spec
-# Owner: Huong Duong | Date: 2026-05-25
+# Feature: Identity & Access Management (feat-auth-and-users) — FULL SPECIFICATION
 
-## 1. Context & Goal
-- Feature này tồn tại để cung cấp cơ chế xác thực bảo mật và phân quyền truy cập cho toàn bộ hệ thống e-learning IELTS.
-- Giải quyết vấn đề bảo vệ tài nguyên (đề thi, tài liệu thư viện, dashboard chấm điểm) không bị truy cập trái phép, đồng thời lưu trữ thông tin tiến độ học tập cá nhân hóa cho từng Học viên.
+Status: **APPROVED** | Locked
+Author: Tech Lead Nguyen Ba Quang Minh | Tech Lead Approval: Nguyen Ba Quang Minh | Date: 2026-06-01
+Risk Level: **High** (Security Core)
+Related Specs: `.sdd/global/constitution.md`, `.sdd/shared_context.md`
 
-## 2. Actors & Roles
-- **Guest (Khách vãng lai):** Quyền xem trang chủ, xem danh mục đề thi, đăng ký tài khoản mới và yêu cầu đặt lại mật khẩu.
-- **Student (Học viên):** Quyền đăng nhập, cập nhật hồ sơ cá nhân (Target Band Score), làm bài thi và xem lịch sử học tập. Không có quyền truy cập vào chức năng của Tutor/Admin.
-- **Tutor (Giáo viên):** Quyền đăng nhập, truy cập dashboard chấm bài tự luận và quản lý thư viện tài liệu. Không có quyền truy cập dashboard Admin.
-- **Admin (Quản trị viên):** Quyền tối cao, quản lý danh sách user, kích hoạt/vô hiệu hóa tài khoản và thay đổi Role của các user khác. Admin không thể tự thay đổi Role của chính mình.
+## 1. Business Context & Goals
 
-> **Lưu ý implementation:** Role được lưu trực tiếp trên bảng `users` dưới dạng enum `user_role ('guest', 'student', 'tutor', 'admin')` — không có bảng `Roles` riêng.
+This feature acts as the core "Security Gateway" and "Identity Registry" for the entire IELTS e-learning platform.
+Goals:
 
-## 3. Functional Requirements (EARS Notation)
+* Provide robust authentication, registration, and password recovery mechanisms.
+* Protect the system against brute-force attacks and data breaches.
+* Manage multi-device user sessions effectively.
+* Provide comprehensive audit trails for all permission and account status changes.
 
-- **FR-01 (Đăng ký):** WHEN Guest gửi thông tin Đăng ký gồm Email (chưa tồn tại trong DB), Mật khẩu (tối thiểu 8 ký tự, có ít nhất 1 chữ số và 1 ký tự đặc biệt) và Tên hiển thị, THE Node.js system SHALL băm mật khẩu bằng Bcrypt (Salt Round = 10), lưu user mới vào PostgreSQL với `status = 'pending'` và `role = 'student'`. Backend phải validate lại toàn bộ các điều kiện này độc lập với Frontend.
+## 2. Stakeholders & User Personas
 
-- **FR-02 (Xác thực Email):** WHEN Guest click vào link xác thực gửi qua email trong vòng 24h, THE system SHALL cập nhật `status = 'active'` và ghi `email_verified_at = NOW()` vào bảng `users`, sau đó điều hướng về trang Đăng nhập. IF link đã hết hạn (quá 24h), THE system SHALL trả về trang thông báo lỗi kèm nút "Gửi lại email xác thực" và đánh dấu token cũ vô hiệu trong bảng `email_verification_tokens`. IF hệ thống gửi email thất bại (lỗi SMTP), THE system SHALL ghi log lỗi và trả về thông báo lỗi cho người dùng, cho phép thử lại sau 60 giây.
+* **User:** Unauthenticated user (Registration, Email Verification, Password Reset).
+* **Student:** Authenticated learner (Session management, Profile & Target Band Score updates).
+* **Tutor:** Content creator/grader (Login to Tutor workspace).
+* **Admin:** System administrator (Manage user lists, RBAC assignments, Lock/Unlock accounts, View Audit Logs).
 
-- **FR-03 (Đăng nhập):** WHEN User gửi đúng Email và Mật khẩu của tài khoản có `status = 'active'`, THE system SHALL sinh ra Access Token (JWT, hạn 15 phút) và Refresh Token (JWT, hạn 7 ngày), đặt cả hai vào HttpOnly Cookie và trả về thông tin user cùng role.
+## 3. User Stories (all paths)
 
-- **FR-04 (Chặn truy cập trái phép):** WHILE một Request được gửi tới các API yêu cầu quyền student/tutor/admin, THE Node.js Middleware SHALL giải mã JWT. IF JWT hết hạn => trả về HTTP 401. IF JWT không hợp lệ hoặc role không đủ quyền => trả về HTTP 403. Middleware phải kiểm tra thêm `status` của User trong DB tại mỗi request để đảm bảo tài khoản `inactive` hoặc `banned` không thể tiếp tục truy cập dù token còn hạn.
+* **USER-03:** As a Guest, I want to register a new account using Email/Password.
+* **USER-04:** As a Guest, I want to receive an email verification link after registration.
+* **USER-05:** As a Student/Tutor/Admin, I want to log in with Email/Password to access my dashboard.
+* **USER-06:** As a Guest, I want to reset my password via email.
+* **USER-09:** As a Student, I want to view and update my profile (Name, Avatar, Target Band Score).
+* **ADM-02:** As an Admin, I want to view and filter the list of all users.
+* **ADM-03:** As an Admin, I want to update and change roles of user accounts.
+* **ADM-04:** As an Admin, I want to activate, deactivate, or delete users.
+* **ADM-06:** As an Admin, I want to view system activity logs for sensitive actions.
 
-- **FR-05 (Refresh Token):** WHEN Access Token hết hạn và React gọi API `/api/auth/refresh` với Refresh Token hợp lệ, THE system SHALL kiểm tra `status` của User. IF `status = 'active'` => cấp Access Token mới. IF `status` khác `active` => từ chối, trả về HTTP 401 và buộc đăng nhập lại.
+## 4. Acceptance Criteria (EARS — exhaustive)
 
-- **FR-06 (Admin đổi Role):** WHEN Admin thực hiện thay đổi role của một User khác (không phải chính mình), THE system SHALL dùng transaction để cập nhật trường `role` trong bảng `users` và ghi vào `audit_logs` với `action = 'role_changed'`, `old_value`, `new_value`. IF có conflict (hai Admin cùng sửa một User), THE system SHALL dùng optimistic locking (kiểm tra `updated_at` timestamp trước khi ghi) và trả về HTTP 409 Conflict cho request đến sau.
+**Ubiquitous (Always true)**
 
-- **FR-07 (Reset Mật khẩu):** WHEN Guest yêu cầu đặt lại mật khẩu bằng Email, THE system SHALL tạo một Reset Token (hết hạn sau 1 giờ), lưu vào bảng `password_reset_tokens` và gửi link đến Email. WHEN Guest submit mật khẩu mới qua link hợp lệ, THE system SHALL cập nhật `password_hash` trong bảng `users`, đánh dấu `used_at = NOW()` trên token, và nếu `status = 'inactive'` (khóa do brute-force) thì tự động chuyển về `active`.
+* THE system SHALL hash all new passwords using the Argon2id algorithm; storing plain-text passwords is STRICTLY PROHIBITED.
+* THE system SHALL log all account state modifications (creation, role changes, deactivation) into the `audit_logs` table.
 
-- **FR-08 (Admin vô hiệu hóa tài khoản):** WHEN Admin vô hiệu hóa một User, THE system SHALL cập nhật `status = 'inactive'` trong bảng `users` và ghi vào `audit_logs` với `action = 'user_deactivated'`. Request tiếp theo của User đó sẽ bị Middleware từ chối tại bước kiểm tra `status`.
+**Event-driven (Triggered by events)**
 
-## 4. Non-functional Requirements
+* WHEN a Guest submits a Registration form (Email does not exist), THE system SHALL create a new user (`status = 'pending'`, `role = 'student'`), generate a token in `email_verification_tokens`, and send a verification email.
+* WHEN a Guest accesses a valid verification link (< 24h), THE system SHALL update `status = 'active'`, record `used_at = NOW()`, and redirect to the Login page.
+* WHEN a User submits valid credentials and the account is `active`, THE system SHALL call the DB function `handle_successful_login()`, create a new record in `user_sessions`, generate an Access Token & Refresh Token (linked to `session_token`), set them in HttpOnly Cookies, and return the user profile.
+* WHEN a User calls the Logout API, THE system SHALL update `revoked_at = NOW()` for the corresponding `user_sessions` record.
+* WHEN an Access Token expires and the Client calls the Refresh API with a valid Refresh Token, THE system SHALL check the user's `status`; if `active`, issue a new Access Token. Otherwise, reject with HTTP 401.
+* WHEN an Admin changes the Role or Status of another User, THE system SHALL update the `users` record and log the action into `audit_logs` (`old_value`, `new_value`).
+* WHEN a Guest requests a password reset, THE system SHALL create a Reset Token (expires in 1 hour) in `password_reset_tokens` and email the link.
+* WHEN a Guest submits a new password via a valid reset link, THE system SHALL update `password_hash` and set `used_at = NOW()`. If the user is `inactive` (due to brute-force), automatically switch `status` back to `active`.
+* WHEN a User requests a Profile update (`full_name`, `avatar_url`, `target_band_score`), THE system SHALL validate the input, update the `users` table, set `updated_at = NOW()`, and return the updated user object.
 
-- **Security:** Mật khẩu bắt buộc băm bằng Bcrypt, Salt Round = 10. Tuyệt đối không lưu plain-text. API đăng ký không được xác nhận email đã tồn tại trong thông báo lỗi công khai để tránh email enumeration attack (xem ER-01).
-- **Performance:** Response time của API Đăng nhập và JWT Middleware phải dưới 200ms trong điều kiện mạng bình thường.
-- **Token Storage:** Access Token và Refresh Token lưu trong HttpOnly Cookie với thuộc tính `Secure` và `SameSite=Strict` để chống XSS/CSRF.
-- **Rate Limiting:** Tất cả các endpoint xác thực (đăng nhập, refresh, reset mật khẩu) phải áp dụng rate limiting theo IP: tối đa 20 request/phút. Vượt ngưỡng trả về HTTP 429 Too Many Requests.
-- **Database:** PostgreSQL với extension `pgcrypto` (gen_random_uuid()). Toàn bộ timestamp dùng `TIMESTAMPTZ` và `NOW()`.
+**State-driven (Continuous conditions)**
 
-## 5. Data (PostgreSQL Schema)
+* WHILE a request passes through the Authenticated Middleware, THE system SHALL decode the JWT and match the `session_token` against `user_sessions`. If `revoked_at IS NOT NULL` OR `expires_at < NOW()` OR user `status != 'active'`, deny access (HTTP 401/403).
+* WHILE a user has `must_change_password = TRUE` in the DB, THE system SHALL block all business API requests and force-redirect the user to the Change Password endpoint.
 
-### Enum Types (liên quan đến auth)
+**Unwanted (Error handling)**
 
-```sql
-CREATE TYPE user_role      AS ENUM ('guest', 'student', 'tutor', 'admin');
-CREATE TYPE account_status AS ENUM ('pending', 'active', 'inactive', 'banned');
-```
+* WHERE a Guest registers with an already existing Email, THE system SHALL return HTTP 400 with a generic message "Registration failed" (Prevent Email Enumeration).
+* WHERE a User inputs an incorrect password, THE system SHALL call the DB function `handle_failed_login()`.
+* WHERE a User has `failed_login_attempts >= 5`, THE system SHALL lock the login flow for 15 minutes (based on `locked_until`) and return HTTP 429 Too Many Requests.
+* WHERE a User changes their password to one that matches their last 3 hashes in `password_history`, THE system SHALL return HTTP 400 "Password has been used recently".
+* WHERE a User submits a `target_band_score` outside [0.0, 9.0] or not divisible by 0.5, THE system SHALL return HTTP 400.
+* WHERE a User successfully logs in but already has >= 3 active sessions, THE system SHALL automatically set `revoked_at = NOW()` for the oldest session (based on `last_active_at`) before creating a new session.
 
-> **Mapping trạng thái:**
-> - `pending` — mới đăng ký, chưa xác thực email
-> - `active` — tài khoản hoạt động bình thường
-> - `inactive` — bị khóa tạm thời (brute-force) hoặc Admin khóa thủ công
-> - `banned` — bị cấm vĩnh viễn bởi Admin
+## 5. API Contracts (full OpenAPI schema)
 
-### Table `users`
+* `POST /api/v1/auth/register` (Body: email, password, full_name) -> 201 Created
+* `POST /api/v1/auth/verify-email` (Body: token) -> 200 OK
+* `POST /api/v1/auth/login` (Body: email, password) -> 200 OK (Set-Cookie)
+* `POST /api/v1/auth/logout` -> 204 No Content
+* `POST /api/v1/auth/refresh` -> 200 OK
+* `POST /api/v1/auth/forgot-password` (Body: email) -> 200 OK
+* `PUT /api/v1/auth/reset-password` (Body: token, new_password) -> 200 OK
+* `PATCH /api/v1/users/me` (Body: full_name, avatar_url, target_band_score) -> 200 OK
+* `GET /api/v1/admin/users` (Query: page, limit, role, status) -> 200 OK (Requires Admin Role)
+* `PATCH /api/v1/admin/users/:id/role` (Body: role) -> 200 OK (Requires Admin Role)
+* `PATCH /api/v1/admin/users/:id/status` (Body: status) -> 200 OK (Requires Admin Role)
 
-```sql
-CREATE TABLE users (
-    id                  UUID            PRIMARY KEY DEFAULT gen_random_uuid(),
-    email               VARCHAR(255)    NOT NULL UNIQUE,
-    password_hash       TEXT            NOT NULL,
-    role                user_role       NOT NULL DEFAULT 'student',
-    status              account_status  NOT NULL DEFAULT 'pending',
-    full_name           VARCHAR(255),
-    avatar_url          TEXT,
-    target_band_score   NUMERIC(3,1)    CHECK (target_band_score BETWEEN 0 AND 9),
-    email_verified_at   TIMESTAMPTZ,
-    created_at          TIMESTAMPTZ     NOT NULL DEFAULT NOW(),
-    updated_at          TIMESTAMPTZ     NOT NULL DEFAULT NOW()
-);
-```
+## 6. Data Models & DB Schema Changes
 
-> **Lưu ý:** Validation bước nhảy 0.5 của `target_band_score` thực hiện ở tầng application (Backend), không phải CHECK constraint DB.
+The system utilizes the existing PostgreSQL v2 schema. AI Agents MUST strictly adhere to these data types and constraints:
 
-> **Lưu ý:** Brute-force counter (`failed_login_count`, `failed_login_window_start`) chưa có trong schema hiện tại — **cần bổ sung migration** trước khi implement FR-07/ER-02.
+**Enum Types (Mandatory):**
 
-### Table `email_verification_tokens`
+* `user_role`: 'user', 'student', 'tutor', 'admin'
+* `account_status`: 'pending', 'active', 'inactive', 'banned'
+* `password_change_reason`: 'user_initiated', 'reset_via_email', 'forced_default', 'admin_reset'
+* `log_action`: Includes security actions ('user_created', 'role_changed', 'login', 'login_failed', 'password_changed', etc.)
 
-```sql
-CREATE TABLE email_verification_tokens (
-    id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id     UUID        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    token       TEXT        NOT NULL UNIQUE,
-    expires_at  TIMESTAMPTZ NOT NULL,
-    used_at     TIMESTAMPTZ,
-    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-```
+**Core Tables (Auth & Identity):**
 
-### Table `password_reset_tokens`
+* `users`: Core identity table. Note: `password_hash` allows NULL (for OAuth readiness). Contains security control fields: `failed_login_attempts`, `locked_until`, `last_login_at`, and `must_change_password`.
+* `user_sessions`: Multi-device session management. Stores `session_token`, device info (`ip_address`, `user_agent`). Controls token lifecycle via `revoked_at` and `expires_at`.
+* `password_history`: Tracks old password hashes with `reason` and `changed_from_ip` (INET type) to prevent password reuse.
+* `email_verification_tokens` & `password_reset_tokens`: Manages email token lifecycles via the `used_at` field.
+* `audit_logs`: Append-only traceability table. Stores `old_value` and `new_value` as JSONB.
 
-```sql
-CREATE TABLE password_reset_tokens (
-    id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id     UUID        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    token       TEXT        NOT NULL UNIQUE,
-    expires_at  TIMESTAMPTZ NOT NULL,
-    used_at     TIMESTAMPTZ,
-    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-```
+**Database Functions & Triggers (Brute-force logic):**
 
-### Table `audit_logs` (liên quan đến auth)
+* The Application Layer (Node.js/Backend) MUST NOT calculate failed login increments manually.
+* WHERE a User inputs an incorrect password, Backend MUST call DB Function: `handle_failed_login(p_user_id)`.
+* WHERE a User logs in successfully, Backend MUST call DB Function: `handle_successful_login(p_user_id)` to reset counters and update `last_login_at`.
+* The `set_updated_at()` trigger is already attached to the `users` table; Backend does not need to manually update the `updated_at` field.
 
-```sql
-CREATE TABLE audit_logs (
-    id              UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
-    actor_id        UUID        REFERENCES users(id) ON DELETE SET NULL,
-    action          log_action  NOT NULL,  -- 'role_changed', 'user_deactivated', 'login', 'logout'
-    target_table    VARCHAR(100),
-    target_id       UUID,
-    old_value       JSONB,
-    new_value       JSONB,
-    ip_address      INET,
-    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-```
+**Supporting Views:**
 
-### Migration cần bổ sung (chưa có trong schema hiện tại)
+* `v_active_sessions`: API can query this view to fetch currently valid sessions (`revoked_at IS NULL` and `expires_at > NOW()`) for the "View active devices" feature.
 
-```sql
--- Phục vụ ER-02 (brute-force protection)
-ALTER TABLE users
-    ADD COLUMN failed_login_count        INT         NOT NULL DEFAULT 0,
-    ADD COLUMN failed_login_window_start TIMESTAMPTZ;
-```
+## 7. Non-Functional Requirements
 
-## 6. Error Handling
+* **Performance:** Login API response time must be < 200ms (p95).
+* **Security:** Tokens MUST be stored in HttpOnly, Secure, SameSite=Strict cookies. All Auth endpoints MUST enforce Rate Limiting (Max 20 req/min for Login).
+* **Scalability:** The JWT Middleware requires Redis Caching for session state (`revoked_at`) verification to prevent hitting PostgreSQL `user_sessions` on every request.
 
-- **ER-01 (Email trùng):** WHERE Guest đăng ký bằng Email đã tồn tại, THE system SHALL trả về HTTP 400 với message chung: "Đăng ký không thành công, vui lòng kiểm tra lại thông tin." — không được xác nhận email đã tồn tại để tránh enumeration attack.
+## 8. Error Handling Matrix
 
-- **ER-02 (Brute-force đăng nhập):** WHERE User nhập sai mật khẩu 5 lần liên tiếp trong cửa sổ 15 phút (tính theo `failed_login_window_start`), THE system SHALL cập nhật `status = 'inactive'`, reset `failed_login_count = 0`, ghi `audit_logs` và gửi email hướng dẫn reset mật khẩu. Sau khi reset mật khẩu thành công, `status` tự động chuyển về `active`.
+| Error Code | HTTP Status | Message (Client) | Retry Behavior |
+| --- | --- | --- | --- |
+| `AUTH_REG_001` | 400 | "Registration failed. Please try again." | Allow retry with different email. |
+| `AUTH_LOG_001` | 401 | "Incorrect email or password." | Allow retry. |
+| `AUTH_LOG_002` | 429 | "Account temporarily locked due to multiple failed attempts. Try again in 15 minutes." | Retry after `locked_until` expires. |
+| `AUTH_SES_001` | 401 | "Session expired." | Client calls Refresh API. |
+| `AUTH_PWD_001` | 400 | "This password has been used recently." | Force new password input. |
+| `AUTH_PERM_001` | 403 | "You do not have permission to perform this action." | Do not retry. |
+| `AUTH_PROF_001` | 400 | "Target Band Score must be between 0 and 9, in 0.5 increments." | Retry with valid input. |
 
-- **ER-03 (Token hết hạn):** WHERE Access Token hết hạn, THE system SHALL trả về HTTP 401. React tự động gọi `/api/auth/refresh`. Nếu Refresh Token cũng hết hạn, hệ thống trả về HTTP 401 và buộc User đăng nhập lại.
+## 9. Edge Cases & Corner Cases
 
-- **ER-04 (Link xác thực hết hạn):** WHERE Guest click link xác thực email đã quá 24h, THE system SHALL trả về trang lỗi với thông báo rõ ràng và nút "Gửi lại email xác thực". Ghi `used_at = NOW()` để vô hiệu hóa token cũ trong bảng `email_verification_tokens`.
+* **Admin Self-Locking Prevention:** Backend logic MUST explicitly check `actor_id != target_id` during role/status update APIs. Return HTTP 403 if an Admin attempts to modify their own role/status.
+* **Concurrent Logins (Max Sessions):** Max 3 active devices per user. A 4th successful login MUST auto-revoke the oldest session (based on `last_active_at`) before creating the new session.
+* **Email Enumeration Mitigation:** Intentionally submitting an already existing Email to the Forgot Password API MUST still return 200 OK without actually sending an email (or sending a notice email indicating the account exists).
 
-## 7. Acceptance Criteria (Testable Checklist)
+## 10. Dependencies & Integration Points
 
-- [ ] Guest đăng ký thành công => DB có bản ghi `status = 'pending'`, `email_verified_at = NULL`, `password_hash` đã được hash.
-- [ ] Guest click link xác thực hợp lệ => `status = 'active'`, `email_verified_at` được ghi giá trị timestamp.
-- [ ] Dùng tài khoản `pending` hoặc `inactive` đăng nhập => HTTP 401, không cấp JWT.
-- [ ] Student truy cập URL của trang Admin => React Router chặn, đẩy về `/403`.
-- [ ] Admin vô hiệu hóa một Tutor => `status = 'inactive'` trong DB, `audit_logs` có bản ghi `action = 'user_deactivated'`; request tiếp theo của Tutor đó bị Middleware từ chối dù Access Token chưa hết hạn.
-- [ ] Nhập mật khẩu không đủ điều kiện khi đăng ký => Frontend báo lỗi ngay; nếu bypass Frontend, Backend cũng từ chối với HTTP 400.
-- [ ] Nhập sai mật khẩu 5 lần trong 15 phút => `status = 'inactive'`, email hướng dẫn được gửi đi.
-- [ ] Reset mật khẩu thành công khi đang `inactive` (do brute-force) => `status` chuyển về `active`, `used_at` được ghi trên token reset.
-- [ ] Admin thay đổi role của User => trường `role` được cập nhật, `audit_logs` có bản ghi `action = 'role_changed'` với `old_value` và `new_value`.
-- [ ] Admin thử tự đổi role của chính mình => HTTP 403, không có thay đổi nào trong DB.
-- [ ] `target_band_score` nhập giá trị ngoài khoảng 0–9 hoặc không phải bước 0.5 => HTTP 400.
-- [ ] Link xác thực email click lần 2 sau khi đã dùng => HTTP 400, `used_at` đã có giá trị.
+* **Email Service (SMTP/SendGrid/SES):** External dependency for token delivery. Requires Timeout and Fallback mechanisms (e.g., if SMTP is down, API must catch the error, log it, and prompt the user gracefully).
+* **Redis (Cache Layer):** Middleware integration point. Valid session lookups should hit Redis first before falling back to PostgreSQL.
 
-## 8. Out of Scope
+## 11. Testing Requirements
 
-- KHÔNG làm Đăng nhập/Đăng ký bằng Google, Facebook hoặc Apple ID trong sprint này.
-- KHÔNG làm xác thực 2 lớp (2FA).
+* **Unit Tests:** Password hashing utilities, JWT generation/decoding, Role-check Middleware.
+* **Integration Tests:** - Mock Email Service for the Register -> Verify flow.
+* Intentional 5x wrong password inputs -> Verify HTTP 429 and `locked_until` DB field update.
+* Session limit test: Create 3 mock sessions -> call login -> verify session 1 is revoked.
+
+
+* **Coverage Target:** >= 85% for the Auth module.
+
+## 12. Rollout Plan
+
+* Greenfield deployment directly to Staging/Production using the v2 SQL schema.
+* No legacy data migration required.
+
+## 13. Open Questions (must resolve before implementation)
+* **Q1: [Session Limit]** — Owner: Tech Lead — Due: Resolved. Decision: Max 3 active Sessions/User. Oldest session auto-revoked upon limit breach. (Incorporated into Sections 4 & 9).
+* **Q2: [Redis Setup]** — Owner: Backend Team — Due: Pre-Coding Phase. Will the Redis Cache system run on an internal container or utilize a Managed Cache service (e.g., ElastiCache)?
