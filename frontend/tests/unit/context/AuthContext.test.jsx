@@ -90,7 +90,7 @@ describe('AuthContext', () => {
     await waitFor(() => expect(screen.getByTestId('loading').textContent).toBe('done'));
     
     // Mock successful login
-    api.post.mockResolvedValueOnce({ data: { data: { user: { id: '2', full_name: 'Logged In User' } } } });
+    api.post.mockResolvedValueOnce({ data: { data: { id: '2', full_name: 'Logged In User' } } });
     
     act(() => {
       screen.getByTestId('btn-login').click();

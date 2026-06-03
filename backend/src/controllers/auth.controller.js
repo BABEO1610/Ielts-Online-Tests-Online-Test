@@ -277,15 +277,17 @@ const googleRedirect = (req, res, next) => {
 
     res.cookie('oauth_state', state, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
+      secure: req.secure || req.headers['x-forwarded-proto'] === 'https',
       sameSite: 'lax',
       maxAge: 15 * 60 * 1000, // 15 phút
       path: '/'
     });
 
     const clientId = process.env.GOOGLE_CLIENT_ID || 'dummy_client_id';
-    const redirectUri = `${process.env.BACKEND_URL || 'http://localhost:5000'}/api/v1/auth/google/callback`;
-    const url = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${redirectUri}&response_type=code&scope=email profile&state=${state}`;
+    const redirectUri = process.env.BACKEND_URL 
+      ? `${process.env.BACKEND_URL}/api/v1/auth/google/callback`
+      : `${req.protocol}://${req.get('host')}/api/v1/auth/google/callback`;
+    const url = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${redirectUri}&response_type=code&scope=email profile&state=${state}&prompt=select_account`;
 
     return res.redirect(url);
   } catch (error) {
@@ -301,7 +303,8 @@ const googleCallback = async (req, res, next) => {
 
     // Verify CSRF state token
     if (!state || state !== cookieState) {
-      const error = new Error('Invalid state parameter.');
+      console.error(`[OAuth] State mismatch! Query state: ${state}, Cookie state: ${cookieState}`);
+      const error = new Error('Invalid state parameter. Please ensure cookies are enabled and try again.');
       error.code = 'AUTH_OAUTH_001';
       error.statusCode = 400;
       throw error;
@@ -322,26 +325,24 @@ const googleCallback = async (req, res, next) => {
     const { user, tokens, is_new } = await authService.handleGoogleCallback(code, { ip: ipAddress, userAgent });
 
     // Set Cookies (giống hàm login)
+    const isSecure = req.secure || req.headers['x-forwarded-proto'] === 'https';
     res.cookie('accessToken', tokens.accessToken, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
+      secure: isSecure,
+      sameSite: 'lax',
       maxAge: 15 * 60 * 1000
     });
 
     res.cookie('refreshToken', tokens.refreshToken, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
+      secure: isSecure,
+      sameSite: 'lax',
       maxAge: 7 * 24 * 60 * 60 * 1000
     });
 
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
-    if (is_new) {
-      return res.redirect(`${frontendUrl}/onboarding`);
-    } else {
-      return res.redirect(`${frontendUrl}/dashboard`);
-    }
+    // Consistent with local login: always redirect to dashboard
+    return res.redirect(`${frontendUrl}/dashboard`);
   } catch (error) {
     next(error);
   }

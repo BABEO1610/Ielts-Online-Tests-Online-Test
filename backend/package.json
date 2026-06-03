@@ -12,7 +12,8 @@
     "dev": "nodemon src/app.js",
     "test": "jest --runInBand",
     "test:coverage": "jest --runInBand --coverage",
-    "lint": "eslint src/ tests/ --ext .js"
+    "lint": "eslint src/ tests/ --ext .js",
+    "migrate": "node scripts/migrate.js"
   },
   "dependencies": {
     "bcrypt": "^6.0.0",

@@ -7,10 +7,12 @@ import Login from './pages/Login';
 import RegisterPage from './pages/RegisterPage';
 import ForgotPwdPage from './pages/ForgotPwdPage';
 import ResetPwdPage from './pages/ResetPwdPage';
+import OnboardingPage from './pages/OnboardingPage';
 
 // Protected Pages
 import UserProfilePage from './pages/UserProfilePage';
 import AdminDashboard from './pages/AdminDashboard';
+import Dashboard from './pages/Dashboard';
 
 import './App.css';
 
@@ -24,11 +26,13 @@ function App() {
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/forgot-password" element={<ForgotPwdPage />} />
         <Route path="/reset-password" element={<ResetPwdPage />} />
+        <Route path="/onboarding" element={<OnboardingPage />} />
 
         {/* Protected Routes */}
         {/* TODO: Wrap with <ProtectedRoute> in the upcoming Authentication integration task */}
         <Route path="/profile" element={<UserProfilePage />} />
         <Route path="/admin" element={<AdminDashboard />} />
+        <Route path="/dashboard" element={<Dashboard />} />
 
         {/* Fallback 404 Route */}
         <Route

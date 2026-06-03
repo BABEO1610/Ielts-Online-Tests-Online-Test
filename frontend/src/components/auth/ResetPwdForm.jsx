@@ -69,27 +69,27 @@ const ResetPwdForm = () => {
   };
 
   return (
-    <div className="w-100" style={{ maxWidth: '400px' }}>
-      <h2 className="text-center mb-4 fw-bold">Đặt lại mật khẩu</h2>
+    <div className="w-100">
+      <h2 className="display-xl text-center mb-xl">Đặt lại mật khẩu</h2>
       
       {successMsg && (
-        <div className="alert alert-success" role="alert" data-testid="success-alert">
+        <div className="api-success-message" role="alert" data-testid="success-alert">
           {successMsg}
         </div>
       )}
       
       {errorMsg && (
-        <div className="alert alert-danger" role="alert" data-testid="error-alert">
+        <div className="api-error-message" role="alert" data-testid="error-alert">
           {errorMsg}
         </div>
       )}
 
       <form onSubmit={handleSubmit} noValidate>
-        <div className="mb-3">
-          <label className="form-label text-secondary fw-semibold">Mật khẩu mới</label>
+        <div className="mb-lg">
+          <label className="form-label">Mật khẩu mới</label>
           <input
             type="password"
-            className={`form-control py-2 ${!isPasswordStrong ? 'is-invalid' : ''}`}
+            className={`text-input ${!isPasswordStrong ? 'error' : ''}`}
             placeholder="Nhập mật khẩu mới (tối thiểu 8 ký tự)"
             value={password}
             onChange={(e) => {
@@ -101,17 +101,17 @@ const ResetPwdForm = () => {
             data-testid="password-input"
           />
           {!isPasswordStrong && (
-            <div className="invalid-feedback" data-testid="password-strength-error">
+            <div className="error-message" data-testid="password-strength-error">
               Mật khẩu phải có ít nhất 8 ký tự.
             </div>
           )}
         </div>
 
-        <div className="mb-4">
-          <label className="form-label text-secondary fw-semibold">Xác nhận mật khẩu</label>
+        <div className="mb-xl">
+          <label className="form-label">Xác nhận mật khẩu</label>
           <input
             type="password"
-            className={`form-control py-2 ${!isPasswordMatch ? 'is-invalid' : ''}`}
+            className={`text-input ${!isPasswordMatch ? 'error' : ''}`}
             placeholder="Nhập lại mật khẩu mới"
             value={confirmPassword}
             onChange={(e) => {
@@ -123,7 +123,7 @@ const ResetPwdForm = () => {
             data-testid="confirm-password-input"
           />
           {!isPasswordMatch && (
-            <div className="invalid-feedback" data-testid="password-mismatch-error">
+            <div className="error-message" data-testid="password-mismatch-error">
               Mật khẩu xác nhận không khớp.
             </div>
           )}
@@ -131,7 +131,7 @@ const ResetPwdForm = () => {
 
         <button
           type="submit"
-          className="btn btn-primary w-100 rounded-pill py-3 fw-bold mb-3"
+          className="button-primary mb-md"
           disabled={loading || !token || !isPasswordMatch || !isPasswordStrong || password.length === 0 || successMsg !== ''}
           data-testid="submit-btn"
         >

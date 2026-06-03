@@ -15,8 +15,8 @@ const AppError = require('../utils/AppError'); // Giả định AppError đã đ
  */
 const authenticate = async (req, res, next) => {
   try {
-    // 1. Đọc access_token từ Cookie
-    const token = req.cookies?.access_token;
+    // 1. Đọc access_token từ Cookie (chú ý: cookie được set là accessToken)
+    const token = req.cookies?.accessToken || req.cookies?.access_token;
 
     if (!token) {
       throw new AppError('Unauthorized: No access token provided', 401, 'AUTH_LOG_001');

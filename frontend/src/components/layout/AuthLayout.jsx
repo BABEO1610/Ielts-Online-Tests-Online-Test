@@ -9,16 +9,10 @@ import PropTypes from 'prop-types';
  */
 const AuthLayout = ({ children }) => {
   return (
-    <div className="min-vh-100 d-flex align-items-center justify-content-center bg-white py-5">
-      <div className="container">
-        <div className="row justify-content-center">
-          <div className="col-12 col-md-8 col-lg-6 col-xl-5">
-            <div className="card shadow-sm rounded-3 border-0 bg-light">
-              <div className="card-body p-4 p-md-5">
-                {children}
-              </div>
-            </div>
-          </div>
+    <div className="auth-container">
+      <div className="auth-card-wrapper">
+        <div className="card-content">
+          {children}
         </div>
       </div>
     </div>

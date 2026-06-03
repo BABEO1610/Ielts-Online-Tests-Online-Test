@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
+import StudentNavbar from '../components/layout/StudentNavbar';
 
 const UserProfilePage = () => {
   const { user, refreshUser } = useAuth();
@@ -69,8 +70,10 @@ const UserProfilePage = () => {
   if (!user) return <div className="p-5 text-center">Đang tải thông tin...</div>;
 
   return (
-    <div className="container py-5">
-      <div className="row justify-content-center">
+    <div className="bg-white min-vh-100 pb-5">
+      <StudentNavbar />
+      <div className="container py-5">
+        <div className="row justify-content-center">
         <div className="col-md-8 col-lg-6">
           <div className="card shadow-sm border-0 rounded-4 p-4">
             <h2 className="fw-bold mb-4 border-bottom pb-3">Hồ sơ cá nhân</h2>
@@ -153,6 +156,7 @@ const UserProfilePage = () => {
           </div>
         </div>
       </div>
+    </div>
     </div>
   );
 };
