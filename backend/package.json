@@ -1,0 +1,56 @@
+{
+  "name": "ieltszone-backend",
+  "version": "0.1.0",
+  "description": "IELTSZone — REST API backend (Node.js 20 + Express 5.x)",
+  "main": "src/app.js",
+  "engines": {
+    "node": ">=20.0.0",
+    "npm": ">=10.0.0"
+  },
+  "scripts": {
+    "start": "node src/app.js",
+    "dev": "nodemon src/app.js",
+    "test": "jest --runInBand",
+    "test:coverage": "jest --runInBand --coverage",
+    "lint": "eslint src/ tests/ --ext .js"
+  },
+  "dependencies": {
+    "bcrypt": "^6.0.0",
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "express-rate-limit": "^8.5.2",
+    "express-validator": "^7.3.2",
+    "ioredis": "^5.11.0",
+    "jsonwebtoken": "^9.0.3",
+    "nodemailer": "^8.0.10",
+    "pg": "^8.21.0",
+    "winston": "^3.11.0"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "nodemailer-mock": "^2.0.11",
+    "supertest": "^7.2.2"
+  },
+  "jest": {
+    "rootDir": "..",
+    "testEnvironment": "node",
+    "testMatch": [
+      "<rootDir>/tests/**/*.test.js",
+      "<rootDir>/backend/tests/**/*.test.js"
+    ],
+    "moduleDirectories": [
+      "node_modules",
+      "<rootDir>/backend/node_modules"
+    ],
+    "coverageDirectory": "<rootDir>/backend/coverage",
+    "coverageThreshold": {
+      "global": {
+        "lines": 80,
+        "functions": 80,
+        "branches": 80
+      }
+    }
+  }
+}
