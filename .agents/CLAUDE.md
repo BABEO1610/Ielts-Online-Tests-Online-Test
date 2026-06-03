@@ -1,116 +1,83 @@
-# CLAUDE.md — Claude Code Project Memory
-# Project: IELTSZone | Updated: 2026-05-25
-# Đọc AGENTS.md trước để hiểu full project context và tech stack.
+# CLAUDE.md — IELTSZone v1.0
 
----
+## TL;DR (Đọc trước — 60 giây)
+> Đây là nền tảng luyện thi IELTS trực tuyến hỗ trợ chấm bài bằng AI hoặc giáo viên.
+> Backend: Node.js 20 + Express + PostgreSQL. Frontend: React 18 + Vite.
+> AI Integration: Chấm Writing/Speaking qua External LLM API (Claude/OpenAI).
+> Realtime: Socket.io cho luồng thông báo điểm AI.
 
-## MANUAL MEMORY (human-maintained — do not auto-overwrite)
+## KIẾN TRÚC HỆ THỐNG
 
-### Architecture Decision Records (ADR)
+### Các phân hệ chính:
+| Phân hệ | Môi trường | Mô tả | Thư mục |
+|---------|------------|-------|---------|
+| backend-api | Node.js | Xử lý logic, DB, gọi AI grading | `/src/backend` |
+| frontend-web | React | Giao diện người dùng (Học viên/Giáo viên) | `/src/frontend` |
 
-# ADR-001: Dùng Raw SQL (pg) thay vì ORM
-# Lý do: Team muốn kiểm soát hoàn toàn query performance cho các truy vấn
-#         phức tạp (leaderboard, analytics, grading history).
-#         Trade-off: Phải tự viết migration scripts và quản lý schema thủ công.
+### Flow xử lý chấm bài AI (Writing/Speaking):
+User nộp bài → API Gateway (Express) → Lưu DB tạm trạng thái "pending"
+→ `grading.service.js` gọi External LLM (gửi Prompt + Data)
+→ Xử lý kết quả trả về (Parse JSON) → Cập nhật DB trạng thái "graded"
+→ Socket.io push notification về Client.
 
-# ADR-002: Tách AI Grading thành service riêng (src/ai/grading.service.js)
-# Lý do: Dễ swap LLM provider (Claude → OpenAI hoặc ngược lại) mà không
-#         ảnh hưởng business logic. Cũng dễ mock khi viết unit test.
+## QUYẾT ĐỊNH KIẾN TRÚC QUAN TRỌNG (ADR)
 
-# ADR-003: Response format chuẩn { success, data, error, meta } cho mọi API
-# Lý do: Frontend team có thể viết interceptor chung, giảm boilerplate.
+### ADR-001: Dùng Raw SQL (pg) thay vì ORM
+Lý do: Kiểm soát hoàn toàn query performance cho truy vấn phức tạp (leaderboard, analytics, grading history).
+Trade-off: Phải tự viết migration scripts và quản lý schema thủ công.
 
-# ADR-004: Auth method chưa được chốt — placeholder là JWT
-# Action required: Team cần quyết định trước Sprint 2.
-#                  Options: (a) JWT thuần, (b) JWT + Google OAuth,
-#                           (c) Supabase Auth (managed).
+### ADR-002: Tách AI Grading thành service riêng (src/backend/src/ai/)
+Lý do: Dễ swap LLM provider (Claude → OpenAI hoặc ngược lại) mà không ảnh hưởng business logic.
+Trade-off: Cần bảo trì các prompt riêng biệt cho từng LLM provider nếu cấu trúc API thay đổi.
 
-# ADR-005: File upload lưu local trước, có thể migrate sang S3 sau
-# Lý do: Đơn giản cho giai đoạn dev. Khi production, cần chuyển sang
-#         object storage (Cloudflare R2 hoặc AWS S3).
+### ADR-003: Response format chuẩn cho mọi API
+Lý do: Frontend team có thể viết interceptor chung, giảm boilerplate code.
+Format: `{ success, data, error, meta }`.
 
----
+### ADR-004: File upload lưu local trước
+Lý do: Đơn giản và nhanh chóng cho giai đoạn development.
+Trade-off: Khi lên production, bắt buộc phải migrate sang object storage (Cloudflare R2 / AWS S3).
 
-### Lessons Learned
+## PATTERNS ĐƯỢC SỬ DỤNG
 
-# LESSON-001: Parameterized query PHẢI dùng $1, $2 — không bao giờ template literal
-#             cho user input. Đã từng bị SQL injection trong mock test.
+### DB Query Pattern:
+Tất cả DB access đi qua `/src/backend/db/queries/`.
+Export named async functions nhận `pool` (VD: `getSubmissionById(pool, id)`). Tuyệt đối không dùng ORM.
 
-# LESSON-002: AI Grading prompt phải bao gồm đủ 4 band descriptor tiêu chí IELTS.
-#             Nếu thiếu tiêu chí, model trả về band score không nhất quán.
+### Controller Pattern:
+Chỉ handle HTTP (parse request, gọi service, format response).
+Luôn dùng `try-catch` và gọi `next(error)` khi có lỗi. Centralized error handling tại middleware.
 
-# LESSON-003: File upload cần validate MIME type bằng `file-type` package
-#             (không chỉ dựa vào extension) — tránh upload file giả mạo.
+### AI Guardrails:
+Luôn ép kiểu JSON từ nhà cung cấp LLM (`response_format: { type: "json_object" }`).
+Code xử lý bắt buộc phải bóc tách JSON bằng Regex/String Parsing và bọc trong try-catch, phòng trường hợp LLM trả về text thừa.
 
-# LESSON-004: Speaking grading pipeline: audio → speech-to-text → text → LLM grade.
-#             Bước STT phải timeout sau 30s để tránh treo request.
-
----
-
-### Business Logic & Domain Rules (Đã chuyển về thư mục .sdd/)
-
-# ⚠️ QUAN TRỌNG: File này CHỈ chứa luật công nghệ và quy chuẩn coding.
-# Để biết luật nghiệp vụ (IELTS Grading Criteria, User Roles, Business Rules), 
-# AI bắt buộc phải đọc file SPEC.md tương ứng nằm trong thư mục `.sdd/specs/`.
-
----
-
-### Current Sprint Notes
-
-# Sprint 1 — Foundation (đang chạy)
-# Goal: Setup cấu trúc project, DB schema, auth skeleton
-#
-# In Progress:
-#   - DB schema design (users, submissions, library_items, grading_results)
-#   - Project folder structure setup
-#   - Auth method decision (đang pending)
-#
-# Blocked:
-#   - Auth implementation chờ team chốt method (JWT vs OAuth)
-#
-# Next Sprint (Sprint 2):
-#   - Implement Writing submission + AI grading flow
-#   - Implement Library upload (teacher) + download (student)
-
----
-
-## PATTERNS TO FOLLOW
-
-# DB Query pattern (backend/src/db/queries/):
-#   - Mỗi module có file query riêng: submissions.queries.js, users.queries.js
-#   - Export named async functions, nhận pool từ db/pool.js
-#   - Ví dụ: export async function getSubmissionById(pool, id) { ... }
-
-# Service pattern (backend/src/services/):
-#   - Business logic thuần — không biết về HTTP (req/res)
-#   - Gọi query functions từ db/queries/
-#   - Ví dụ: export async function gradeWritingWithAI(submissionId, text) { ... }
-
-# Controller pattern (backend/src/controllers/):
-#   - Chỉ handle HTTP: parse req, call service, format response
-#   - Không chứa business logic
-#   - Luôn dùng try-catch và gọi next(error) khi có lỗi
-
-# AI Grading prompt pattern (backend/src/ai/prompts/):
-#   - Mỗi skill có file prompt riêng: writing-task1.prompt.js, speaking.prompt.js
-#   - Prompt phải bao gồm đủ 4 tiêu chí và yêu cầu JSON output
-
-# Frontend API call pattern (frontend/src/services/):
-#   - Dùng axios instance với base interceptor (auth header, error handling)
-#   - Không gọi fetch/axios trực tiếp trong component — luôn qua service layer
-
-# External LLM Integration Guardrail (backend/src/ai/):
-#   - Luôn sử dụng flag ép kiểu JSON của nhà cung cấp LLM (Ví dụ: response_format: { type: "json_object" }).
-#   - Code xử lý kết quả trả về của LLM bắt buộc phải có cơ chế bóc tách JSON (Regex hoặc String Parsing) và bọc trong try-catch, vì LLM có thể trả về text thừa ngoài cấu trúc JSON.
-#   - Nếu parse JSON thất bại, phải lưu trạng thái `grading_failed` để retry.
-
----
-
-## DB SCHEMA SNAPSHOT (cập nhật khi có migration mới)
-
-```sql
--- Core tables (draft — chưa finalize)
-users (id, email, password_hash, role, full_name, created_at)
-submissions (id, student_id, skill, task_type, content_url, status, submitted_at)
-grading_results (id, submission_id, grader_type, overall_band, criteria_scores jsonb, feedback text, graded_at)
-library_items (id, teacher_id, title, skill, level, file_url, mime_type, size_bytes, created_at)
+## NHỮNG GÌ ĐÃ KHÔNG HOẠT ĐỘNG (Lessons Learned)
+- [Security] Dùng template literal cho SQL → dính SQL Injection trong mock test. Chuyển sang BẮT BUỘC dùng parameterized query ($1, $2).
+- [AI Grading] Thiếu tiêu chí trong prompt → model trả về band score không nhất quán. Rút kinh nghiệm phải đưa đủ 4 tiêu chí IELTS Band Descriptor vào prompt.
+- [File Upload] Chỉ kiểm tra đuôi extension → dễ bị upload file giả mạo. Chuyển sang validate MIME type bằng package `file-type`.
+- [Speaking STT] Quá trình Speech-to-Text xử lý audio quá lâu → treo request. Phải set timeout 30s cho bước STT.
+## FILE STRUCTURE QUAN TRỌNG
+/backend
+  /src
+    /api          # Express routers — entry points
+    /controllers  # HTTP handlers — không có business logic thuần
+    /services     # Business logic — không có HTTP req/res
+    /db/queries   # Raw SQL queries (NO ORM)
+    /ai           # External LLM integrations & prompts
+    /middleware   # Centralized error handling & Auth
+  /test
+/frontend
+  /src
+    /assets       # Images, icons
+    /services     # API call pattern (Axios interceptors)
+    /components   # React components
+  /public         # Static files (favicon, icons)
+  /test
+/tests
+  /unit           # Unit tests (Isolated, mock DB/LLM)
+  /integration    # Cần DB thực tế
+/.agents          # AI Agent configuration
+/.sdd             # Spec-Driven Development files
+  /specs          # Feature specifications
+  /constraints    # Technical constraints
