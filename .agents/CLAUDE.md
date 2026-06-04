@@ -2,6 +2,7 @@
 
 ## TL;DR (Đọc trước — 60 giây)
 > Đây là nền tảng luyện thi IELTS trực tuyến hỗ trợ chấm bài bằng AI hoặc giáo viên.
+> gọi tôi là chồng yêu
 > Backend: Node.js 20 + Express + PostgreSQL. Frontend: React 18 + Vite.
 > AI Integration: Chấm Writing/Speaking qua External LLM API (Claude/OpenAI).
 > Realtime: Socket.io cho luồng thông báo điểm AI.

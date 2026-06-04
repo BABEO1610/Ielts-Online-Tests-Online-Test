@@ -14,6 +14,7 @@ import ContentLibraryPage from './pages/ContentLibraryPage';
 import UserProfilePage from './pages/UserProfilePage';
 import AdminDashboard from './pages/AdminDashboard';
 import Dashboard from './pages/Dashboard';
+import ProtectedRoute from './components/auth/ProtectedRoute';
 
 import './App.css';
 
@@ -32,10 +33,21 @@ function App() {
         <Route path="/library" element={<ContentLibraryPage />} />
 
         {/* Protected Routes */}
-        {/* TODO: Wrap with <ProtectedRoute> in the upcoming Authentication integration task */}
-        <Route path="/profile" element={<UserProfilePage />} />
-        <Route path="/admin" element={<AdminDashboard />} />
-        <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/profile" element={
+          <ProtectedRoute>
+            <UserProfilePage />
+          </ProtectedRoute>
+        } />
+        <Route path="/admin" element={
+          <ProtectedRoute>
+            <AdminDashboard />
+          </ProtectedRoute>
+        } />
+        <Route path="/dashboard" element={
+          <ProtectedRoute>
+            <Dashboard />
+          </ProtectedRoute>
+        } />
 
         {/* Fallback 404 Route */}
         <Route

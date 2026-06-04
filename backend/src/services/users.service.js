@@ -73,7 +73,136 @@ const updateProfile = async (userId, { fullName, avatarUrl, targetBandScore }) =
   return safeUser;
 };
 
+const AuditLogService = require('./audit.service');
+const sessionsQueries = require('../db/queries/sessions.queries');
+
+/**
+ * Lists users with pagination and filters.
+ * EARS[Event]: WHEN listUsers is called, THE system SHALL return paginated safe users based on query parameters.
+ * @param {string} actorRole - The role of the user requesting the list.
+ * @param {Object} filters
+ * @returns {Promise<Object>} Paginated users.
+ */
+const listUsers = async (actorRole, { page, limit, role, status }) => {
+  if (actorRole !== 'admin') {
+    const error = new Error('You do not have permission to perform this action.');
+    error.code = 'AUTH_PERM_001';
+    error.statusCode = 403;
+    throw error;
+  }
+  
+  const result = await usersQueries.listUsers({ page, limit, role, status });
+  
+  const safeUsers = result.rows.map(user => {
+    const { password_hash, ...safeUser } = user;
+    return safeUser;
+  });
+  
+  return {
+    users: safeUsers,
+    total: result.total,
+    page,
+    limit
+  };
+};
+
+/**
+ * Changes a user's role.
+ * EARS[Event]: WHEN an Admin changes the Role of another User, THE system SHALL update the users record and log the action.
+ * @param {string} actorId - The ID of the admin.
+ * @param {string} targetId - The ID of the user.
+ * @param {string} role - The new role.
+ * @returns {Promise<Object>} The updated user.
+ */
+const changeUserRole = async (actorId, targetId, role) => {
+  if (actorId === targetId) {
+    const error = new Error('Cannot change your own role');
+    error.code = 'AUTH_PERM_001';
+    error.statusCode = 403;
+    throw error;
+  }
+  
+  const oldUser = await usersQueries.findUserById(targetId);
+  if (!oldUser) {
+    const error = new Error('User not found');
+    error.code = 'NOT_FOUND';
+    error.statusCode = 404;
+    throw error;
+  }
+  
+  const updatedUser = await usersQueries.updateRole(targetId, role);
+  
+  // Revoke all sessions
+  await sessionsQueries.revokeAllSessionsForUser(targetId);
+  
+  // Log action
+  await AuditLogService.logAction(
+    actorId,
+    'role_changed',
+    'users',
+    targetId,
+    { role: oldUser.role },
+    { role: updatedUser.role },
+    null
+  );
+  
+  const { password_hash, ...safeUser } = updatedUser;
+  return safeUser;
+};
+
+/**
+ * Changes a user's status.
+ * EARS[Event]: WHEN an Admin changes the Status of another User, THE system SHALL update the users record and log the action.
+ * @param {string} actorId - The ID of the admin.
+ * @param {string} targetId - The ID of the user.
+ * @param {string} status - The new status.
+ * @returns {Promise<Object>} The updated user.
+ */
+const changeUserStatus = async (actorId, targetId, status) => {
+  if (actorId === targetId) {
+    const error = new Error('Cannot change your own status');
+    error.code = 'AUTH_PERM_001';
+    error.statusCode = 403;
+    throw error;
+  }
+  
+  const oldUser = await usersQueries.findUserById(targetId);
+  if (!oldUser) {
+    const error = new Error('User not found');
+    error.code = 'NOT_FOUND';
+    error.statusCode = 404;
+    throw error;
+  }
+  
+  const updatedUser = await usersQueries.updateStatus(targetId, status);
+  
+  // Revoke all sessions if deactivated/banned
+  if (status === 'inactive' || status === 'banned') {
+    await sessionsQueries.revokeAllSessionsForUser(targetId);
+  }
+  
+  // Log action
+  let actionName = 'user_updated';
+  if (status === 'inactive' || status === 'banned') actionName = 'user_deactivated';
+  
+  await AuditLogService.logAction(
+    actorId,
+    actionName,
+    'users',
+    targetId,
+    { status: oldUser.status },
+    { status: updatedUser.status },
+    null
+  );
+  
+  const { password_hash, ...safeUser } = updatedUser;
+  return safeUser;
+};
+
 module.exports = {
   getProfile,
   updateProfile,
+  listUsers,
+  changeUserRole,
+  changeUserStatus,
 };
