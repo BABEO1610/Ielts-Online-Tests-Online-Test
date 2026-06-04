@@ -3,7 +3,7 @@
  * @description Service for managing audit logs.
  */
 
-const pool = require('../db/pool');
+const { pool } = require('../db/pool');
 const { insertAuditLog } = require('../db/queries/audit.queries');
 
 class AppError extends Error {

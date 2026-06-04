@@ -348,6 +348,35 @@ const googleCallback = async (req, res, next) => {
   }
 };
 
+const changePasswordValidator = [
+  body('old_password')
+    .notEmpty().withMessage('Vui lòng nhập mật khẩu cũ')
+    .trim(),
+  body('new_password')
+    .notEmpty().withMessage('Vui lòng nhập mật khẩu mới')
+    .isLength({ min: 8 }).withMessage('Mật khẩu mới phải có ít nhất 8 ký tự'),
+  validate
+];
+
+const changePassword = async (req, res, next) => {
+  try {
+    const userId = req.user.id;
+    const { old_password, new_password } = req.body;
+    const ipAddress = req.ip || req.connection.remoteAddress;
+
+    const result = await authService.changePassword(userId, old_password, new_password, ipAddress);
+
+    return res.status(200).json({
+      success: true,
+      data: result,
+      error: null,
+      meta: null
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   validate,
   registerValidator,
@@ -363,5 +392,7 @@ module.exports = {
   resetPasswordValidator,
   resetPassword,
   googleRedirect,
-  googleCallback
+  googleCallback,
+  changePasswordValidator,
+  changePassword
 };

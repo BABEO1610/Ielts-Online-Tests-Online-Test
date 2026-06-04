@@ -2,11 +2,13 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import CreateTutorModal from '../admin/CreateTutorModal';
+import ChangePwdModal from '../profile/ChangePwdModal';
 
 const AdminNavbar = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [showTutorModal, setShowTutorModal] = useState(false);
+  const [showPwdModal, setShowPwdModal] = useState(false);
 
   const handleLogout = async () => {
     try {
@@ -50,6 +52,7 @@ const AdminNavbar = () => {
           </button>
           <ul className="dropdown-menu dropdown-menu-end rounded-4 shadow border-0 mt-2 p-2">
             <li><Link className="dropdown-item rounded-3 py-2" to="/profile">Hồ sơ cá nhân</Link></li>
+            <li><button className="dropdown-item rounded-3 py-2" onClick={() => setShowPwdModal(true)}>Đổi mật khẩu</button></li>
             <li><hr className="dropdown-divider" /></li>
             <li><button className="dropdown-item rounded-3 py-2 text-danger" onClick={handleLogout}>Đăng xuất</button></li>
           </ul>
@@ -63,6 +66,11 @@ const AdminNavbar = () => {
           // Buộc reload trang AdminDashboard để thấy danh sách mới
           window.location.reload();
         }}
+      />
+
+      <ChangePwdModal 
+        isOpen={showPwdModal}
+        onClose={() => setShowPwdModal(false)}
       />
     </nav>
   );

@@ -1,10 +1,12 @@
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import ChangePwdModal from '../profile/ChangePwdModal';
 
 const StudentNavbar = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const [showPwdModal, setShowPwdModal] = React.useState(false);
 
   const handleLogout = async () => {
     try {
@@ -65,6 +67,7 @@ const StudentNavbar = () => {
               <ul className="dropdown-menu dropdown-menu-end rounded-4 shadow border-0 mt-2 p-2">
                 <li><Link className="dropdown-item rounded-3 py-2" to="/profile">Hồ sơ cá nhân</Link></li>
                 <li><Link className="dropdown-item rounded-3 py-2" to="/history">Lịch sử làm bài</Link></li>
+                <li><button className="dropdown-item rounded-3 py-2" onClick={() => setShowPwdModal(true)}>Đổi mật khẩu</button></li>
                 <li><hr className="dropdown-divider" /></li>
                 <li><button className="dropdown-item rounded-3 py-2 text-danger" onClick={handleLogout}>Đăng xuất</button></li>
               </ul>
@@ -72,6 +75,11 @@ const StudentNavbar = () => {
           </div>
         </div>
       </div>
+      
+      <ChangePwdModal 
+        isOpen={showPwdModal}
+        onClose={() => setShowPwdModal(false)}
+      />
     </nav>
   );
 };

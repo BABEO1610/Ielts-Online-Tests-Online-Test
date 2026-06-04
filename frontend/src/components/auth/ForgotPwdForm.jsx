@@ -14,15 +14,11 @@ const ForgotPwdForm = () => {
     setLoading(true);
 
     try {
-      // EARS[Event]: WHEN a Guest requests a password reset...
       await api.post('/auth/forgot-password', { email });
     } catch (error) {
-      // Intentionally ignore error for anti-enumeration
       console.error('Forgot password error:', error);
     } finally {
       setLoading(false);
-      // EARS[Edge Case]: Mitigation - Anti-enumeration
-      // Luôn báo thành công dù API trả về kết quả ra sao
       setIsSubmitted(true);
     }
   };
@@ -30,11 +26,14 @@ const ForgotPwdForm = () => {
   if (isSubmitted) {
     return (
       <div className="w-100 text-center">
-        <h2 className="display-xl mb-md">Kiểm tra email</h2>
-        <div className="api-success-message" role="alert" data-testid="success-alert">
-          Nếu email <strong>{email}</strong> tồn tại trong hệ thống, bạn sẽ nhận được hướng dẫn đặt lại mật khẩu. Vui lòng kiểm tra hộp thư của bạn (bao gồm cả thư mục Spam).
+        <h2 className="fw-bold mb-3">Kiểm tra email</h2>
+        <div className="alert alert-success d-flex align-items-center mb-4 rounded-3 shadow-sm text-start" role="alert" data-testid="success-alert">
+          <i className="bi bi-check-circle-fill me-2 fs-4"></i>
+          <div>
+            Nếu email <strong>{email}</strong> tồn tại trong hệ thống, bạn sẽ nhận được hướng dẫn đặt lại mật khẩu. Vui lòng kiểm tra hộp thư của bạn (bao gồm cả thư mục Spam).
+          </div>
         </div>
-        <Link to="/login" className="button-secondary mt-lg">
+        <Link to="/login" className="btn btn-outline-dark btn-lg rounded-pill fw-bold shadow-sm w-100">
           Quay lại Đăng nhập
         </Link>
       </div>
@@ -43,18 +42,18 @@ const ForgotPwdForm = () => {
 
   return (
     <div className="w-100">
-      <h2 className="display-xl text-center mb-md">Quên mật khẩu?</h2>
-      <p className="body-md text-center mb-2xl" style={{ color: 'var(--body)' }}>
+      <h2 className="fw-bold text-center mb-2">Quên mật khẩu?</h2>
+      <p className="text-muted text-center mb-4">
         Nhập email liên kết với tài khoản của bạn để nhận hướng dẫn đặt lại mật khẩu.
       </p>
 
       <form onSubmit={handleSubmit} noValidate>
-        <div className="mb-lg">
-          <label className="form-label">Email</label>
+        <div className="mb-4">
+          <label className="form-label fw-medium text-dark">Email</label>
           <input
             type="email"
-            className="text-input"
-            placeholder="Nhập email của bạn"
+            className="form-control form-control-lg rounded-3 bg-white border-0 shadow-sm"
+            placeholder="name@example.com"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
@@ -62,19 +61,23 @@ const ForgotPwdForm = () => {
           />
         </div>
 
-        <button
-          type="submit"
-          className="button-primary mb-md"
-          disabled={loading || !email}
-          data-testid="submit-btn"
-        >
-          {loading ? 'Đang gửi yêu cầu...' : 'Gửi yêu cầu'}
-        </button>
+        <div className="d-grid gap-2 mb-4">
+          <button
+            type="submit"
+            className="btn btn-dark btn-lg rounded-pill fw-bold text-white shadow-sm"
+            disabled={loading || !email}
+            style={{ backgroundColor: '#000000' }}
+            data-testid="submit-btn"
+          >
+            {loading ? 'Đang xử lý...' : 'Gửi yêu cầu'}
+          </button>
+        </div>
       </form>
 
-      <div className="text-center mt-lg">
-        <Link to="/login" className="link-blue">
-          Quay lại đăng nhập
+      <div className="text-center mt-4">
+        <span className="text-muted" style={{ fontSize: '14px' }}>Nhớ ra mật khẩu rồi? </span>
+        <Link to="/login" className="text-decoration-none fw-bold" style={{ color: '#000000', fontSize: '14px' }}>
+          Đăng nhập ngay
         </Link>
       </div>
     </div>
