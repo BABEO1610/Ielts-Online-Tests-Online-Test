@@ -87,10 +87,27 @@ const revokeOldestSession = async (userId) => {
   return rows[0] || null;
 };
 
+/**
+ * Revoke all active sessions for a user
+ * EARS[Event]: WHEN a User is deactivated or their role is changed, THE system SHALL revoke all their sessions.
+ */
+const revokeAllSessionsForUser = async (userId) => {
+  const query = `
+    UPDATE user_sessions
+    SET revoked_at = NOW()
+    WHERE user_id = $1 AND revoked_at IS NULL
+    RETURNING *;
+  `;
+  const values = [userId];
+  const { rows } = await pool.query(query, values);
+  return rows;
+};
+
 module.exports = {
   createSession,
   findActiveSession,
   revokeSession,
   countActiveSessions,
-  revokeOldestSession
+  revokeOldestSession,
+  revokeAllSessionsForUser
 };

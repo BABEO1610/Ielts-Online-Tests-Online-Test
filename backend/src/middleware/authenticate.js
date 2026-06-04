@@ -24,7 +24,7 @@ const authenticate = async (req, res, next) => {
 
     // 2. Verify JWT
     const decoded = verifyAccessToken(token);
-    
+
     if (!decoded) {
       throw new AppError('Unauthorized: Invalid or expired token', 401, 'AUTH_SES_001');
     }
@@ -37,7 +37,7 @@ const authenticate = async (req, res, next) => {
 
     // 3. Kiểm tra Redis cache
     let isRevoked = false;
-    
+
     // Nếu Redis sập, bỏ qua bước check Redis và luôn fallback vào DB
     if (redisClient.status === 'ready') {
       const revokedVal = await redisClient.hget(`session:${session_token}`, 'revoked');
@@ -53,7 +53,7 @@ const authenticate = async (req, res, next) => {
     // 4. Fallback DB Query nếu Redis chưa có thông tin bị revoked
     // Cache redis chỉ lưu 'revoked' = 'true' nếu session bị revoke.
     // Nếu redis trả về null, ta phải check ở DB để đảm bảo session chưa bị thu hồi và chưa hết hạn.
-    const session = await findActiveSession(pool, session_token);
+    const session = await findActiveSession(session_token);
 
     if (!session) {
       // Có thể session không tồn tại, hoặc đã hết hạn (expires_at < NOW()), hoặc revoked_at IS NOT NULL
@@ -61,7 +61,7 @@ const authenticate = async (req, res, next) => {
       if (redisClient.status === 'ready') {
         // Set TTL cho key là 15 phút (bằng với maxAge của access_token)
         await redisClient.hset(`session:${session_token}`, 'revoked', 'true');
-        await redisClient.expire(`session:${session_token}`, 15 * 60); 
+        await redisClient.expire(`session:${session_token}`, 15 * 60);
       }
       throw new AppError('Session expired', 401, 'AUTH_SES_001');
     }
@@ -72,7 +72,7 @@ const authenticate = async (req, res, next) => {
         '/api/v1/auth/change-password',
         '/api/v1/auth/logout'
       ];
-      
+
       // Nếu đường dẫn không nằm trong whitelist -> block
       if (!whitelistPaths.includes(req.path)) {
         throw new AppError('You must change your password before continuing', 403, 'AUTH_PERM_002'); // Có thể define thêm mã lỗi AUTH_PERM_002 hoặc dùng AUTH_PERM_001

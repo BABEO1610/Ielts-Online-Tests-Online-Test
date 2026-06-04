@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import UserModals from '../components/admin/UserModals';
 
 const ROLES = ['', 'student', 'tutor', 'admin'];
 const STATUSES = ['', 'active', 'inactive', 'pending', 'banned'];
@@ -12,6 +13,8 @@ const AdminDashboard = () => {
   const [meta, setMeta] = useState({ page: 1, limit: 10, total: 0, totalPages: 1 });
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+  
+  const [selectedUser, setSelectedUser] = useState(null);
 
   const [filters, setFilters] = useState({ role: '', status: '', page: 1, limit: 10 });
 
@@ -164,7 +167,7 @@ const AdminDashboard = () => {
                         <button
                           className="btn btn-sm btn-outline-primary"
                           data-testid={`action-btn-${u.id}`}
-                          onClick={() => {/* Modals handled by T050 */}}
+                          onClick={() => setSelectedUser(u)}
                         >
                           Quản lý
                         </button>
@@ -219,6 +222,13 @@ const AdminDashboard = () => {
           </div>
         )}
       </div>
+      
+      {/* T050: Admin Action Modals */}
+      <UserModals 
+        selectedUser={selectedUser} 
+        onClose={() => setSelectedUser(null)} 
+        onSuccess={() => fetchUsers()} 
+      />
     </div>
   );
 };

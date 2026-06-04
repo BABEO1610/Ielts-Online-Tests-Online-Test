@@ -284,7 +284,7 @@ const googleRedirect = (req, res, next) => {
     });
 
     const clientId = process.env.GOOGLE_CLIENT_ID || 'dummy_client_id';
-    const redirectUri = process.env.BACKEND_URL 
+    const redirectUri = process.env.BACKEND_URL
       ? `${process.env.BACKEND_URL}/api/v1/auth/google/callback`
       : `${req.protocol}://${req.get('host')}/api/v1/auth/google/callback`;
     const url = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${redirectUri}&response_type=code&scope=email profile&state=${state}&prompt=select_account`;
@@ -340,7 +340,7 @@ const googleCallback = async (req, res, next) => {
       maxAge: 7 * 24 * 60 * 60 * 1000
     });
 
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
     // Consistent with local login: always redirect to dashboard
     return res.redirect(`${frontendUrl}/dashboard`);
   } catch (error) {
