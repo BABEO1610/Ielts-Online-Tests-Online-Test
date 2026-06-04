@@ -8,6 +8,7 @@ import RegisterPage from './pages/RegisterPage';
 import ForgotPwdPage from './pages/ForgotPwdPage';
 import ResetPwdPage from './pages/ResetPwdPage';
 import OnboardingPage from './pages/OnboardingPage';
+import ContentLibraryPage from './pages/ContentLibraryPage';
 
 // Protected Pages
 import UserProfilePage from './pages/UserProfilePage';
@@ -27,6 +28,8 @@ function App() {
         <Route path="/forgot-password" element={<ForgotPwdPage />} />
         <Route path="/reset-password" element={<ResetPwdPage />} />
         <Route path="/onboarding" element={<OnboardingPage />} />
+        {/* EARS[Event]: WHEN user navigates to /library THEN route to ContentLibraryPage */}
+        <Route path="/library" element={<ContentLibraryPage />} />
 
         {/* Protected Routes */}
         {/* TODO: Wrap with <ProtectedRoute> in the upcoming Authentication integration task */}
