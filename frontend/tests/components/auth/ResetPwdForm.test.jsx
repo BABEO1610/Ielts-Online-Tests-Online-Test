@@ -52,41 +52,41 @@ describe('ResetPwdForm Component', () => {
 
   test('validates password strength and match in real-time', () => {
     renderWithRouter(<ResetPwdForm />);
-    
+
     const passwordInput = screen.getByTestId('password-input');
     const confirmPasswordInput = screen.getByTestId('confirm-password-input');
-    
+
     // Test weak password
     fireEvent.change(passwordInput, { target: { value: '123' } });
-    expect(passwordInput).toHaveClass('is-invalid');
+    expect(passwordInput).toHaveClass('error');
     expect(screen.getByTestId('password-strength-error')).toBeInTheDocument();
-    
+
     // Fix password strength but create mismatch
     fireEvent.change(passwordInput, { target: { value: 'secret123' } });
     fireEvent.change(confirmPasswordInput, { target: { value: 'secret' } });
-    
-    expect(passwordInput).not.toHaveClass('is-invalid');
-    expect(confirmPasswordInput).toHaveClass('is-invalid');
+
+    expect(passwordInput).not.toHaveClass('error');
+    expect(confirmPasswordInput).toHaveClass('error');
     expect(screen.getByTestId('password-mismatch-error')).toBeInTheDocument();
     expect(screen.getByTestId('submit-btn')).toBeDisabled();
-    
+
     // Fix mismatch
     fireEvent.change(confirmPasswordInput, { target: { value: 'secret123' } });
-    expect(confirmPasswordInput).not.toHaveClass('is-invalid');
+    expect(confirmPasswordInput).not.toHaveClass('error');
     expect(screen.getByTestId('submit-btn')).not.toBeDisabled();
   });
 
   test('handles successful password reset and redirects (USER-06)', async () => {
     const setTimeoutSpy = vi.spyOn(global, 'setTimeout');
     api.put.mockResolvedValueOnce({ data: { success: true } });
-    
+
     renderWithRouter(<ResetPwdForm />);
-    
+
     fireEvent.change(screen.getByTestId('password-input'), { target: { value: 'secret123' } });
     fireEvent.change(screen.getByTestId('confirm-password-input'), { target: { value: 'secret123' } });
-    
+
     fireEvent.click(screen.getByTestId('submit-btn'));
-    
+
     await waitFor(() => {
       expect(api.put).toHaveBeenCalledWith('/auth/reset-password', {
         token: 'valid-token',
@@ -95,7 +95,7 @@ describe('ResetPwdForm Component', () => {
       expect(screen.getByTestId('success-alert')).toBeInTheDocument();
       expect(screen.getByTestId('password-input')).toBeDisabled(); // Form disabled after success
     });
-    
+
     // Check if setTimeout was called to trigger redirect with 3000ms
     expect(setTimeoutSpy).toHaveBeenCalled();
     const redirectCall = setTimeoutSpy.mock.calls.find(call => call[1] === 3000);
@@ -103,7 +103,7 @@ describe('ResetPwdForm Component', () => {
     const redirectCallback = redirectCall[0];
     redirectCallback(); // Manually execute the callback to trigger navigate
     expect(mockNavigate).toHaveBeenCalledWith('/login');
-    
+
     setTimeoutSpy.mockRestore();
   });
 
@@ -112,14 +112,14 @@ describe('ResetPwdForm Component', () => {
     api.put.mockRejectedValueOnce({
       response: { data: { error: errorMsg } }
     });
-    
+
     renderWithRouter(<ResetPwdForm />);
-    
+
     fireEvent.change(screen.getByTestId('password-input'), { target: { value: 'secret123' } });
     fireEvent.change(screen.getByTestId('confirm-password-input'), { target: { value: 'secret123' } });
-    
+
     fireEvent.click(screen.getByTestId('submit-btn'));
-    
+
     await waitFor(() => {
       expect(screen.getByTestId('error-alert')).toBeInTheDocument();
       expect(screen.getByTestId('error-alert')).toHaveTextContent(errorMsg);

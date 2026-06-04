@@ -1,6 +1,7 @@
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
+import { BrowserRouter } from 'react-router-dom';
 import { describe, test, expect, vi, beforeEach } from 'vitest';
 import UserProfilePage from '../../src/pages/UserProfilePage';
 import api from '../../src/services/api';
@@ -35,7 +36,11 @@ describe('UserProfilePage Component', () => {
   });
 
   test('renders user info (read-only) and editable fields (USER-09)', () => {
-    render(<UserProfilePage />);
+    render(
+      <BrowserRouter>
+        <UserProfilePage />
+      </BrowserRouter>
+    );
 
     // Read-only fields
     expect(screen.getByText('test@example.com')).toBeInTheDocument();
@@ -49,7 +54,11 @@ describe('UserProfilePage Component', () => {
   });
 
   test('generates band score options from 0.0 to 9.0 in 0.5 steps', () => {
-    render(<UserProfilePage />);
+    render(
+      <BrowserRouter>
+        <UserProfilePage />
+      </BrowserRouter>
+    );
     const select = screen.getByTestId('bandscore-select');
     const options = Array.from(select.options).map(opt => opt.value);
 
@@ -65,7 +74,11 @@ describe('UserProfilePage Component', () => {
     api.patch.mockResolvedValueOnce({ data: { success: true } });
     mockRefreshUser.mockResolvedValueOnce(undefined);
 
-    render(<UserProfilePage />);
+    render(
+      <BrowserRouter>
+        <UserProfilePage />
+      </BrowserRouter>
+    );
 
     fireEvent.change(screen.getByTestId('fullname-input'), {
       target: { name: 'full_name', value: 'Updated Name' }
@@ -94,7 +107,11 @@ describe('UserProfilePage Component', () => {
       response: { data: { error: errorMsg } }
     });
 
-    render(<UserProfilePage />);
+    render(
+      <BrowserRouter>
+        <UserProfilePage />
+      </BrowserRouter>
+    );
 
     fireEvent.click(screen.getByTestId('submit-btn'));
 

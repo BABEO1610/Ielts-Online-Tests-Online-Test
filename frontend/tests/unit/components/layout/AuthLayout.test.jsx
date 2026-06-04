@@ -30,13 +30,9 @@ describe('AuthLayout Component', () => {
       </AuthLayout>
     );
 
-    // Kiểm tra thẻ div wrapper ngoài cùng (viewport-height centering)
+    // Kiểm tra thẻ div wrapper ngoài cùng
     const outerContainer = container.firstChild;
-    expect(outerContainer).toHaveClass('d-flex');
-    expect(outerContainer).toHaveClass('align-items-center');
-    expect(outerContainer).toHaveClass('justify-content-center');
-    expect(outerContainer).toHaveClass('min-vh-100');
-    expect(outerContainer).toHaveClass('bg-white');
+    expect(outerContainer).toHaveClass('auth-container');
   });
 
   it('should apply Uber-inspired design classes to card container', () => {
@@ -47,11 +43,10 @@ describe('AuthLayout Component', () => {
     );
 
     // Kiểm tra UI của container hiển thị form (Uber card style)
-    const card = container.querySelector('.card');
-    expect(card).toBeInTheDocument();
-    expect(card).toHaveClass('border-0');
-    expect(card).toHaveClass('shadow-sm');
-    expect(card).toHaveClass('rounded-4');
-    expect(card).toHaveClass('bg-light');
+    const cardWrapper = container.querySelector('.auth-card-wrapper');
+    expect(cardWrapper).toBeInTheDocument();
+    
+    const cardContent = container.querySelector('.card-content');
+    expect(cardContent).toBeInTheDocument();
   });
 });
