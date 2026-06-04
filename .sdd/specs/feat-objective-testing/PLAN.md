@@ -1,362 +1,290 @@
-# Implementation Plan: Objective Testing & Test Management (feat-objective-testing)
+# Kế hoạch Triển khai: Thi Trắc nghiệm & Quản lý Đề (feat-objective-testing)
 
-**Status:** DRAFT — Awaiting Tech Lead Review  
-**Linked Spec:** `.sdd/specs/feat-objective-testing/SPEC.md` (DRAFT, Risk: Medium)  
-**Sprint:** Sprint 2 — Assessment Engine  
-**Date:** 2026-06-03
-
----
-
-## 1. ARCHITECTURAL APPROACH
-
-- **Layered Architecture:** Tuân thủ Route → Controller → Service → DB Query (raw `pg`). Tuyệt đối không dùng ORM (Constitution Article 1).
-- **Synchronous Auto-grading:** Grading phải chạy within the submit transaction và hoàn tất < 1 giây cho 40 câu hỏi. `AutoGrader` là pure service chạy in-memory, không gọi AI.
-- **Historical Immutability:** Khi Tutor cập nhật question, tạo row `questions` mới (versioning). Existing `question_answers` vẫn reference `question_id` cũ — tuyệt đối không re-grade retroactively.
-- **Parameterized Queries Only:** Mọi DB query dùng `$1, $2` (SEC-03). Zero string concatenation với user input.
-- **Audit Logging:** Mọi Tutor mutation (create, update, delete test/question, update answer key) ghi vào `audit_logs` với `actor_id`, `action`, `target_table`, `target_id`, `old_value`, `new_value` (JSONB).
-- **Standardized Responses:** Mọi API endpoint tuân theo format `{ success, data, error, meta }` (Constitution Article 2).
+**Trạng thái:** BẢN NHÁP — Chờ Tech Lead duyệt  
+**Tài liệu đặc tả liên kết:** `.sdd/specs/feat-objective-testing/SPEC.md` (BẢN NHÁP, Rủi ro: Trung bình)  
+**Sprint:** Sprint 2 — Hệ thống Đánh giá  
+**Ngày:** 2026-06-03  
+**Công nghệ giao diện:** Bootstrap 5 (CSS Framework)
 
 ---
 
-## 2. COMPONENTS & INTERFACE
+## 1. PHƯƠNG ÁN KIẾN TRÚC
+
+- **Kiến trúc phân lớp:** Tuân thủ Route → Controller → Service → DB Query (raw `pg`). Tuyệt đối không dùng ORM (Điều 1 Hiến pháp Dự án).
+- **Chấm điểm đồng bộ:** Chấm bài phải chạy trong transaction nộp bài và hoàn tất < 1 giây cho 40 câu hỏi. `AutoGrader` là service thuần chạy trong bộ nhớ, không gọi AI.
+- **Bất biến lịch sử:** Khi Giáo viên cập nhật câu hỏi, tạo dòng `questions` mới (phiên bản hóa). `question_answers` hiện tại vẫn tham chiếu `question_id` cũ — tuyệt đối không chấm lại hồi tố.
+- **Chỉ dùng truy vấn tham số hóa:** Mọi DB query dùng `$1, $2` (SEC-03). Không nối chuỗi với dữ liệu người dùng.
+- **Ghi nhật ký kiểm toán:** Mọi thao tác thay đổi của Giáo viên (tạo, sửa, xóa đề/câu hỏi, cập nhật đáp án) ghi vào `audit_logs` với `actor_id`, `action`, `target_table`, `target_id`, `old_value`, `new_value` (JSONB).
+- **Định dạng phản hồi chuẩn:** Mọi API endpoint tuân theo format `{ success, data, error, meta }` (Điều 2 Hiến pháp Dự án).
+
+---
+
+## 2. THÀNH PHẦN & GIAO DIỆN
 
 ### 2.1 `AutoGrader` — `src/backend/src/services/autoGrader.service.js`
 
-> Pure utility service — không phụ thuộc DB, không phụ thuộc HTTP, 100% testable.
+> Service tiện ích thuần — không phụ thuộc DB, không phụ thuộc HTTP, 100% có thể kiểm thử.
 
-| Function | Input | Output | Ghi chú |
-|----------|-------|--------|---------|
-| `gradeAttempt(testQuestions, answers)` | `testQuestions: []`, `answers: [{ question_id, given_answer }]` | `{ raw_score: number, per_question: [{ question_id, is_correct, given_answer, correct_answer, explanation }] }` | Multiple Choice: exact match. Fill-in-blank: normalize cả hai chuỗi rồi so sánh. Chạy xong < 1s |
-| `normalizeAnswer(answer, question_type)` | `answer: string`, `question_type: 'mcq' \| 'fill_blank'` | `normalized: string` | Fill-in-blank: `s.trim().toLowerCase().replace(/[.,!?;:'"]+$/, '').replace(/\s+/g, ' ')`. Null input → `''`. MCQ: trim only. |
-| `toBandScore(rawScore, skill)` | `rawScore: number (0–40)`, `skill: 'reading' \| 'listening'` | `band: number (1.0–9.0 bội số 0.5)` | Lookup skill-specific table: `READING_BAND_TABLE` hoặc `LISTENING_BAND_TABLE` — cả hai hardcoded. VD: Reading 30 → 6.5, Listening 30 → 6.5. |
+| Hàm | Đầu vào | Đầu ra | Ghi chú |
+|-----|---------|--------|---------|
+| `gradeAttempt(testQuestions, answers)` | `testQuestions: []`, `answers: [{ question_id, given_answer }]` | `{ raw_score, per_question: [{ question_id, is_correct, given_answer, correct_answer, explanation }] }` | Trắc nghiệm: so khớp chính xác. Điền khuyết: chuẩn hóa cả hai chuỗi rồi so sánh. Xong < 1s |
+| `normalizeAnswer(answer, question_type)` | `answer: string`, `question_type: 'mcq' \| 'fill_blank'` | `normalized: string` | Điền khuyết: `s.trim().toLowerCase().replace(/[.,!?;:'"]+$/, '').replace(/\s+/g, ' ')`. Null → `''`. Trắc nghiệm: trim only. |
+| `toBandScore(rawScore, skill)` | `rawScore: number (0–40)`, `skill: 'reading' \| 'listening'` | `band: number (1.0–9.0 bội số 0.5)` | Tra bảng theo kỹ năng: `READING_BAND_TABLE` hoặc `LISTENING_BAND_TABLE` — cả hai hardcoded. VD: Reading 30 → 6.5. |
 
 ---
 
-### 2.2 DB Queries — `src/backend/src/db/queries/tests.queries.js`
+### 2.2 Truy vấn CSDL — `src/backend/src/db/queries/tests.queries.js`
 
-> Raw SQL parameterized ($1, $2). Mọi function nhận `pool` làm tham số đầu tiên.
+> SQL thô tham số hóa ($1, $2). Mọi hàm nhận `pool` làm tham số đầu tiên.
 
-| Function | Input | Output | SQL target |
-|----------|-------|--------|------------|
-| `getQuestionsForAttempt(pool, testId)` | `testId: string` | `questions: [{ id, question_order, question_text, options, question_type }]` | `SELECT DISTINCT ON (question_order) ... ORDER BY question_order ASC, updated_at DESC` — lấy 1 version mới nhất mỗi `question_order`. Omit `correct_answer`/`explanation`. Dùng cho `startAttempt`. |
-| `getTestForStart(pool, testId)` | `testId: string` | `{ id, title, skill, difficulty, duration_minutes }` | SELECT metadata từ `mock_tests`. Check `is_published = TRUE`. |
-| `getTestForGrading(pool, testId, questionIds)` | `testId`, `questionIds[]` | `{ questions: [{ id, question_text, options, correct_answer, question_order }] }` | Fetch official questions theo `question_id` array để grade. `correct_answer` có mặt. |
-| `createTestAttempt(pool, data)` | `{ test_id, user_id, mode: 'timed' \| 'untimed' }` | `{ id: string }` | INSERT vào `test_attempts`, set `started_at = NOW()`, `submitted_at = NULL`. |
-| `insertQuestionAnswers(pool, attemptId, answers)` | `attemptId`, `answers: [{ question_id, given_answer, is_correct }]` | `void` | Bulk INSERT vào `question_answers`. |
+| Hàm | Đầu vào | Đầu ra | Bảng SQL |
+|-----|---------|--------|----------|
+| `getQuestionsForAttempt(pool, testId)` | `testId` | `questions[]` | SELECT phiên bản mới nhất mỗi `question_order`. Ẩn `correct_answer`/`explanation`. |
+| `getTestForStart(pool, testId)` | `testId` | `{ id, title, skill, ... }` | SELECT metadata từ `mock_tests`. Kiểm `is_published = TRUE`. |
+| `getTestForGrading(pool, testId, questionIds)` | `testId`, `questionIds[]` | `{ questions[] }` | Lấy câu hỏi chính thức kèm `correct_answer` để chấm. |
+| `createTestAttempt(pool, data)` | `{ test_id, user_id, mode }` | `{ id }` | INSERT `test_attempts`, `started_at = NOW()`. |
+| `insertQuestionAnswers(pool, attemptId, answers)` | `attemptId`, `answers[]` | `void` | Bulk INSERT `question_answers`. |
 | `updateTestAttemptResult(pool, data)` | `{ attempt_id, submitted_at, band_score, raw_score }` | `void` | UPDATE `test_attempts`. |
-| `versionQuestion(pool, data, actorId)` | `{ test_id, question_id, newValues: { correct_answer, explanation, question_text, options } }`, `actorId` | `{ new_question_id: string }` | INSERT row `questions` mới (preserve `question_order`), log audit. |
-| `getLatestQuestionByTestAndOrder(pool, testId, order)` | `testId`, `order: number (1–40)` | `{ id, ..., updated_at }` | Fetch question hiện tại cho test theo order cụ thể. |
-| `insertAuditLog(pool, audit)` | `{ actor_id, action, target_table, target_id, old_value, new_value }` | `void` | INSERT vào `audit_logs`. |
-| `getAttemptWithAnswers(pool, attemptId)` | `attemptId` | `{ attempt, questions_answers[] }` | JOIN `test_attempts` + `question_answers` + `questions` để view result. |
-| `countActiveAttempts(pool, userId, testId)` | `userId`, `testId` | `number` | Kiểm tra user có attempt chưa submit. |
+| `versionQuestion(pool, data, actorId)` | `{ test_id, question_id, newValues }`, `actorId` | `{ new_question_id }` | INSERT dòng `questions` mới, ghi audit. |
+| `insertAuditLog(pool, audit)` | `{ actor_id, action, ... }` | `void` | INSERT vào `audit_logs`. |
+| `getAttemptWithAnswers(pool, attemptId)` | `attemptId` | `{ attempt, questions_answers[] }` | JOIN `test_attempts` + `question_answers` + `questions`. |
+| `countActiveAttempts(pool, userId, testId)` | `userId`, `testId` | `number` | Kiểm tra user có bài thi chưa nộp. |
 
 ---
 
 ### 2.3 `TestAttemptsController` — `src/backend/src/controllers/testAttempts.controller.js`
 
-| Handler | Endpoint | Input | Output | Logic tóm tắt |
-|---------|----------|-------|--------|----------------|
-| `startAttempt` | `POST /api/v1/test-attempts` | `{ test_id, mode }` (body) | 201 `{ attempt_id, test_id, mode, started_at, questions[] }` | Validate test `is_published=true`. Check user không có incomplete attempt cho test này (409). Create attempt. Gọi `getQuestionsForAttempt` (latest version per order). Return questions (omit answers). |
-| `submitAttempt` | `POST /api/v1/test-attempts/:id/submit` | `{ answers: [{ question_id, given_answer }] }` | 200 `{ band_score, raw_score, submitted_at }` | Validate owner (IDOR). Check `submitted_at IS NULL` (409). Fetch official questions. Run `AutoGrader.gradeAttempt()`. Tính `band_score = AutoGrader.toBandScore(raw_score, skill)`. Begin TX → Insert answers → Update result → Commit. |
-| `getResult` | `GET /api/v1/test-attempts/:id/result` | URL param: `id` | 200 `{ band_score, raw_score, per_question: [{ given_answer, correct_answer, is_correct, explanation }] }` | Owner hoặc tutor/admin mới xem. Return full result với correct answers + explanations. |
-| `listAttempts` | `GET /api/v1/test-attempts` | Query: `page, limit, skill?` | 200 `{ attempts: [], page, limit, total }` | Student xem own attempts (filter by `req.user.id`). Tutor xem tất cả. |
+| Xử lý | Endpoint | Logic tóm tắt |
+|--------|----------|----------------|
+| `startAttempt` | `POST /api/v1/test-attempts` | Kiểm tra đề đã publish. Kiểm student không có bài thi dở (409). Tạo attempt. Trả câu hỏi (ẩn đáp án). |
+| `submitAttempt` | `POST /api/v1/test-attempts/:id/submit` | Kiểm tra quyền sở hữu (IDOR). Kiểm chưa nộp (409). Chấm điểm. Transaction → Lưu đáp án → Cập nhật kết quả → Commit. |
+| `getResult` | `GET /api/v1/test-attempts/:id/result` | Chỉ chủ sở hữu hoặc giáo viên/admin xem. Trả kết quả đầy đủ với đáp án đúng + giải thích. |
+| `listAttempts` | `GET /api/v1/test-attempts` | Student xem bài thi của mình. Giáo viên xem tất cả. Phân trang. |
 
 ---
 
 ### 2.4 `MockTestsController` — `src/backend/src/controllers/mockTests.controller.js`
 
-| Handler | Endpoint | Input | Output | Logic tóm tắt |
-|---------|----------|-------|--------|----------------|
-| `createTest` | `POST /api/v1/mock-tests` | `{ title, description, skill, difficulty, duration_minutes }` | 201 `{ id, ... }` | Auth required (tutor). Validate enums. Create row. Log audit `test_created`. |
-| `updateTest` | `PUT /api/v1/mock-tests/:id` | `{ title?, difficulty?, duration_minutes?, is_published?, publish_at? }` | 200 `{ id, ... }` | Guard auth. Validate. Kiểm tra ít nhất 1 câu hỏi nếu publish (422 nếu không). Update. Log audit `test_updated`. |
-| `deleteTest` | `DELETE /api/v1/mock-tests/:id` | — | 200 | Soft-delete: set `is_published=FALSE`. Log audit `test_deleted`. Existing attempts unaffected. |
-| `createQuestion` | `POST /api/v1/mock-tests/:test_id/questions` | `{ question_order, question_text, question_type, options, correct_answer, explanation }` | 201 `{ id, ... }` | Tutor only. Check `question_order` 1–40, unique per test. Insert question. Log audit. |
-| `updateQuestion` | `PUT /api/v1/mock-tests/:test_id/questions/:question_id` | Same as create | 200 `{ id, ... }` | Versioning: nếu đề đã có attempt → INSERT new row (preserve `question_order`, `test_id`). Nếu chưa có attempt → UPDATE in-place. Log audit `answer_key_updated`. |
-| `listPublishedTests` | `GET /api/v1/mock-tests` | Query: `skill, difficulty, page, limit, search` | 200 `{ tests: [], meta }` | Guest/Student see `is_published=TRUE` only. Return metadata (exclude answers). |
-| `listTutorTests` | `GET /api/v1/mock-tests/manage` | Query: `page, limit` | 200 `{ tests: [], meta }` | Tutor only (`authorize('tutor','admin')`). Trả ALL tests (kể cả unpublished) của `created_by = req.user.id`. |
-| `getTestDetail` | `GET /api/v1/mock-tests/:id` | — | 200 `{ id, title, skill, ... }` | Return metadata. Tutor see full details + answers; others see metadata + question count. 404 nếu unpublished + non-tutor. |
+| Xử lý | Endpoint | Logic tóm tắt |
+|--------|----------|----------------|
+| `createTest` | `POST /api/v1/mock-tests` | Yêu cầu đăng nhập (giáo viên). Tạo đề mới. Ghi audit. |
+| `updateTest` | `PUT /api/v1/mock-tests/:id` | Cập nhật metadata. Kiểm ít nhất 1 câu hỏi nếu publish (422). Ghi audit. |
+| `deleteTest` | `DELETE /api/v1/mock-tests/:id` | Xóa mềm: `is_published=FALSE`. Ghi audit. Bài thi đã nộp không bị ảnh hưởng. |
+| `createQuestion` | `POST /api/v1/mock-tests/:test_id/questions` | Chỉ giáo viên. Kiểm `question_order` 1–40, duy nhất trong đề. Ghi audit. |
+| `updateQuestion` | `PUT /api/v1/mock-tests/:test_id/questions/:question_id` | Phiên bản hóa: INSERT dòng mới (giữ `question_order`). Ghi audit. |
+| `listPublishedTests` | `GET /api/v1/mock-tests` | Công khai. Lọc `is_published=TRUE`, phân trang, chỉ metadata. |
+| `listTutorTests` | `GET /api/v1/mock-tests/manage` | Chỉ giáo viên. Trả TẤT CẢ đề (kể cả chưa publish). |
+| `getTestDetail` | `GET /api/v1/mock-tests/:id` | Giáo viên xem chi tiết đầy đủ + đáp án. Học viên xem metadata. |
 
 ---
 
-### 2.5 Frontend (React) — High-Level Responsibilities
+### 2.5 Giao diện Frontend — Danh sách Màn hình (Bootstrap 5)
 
-| Component / Flow | Responsibility |
-|---|---|
-| **Start Test UI** | Call `POST /api/v1/test-attempts`, render 40-item navigation panel, show timer (timed mode only), display current question. |
-| **Timer & Auto-submit** | Countdown logic. At 00:00: lock UI, show "Submitting..." modal, call submit endpoint automatically. Show submit confirmation. |
-| **Autosave Draft** | Every 60s: serialize current answers → save to `localStorage` under key `attempt:{attempt_id}:draft`. Optional: sync draft to server endpoint if needed (not in spec). |
-| **Results Page** | Call `GET /api/v1/test-attempts/:id/result`, display band score (large), raw score (40), per-question grid with given answer / correct answer / is_correct / explanation. |
-| **Explain with AI** | "Explain" button → call `POST /api/v1/ai-explain` with `question_id` → display AI-simplified explanation below. AI service must be mockable in tests. |
+> Tất cả giao diện sử dụng **Bootstrap 5** để styling. Responsive trên Tablet+ (≥ 768px).
+
+| # | Màn hình | Mô tả | Component chính |
+|---|----------|-------|-----------------|
+| 1 | **Trang danh sách đề thi** (Học viên) | Hiển thị các đề thi đã publish. Lọc theo skill, difficulty. Phân trang. | `TestListPage` |
+| 2 | **Trang chi tiết đề thi** (Học viên) | Xem thông tin đề thi, số câu hỏi, thời gian. Nút "Bắt đầu thi". | `TestDetailPage` |
+| 3 | **Modal hướng dẫn trước khi thi** | Hiển thị quy tắc, cảnh báo thời gian, cảnh báo auto-submit. | `PreTestInstructionModal` |
+| 4 | **Trang làm bài thi Reading** | Split View: Bên trái đoạn văn, bên phải câu hỏi. Thanh điều hướng 40 câu. Timer. | `ReadingTestPage` |
+| 5 | **Trang làm bài thi Listening** | Audio player cố định phía trên. Câu hỏi bên dưới. Thanh điều hướng 40 câu. Timer. | `ListeningTestPage` |
+| 6 | **Bảng điều hướng 40 câu** | 40 ô vuông, mã màu theo trạng thái (chưa làm/đã làm/hiện tại/đánh dấu). | `QuestionNavigationPanel` |
+| 7 | **Timer đếm ngược** | Hiển thị MM:SS. Đổi màu đỏ khi ≤ 5 phút. Auto-submit khi hết giờ. | `Timer` |
+| 8 | **Modal nộp bài tự động** | Khóa màn hình, hiển thị "Đang nộp bài...", gọi API nộp bài. | `AutoSubmitModal` |
+| 9 | **Trang kết quả thi** | Band Score lớn nổi bật. Điểm thô /40. Lưới từng câu với đáp án đúng/sai + giải thích. | `ResultsPage` |
+| 10 | **Trang quản lý đề thi** (Giáo viên) | Danh sách tất cả đề thi (kể cả chưa publish). CRUD đề thi. | `TutorTestManagePage` |
+| 11 | **Form tạo/sửa đề thi** (Giáo viên) | Form nhập title, skill, difficulty, duration, publish. | `TestFormPage` |
+| 12 | **Form tạo/sửa câu hỏi** (Giáo viên) | Form nhập câu hỏi MCQ hoặc điền khuyết. Đáp án + giải thích. | `QuestionFormPage` |
+| 13 | **Trang Nhật ký Kiểm toán** (Admin) | Xem audit logs. Lọc theo bảng, người thao tác, ngày. | `AuditLogPage` |
+| 14 | **Trang lịch sử thi** (Học viên) | Danh sách các lần thi. Band score, ngày thi. Link xem chi tiết. | `AttemptHistoryPage` |
 
 ---
 
-## 3. DATA FLOW (Luồng dữ liệu)
+## 3. LUỒNG DỮ LIỆU
 
-### Flow 1: Test Publishing & Availability
+### Luồng 1: Xuất bản Đề thi
 
 ```
-Tutor  POST /api/v1/mock-tests  { title, skill, difficulty, ... }
+Giáo viên  POST /api/v1/mock-tests  { title, skill, difficulty, ... }
   → MockTestsController.createTest()
-  → MockTestsService.createTest()
       ├─ Validate: skill ∈ {reading, listening}, difficulty ∈ {beginner, intermediate, advanced}
-      ├─ createTest() → INSERT mock_tests (is_published=FALSE)
-      ├─ insertAuditLog(action='test_created', ...)
+      ├─ INSERT mock_tests (is_published=FALSE)
+      ├─ insertAuditLog(action='test_created')
       └─ return { id }
-  ← Response: 201 { data: { id, title, ... } }
+  ← Phản hồi: 201 { data: { id, title, ... } }
 
-Tutor  PUT /api/v1/mock-tests/:id  { is_published: true, publish_at: null }
+Giáo viên  PUT /api/v1/mock-tests/:id  { is_published: true }
   → MockTestsController.updateTest()
-  → MockTestsService.updateTest()
-      ├─ Validate ownership
+      ├─ Validate quyền sở hữu
       ├─ UPDATE mock_tests SET is_published=TRUE
-      ├─ insertAuditLog(action='test_updated', old_value={...}, new_value={...})
+      ├─ insertAuditLog(action='test_updated')
       └─ return { id }
-  ← Response: 200 { data: { id, is_published: true, ... } }
+  ← Phản hồi: 200 { data: { id, is_published: true } }
 
-Guest/Student  GET /api/v1/mock-tests  { skill='reading', difficulty='intermediate' }
+Học viên  GET /api/v1/mock-tests  { skill='reading' }
   → MockTestsController.listPublishedTests()
-  → getPublishedTests(pool, filters)
-      ├─ SELECT FROM mock_tests WHERE is_published=TRUE AND skill=$1 AND difficulty=$2
-      └─ return paginated list (omit correct_answer, explanation)
-  ← Response: 200 { data: { tests: [...], meta: { page, limit, total } } }
+      ├─ SELECT FROM mock_tests WHERE is_published=TRUE
+      └─ Trả danh sách phân trang (ẩn đáp án)
+  ← Phản hồi: 200 { data: { tests: [...], meta: { page, limit, total } } }
 ```
 
----
-
-### Flow 2: Test Attempt & Auto-grading
+### Luồng 2: Làm bài & Chấm điểm tự động
 
 ```
-Student  POST /api/v1/test-attempts  { test_id, mode: 'timed' }
+Học viên  POST /api/v1/test-attempts  { test_id, mode: 'timed' }
   → TestAttemptsController.startAttempt()
-  → TestAttemptsService.startAttempt(test_id, user_id, mode)
-      ├─ getTestForStart(test_id) → check is_published=TRUE
-      ├─ countActiveAttempts(user_id, test_id) > 0 → 409 Conflict
-      ├─ createTestAttempt({ test_id, user_id, mode, started_at=NOW() })
-      ├─ fetch questions from getTestForStart() → omit correct_answer
-      └─ return { attempt_id, test_id, mode, started_at, questions: [...], duration_minutes }
-  ← Response: 201 { data: { attempt_id, questions: [...], timer_ms: 2400000 } }
+      ├─ Kiểm tra đề đã publish
+      ├─ Kiểm tra không có bài thi dở (409 nếu có)
+      ├─ Tạo attempt mới
+      ├─ Lấy câu hỏi (ẩn đáp án)
+      └─ Trả { attempt_id, questions[], duration_minutes }
+  ← Phản hồi: 201 { data: { attempt_id, questions: [...], timer_ms: 2400000 } }
 
-[Frontend: Countdown timer reaches 00:00]
+[Frontend: Timer đếm ngược đến 00:00]
   ↓
-Student  [Auto-submit UI locked]  POST /api/v1/test-attempts/:id/submit  { answers: [...] }
-  → TestAttemptsController.submitAttempt(id)
-  → TestAttemptsService.submitAttempt(attemptId, user_id, answers)
-      ├─ getAttempt(attemptId) → check user_id matches (IDOR), submitted_at IS NULL
-      ├─ getTestForGrading(test_id, question_ids) → fetch official questions (with correct_answer)
+Học viên  [Tự động nộp - UI bị khóa]  POST /api/v1/test-attempts/:id/submit
+  → TestAttemptsController.submitAttempt()
+      ├─ Kiểm tra quyền sở hữu (IDOR)
+      ├─ Kiểm tra chưa nộp (409 nếu đã nộp)
       ├─ BEGIN TRANSACTION
-      ├─ AutoGrader.gradeAttempt(questions, answers)
-      │   ├─ for each answer:
-      │   │   ├─ if question.type='mcq': exact match
-      │   │   └─ if question.type='fill_blank': normalize both sides, exact match
-      │   │   └─ store { question_id, given_answer, is_correct }
-      │   └─ raw_score = count(is_correct)
-      ├─ band_score = AutoGrader.toBandScore(raw_score)
-      ├─ insertQuestionAnswers(attemptId, per_question_results)
-      ├─ updateTestAttemptResult({ attempt_id, submitted_at=NOW(), band_score, raw_score })
+      ├─ AutoGrader.gradeAttempt() → chấm từng câu
+      ├─ Tính band_score = AutoGrader.toBandScore(raw_score)
+      ├─ Lưu đáp án + cập nhật kết quả
       ├─ COMMIT TRANSACTION
-      └─ emit Socket event `grading_completed` to user
-  ← Response: 200 { data: { band_score: 7.5, raw_score: 30, submitted_at, per_question: [...] } }
-
-Student  GET /api/v1/test-attempts/:id/result
-  → TestAttemptsController.getResult(id, user_id)
-  → getAttemptWithAnswers(attemptId)
-      ├─ SELECT * FROM test_attempts WHERE id=$1 AND user_id=$2
-      ├─ SELECT * FROM question_answers WHERE attempt_id=$1
-      ├─ JOIN questions to get correct_answer + explanation
-      └─ return { band_score, raw_score, per_question: [{ given_answer, correct_answer, is_correct, explanation }] }
-  ← Response: 200 { data: { band_score, raw_score, questions: [...] } }
+      └─ Phát sự kiện Socket `grading_completed`
+  ← Phản hồi: 200 { data: { band_score: 7.5, raw_score: 30, per_question: [...] } }
 ```
 
----
-
-### Flow 3: Question Versioning (Non-destructive Update)
+### Luồng 3: Phiên bản hóa Câu hỏi (Cập nhật không phá hủy)
 
 ```
-Tutor  PUT /api/v1/mock-tests/:test_id/questions/:question_id  { correct_answer, explanation }
+Giáo viên  PUT /api/v1/mock-tests/:test_id/questions/:question_id
   → MockTestsController.updateQuestion()
-  → MockTestsService.versionQuestion(test_id, question_id, newValues, tutor_id)
-      ├─ SELECT FROM questions WHERE id=$1 AND test_id=$2 → old row
+      ├─ Lấy câu hỏi cũ
       ├─ BEGIN TRANSACTION
-      ├─ INSERT INTO questions (test_id, question_order, question_text, ..., correct_answer=NEW)
-      │   → old question_id vẫn tồn tại, dùng cho existing attempts
-      │   → new row có id khác, dùng cho future attempts (hiện tại không applicable cho reading/listening tại tác điểm)
-      ├─ insertAuditLog(
-      │     action='answer_key_updated',
-      │     target_id=old.id,
-      │     old_value={ correct_answer: old.correct_answer, explanation: old.explanation },
-      │     new_value={ correct_answer: NEW.correct_answer, explanation: NEW.explanation }
-      │   )
+      ├─ INSERT dòng questions MỚI (giữ question_order + test_id)
+      │   → Câu hỏi cũ vẫn tồn tại cho các bài thi đã nộp
+      ├─ insertAuditLog(action='answer_key_updated', old_value, new_value)
       ├─ COMMIT TRANSACTION
       └─ return { id: new_question_id }
-  ← Response: 200 { data: { id } }
+  ← Phản hồi: 200 { data: { id } }
 
-[Ví dụ: Tutor sửa answer key sau khi có students đã nộp]
-→ Question_answers của students cũ vẫn reference old question_id
-→ old question row vẫn có correct_answer=OLD value
-→ Grading result của students cũ KHÔNG thay đổi
-→ New attempts (không có) sẽ dùng mới (question_id khác, nếu test chưa lock)
+[Kết quả: Điểm của học viên đã thi KHÔNG bị thay đổi]
 ```
 
 ---
 
-## 4. IMPLEMENTATION TASKS & ESTIMATES
+## 4. NHIỆM VỤ TRIỂN KHAI & ƯỚC TÍNH
 
-| # | Task | Effort | Dependencies |
-|---|------|--------|--------------|
-| **A** | DB Migrations: `mock_tests`, `questions`, `test_attempts`, `question_answers`, `ai_explain_requests`, `audit_logs` tables. Indexes, enums, constraints. | 1 day | — |
-| **B** | DB Queries Module (`tests.queries.js`): All parameterized queries, tested. | 1 day | **A** |
-| **C** | `AutoGrader` service: gradeAttempt, normalizeAnswer, toBandScore. Unit tests (pure logic). | 0.5 day | — |
-| **D** | Controllers & Routes: start, submit, result endpoints. Input validation (express-validator). IDOR checks. Transaction setup. | 1.5 days | **B**, **C** |
-| **E** | Question Versioning & Tutor endpoints: updateQuestion versioning logic. Audit logging for all mutations. | 1 day | **B**, **D** |
-| **F** | Scheduled Publish Job: node-cron + DB/Redis advisory lock (optional for MVP). | 0.5 day | **B** |
-| **G** | Frontend UI: Start test page (timer, navigation panel, autosave), Results page (band score, per-question grid). | 3 days | **D** (backend) |
-| **H** | Tests: Unit tests for AutoGrader, integration tests for submit flow, DB migration tests, end-to-end scenario. AI service mocking. | 2 days | **C**, **D**, **E** |
-| **I** | Code review, ESLint, Prettier, Pre-commit checklist, PR. | 0.5 day | **A**–**H** |
+| # | Nhiệm vụ | Công sức | Phụ thuộc |
+|---|----------|----------|-----------|
+| **A** | Di chuyển CSDL: tạo bảng `mock_tests`, `questions`, `test_attempts`, `question_answers`, `ai_explain_requests`, `audit_logs`. Index, enum, ràng buộc. | 1 ngày | — |
+| **B** | Module Truy vấn CSDL (`tests.queries.js`): Tất cả truy vấn tham số hóa. | 1 ngày | **A** |
+| **C** | Service `AutoGrader`: gradeAttempt, normalizeAnswer, toBandScore. Unit test. | 0.5 ngày | — |
+| **D** | Controller & Routes: start, submit, result endpoints. Validation. IDOR. Transaction. | 1.5 ngày | **B**, **C** |
+| **E** | Phiên bản hóa câu hỏi & Endpoint giáo viên. Audit logging. | 1 ngày | **B**, **D** |
+| **F** | Công việc đặt lịch Publish: node-cron + DB advisory lock. | 0.5 ngày | **B** |
+| **G** | **Giao diện Frontend (Bootstrap 5): 14 màn hình + styling** | 3 ngày | **D** (backend) |
+| **H** | Kiểm thử: Unit test, integration test, E2E. | 2 ngày | **C**, **D**, **E** |
+| **I** | Review code, ESLint, Prettier, PR. | 0.5 ngày | **A**–**H** |
 
-**Total estimate:** ~11 days (parallelizable across backend/frontend/QA teams).
+**Tổng ước tính:** ~11 ngày (có thể làm song song giữa backend/frontend/QA).
 
 ---
 
-## 5. DATA MODELS & DB SCHEMA
+## 5. MÔ HÌNH DỮ LIỆU & SCHEMA CSDL
 
-### Core Tables
+### Bảng chính
 
-**Table: `mock_tests`**
-- `id` (UUID PK)
-- `title` (VARCHAR 500)
-- `description` (TEXT)
-- `skill` (ENUM: reading, listening, writing, speaking) — feature uses reading/listening
+**Bảng: `mock_tests` (Đề thi)**
+- `id` (UUID PK), `title` (VARCHAR 500), `description` (TEXT)
+- `skill` (ENUM: reading, listening, writing, speaking)
 - `difficulty` (ENUM: beginner, intermediate, advanced)
-- `duration_minutes` (INT) — NULL = no time limit
-- `is_published` (BOOLEAN DEFAULT FALSE)
-- `publish_at` (TIMESTAMPTZ) — NULL = no scheduled publish
-- `created_by` (UUID FK → users)
-- `created_at` (TIMESTAMPTZ DEFAULT NOW())
-- `updated_at` (TIMESTAMPTZ DEFAULT NOW())
+- `duration_minutes` (INT) — NULL = không giới hạn thời gian
+- `is_published` (BOOLEAN DEFAULT FALSE), `publish_at` (TIMESTAMPTZ)
+- `created_by` (UUID FK → users), `created_at`, `updated_at` (TIMESTAMPTZ)
 
-**Indexes:** `idx_mock_tests_publish`, `idx_mock_tests_skill`, `idx_tests_title_trgm` (GIN trigram for search).
+**Bảng: `questions` (Câu hỏi)**
+- `id` (UUID PK), `test_id` (UUID FK → mock_tests ON DELETE CASCADE)
+- `question_order` (SMALLINT, 1–40), `question_type` (ENUM: mcq, fill_blank)
+- `question_text` (TEXT), `options` (JSONB), `correct_answer` (VARCHAR), `explanation` (TEXT)
+- `created_at`, `updated_at` (TIMESTAMPTZ)
+- **Ràng buộc:** UNIQUE (test_id, question_order)
 
-**Table: `questions`**
-- `id` (UUID PK)
-- `test_id` (UUID FK → mock_tests, ON DELETE CASCADE)
-- `question_order` (SMALLINT, 1–40)
-- `question_type` (ENUM: mcq, fill_blank)
-- `question_text` (TEXT)
-- `options` (JSONB: `[{ label: 'A', text: '...' }, ...]` — only for MCQ)
-- `correct_answer` (VARCHAR)
-- `explanation` (TEXT)
-- `created_at` (TIMESTAMPTZ DEFAULT NOW())
-- `updated_at` (TIMESTAMPTZ DEFAULT NOW())
+**Bảng: `test_attempts` (Lịch sử làm bài)**
+- `id` (UUID PK), `test_id` (UUID FK), `user_id` (UUID FK)
+- `mode` (ENUM: timed, untimed), `started_at` (TIMESTAMPTZ NOT NULL)
+- `submitted_at` (TIMESTAMPTZ) — NULL = đang làm
+- `band_score` (NUMERIC(3,1)), `raw_score` (SMALLINT), `created_at` (TIMESTAMPTZ)
 
-**Constraint:** UNIQUE (test_id, question_order) — one question per position.
+**Bảng: `question_answers` (Chi tiết đáp án nộp)**
+- `id` (UUID PK), `attempt_id` (UUID FK), `question_id` (UUID FK)
+- `given_answer` (VARCHAR), `is_correct` (BOOLEAN), `created_at` (TIMESTAMPTZ)
+- **Ràng buộc:** UNIQUE (attempt_id, question_id)
 
-**Table: `test_attempts`**
-- `id` (UUID PK)
-- `test_id` (UUID FK → mock_tests, ON DELETE CASCADE)
-- `user_id` (UUID FK → users, ON DELETE CASCADE)
-- `mode` (ENUM: timed, untimed)
-- `started_at` (TIMESTAMPTZ NOT NULL)
-- `submitted_at` (TIMESTAMPTZ) — NULL = in-progress
-- `band_score` (NUMERIC(3,1)) — 1.0–9.0, null while pending
-- `raw_score` (SMALLINT) — 0–40, null while pending
-- `created_at` (TIMESTAMPTZ DEFAULT NOW())
-
-**Constraint:** `submitted_at IS NOT NULL` → attempt immutable (no re-grade, no re-submit).
-
-**Constraint:** `submitted_at IS NOT NULL` means immutable.
-
-**Table: `question_answers`**
-- `id` (UUID PK)
-- `attempt_id` (UUID FK → test_attempts, ON DELETE CASCADE)
-- `question_id` (UUID FK → questions, ON DELETE CASCADE)
-- `given_answer` (VARCHAR)
-- `is_correct` (BOOLEAN)
-- `created_at` (TIMESTAMPTZ DEFAULT NOW())
-
-**Constraint:** UNIQUE (attempt_id, question_id) — one answer per question per attempt.
-
-**Table: `audit_logs`** (shared, defined in feat-auth-and-users, reused here)
-- `id` (UUID PK)
-- `actor_id` (UUID FK → users)
-- `action` (VARCHAR: test_created, test_updated, test_deleted, answer_key_updated, ...)
-- `target_table` (VARCHAR: mock_tests, questions, ...)
-- `target_id` (UUID)
-- `old_value` (JSONB)
-- `new_value` (JSONB)
-- `created_at` (TIMESTAMPTZ DEFAULT NOW())
+**Bảng: `audit_logs` (Nhật ký kiểm toán) — dùng chung**
+- `id` (UUID PK), `actor_id` (UUID FK), `action` (VARCHAR)
+- `target_table` (VARCHAR), `target_id` (UUID)
+- `old_value` (JSONB), `new_value` (JSONB), `created_at` (TIMESTAMPTZ)
 
 ---
 
-## 6. TECHNICAL RISKS & MITIGATIONS
+## 6. RỦI RO KỸ THUẬT & BIỆN PHÁP GIẢM THIỂU
 
-| # | Risk | Severity | Mitigation |
-|---|------|----------|-----------|
-| 1 | Auto-grader performance spike on concurrent submits | Low | O(n) with n=40. Rate-limit submissions. Horizontal scale. Monitor p99 latency. |
-| 2 | Incorrect versioning: old question row gets deleted or updated retroactively | High | Enforce INSERT-only for new versions. Old question_id immutable. Tests validate historical grading. |
-| 3 | Race: Tutor updates question while Student submitting | Medium | Fetch question row by ID at submit time. Do NOT join test.latest_questions. Snapshot in transaction. |
-| 4 | Scheduled publish in multi-instance setup causes double-publish | Medium | Use DB advisory lock or Redis distributed lock. Single writer pattern. |
-| 5 | Student loses draft on network drop before auto-submit | Medium | LocalStorage auto-save every 60s (spec). Optional: server-side draft persistence (out of scope MVP). |
-| 6 | Band score calculation errors due to hardcoded table misalignment | Medium | Unit test `toBandScore()` against official IELTS table. Doc table in code comment. |
-
----
-
-## 7. OPEN QUESTIONS
-
-| # | Question | Owner | Priority | Status |
-|---|----------|-------|----------|--------|
-| **Q1** | Fill-in-the-blank: Levenshtein distance tolerance or strict exact-match? Default = exact post-normalization. Tolerant requires RFC. | Tech Lead | HIGH | Open |
-| **Q2** | Question versioning: Should old attempts show both old + new correct_answer for transparency, or only historical old? | Product | HIGH | Open |
-| **Q3** | Publish job: Use `node-cron` (single instance) or background queue (e.g., Bull)? MVP: `node-cron` + lock. | Backend | MEDIUM | Open |
-| **Q4** | Should server persist draft submissions besides `localStorage`? Spec only mandates localStorage. | Product | MEDIUM | Open |
-| **Q5** | Explain with AI: Route through existing `src/ai/grading.service.js` or new `src/ai/explain.service.js`? | Tech Lead | MEDIUM | Open |
+| # | Rủi ro | Mức độ | Biện pháp |
+|---|--------|--------|-----------|
+| 1 | Hiệu năng chấm điểm khi nộp đồng thời | Thấp | O(n) với n=40. Giới hạn tốc độ nộp bài. |
+| 2 | Phiên bản hóa sai: dòng câu hỏi cũ bị xóa/sửa hồi tố | Cao | Chỉ INSERT cho phiên bản mới. question_id cũ bất biến. |
+| 3 | Race condition: Giáo viên sửa câu hỏi trong khi Học viên nộp bài | Trung bình | Lấy câu hỏi theo ID tại thời điểm nộp. Snapshot trong transaction. |
+| 4 | Học viên mất bản nháp khi mất mạng | Trung bình | LocalStorage auto-save mỗi 60s. |
+| 5 | Lỗi tính band score do bảng hardcoded sai | Trung bình | Unit test `toBandScore()` với bảng IELTS chính thức. |
 
 ---
 
-## 8. DEFINITION OF DONE
+## 7. CÂU HỎI MỞ
 
-Feature `feat-objective-testing` được xem là **DONE** khi:
-
-- ✅ Tất cả Acceptance Criteria trong linked spec được thỏa mãn.
-- ✅ Tất cả DB queries dùng parameterized SQL, no hardcoded values.
-- ✅ `AutoGrader` service unit-tested, 100% deterministic, idempotent.
-- ✅ Integration test: submit flow (create → submit → verify band_score + question_answers persisted).
-- ✅ Versioning test: update question → verify old attempt grade unchanged, new attempt uses new data.
-- ✅ Audit logs recorded for all Tutor mutations.
-- ✅ ESLint/Prettier clean (0 warnings).
-- ✅ No hardcoded secrets, API keys.
-- ✅ Stack trace not exposed in API responses.
-- ✅ Input validation on all endpoints.
-- ✅ IDOR prevention (attempt ownership check).
-- ✅ Transaction safety: all-or-nothing submit.
+| # | Câu hỏi | Người phụ trách | Ưu tiên | Trạng thái |
+|---|---------|-----------------|---------|------------|
+| Q1 | Điền khuyết: Cho phép sai lệch Levenshtein hay chỉ so khớp chính xác? | Tech Lead | CAO | Mở |
+| Q2 | Phiên bản hóa: Bài thi cũ hiện cả đáp án cũ + mới hay chỉ đáp án lịch sử? | Product | CAO | Mở |
+| Q3 | Công việc đặt lịch: Dùng `node-cron` hay hàng đợi nền (Bull)? | Backend | TB | Mở |
+| Q4 | Lưu bản nháp trên server ngoài localStorage? | Product | TB | Mở |
+| Q5 | AI giải thích: Dùng service hiện có hay tạo mới? | Tech Lead | TB | Mở |
 
 ---
 
-## 9. NEXT STEPS (Immediate Actions)
+## 8. ĐỊNH NGHĨA HOÀN THÀNH
 
-1. **Tech Lead Review:** Approve this PLAN with feedback.
-2. **Create DB Migrations:** Write migration files under `backend/db/migrations/` for new tables (mock_tests, questions, test_attempts, question_answers).
-3. **Implement AutoGrader:** Pure service + unit tests.
-4. **Implement DB Queries:** Parameterized SQL module + integration tests.
-5. **Implement Controllers & Routes:** submit flow with transaction.
+Feature `feat-objective-testing` được xem là **HOÀN THÀNH** khi:
 
----
-
-## 10. AMENDMENTS & RFC PROCESS
-
-Any changes to this PLAN or Constitution Article 1 (Tech Stack) must follow RFC process:
-1. Create `.sdd/rfcs/rfc-[YYYY-MM-DD]-[topic].md`.
-2. Team review & approval.
-3. Update AMENDMENT LOG below with link to RFC.
-
-| Date | RFC File | Change | Approved by |
-|------|----------|--------|-------------|
-| — | — | — | — |
+- ✅ Tất cả Tiêu chí Nghiệm thu trong đặc tả được thỏa mãn.
+- ✅ Tất cả truy vấn CSDL dùng SQL tham số hóa, không hardcode giá trị.
+- ✅ `AutoGrader` được unit-test, 100% xác định, idempotent.
+- ✅ Integration test: luồng nộp bài (tạo → nộp → kiểm tra band_score).
+- ✅ Test phiên bản hóa: sửa câu hỏi → điểm bài cũ không đổi.
+- ✅ Audit logs ghi lại mọi thao tác Giáo viên.
+- ✅ ESLint/Prettier clean (0 cảnh báo).
+- ✅ Không hardcode secrets, API keys.
+- ✅ Không lộ stack trace trong API response.
+- ✅ Validation đầu vào trên tất cả endpoint.
+- ✅ Ngăn chặn IDOR (kiểm tra quyền sở hữu).
+- ✅ Transaction an toàn: tất-cả-hoặc-không-gì cả.
 
 ---
 
-*Authors:* Prepared for Tech Lead review (2026-06-03).  
-*References:*
-- `.sdd/constitution.md` — Project law & constraints
-- `.sdd/shared_context.md` — Shared domain knowledge
-- `.sdd/specs/feat-objective-testing/SPEC.md` — Full spec (DRAFT)
-- `.sdd/specs/feat-auth-and-users/PLAN.md` — Template reference
+## 9. BƯỚC TIẾP THEO
+
+1. **Tech Lead duyệt:** Phê duyệt PLAN này với phản hồi.
+2. **Tạo DB Migrations:** Viết file migration cho các bảng mới.
+3. **Triển khai AutoGrader:** Service thuần + unit test.
+4. **Triển khai Truy vấn CSDL:** Module SQL tham số hóa + integration test.
+5. **Triển khai Controller & Routes:** Luồng nộp bài với transaction.
+6. **Triển khai 14 màn hình Frontend:** Dùng Bootstrap 5 cho styling.
+
+---
+
+*Tác giả:* Chuẩn bị cho Tech Lead duyệt (2026-06-03).  
+*Tham khảo:*
+- `.sdd/specs/feat-objective-testing/SPEC.md` — Đặc tả đầy đủ
+- `.sdd/constitution.md` — Luật & ràng buộc dự án
