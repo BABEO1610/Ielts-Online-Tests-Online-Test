@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import StudentNavbar from '../components/layout/StudentNavbar';
 import FeatureCard from '../components/dashboard/FeatureCard';
 import PromoBand from '../components/dashboard/PromoBand';
@@ -6,6 +7,13 @@ import { useAuth } from '../context/AuthContext';
 
 const Dashboard = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (user && user.role === 'admin') {
+      navigate('/admin', { replace: true });
+    }
+  }, [user, navigate]);
 
   return (
     <div className="bg-white min-vh-100 pb-5">
