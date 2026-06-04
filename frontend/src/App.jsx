@@ -15,6 +15,25 @@ import AdminDashboard from './pages/AdminDashboard';
 import Dashboard from './pages/Dashboard';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 
+// Objective Testing — Student Views (Task 4.1)
+import TestListPage from './pages/objective-testing/TestListPage';
+import TestDetailPage from './pages/objective-testing/TestDetailPage';
+import TestHistoryPage from './pages/objective-testing/TestHistoryPage';
+
+// Objective Testing — Live Test Views (Task 4.2)
+import ReadingTestPage from './pages/objective-testing/ReadingTestPage';
+import ListeningTestPage from './pages/objective-testing/ListeningTestPage';
+
+// Objective Testing — Result Views (Task 4.3)
+import TestResultPage from './pages/objective-testing/TestResultPage';
+import TestResultDetailPage from './pages/objective-testing/TestResultDetailPage';
+
+// Objective Testing — Tutor/Admin Views (Task 4.4)
+import TutorTestManagePage from './pages/objective-testing/TutorTestManagePage';
+import TutorTestFormPage from './pages/objective-testing/TutorTestFormPage';
+import TutorQuestionFormPage from './pages/objective-testing/TutorQuestionFormPage';
+import AuditLogPage from './pages/objective-testing/AuditLogPage';
+
 import './App.css';
 
 function App() {
@@ -45,6 +64,31 @@ function App() {
             <Dashboard />
           </ProtectedRoute>
         } />
+
+        {/* ═══ Objective Testing Routes (feat-objective-testing) ═══ */}
+
+        {/* Student: Test Browsing */}
+        <Route path="/tests" element={<TestListPage />} />
+        <Route path="/tests/:id" element={<TestDetailPage />} />
+        <Route path="/tests/history" element={<TestHistoryPage />} />
+
+        {/* Student: Live Test */}
+        <Route path="/tests/:id/reading" element={<ReadingTestPage />} />
+        <Route path="/tests/:id/listening" element={<ListeningTestPage />} />
+
+        {/* Student: Results */}
+        <Route path="/results/:attemptId" element={<TestResultPage />} />
+        <Route path="/results/:attemptId/detail" element={<TestResultDetailPage />} />
+
+        {/* Tutor: Test Management */}
+        <Route path="/tutor/tests" element={<TutorTestManagePage />} />
+        <Route path="/tutor/tests/new" element={<TutorTestFormPage />} />
+        <Route path="/tutor/tests/:id/edit" element={<TutorTestFormPage />} />
+        <Route path="/tutor/tests/:id/questions/new" element={<TutorQuestionFormPage />} />
+        <Route path="/tutor/tests/:id/questions/:qId/edit" element={<TutorQuestionFormPage />} />
+
+        {/* Admin: Audit Logs */}
+        <Route path="/admin/audit-logs" element={<AuditLogPage />} />
 
         {/* Fallback 404 Route */}
         <Route

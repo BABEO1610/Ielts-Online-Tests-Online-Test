@@ -1,0 +1,463 @@
+/* ============================================================
+   objective-testing.css — Custom styles for Objective Testing Module
+   Following DESIGN.md (Uber-inspired) + Bootstrap 5
+   ============================================================ */
+
+/* ─── Question Navigation Grid ─── */
+.question-nav-grid {
+  display: grid;
+  grid-template-columns: repeat(10, 1fr);
+  gap: var(--spacing-xs);
+}
+
+.question-nav-grid .q-btn {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--rounded-md);
+  font-family: var(--font-text);
+  font-size: 13px;
+  font-weight: 500;
+  border: 2px solid var(--surface-pressed);
+  background: var(--canvas);
+  color: var(--ink);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  padding: 0;
+}
+
+.question-nav-grid .q-btn:hover {
+  border-color: var(--ink);
+}
+
+.question-nav-grid .q-btn.answered {
+  background: var(--ink);
+  color: var(--on-primary);
+  border-color: var(--ink);
+}
+
+.question-nav-grid .q-btn.current {
+  border-color: var(--ink);
+  box-shadow: 0 0 0 2px var(--ink);
+}
+
+/* ─── Split View for Reading ─── */
+.split-view {
+  display: flex;
+  height: calc(100vh - 120px);
+  overflow: hidden;
+}
+
+.split-view .split-left,
+.split-view .split-right {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--spacing-2xl);
+}
+
+.split-view .split-left {
+  border-right: 1px solid var(--surface-pressed);
+  background: var(--canvas);
+}
+
+.split-view .split-right {
+  background: var(--canvas-soft);
+}
+
+/* ─── Timer Bar ─── */
+.timer-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--spacing-md) var(--spacing-2xl);
+  background: var(--ink);
+  color: var(--on-dark);
+  font-family: var(--font-text);
+  position: sticky;
+  top: 0;
+  z-index: 1040;
+}
+
+.timer-bar .timer-display {
+  font-size: 20px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 1px;
+}
+
+.timer-bar .timer-display.danger {
+  color: #ef4444;
+  animation: pulse-danger 1s ease-in-out infinite;
+}
+
+@keyframes pulse-danger {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+/* ─── Audio Player Sticky ─── */
+.audio-player-sticky {
+  position: sticky;
+  top: 56px;
+  z-index: 1030;
+  background: var(--canvas);
+  padding: var(--spacing-lg) var(--spacing-2xl);
+  border-bottom: 1px solid var(--surface-pressed);
+  box-shadow: var(--shadow-subtle);
+}
+
+.audio-player-sticky audio {
+  width: 100%;
+  border-radius: var(--rounded-md);
+}
+
+/* ─── Test Card Grid ─── */
+.test-card {
+  background: var(--canvas);
+  border-radius: var(--rounded-xl);
+  padding: var(--spacing-2xl);
+  box-shadow: var(--shadow-flat);
+  border: 1px solid var(--surface-pressed);
+  transition: box-shadow 0.2s ease, transform 0.15s ease;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.test-card:hover {
+  box-shadow: var(--shadow-subtle);
+  transform: translateY(-2px);
+}
+
+.test-card .card-title {
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 28px;
+  margin-bottom: var(--spacing-sm);
+}
+
+.test-card .card-meta {
+  display: flex;
+  gap: var(--spacing-sm);
+  flex-wrap: wrap;
+  margin-bottom: var(--spacing-lg);
+}
+
+/* ─── Badge Pills ─── */
+.badge-skill {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--spacing-xxs) var(--spacing-md);
+  border-radius: var(--rounded-pill);
+  font-family: var(--font-text);
+  font-size: 12px;
+  font-weight: 500;
+  background: var(--ink);
+  color: var(--on-primary);
+}
+
+.badge-difficulty {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--spacing-xxs) var(--spacing-md);
+  border-radius: var(--rounded-pill);
+  font-family: var(--font-text);
+  font-size: 12px;
+  font-weight: 500;
+  background: var(--canvas-soft);
+  color: var(--ink);
+}
+
+.badge-status {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--spacing-xxs) var(--spacing-md);
+  border-radius: var(--rounded-pill);
+  font-family: var(--font-text);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.badge-status.published {
+  background: #edf7ed;
+  color: #1e4620;
+}
+
+.badge-status.draft {
+  background: #fef3cd;
+  color: #856404;
+}
+
+/* ─── Band Score Display ─── */
+.band-score-display {
+  font-family: var(--font-display);
+  font-size: 96px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--ink);
+  text-align: center;
+}
+
+.band-score-display .band-label {
+  font-size: 18px;
+  font-weight: 500;
+  color: var(--body);
+  margin-top: var(--spacing-sm);
+}
+
+/* ─── Result Detail Grid ─── */
+.result-item {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-lg);
+  padding: var(--spacing-lg) 0;
+  border-bottom: 1px solid var(--surface-pressed);
+}
+
+.result-item:last-child {
+  border-bottom: none;
+}
+
+.result-item .q-number {
+  min-width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--rounded-md);
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.result-item .q-number.correct {
+  background: #edf7ed;
+  color: #1e4620;
+}
+
+.result-item .q-number.incorrect {
+  background: #fdf2f2;
+  color: #e02424;
+}
+
+/* ─── Exam Detail Hero ─── */
+.exam-detail-hero {
+  background: var(--ink);
+  color: var(--on-dark);
+  padding: 64px var(--spacing-3xl);
+  border-radius: var(--rounded-xl);
+  text-align: center;
+}
+
+.exam-detail-hero .hero-title {
+  font-family: var(--font-display);
+  font-size: 36px;
+  font-weight: 700;
+  line-height: 44px;
+  margin-bottom: var(--spacing-lg);
+}
+
+/* ─── Tutor Table ─── */
+.tutor-table th {
+  background: var(--canvas-soft);
+  font-family: var(--font-text);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--ink);
+  padding: var(--spacing-md) var(--spacing-lg);
+  border-bottom: 1px solid var(--surface-pressed);
+}
+
+.tutor-table td {
+  font-family: var(--font-text);
+  font-size: 14px;
+  font-weight: 400;
+  padding: var(--spacing-md) var(--spacing-lg);
+  border-bottom: 1px solid var(--surface-pressed);
+  vertical-align: middle;
+}
+
+.tutor-table tr:hover td {
+  background: var(--canvas-softer);
+}
+
+/* ─── Filter Bar ─── */
+.filter-bar {
+  display: flex;
+  gap: var(--spacing-md);
+  flex-wrap: wrap;
+  padding: var(--spacing-lg) 0;
+}
+
+.filter-bar select,
+.filter-bar input {
+  font-family: var(--font-text);
+  font-size: 14px;
+  font-weight: 400;
+  padding: var(--spacing-sm) var(--spacing-lg);
+  border-radius: var(--rounded-pill);
+  border: 1px solid var(--surface-pressed);
+  background: var(--canvas);
+  color: var(--ink);
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.filter-bar select:focus,
+.filter-bar input:focus {
+  border-color: var(--ink);
+}
+
+/* ─── Modal Overrides ─── */
+.modal-uber .modal-content {
+  border-radius: var(--rounded-xl);
+  border: none;
+  box-shadow: var(--shadow-card);
+}
+
+.modal-uber .modal-header {
+  border-bottom: 1px solid var(--surface-pressed);
+  padding: var(--spacing-2xl);
+}
+
+.modal-uber .modal-body {
+  padding: var(--spacing-2xl);
+}
+
+.modal-uber .modal-footer {
+  border-top: 1px solid var(--surface-pressed);
+  padding: var(--spacing-lg) var(--spacing-2xl);
+}
+
+/* ─── Audit Log JSON Block ─── */
+.audit-json-block {
+  background: var(--canvas-softer);
+  border-radius: var(--rounded-md);
+  padding: var(--spacing-md);
+  font-family: 'Courier New', monospace;
+  font-size: 12px;
+  max-height: 120px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+/* ─── Form Card for Tutor ─── */
+.form-card {
+  background: var(--canvas);
+  border-radius: var(--rounded-xl);
+  padding: var(--spacing-3xl);
+  box-shadow: var(--shadow-card);
+}
+
+.form-card .form-group {
+  margin-bottom: var(--spacing-xl);
+}
+
+.form-card label {
+  font-family: var(--font-text);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--ink);
+  margin-bottom: var(--spacing-sm);
+  display: block;
+}
+
+.form-card input,
+.form-card select,
+.form-card textarea {
+  width: 100%;
+  font-family: var(--font-text);
+  font-size: 16px;
+  font-weight: 400;
+  padding: var(--spacing-lg);
+  border-radius: var(--rounded-md);
+  border: 1px solid var(--surface-pressed);
+  background: var(--canvas-soft);
+  color: var(--ink);
+  outline: none;
+  box-sizing: border-box;
+  transition: border-color 0.15s, background-color 0.15s;
+}
+
+.form-card input:focus,
+.form-card select:focus,
+.form-card textarea:focus {
+  border-color: var(--ink);
+  background: var(--canvas);
+  box-shadow: 0 0 0 2px var(--ink);
+}
+
+/* ─── Question Option Card ─── */
+.option-card {
+  background: var(--canvas-soft);
+  border-radius: var(--rounded-lg);
+  padding: var(--spacing-lg);
+  margin-bottom: var(--spacing-sm);
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  cursor: pointer;
+  border: 2px solid transparent;
+  transition: border-color 0.15s, background-color 0.15s;
+}
+
+.option-card:hover {
+  background: var(--surface-pressed);
+}
+
+.option-card.selected {
+  border-color: var(--ink);
+  background: var(--canvas);
+}
+
+/* ─── Page Heading ─── */
+.page-heading {
+  margin-bottom: var(--spacing-3xl);
+}
+
+.page-heading h1 {
+  font-family: var(--font-display);
+  font-size: 36px;
+  font-weight: 700;
+  line-height: 44px;
+  margin: 0 0 var(--spacing-sm) 0;
+}
+
+.page-heading p {
+  font-family: var(--font-text);
+  font-size: 16px;
+  color: var(--body);
+  margin: 0;
+}
+
+/* ─── Responsive ─── */
+@media (max-width: 767px) {
+  .split-view {
+    flex-direction: column;
+    height: auto;
+  }
+  .split-view .split-left,
+  .split-view .split-right {
+    border-right: none;
+  }
+  .split-view .split-left {
+    border-bottom: 1px solid var(--surface-pressed);
+    max-height: 50vh;
+  }
+  .question-nav-grid {
+    grid-template-columns: repeat(8, 1fr);
+  }
+  .band-score-display {
+    font-size: 64px;
+  }
+  .exam-detail-hero {
+    padding: var(--spacing-3xl) var(--spacing-lg);
+  }
+  .exam-detail-hero .hero-title {
+    font-size: 28px;
+    line-height: 36px;
+  }
+}
