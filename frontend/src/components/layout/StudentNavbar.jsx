@@ -51,10 +51,10 @@ const StudentNavbar = () => {
             {/* EARS[State-driven]: WHEN user is authenticated THEN render the profile dropdown, ELSE render the login and register button pills. */}
             {isAuthenticated ? (
               <div className="dropdown" data-testid="profile-dropdown">
-                <button 
-                  className="btn btn-light rounded-pill px-4 py-2 fw-medium border-0 d-flex align-items-center gap-2" 
-                  type="button" 
-                  data-bs-toggle="dropdown" 
+                <button
+                  className="btn btn-light rounded-pill px-4 py-2 fw-medium border-0 d-flex align-items-center gap-2"
+                  type="button"
+                  data-bs-toggle="dropdown"
                   style={{ backgroundColor: '#efefef' }}
                 >
                   {user?.avatar_url ? (
@@ -75,17 +75,17 @@ const StudentNavbar = () => {
               </div>
             ) : (
               <div className="d-flex gap-2" data-testid="guest-auth-buttons">
-                <Link 
-                  to="/login" 
-                  className="btn btn-light rounded-pill px-4 py-2 fw-medium border-0" 
+                <Link
+                  to="/login"
+                  className="btn btn-light rounded-pill px-4 py-2 fw-medium border-0"
                   style={{ backgroundColor: '#efefef', color: '#000000', fontSize: '16px' }}
                   data-testid="login-link"
                 >
                   Đăng nhập
                 </Link>
-                <Link 
-                  to="/register" 
-                  className="btn btn-dark rounded-pill px-4 py-2 fw-medium border-0 text-white" 
+                <Link
+                  to="/register"
+                  className="btn btn-dark rounded-pill px-4 py-2 fw-medium border-0 text-white"
                   style={{ backgroundColor: '#000000', fontSize: '16px' }}
                   data-testid="register-link"
                 >
