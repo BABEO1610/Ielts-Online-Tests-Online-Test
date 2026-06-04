@@ -1,0 +1,57 @@
+import React from 'react';
+import { render, screen } from '@testing-library/react';
+import { describe, it, expect } from 'vitest';
+import AuthLayout from '../../../../src/components/layout/AuthLayout';
+
+/**
+ * Traceability Matrix:
+ * - Requirement: T043 - Component căn giữa màn hình cho các trang đăng nhập/đăng ký.
+ * - EARS: EARS[State]: WHILE rendering auth pages, THE system SHALL wrap children in a centered layout.
+ */
+
+describe('AuthLayout Component', () => {
+  it('should render children correctly', () => {
+    // EARS[State]: WHILE rendering auth pages, THE system SHALL wrap children in a centered layout.
+    render(
+      <AuthLayout>
+        <div data-testid="test-child">Child Content</div>
+      </AuthLayout>
+    );
+
+    const child = screen.getByTestId('test-child');
+    expect(child).toBeInTheDocument();
+    expect(child).toHaveTextContent('Child Content');
+  });
+
+  it('should apply centering and layout classes to wrapper', () => {
+    const { container } = render(
+      <AuthLayout>
+        <div>Content</div>
+      </AuthLayout>
+    );
+
+    // Kiểm tra thẻ div wrapper ngoài cùng (viewport-height centering)
+    const outerContainer = container.firstChild;
+    expect(outerContainer).toHaveClass('d-flex');
+    expect(outerContainer).toHaveClass('align-items-center');
+    expect(outerContainer).toHaveClass('justify-content-center');
+    expect(outerContainer).toHaveClass('min-vh-100');
+    expect(outerContainer).toHaveClass('bg-white');
+  });
+
+  it('should apply Uber-inspired design classes to card container', () => {
+    const { container } = render(
+      <AuthLayout>
+        <div>Content</div>
+      </AuthLayout>
+    );
+
+    // Kiểm tra UI của container hiển thị form (Uber card style)
+    const card = container.querySelector('.card');
+    expect(card).toBeInTheDocument();
+    expect(card).toHaveClass('border-0');
+    expect(card).toHaveClass('shadow-sm');
+    expect(card).toHaveClass('rounded-4');
+    expect(card).toHaveClass('bg-light');
+  });
+});
