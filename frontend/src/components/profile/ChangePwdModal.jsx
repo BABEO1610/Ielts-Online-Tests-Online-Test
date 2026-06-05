@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import api from '../../services/api';
+import { useAuth } from '../../context/AuthContext';
 
 const ChangePwdModal = ({ isOpen, onClose }) => {
+  const { user } = useAuth();
   const [oldPassword, setOldPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -87,90 +89,112 @@ const ChangePwdModal = ({ isOpen, onClose }) => {
             </div>
             
             <div className="modal-body p-4">
-              {successMsg && (
-                <div className="alert alert-success d-flex align-items-center mb-4 rounded-3 shadow-sm" role="alert">
-                  <i className="bi bi-check-circle-fill me-2 fs-5"></i>
-                  <div>{successMsg}</div>
-                </div>
-              )}
-              
-              {errorMsg && (
-                <div className="alert alert-danger d-flex align-items-center mb-4 rounded-3 shadow-sm" role="alert">
-                  <i className="bi bi-exclamation-circle-fill me-2 fs-5"></i>
-                  <div>{errorMsg}</div>
-                </div>
-              )}
-
-              <form onSubmit={handleSubmit} noValidate>
-                <div className="mb-3">
-                  <label className="form-label fw-medium text-dark">Mật khẩu hiện tại</label>
-                  <input
-                    type="password"
-                    className="form-control form-control-lg rounded-3 bg-light border-0"
-                    placeholder="Nhập mật khẩu hiện tại"
-                    value={oldPassword}
-                    onChange={(e) => {
-                      setOldPassword(e.target.value);
-                      setErrorMsg('');
-                    }}
-                    required
-                    disabled={successMsg !== ''}
-                  />
-                </div>
-
-                <div className="mb-3">
-                  <label className="form-label fw-medium text-dark">Mật khẩu mới</label>
-                  <input
-                    type="password"
-                    className={`form-control form-control-lg rounded-3 bg-light border-0 ${!isPasswordStrong ? 'is-invalid' : ''}`}
-                    placeholder="Tối thiểu 8 ký tự"
-                    value={newPassword}
-                    onChange={(e) => {
-                      setNewPassword(e.target.value);
-                      setErrorMsg('');
-                    }}
-                    required
-                    disabled={successMsg !== ''}
-                  />
-                  {!isPasswordStrong && (
-                    <div className="invalid-feedback fw-medium">
-                      Mật khẩu phải có ít nhất 8 ký tự.
-                    </div>
-                  )}
-                </div>
-
-                <div className="mb-4">
-                  <label className="form-label fw-medium text-dark">Xác nhận mật khẩu mới</label>
-                  <input
-                    type="password"
-                    className={`form-control form-control-lg rounded-3 bg-light border-0 ${!isPasswordMatch ? 'is-invalid' : ''}`}
-                    placeholder="Nhập lại mật khẩu mới"
-                    value={confirmPassword}
-                    onChange={(e) => {
-                      setConfirmPassword(e.target.value);
-                      setErrorMsg('');
-                    }}
-                    required
-                    disabled={successMsg !== ''}
-                  />
-                  {!isPasswordMatch && (
-                    <div className="invalid-feedback fw-medium">
-                      Mật khẩu xác nhận không khớp.
-                    </div>
-                  )}
-                </div>
-
-                <div className="d-grid gap-2">
-                  <button
-                    type="submit"
-                    className="btn btn-dark btn-lg rounded-pill fw-bold text-white shadow-sm"
-                    disabled={loading || !oldPassword || !newPassword || !isPasswordMatch || !isPasswordStrong || successMsg !== ''}
-                    style={{ backgroundColor: '#000000' }}
+              {user && user.has_password === false ? (
+                <div className="text-center py-3">
+                  <div className="mb-3">
+                    <i className="bi bi-google fs-1 text-primary"></i>
+                  </div>
+                  <h5 className="fw-bold mb-3">Tài khoản liên kết Google</h5>
+                  <p className="text-muted mb-4">
+                    Bạn đang đăng nhập bằng Google nên chưa có mật khẩu.<br/>
+                    Vui lòng <strong>Đăng xuất</strong> và chọn <strong>Quên mật khẩu</strong> ở màn hình đăng nhập để hệ thống hỗ trợ bạn tạo mật khẩu mới nhé.
+                  </p>
+                  <button 
+                    type="button" 
+                    className="btn btn-dark px-4 py-2 rounded-pill fw-medium shadow-sm"
+                    onClick={onClose}
                   >
-                    {loading ? 'Đang xử lý...' : 'Lưu thay đổi'}
+                    Đã hiểu
                   </button>
                 </div>
-              </form>
+              ) : (
+                <>
+                  {successMsg && (
+                    <div className="alert alert-success d-flex align-items-center mb-4 rounded-3 shadow-sm" role="alert">
+                      <i className="bi bi-check-circle-fill me-2 fs-5"></i>
+                      <div>{successMsg}</div>
+                    </div>
+                  )}
+                  
+                  {errorMsg && (
+                    <div className="alert alert-danger d-flex align-items-center mb-4 rounded-3 shadow-sm" role="alert">
+                      <i className="bi bi-exclamation-circle-fill me-2 fs-5"></i>
+                      <div>{errorMsg}</div>
+                    </div>
+                  )}
+
+                  <form onSubmit={handleSubmit} noValidate>
+                    <div className="mb-3">
+                      <label className="form-label fw-medium text-dark">Mật khẩu hiện tại</label>
+                      <input
+                        type="password"
+                        className="form-control form-control-lg rounded-3 bg-light border-0"
+                        placeholder="Nhập mật khẩu hiện tại"
+                        value={oldPassword}
+                        onChange={(e) => {
+                          setOldPassword(e.target.value);
+                          setErrorMsg('');
+                        }}
+                        required
+                        disabled={successMsg !== ''}
+                      />
+                    </div>
+
+                    <div className="mb-3">
+                      <label className="form-label fw-medium text-dark">Mật khẩu mới</label>
+                      <input
+                        type="password"
+                        className={`form-control form-control-lg rounded-3 bg-light border-0 ${!isPasswordStrong ? 'is-invalid' : ''}`}
+                        placeholder="Tối thiểu 8 ký tự"
+                        value={newPassword}
+                        onChange={(e) => {
+                          setNewPassword(e.target.value);
+                          setErrorMsg('');
+                        }}
+                        required
+                        disabled={successMsg !== ''}
+                      />
+                      {!isPasswordStrong && (
+                        <div className="invalid-feedback fw-medium">
+                          Mật khẩu phải có ít nhất 8 ký tự.
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="mb-4">
+                      <label className="form-label fw-medium text-dark">Xác nhận mật khẩu mới</label>
+                      <input
+                        type="password"
+                        className={`form-control form-control-lg rounded-3 bg-light border-0 ${!isPasswordMatch ? 'is-invalid' : ''}`}
+                        placeholder="Nhập lại mật khẩu mới"
+                        value={confirmPassword}
+                        onChange={(e) => {
+                          setConfirmPassword(e.target.value);
+                          setErrorMsg('');
+                        }}
+                        required
+                        disabled={successMsg !== ''}
+                      />
+                      {!isPasswordMatch && (
+                        <div className="invalid-feedback fw-medium">
+                          Mật khẩu xác nhận không khớp.
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="d-grid gap-2">
+                      <button
+                        type="submit"
+                        className="btn btn-dark btn-lg rounded-pill fw-bold text-white shadow-sm"
+                        disabled={loading || !oldPassword || !newPassword || !isPasswordMatch || !isPasswordStrong || successMsg !== ''}
+                        style={{ backgroundColor: '#000000' }}
+                      >
+                        {loading ? 'Đang xử lý...' : 'Lưu thay đổi'}
+                      </button>
+                    </div>
+                  </form>
+                </>
+              )}
             </div>
           </div>
         </div>
