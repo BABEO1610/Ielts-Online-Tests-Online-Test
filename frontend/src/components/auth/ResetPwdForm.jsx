@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import api from '../../services/api';
 
 const ResetPwdForm = () => {
@@ -16,7 +16,7 @@ const ResetPwdForm = () => {
 
   useEffect(() => {
     if (!token) {
-      setErrorMsg('Đường dẫn không hợp lệ hoặc đã hết hạn.');
+      setErrorMsg('Đường dẫn đặt lại mật khẩu không hợp lệ hoặc đã hết hạn.');
     }
   }, [token]);
 
@@ -47,9 +47,9 @@ const ResetPwdForm = () => {
 
     try {
       // EARS[Event]: WHEN a Guest submits a new password via a valid reset link...
-      await api.put('/auth/reset-password', {
+      await api.post('/auth/reset-password', {
         token,
-        new_password: password
+        password: password
       });
 
       setSuccessMsg('Đặt lại mật khẩu thành công! Đang chuyển hướng về trang Đăng nhập...');
@@ -60,8 +60,7 @@ const ResetPwdForm = () => {
       }, 3000);
       
     } catch (error) {
-      // EARS[Unwanted]: WHERE a User changes their password to one that matches their last 3 hashes...
-      const message = error.response?.data?.error || 'Không thể đặt lại mật khẩu. Vui lòng thử lại.';
+      const message = error.response?.data?.error?.message || error.response?.data?.error || 'Không thể đặt lại mật khẩu. Vui lòng thử lại.';
       setErrorMsg(message);
     } finally {
       setLoading(false);
@@ -70,27 +69,29 @@ const ResetPwdForm = () => {
 
   return (
     <div className="w-100">
-      <h2 className="display-xl text-center mb-xl">Đặt lại mật khẩu</h2>
+      <h2 className="fw-bold text-center mb-4">Đặt lại mật khẩu</h2>
       
       {successMsg && (
-        <div className="api-success-message" role="alert" data-testid="success-alert">
-          {successMsg}
+        <div className="alert alert-success d-flex align-items-center mb-4 rounded-3 shadow-sm" role="alert" data-testid="success-alert">
+          <i className="bi bi-check-circle-fill me-2 fs-4"></i>
+          <div>{successMsg}</div>
         </div>
       )}
       
       {errorMsg && (
-        <div className="api-error-message" role="alert" data-testid="error-alert">
-          {errorMsg}
+        <div className="alert alert-danger d-flex align-items-center mb-4 rounded-3 shadow-sm" role="alert" data-testid="error-alert">
+          <i className="bi bi-exclamation-circle-fill me-2 fs-4"></i>
+          <div>{errorMsg}</div>
         </div>
       )}
 
       <form onSubmit={handleSubmit} noValidate>
-        <div className="mb-lg">
-          <label className="form-label">Mật khẩu mới</label>
+        <div className="mb-3">
+          <label className="form-label fw-medium text-dark">Mật khẩu mới</label>
           <input
             type="password"
-            className={`text-input ${!isPasswordStrong ? 'error' : ''}`}
-            placeholder="Nhập mật khẩu mới (tối thiểu 8 ký tự)"
+            className={`form-control form-control-lg rounded-3 bg-white border-0 shadow-sm ${!isPasswordStrong ? 'is-invalid' : ''}`}
+            placeholder="Tối thiểu 8 ký tự"
             value={password}
             onChange={(e) => {
               setPassword(e.target.value);
@@ -101,17 +102,17 @@ const ResetPwdForm = () => {
             data-testid="password-input"
           />
           {!isPasswordStrong && (
-            <div className="error-message" data-testid="password-strength-error">
+            <div className="invalid-feedback fw-medium" data-testid="password-strength-error">
               Mật khẩu phải có ít nhất 8 ký tự.
             </div>
           )}
         </div>
 
-        <div className="mb-xl">
-          <label className="form-label">Xác nhận mật khẩu</label>
+        <div className="mb-4">
+          <label className="form-label fw-medium text-dark">Xác nhận mật khẩu</label>
           <input
             type="password"
-            className={`text-input ${!isPasswordMatch ? 'error' : ''}`}
+            className={`form-control form-control-lg rounded-3 bg-white border-0 shadow-sm ${!isPasswordMatch ? 'is-invalid' : ''}`}
             placeholder="Nhập lại mật khẩu mới"
             value={confirmPassword}
             onChange={(e) => {
@@ -123,21 +124,31 @@ const ResetPwdForm = () => {
             data-testid="confirm-password-input"
           />
           {!isPasswordMatch && (
-            <div className="error-message" data-testid="password-mismatch-error">
+            <div className="invalid-feedback fw-medium" data-testid="password-mismatch-error">
               Mật khẩu xác nhận không khớp.
             </div>
           )}
         </div>
 
-        <button
-          type="submit"
-          className="button-primary mb-md"
-          disabled={loading || !token || !isPasswordMatch || !isPasswordStrong || password.length === 0 || successMsg !== ''}
-          data-testid="submit-btn"
-        >
-          {loading ? 'Đang xử lý...' : 'Xác nhận đặt lại'}
-        </button>
+        <div className="d-grid gap-2 mb-4">
+          <button
+            type="submit"
+            className="btn btn-dark btn-lg rounded-pill fw-bold text-white shadow-sm"
+            disabled={loading || !token || !isPasswordMatch || !isPasswordStrong || password.length === 0 || successMsg !== ''}
+            style={{ backgroundColor: '#000000' }}
+            data-testid="submit-btn"
+          >
+            {loading ? 'Đang xử lý...' : 'Xác nhận đặt lại'}
+          </button>
+        </div>
       </form>
+      
+      <div className="text-center mt-4">
+        <Link to="/login" className="text-decoration-none fw-medium" style={{ color: '#0000ee', fontSize: '14px' }}>
+          <i className="bi bi-arrow-left me-1"></i>
+          Quay lại đăng nhập
+        </Link>
+      </div>
     </div>
   );
 };

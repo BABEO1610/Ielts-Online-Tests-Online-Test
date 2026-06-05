@@ -28,6 +28,9 @@ router.post('/forgot-password', forgotPasswordLimiter, authController.forgotPass
 // Reset Password
 router.post('/reset-password', authController.resetPasswordValidator, authController.resetPassword);
 
+// Change Password (Requires Authentication)
+router.post('/change-password', authenticate, authController.changePasswordValidator, authController.changePassword);
+
 // Google OAuth
 router.get('/google', authController.googleRedirect);
 router.get('/google/callback', authController.googleCallback);

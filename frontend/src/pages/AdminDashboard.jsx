@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import UserModals from '../components/admin/UserModals';
+import AdminNavbar from '../components/layout/AdminNavbar';
 
 const ROLES = ['', 'student', 'tutor', 'admin'];
 const STATUSES = ['', 'active', 'inactive', 'pending', 'banned'];
@@ -66,8 +67,10 @@ const AdminDashboard = () => {
   };
 
   return (
-    <div className="container-fluid py-4">
-      <div className="d-flex align-items-center justify-content-between mb-4">
+    <>
+      <AdminNavbar />
+      <div className="container-fluid py-4">
+        <div className="d-flex align-items-center justify-content-between mb-4">
         <h2 className="fw-bold mb-0">Quản lý Người dùng</h2>
         <span className="text-secondary">
           Tổng: <strong data-testid="total-count">{meta.total}</strong> người dùng
@@ -230,6 +233,7 @@ const AdminDashboard = () => {
         onSuccess={() => fetchUsers()} 
       />
     </div>
+    </>
   );
 };
 
