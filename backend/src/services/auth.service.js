@@ -163,6 +163,7 @@ const verifyLogin = async (email, password) => {
     // 7. Get updated user to return without hash
     const updatedUser = await findUserByEmail(email);
     const { password_hash, ...safeUser } = updatedUser;
+    safeUser.has_password = !!password_hash;
     
     return safeUser;
 };

@@ -22,6 +22,7 @@ const getProfile = async (userId) => {
   
   // Return safe user object (omit password_hash)
   const { password_hash, ...safeUser } = user;
+  safeUser.has_password = !!password_hash;
   return safeUser;
 };
 
