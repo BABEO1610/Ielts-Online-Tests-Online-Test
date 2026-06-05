@@ -1,7 +1,10 @@
 import React from 'react';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Link } from 'react-router-dom';
 
-// Public Pages
+// ── Auth Guard ─────────────────────────────────────────────────────────────────
+import ProtectedRoute from './components/auth/ProtectedRoute';
+
+// ── Public Pages ───────────────────────────────────────────────────────────────
 import LandingPage from './pages/LandingPage';
 import Login from './pages/Login';
 import RegisterPage from './pages/RegisterPage';
@@ -9,26 +12,35 @@ import ForgotPwdPage from './pages/ForgotPwdPage';
 import ResetPwdPage from './pages/ResetPwdPage';
 import OnboardingPage from './pages/OnboardingPage';
 
-// Protected Pages
+// ── Core Protected Pages ───────────────────────────────────────────────────────
+import Dashboard from './pages/Dashboard';
 import UserProfilePage from './pages/UserProfilePage';
 import AdminDashboard from './pages/AdminDashboard';
-import Dashboard from './pages/Dashboard';
-import ProtectedRoute from './components/auth/ProtectedRoute';
+import TutorDashboard from './pages/TutorDashboard';
 
-// Objective Testing — Student Views (Task 4.1)
+// ── Student Skill Pages — Subjective (Navbar: Writing / Speaking) ──────────────
+import WritingPage from './pages/WritingPage';
+import SpeakingPage from './pages/SpeakingPage';
+
+// ── Student History (Profile Dropdown → /history) ─────────────────────────────
+import StudentHistoryPage from './pages/grading/StudentHistoryPage';
+
+// ── Tutor Workspace — Subjective Grading ──────────────────────────────────────
+import TutorQueuePage from './pages/grading/TutorQueuePage';
+import TutorGradingPage from './pages/grading/TutorGradingPage';
+
+// ── Objective Testing — Student Views ─────────────────────────────────────────
 import TestListPage from './pages/objective-testing/TestListPage';
 import TestDetailPage from './pages/objective-testing/TestDetailPage';
 import TestHistoryPage from './pages/objective-testing/TestHistoryPage';
-
-// Objective Testing — Live Test Views (Task 4.2)
+import ReadingPage from './pages/objective-testing/ReadingPage';
+import ListeningPage from './pages/objective-testing/ListeningPage';
 import ReadingTestPage from './pages/objective-testing/ReadingTestPage';
 import ListeningTestPage from './pages/objective-testing/ListeningTestPage';
-
-// Objective Testing — Result Views (Task 4.3)
 import TestResultPage from './pages/objective-testing/TestResultPage';
 import TestResultDetailPage from './pages/objective-testing/TestResultDetailPage';
 
-// Objective Testing — Tutor/Admin Views (Task 4.4)
+// ── Objective Testing — Tutor / Admin Views ────────────────────────────────────
 import TutorTestManagePage from './pages/objective-testing/TutorTestManagePage';
 import TutorTestFormPage from './pages/objective-testing/TutorTestFormPage';
 import TutorQuestionFormPage from './pages/objective-testing/TutorQuestionFormPage';
@@ -36,11 +48,39 @@ import AuditLogPage from './pages/objective-testing/AuditLogPage';
 
 import './App.css';
 
+// ── 404 Page — "Về trang chủ" trỏ về /dashboard (không phải Landing Page) ─────
+const NotFoundPage = () => (
+  <div style={{ textAlign: 'center', padding: '6rem 2rem', fontFamily: 'UberMoveText, system-ui, sans-serif' }}>
+    <h1 style={{ fontFamily: 'UberMove, system-ui, sans-serif', fontSize: '72px', fontWeight: 700, color: '#000', lineHeight: 1 }}>
+      404
+    </h1>
+    <p style={{ fontSize: '20px', color: '#5e5e5e', marginTop: '16px', marginBottom: '32px' }}>
+      Trang bạn tìm kiếm không tồn tại.
+    </p>
+    <Link
+      to="/dashboard"
+      style={{
+        display: 'inline-block',
+        backgroundColor: '#000',
+        color: '#fff',
+        padding: '14px 28px',
+        borderRadius: '999px',
+        fontWeight: 500,
+        textDecoration: 'none',
+        fontSize: '16px'
+      }}
+    >
+      Về trang chủ
+    </Link>
+  </div>
+);
+
 function App() {
   return (
     <BrowserRouter>
       <Routes>
-        {/* Public Routes */}
+
+        {/* ── Public Routes ─────────────────────────────────────────────────── */}
         <Route path="/" element={<LandingPage />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<RegisterPage />} />
@@ -48,59 +88,101 @@ function App() {
         <Route path="/reset-password" element={<ResetPwdPage />} />
         <Route path="/onboarding" element={<OnboardingPage />} />
 
-        {/* Protected Routes */}
+        {/* ── Protected Core ────────────────────────────────────────────────── */}
+        <Route path="/dashboard" element={
+          <ProtectedRoute><Dashboard /></ProtectedRoute>
+        } />
+        <Route path="/tutor/dashboard" element={
+          <ProtectedRoute role="tutor"><TutorDashboard /></ProtectedRoute>
+        } />
         <Route path="/profile" element={
-          <ProtectedRoute>
-            <UserProfilePage />
-          </ProtectedRoute>
+          <ProtectedRoute><UserProfilePage /></ProtectedRoute>
         } />
         <Route path="/admin" element={
-          <ProtectedRoute>
-            <AdminDashboard />
-          </ProtectedRoute>
-        } />
-        <Route path="/dashboard" element={
-          <ProtectedRoute>
-            <Dashboard />
-          </ProtectedRoute>
+          <ProtectedRoute><AdminDashboard /></ProtectedRoute>
         } />
 
-        {/* ═══ Objective Testing Routes (feat-objective-testing) ═══ */}
+        {/* ── Subjective — Student Skill Pages (Navbar: Writing / Speaking) ─── */}
+        <Route path="/writing" element={
+          <ProtectedRoute><WritingPage /></ProtectedRoute>
+        } />
+        <Route path="/speaking" element={
+          <ProtectedRoute><SpeakingPage /></ProtectedRoute>
+        } />
 
-        {/* Student: Test Browsing */}
-        <Route path="/tests" element={<TestListPage />} />
-        <Route path="/tests/:id" element={<TestDetailPage />} />
-        <Route path="/tests/history" element={<TestHistoryPage />} />
+        {/* ── Subjective — Student History (Profile Dropdown) ───────────────── */}
+        <Route path="/history" element={
+          <ProtectedRoute><StudentHistoryPage /></ProtectedRoute>
+        } />
 
-        {/* Student: Live Test */}
-        <Route path="/tests/:id/reading" element={<ReadingTestPage />} />
-        <Route path="/tests/:id/listening" element={<ListeningTestPage />} />
+        {/* ── Subjective — Tutor Workspace (role guard) ─────────────────────── */}
+        <Route path="/grading/tutor/queue" element={
+          <ProtectedRoute role="tutor"><TutorQueuePage /></ProtectedRoute>
+        } />
+        <Route path="/grading/tutor/grade/:type/:submissionId" element={
+          <ProtectedRoute role="tutor"><TutorGradingPage /></ProtectedRoute>
+        } />
 
-        {/* Student: Results */}
-        <Route path="/results/:attemptId" element={<TestResultPage />} />
-        <Route path="/results/:attemptId/detail" element={<TestResultDetailPage />} />
+        {/* ── Objective Testing — Student: Browsing ─────────────────────────── */}
+        <Route path="/tests" element={
+          <ProtectedRoute><TestListPage /></ProtectedRoute>
+        } />
+        <Route path="/tests/history" element={
+          <ProtectedRoute><TestHistoryPage /></ProtectedRoute>
+        } />
+        <Route path="/tests/:id" element={
+          <ProtectedRoute><TestDetailPage /></ProtectedRoute>
+        } />
 
-        {/* Tutor: Test Management */}
-        <Route path="/tutor/tests" element={<TutorTestManagePage />} />
-        <Route path="/tutor/tests/new" element={<TutorTestFormPage />} />
-        <Route path="/tutor/tests/:id/edit" element={<TutorTestFormPage />} />
-        <Route path="/tutor/tests/:id/questions/new" element={<TutorQuestionFormPage />} />
-        <Route path="/tutor/tests/:id/questions/:qId/edit" element={<TutorQuestionFormPage />} />
+        {/* ── Objective Testing — Navbar: Reading / Listening (riêng biệt) ───── */}
+        <Route path="/reading" element={
+          <ProtectedRoute><ReadingPage /></ProtectedRoute>
+        } />
+        <Route path="/listening" element={
+          <ProtectedRoute><ListeningPage /></ProtectedRoute>
+        } />
 
-        {/* Admin: Audit Logs */}
-        <Route path="/admin/audit-logs" element={<AuditLogPage />} />
+        {/* ── Objective Testing — Student: Live Test ────────────────────────── */}
+        <Route path="/tests/:id/reading" element={
+          <ProtectedRoute><ReadingTestPage /></ProtectedRoute>
+        } />
+        <Route path="/tests/:id/listening" element={
+          <ProtectedRoute><ListeningTestPage /></ProtectedRoute>
+        } />
 
-        {/* Fallback 404 Route */}
-        <Route
-          path="*"
-          element={
-            <div style={{ textAlign: 'center', padding: '4rem' }}>
-              <h1>404 – Not Found</h1>
-              <p>The page you are looking for does not exist.</p>
-              <a href="/">Go to Home</a>
-            </div>
-          }
-        />
+        {/* ── Objective Testing — Student: Results ──────────────────────────── */}
+        <Route path="/results/:attemptId" element={
+          <ProtectedRoute><TestResultPage /></ProtectedRoute>
+        } />
+        <Route path="/results/:attemptId/detail" element={
+          <ProtectedRoute><TestResultDetailPage /></ProtectedRoute>
+        } />
+
+        {/* ── Objective Testing — Tutor: Test Management ────────────────────── */}
+        <Route path="/tutor/tests" element={
+          <ProtectedRoute role="tutor"><TutorTestManagePage /></ProtectedRoute>
+        } />
+        <Route path="/tutor/tests/new" element={
+          <ProtectedRoute role="tutor"><TutorTestFormPage /></ProtectedRoute>
+        } />
+        <Route path="/tutor/tests/:id/edit" element={
+          <ProtectedRoute role="tutor"><TutorTestFormPage /></ProtectedRoute>
+        } />
+        <Route path="/tutor/tests/:id/questions/new" element={
+          <ProtectedRoute role="tutor"><TutorQuestionFormPage /></ProtectedRoute>
+        } />
+        <Route path="/tutor/tests/:id/questions/:qId/edit" element={
+          <ProtectedRoute role="tutor"><TutorQuestionFormPage /></ProtectedRoute>
+        } />
+
+        {/* ── Admin: Audit Logs ─────────────────────────────────────────────── */}
+        <Route path="/admin/audit-logs" element={
+          <ProtectedRoute><AuditLogPage /></ProtectedRoute>
+        } />
+
+        {/* ── 404 — "Về trang chủ" → /dashboard ────────────────────────────── */}
+        <Route path="*" element={<NotFoundPage />} />
+
       </Routes>
     </BrowserRouter>
   );

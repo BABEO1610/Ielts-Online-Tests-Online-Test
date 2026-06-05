@@ -20,8 +20,15 @@ const LoginForm = () => {
     const result = await login({ email, password });
 
     if (result.success) {
-      // EARS[Event]: THEN call DB function handle_successful_login(), set cookies, return user profile
-      navigate('/dashboard'); 
+      // EARS[State-driven]: WHEN login succeeds, redirect based on user role
+      const role = result.user?.role || result.data?.role;
+      if (role === 'tutor') {
+        navigate('/tutor/dashboard');
+      } else if (role === 'admin') {
+        navigate('/admin');
+      } else {
+        navigate('/dashboard');
+      }
     } else {
       const code = result.error?.code;
       // EARS[Unwanted]: WHERE a User has failed_login_attempts >= 5 THEN lock flow
