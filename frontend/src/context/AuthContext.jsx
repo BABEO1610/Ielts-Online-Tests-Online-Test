@@ -38,7 +38,8 @@ export const AuthProvider = ({ children }) => {
       if (response.data && response.data.data) {
         setUser(response.data.data);
         setIsAuthenticated(true);
-        return { success: true };
+        // Return user data (including role) so caller can redirect appropriately
+        return { success: true, user: response.data.data };
       }
       return { success: false, error: { message: 'Invalid response format' } };
     } catch (error) {
