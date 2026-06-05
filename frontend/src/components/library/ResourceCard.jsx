@@ -1,4 +1,6 @@
 import React from 'react';
+import LibraryDownloadButton from './LibraryDownloadButton';
+import MockTestBuilderEntry from './MockTestBuilderEntry';
 
 const formatFileSize = (bytes) => {
   if (bytes === 0 || !bytes) return '0 Bytes';
@@ -27,13 +29,16 @@ const ResourceCard = ({ resource, onEdit, onDelete, onDownload, canManage, isAut
   return (
     <div className="card h-100 border-0 p-4" style={{ backgroundColor: '#ffffff', borderRadius: '16px', boxShadow: 'rgba(0, 0, 0, 0.08) 0px 4px 16px 0px' }} data-testid="resource-card">
       <div className="d-flex justify-content-between align-items-start mb-3">
-        <span 
-          className={`badge rounded-pill px-3 py-2 text-white ${isPdf ? 'bg-danger' : 'bg-primary'}`} 
-          style={{ fontSize: '12px', fontWeight: '500' }}
-          data-testid="resource-type-badge"
-        >
-          {isPdf ? 'PDF' : 'Audio'}
-        </span>
+        <div className="d-flex gap-2 align-items-center">
+          <span 
+            className={`badge rounded-pill px-3 py-2 text-white ${isPdf ? 'bg-danger' : 'bg-primary'}`} 
+            style={{ fontSize: '12px', fontWeight: '500' }}
+            data-testid="resource-type-badge"
+          >
+            {isPdf ? 'PDF' : 'Audio'}
+          </span>
+          <MockTestBuilderEntry resourceId={resource.id} />
+        </div>
         
         {canManage && (
           <div className="dropdown" data-testid="manage-dropdown">
@@ -86,28 +91,7 @@ const ResourceCard = ({ resource, onEdit, onDelete, onDownload, canManage, isAut
           </div>
         </div>
         
-        {isAuthenticated ? (
-          <button 
-            className="btn btn-dark rounded-pill px-4 py-2 fw-medium d-flex align-items-center gap-2 transition-all" 
-            onClick={() => onDownload(resource)}
-            style={{ fontSize: '14px' }}
-            data-testid="download-btn"
-          >
-            <i className="bi bi-download"></i>
-            <span className="d-none d-sm-inline">Tải xuống</span>
-          </button>
-        ) : (
-          <button 
-            className="btn btn-light rounded-pill px-4 py-2 fw-medium text-muted d-flex align-items-center gap-2 border-0" 
-            disabled
-            title="Vui lòng đăng nhập để tải xuống"
-            style={{ fontSize: '14px', backgroundColor: '#f3f3f3' }}
-            data-testid="download-btn-disabled"
-          >
-            <i className="bi bi-lock-fill"></i>
-            <span className="d-none d-sm-inline">Đăng nhập để tải</span>
-          </button>
-        )}
+        <LibraryDownloadButton resource={resource} />
       </div>
     </div>
   );
