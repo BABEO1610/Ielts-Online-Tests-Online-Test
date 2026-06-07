@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import ChangePwdModal from '../components/profile/ChangePwdModal';
 
 /**
  * TutorDashboard.jsx — Trang chủ của Tutor
@@ -71,6 +72,7 @@ const TutorNavbar = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [showPwdModal, setShowPwdModal] = useState(false);
 
   const handleLogout = async () => {
     await logout();
@@ -142,12 +144,16 @@ const TutorNavbar = () => {
           style={{ backgroundColor: '#fff', fontFamily: 'UberMoveText, system-ui, sans-serif', fontSize: '15px', fontWeight: 500 }}
           onClick={() => setDropdownOpen(p => !p)}
         >
-          <div
-            className="d-flex align-items-center justify-content-center fw-bold"
-            style={{ width: '28px', height: '28px', borderRadius: '999px', backgroundColor: '#000', color: '#fff', fontSize: '13px' }}
-          >
-            {user?.full_name?.charAt(0)?.toUpperCase() || 'T'}
-          </div>
+          {user?.avatar_url ? (
+            <img src={user.avatar_url} alt="Avatar" className="rounded-circle" style={{ width: '28px', height: '28px', objectFit: 'cover' }} />
+          ) : (
+            <div
+              className="d-flex align-items-center justify-content-center fw-bold"
+              style={{ width: '28px', height: '28px', borderRadius: '999px', backgroundColor: '#000', color: '#fff', fontSize: '13px' }}
+            >
+              {user?.full_name?.charAt(0)?.toUpperCase() || 'T'}
+            </div>
+          )}
           <span>{user?.full_name || 'Tutor'}</span>
         </button>
         {dropdownOpen && (
@@ -161,6 +167,11 @@ const TutorNavbar = () => {
                 Hồ sơ cá nhân
               </Link>
             </li>
+            <li>
+              <button className="dropdown-item rounded-3 py-2" onClick={() => { setDropdownOpen(false); setShowPwdModal(true); }}>
+                Đổi mật khẩu
+              </button>
+            </li>
             <li><hr className="dropdown-divider" /></li>
             <li>
               <button className="dropdown-item rounded-3 py-2 text-danger" onClick={handleLogout}>
@@ -170,6 +181,11 @@ const TutorNavbar = () => {
           </ul>
         )}
       </div>
+
+      <ChangePwdModal 
+        isOpen={showPwdModal}
+        onClose={() => setShowPwdModal(false)}
+      />
     </nav>
   );
 };

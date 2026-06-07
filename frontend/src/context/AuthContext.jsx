@@ -10,7 +10,6 @@ export const AuthProvider = ({ children }) => {
 
   const refreshUser = async () => {
     try {
-      setIsLoading(true);
       // EARS[Event]: WHEN refreshing user THEN fetch profile from API
       const response = await api.get('/users/me');
       if (response.data && response.data.data) {

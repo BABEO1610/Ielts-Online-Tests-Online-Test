@@ -10,8 +10,12 @@ const Dashboard = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (user && user.role === 'admin') {
-      navigate('/admin', { replace: true });
+    if (user) {
+      if (user.role === 'admin') {
+        navigate('/admin', { replace: true });
+      } else if (user.role === 'tutor') {
+        navigate('/tutor/dashboard', { replace: true });
+      }
     }
   }, [user, navigate]);
 
