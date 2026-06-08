@@ -1,0 +1,191 @@
+{
+  "roles": [
+    { "id": 1, "name": "Admin" },
+    { "id": 2, "name": "Teacher" },
+    { "id": 3, "name": "Student" }
+  ],
+  "users": [
+    {
+      "id": 1,
+      "name": "System Admin",
+      "email": "admin@example.com",
+      "password": "hashed_password",
+      "roleId": 1,
+      "avatar": "https://i.pravatar.cc/150?u=admin"
+    },
+    {
+      "id": 2,
+      "name": "John Teacher",
+      "email": "teacher@example.com",
+      "password": "hashed_password",
+      "roleId": 2,
+      "avatar": "https://i.pravatar.cc/150?u=teacher"
+    },
+    {
+      "id": 3,
+      "name": "Alice Student",
+      "email": "student@example.com",
+      "password": "hashed_password",
+      "roleId": 3,
+      "avatar": "https://i.pravatar.cc/150?u=student"
+    }
+  ],
+  "courses": [
+    {
+      "id": 1,
+      "title": "IELTS Foundation",
+      "description": "Basic IELTS preparation course.",
+      "teacherId": 2,
+      "price": 50.0,
+      "thumbnail": "https://placehold.co/600x400",
+      "status": "published"
+    },
+    {
+      "id": 2,
+      "title": "IELTS Masterclass",
+      "description": "Advanced IELTS preparation.",
+      "teacherId": 2,
+      "price": 100.0,
+      "thumbnail": "https://placehold.co/600x400",
+      "status": "published"
+    }
+  ],
+  "lessons": [
+    {
+      "id": 1,
+      "courseId": 1,
+      "title": "Introduction to IELTS Listening",
+      "content": "This lesson covers the basics of the IELTS Listening test.",
+      "videoUrl": "https://example.com/video1.mp4",
+      "order": 1
+    },
+    {
+      "id": 2,
+      "courseId": 1,
+      "title": "Listening Section 1: Form Completion",
+      "content": "Strategies for form completion.",
+      "videoUrl": "https://example.com/video2.mp4",
+      "order": 2
+    }
+  ],
+  "tests": [
+    {
+      "id": 1,
+      "title": "Cambridge IELTS 16 - Test 1 - Listening",
+      "type": "Listening",
+      "duration": 40,
+      "courseId": 1,
+      "status": "published"
+    },
+    {
+      "id": 2,
+      "title": "Cambridge IELTS 16 - Test 1 - Reading",
+      "type": "Reading",
+      "duration": 60,
+      "courseId": null,
+      "status": "published"
+    }
+  ],
+  "questions": [
+    {
+      "id": 1,
+      "testId": 1,
+      "questionText": "What is the name of the booking agent?",
+      "type": "short_answer",
+      "options": [],
+      "correctAnswer": "Mr. Smith",
+      "points": 1,
+      "order": 1
+    },
+    {
+      "id": 2,
+      "testId": 2,
+      "questionText": "Which paragraph contains information about the discovery of penicillin?",
+      "type": "multiple_choice",
+      "options": ["Paragraph A", "Paragraph B", "Paragraph C", "Paragraph D"],
+      "correctAnswer": "Paragraph B",
+      "points": 1,
+      "order": 1
+    }
+  ],
+  "testAttempts": [
+    {
+      "id": 1,
+      "userId": 3,
+      "testId": 1,
+      "score": 8.5,
+      "totalCorrect": 35,
+      "totalQuestions": 40,
+      "startedAt": "2026-06-01T10:00:00Z",
+      "completedAt": "2026-06-01T10:40:00Z"
+    }
+  ],
+  "flashcards": [
+    {
+      "id": 1,
+      "deckName": "IELTS Academic Vocabulary",
+      "term": "Mitigate",
+      "definition": "Make less severe, serious, or painful.",
+      "example": "He wanted to mitigate misery in the world.",
+      "courseId": 1
+    },
+    {
+      "id": 2,
+      "deckName": "IELTS Academic Vocabulary",
+      "term": "Abundant",
+      "definition": "Existing or available in large quantities; plentiful.",
+      "example": "There was abundant evidence to support the theory.",
+      "courseId": 1
+    }
+  ],
+  "enrollments": [
+    {
+      "id": 1,
+      "userId": 3,
+      "courseId": 1,
+      "enrollmentDate": "2026-05-15T08:00:00Z",
+      "status": "active"
+    }
+  ],
+  "lessonProgress": [
+    {
+      "id": 1,
+      "enrollmentId": 1,
+      "lessonId": 1,
+      "completed": true,
+      "completedAt": "2026-05-16T09:00:00Z"
+    }
+  ],
+  "payments": [
+    {
+      "id": 1,
+      "userId": 3,
+      "amount": 50.0,
+      "currency": "USD",
+      "paymentDate": "2026-05-15T07:55:00Z",
+      "status": "completed",
+      "method": "Credit Card"
+    }
+  ],
+  "transactions": [
+    {
+      "id": 1,
+      "paymentId": 1,
+      "gateway": "Stripe",
+      "transactionId": "txn_1J2k3L4m5N6o7P8q9R",
+      "status": "success",
+      "createdAt": "2026-05-15T07:55:00Z"
+    }
+  ],
+  "approvalRequests": [
+    {
+      "id": 1,
+      "type": "Course Publishing",
+      "requestedBy": 2,
+      "courseId": 1,
+      "status": "approved",
+      "requestedAt": "2026-05-10T10:00:00Z",
+      "resolvedAt": "2026-05-11T14:00:00Z"
+    }
+  ]
+}

@@ -15,8 +15,22 @@ import OnboardingPage from './pages/OnboardingPage';
 // ── Core Protected Pages ───────────────────────────────────────────────────────
 import Dashboard from './pages/Dashboard';
 import UserProfilePage from './pages/UserProfilePage';
-import AdminDashboard from './pages/AdminDashboard';
 import TutorDashboard from './pages/TutorDashboard';
+
+// ── Admin Section — Layout + nested pages ──────────────────────────────────────
+import AdminLayout from './layouts/AdminLayout';
+import AdminOverviewPage from './pages/admin/AdminOverviewPage';
+import AdminUsersPage from './pages/admin/AdminUsersPage';
+import AdminActivityLogPage from './pages/admin/AdminActivityLogPage';
+import AdminAiUsagePage from './pages/admin/AdminAiUsagePage';
+import ContentReviewPage from './pages/admin/ContentReviewPage';
+import GradingOversightPage from './pages/admin/GradingOversightPage';
+import SessionsPage from './pages/admin/SessionsPage';
+import ContactInboxPage from './pages/admin/ContactInboxPage';
+import ReportsPage from './pages/admin/ReportsPage';
+import TutorAssignmentPage from './pages/admin/TutorAssignmentPage';
+import AdminChangeLogPage from './pages/admin/AdminChangeLogPage';
+import AdminProfilePage from './pages/admin/AdminProfilePage';
 
 // ── Student Skill Pages — Subjective (Navbar: Writing / Speaking) ──────────────
 import WritingPage from './pages/WritingPage';
@@ -98,9 +112,23 @@ function App() {
         <Route path="/profile" element={
           <ProtectedRoute><UserProfilePage /></ProtectedRoute>
         } />
+        {/* ── Admin Section — nested under AdminLayout (sidebar + topbar + footer) ── */}
         <Route path="/admin" element={
-          <ProtectedRoute><AdminDashboard /></ProtectedRoute>
-        } />
+          <ProtectedRoute role="admin"><AdminLayout /></ProtectedRoute>
+        }>
+          <Route index element={<AdminOverviewPage />} />
+          <Route path="users" element={<AdminUsersPage />} />
+          <Route path="tutor-assignment" element={<TutorAssignmentPage />} />
+          <Route path="sessions" element={<SessionsPage />} />
+          <Route path="content-review" element={<ContentReviewPage />} />
+          <Route path="grading" element={<GradingOversightPage />} />
+          <Route path="change-log" element={<AdminChangeLogPage />} />
+          <Route path="contacts" element={<ContactInboxPage />} />
+          <Route path="activity" element={<AdminActivityLogPage />} />
+          <Route path="ai-usage" element={<AdminAiUsagePage />} />
+          <Route path="reports" element={<ReportsPage />} />
+          <Route path="profile" element={<AdminProfilePage />} />
+        </Route>
 
         {/* ── Subjective — Student Skill Pages (Navbar: Writing / Speaking) ─── */}
         <Route path="/writing" element={
