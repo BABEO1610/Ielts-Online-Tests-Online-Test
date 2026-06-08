@@ -4,10 +4,11 @@ import { useAuth } from '../../context/AuthContext';
 import ChangePwdModal from '../profile/ChangePwdModal';
 
 const StudentNavbar = () => {
-  const { user, logout } = useAuth();
+  const { user, isAuthenticated, logout } = useAuth();
   const navigate = useNavigate();
   const [showPwdModal, setShowPwdModal] = React.useState(false);
 
+  // EARS[Event]: WHEN the user clicks logout THEN trigger the logout API call and navigate to login.
   const handleLogout = async () => {
     try {
       await logout();
@@ -42,8 +43,9 @@ const StudentNavbar = () => {
             <li className="nav-item">
               <Link className="nav-link fw-medium text-dark px-0" to="/speaking" style={{ fontSize: '16px' }}>Speaking</Link>
             </li>
+            {/* EARS[Ubiquitous]: The "Thư viện" link must be public and visible to both Guest and authenticated users. */}
             <li className="nav-item">
-              <Link className="nav-link fw-medium text-dark px-0" to="/library" style={{ fontSize: '16px' }}>Library</Link>
+              <Link className="nav-link fw-medium text-dark px-0" to="/library" style={{ fontSize: '16px' }} data-testid="library-nav-link">Thư viện</Link>
             </li>
           </ul>
 

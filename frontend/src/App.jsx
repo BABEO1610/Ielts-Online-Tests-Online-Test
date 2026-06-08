@@ -11,6 +11,7 @@ import RegisterPage from './pages/RegisterPage';
 import ForgotPwdPage from './pages/ForgotPwdPage';
 import ResetPwdPage from './pages/ResetPwdPage';
 import OnboardingPage from './pages/OnboardingPage';
+import ContentLibraryPage from './pages/ContentLibraryPage';
 
 // ── Core Protected Pages ───────────────────────────────────────────────────────
 import Dashboard from './pages/Dashboard';
@@ -101,6 +102,8 @@ function App() {
         <Route path="/forgot-password" element={<ForgotPwdPage />} />
         <Route path="/reset-password" element={<ResetPwdPage />} />
         <Route path="/onboarding" element={<OnboardingPage />} />
+        {/* EARS[Event]: WHEN user navigates to /library THEN route to ContentLibraryPage */}
+        <Route path="/library" element={<ContentLibraryPage />} />
 
         {/* ── Protected Core ────────────────────────────────────────────────── */}
         <Route path="/dashboard" element={
