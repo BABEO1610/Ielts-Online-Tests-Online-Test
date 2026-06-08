@@ -1,5 +1,8 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
 import StudentNavbar from '../../components/layout/StudentNavbar';
+import ModeSelector from '../../components/objective-testing/ModeSelector';
 
 /**
  * ReadingPage.jsx — /reading
@@ -81,7 +84,31 @@ const DIFFICULTY_STYLE = {
 };
 
 // ─── Level 2: Passages của một đề ─────────────────────────────────────────────
-const PassageList = ({ exam, onBack }) => (
+const PassageList = ({ exam, onBack }) => {
+  const navigate = useNavigate();
+  const { isAuthenticated } = useAuth();
+  const [showModeModal, setShowModeModal] = useState(false);
+
+  const handleStartTest = (modeConfig) => {
+    // EARS[Event]: WHEN user tries to start test
+    if (!isAuthenticated) {
+      // EARS[Unwanted]: IF user is not authenticated THEN redirect to login
+      navigate('/login', { state: { message: 'Vui lòng đăng nhập để bắt đầu làm bài thi' } });
+      return;
+    }
+    setShowModeModal(false);
+    navigate(`/tests/${exam.id}/reading`, { 
+      state: { 
+        practiceMode: modeConfig.isPractice,
+        selectedPartIds: modeConfig.selectedPartIds,
+        customTimeLimit: modeConfig.customTimeLimit
+      } 
+    });
+  };
+
+  const partsForMode = exam.passages.map((p, idx) => ({ id: `p${idx + 1}`, label: p.label }));
+
+  return (
   <div className="bg-white min-vh-100 pb-5">
     <StudentNavbar />
     <main className="container-fluid px-3 px-md-5 mt-4 mt-md-5" style={{ maxWidth: '1200px' }}>
@@ -115,7 +142,7 @@ const PassageList = ({ exam, onBack }) => (
             className="rounded-4 overflow-hidden"
             style={{
               border: '1px solid #e2e2e2',
-              backgroundColor: idx === 1 ? '#000' : '#fff',
+              backgroundColor: '#fff',
               transition: 'box-shadow 0.15s ease'
             }}
             onMouseEnter={e => e.currentTarget.style.boxShadow = 'rgba(0,0,0,0.12) 0px 4px 16px'}
@@ -127,21 +154,21 @@ const PassageList = ({ exam, onBack }) => (
                   className="d-flex align-items-center justify-content-center fw-bold flex-shrink-0"
                   style={{
                     width: '56px', height: '56px', borderRadius: '999px',
-                    backgroundColor: idx === 1 ? '#fff' : '#000',
-                    color: idx === 1 ? '#000' : '#fff',
+                    backgroundColor: '#000',
+                    color: '#fff',
                     fontSize: '18px', fontFamily: 'UberMove, system-ui, sans-serif'
                   }}
                 >
                   {idx + 1}
                 </div>
                 <div>
-                  <p className="mb-1 fw-bold" style={{ fontSize: '13px', fontFamily: 'UberMoveText, system-ui, sans-serif', color: idx === 1 ? '#afafaf' : '#5e5e5e', textTransform: 'uppercase' }}>
+                  <p className="mb-1 fw-bold" style={{ fontSize: '13px', fontFamily: 'UberMoveText, system-ui, sans-serif', color: '#5e5e5e', textTransform: 'uppercase' }}>
                     {p.label}
                   </p>
-                  <h4 className="fw-bold mb-1" style={{ fontFamily: 'UberMove, system-ui, sans-serif', fontSize: '20px', color: idx === 1 ? '#fff' : '#000' }}>
+                  <h4 className="fw-bold mb-1" style={{ fontFamily: 'UberMove, system-ui, sans-serif', fontSize: '20px', color: '#000' }}>
                     {p.title}
                   </h4>
-                  <p className="mb-0" style={{ fontSize: '14px', color: idx === 1 ? '#afafaf' : '#5e5e5e', fontFamily: 'UberMoveText, system-ui, sans-serif' }}>
+                  <p className="mb-0" style={{ fontSize: '14px', color: '#5e5e5e', fontFamily: 'UberMoveText, system-ui, sans-serif' }}>
                     {p.questions} câu · {p.type}
                   </p>
                 </div>
@@ -159,21 +186,42 @@ const PassageList = ({ exam, onBack }) => (
         <p className="mb-4" style={{ fontFamily: 'UberMoveText, system-ui, sans-serif', fontSize: '18px', color: '#afafaf' }}>
           Làm toàn bộ đề trong {exam.duration} phút. Kết quả sẽ được chấm tự động ngay sau khi nộp.
         </p>
-        <a
-          href={`/tests/${exam.id}/reading`}
+        <button
+          onClick={() => setShowModeModal(true)}
           className="btn rounded-pill px-5 py-3 fw-bold"
-          style={{ backgroundColor: '#fff', color: '#000', fontFamily: 'UberMoveText, system-ui, sans-serif', fontSize: '18px', textDecoration: 'none' }}
+          style={{ backgroundColor: '#fff', color: '#000', fontFamily: 'UberMoveText, system-ui, sans-serif', fontSize: '18px', border: 'none' }}
         >
           Bắt đầu làm bài →
-        </a>
+        </button>
       </div>
+
+      <ModeSelector 
+        show={showModeModal} 
+        onHide={() => setShowModeModal(false)} 
+        onSelectMode={handleStartTest} 
+        examType="Reading"
+        parts={partsForMode}
+        fullDuration={exam.duration}
+      />
     </main>
   </div>
-);
+  );
+};
 
-// ─── Level 1: Danh sách đề thi Reading ────────────────────────────────────────
 const ReadingPage = () => {
   const [selectedExam, setSelectedExam] = useState(null);
+  const navigate = useNavigate();
+  const { isAuthenticated } = useAuth();
+
+  const handleViewExam = (exam) => {
+    // EARS[Event]: WHEN user tries to view exam details
+    if (!isAuthenticated) {
+      // EARS[Unwanted]: IF user is not authenticated THEN redirect to login
+      navigate('/login', { state: { message: 'Vui lòng đăng nhập để xem chi tiết đề thi' } });
+      return;
+    }
+    setSelectedExam(exam);
+  };
 
   if (selectedExam) {
     return <PassageList exam={selectedExam} onBack={() => setSelectedExam(null)} />;
@@ -205,7 +253,7 @@ const ReadingPage = () => {
                   style={{ border: '1px solid #e2e2e2', cursor: 'pointer', transition: 'box-shadow 0.2s ease' }}
                   onMouseEnter={e => e.currentTarget.style.boxShadow = 'rgba(0,0,0,0.12) 0px 4px 16px 0px'}
                   onMouseLeave={e => e.currentTarget.style.boxShadow = 'none'}
-                  onClick={() => setSelectedExam(exam)}
+                  onClick={() => handleViewExam(exam)}
                 >
                   <div>
                     <div className="d-flex justify-content-between align-items-start mb-3">
@@ -235,7 +283,7 @@ const ReadingPage = () => {
                   <button
                     className="btn btn-dark rounded-pill px-4 py-2 fw-medium align-self-start"
                     style={{ fontFamily: 'UberMoveText, system-ui, sans-serif', fontSize: '15px' }}
-                    onClick={(e) => { e.stopPropagation(); setSelectedExam(exam); }}
+                    onClick={(e) => { e.stopPropagation(); handleViewExam(exam); }}
                   >
                     Xem đề →
                   </button>

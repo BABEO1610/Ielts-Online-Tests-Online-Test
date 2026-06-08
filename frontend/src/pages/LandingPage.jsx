@@ -1,6 +1,7 @@
 import React, { useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, useScroll, useTransform, useSpring, useMotionValue } from 'framer-motion';
+import StudentNavbar from '../components/layout/StudentNavbar';
 
 // --- Sub-components for heavy animations ---
 
@@ -210,6 +211,8 @@ const LandingPage = () => {
 
     return (
         <div className="landing-page min-vh-100 position-relative overflow-hidden" style={{ fontFamily: 'UberMoveText, system-ui, sans-serif', backgroundColor: '#ffffff' }}>
+            
+            <StudentNavbar />
             
             <AnimatedBackground />
 

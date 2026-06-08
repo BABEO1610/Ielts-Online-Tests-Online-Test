@@ -1,7 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 import StudentNavbar from '../components/layout/StudentNavbar';
 import WritingEditor from '../components/grading/WritingEditor';
 import FeedbackReport from '../components/grading/FeedbackReport';
+import ModeSelector from '../components/objective-testing/ModeSelector';
+import TimerBar from '../components/objective-testing/TimerBar';
+import AutoSubmitModal from '../components/objective-testing/AutoSubmitModal';
 
 // ─── MOCK DATA — Danh sách đề thi (cấu trúc như IELTS Online Tests) ──────────
 // Mỗi exam có nhiều tasks, mỗi task có prompt riêng
@@ -165,9 +170,36 @@ const DIFFICULTY_STYLE = {
 };
 
 // ─── Level 3: Giao diện làm bài ──────────────────────────────────────────────
-const WritingTestScreen = ({ task, exam, onBack, onSubmitSuccess }) => (
+const WritingTestScreen = ({ task, exam, onBack, onSubmitSuccess, practiceMode, customTimeLimit }) => {
+  const editorRef = useRef(null);
+  const [showAutoSubmit, setShowAutoSubmit] = useState(false);
+
+  const durationMinutes = parseInt(task.duration) || 20;
+
+  const handleTimeUp = useCallback(() => {
+    setShowAutoSubmit(true);
+    if (editorRef.current) {
+      editorRef.current.submit();
+    }
+  }, []);
+
+  const handleSubmitEarly = useCallback(() => {
+    if (window.confirm('Bạn có chắc chắn muốn nộp bài?')) {
+      setShowAutoSubmit(true);
+      if (editorRef.current) {
+        editorRef.current.submit();
+      }
+    }
+  }, []);
+
+  const handleSuccess = (res) => {
+    setShowAutoSubmit(false);
+    if (onSubmitSuccess) onSubmitSuccess(res);
+  };
+
+  return (
   <div className="bg-white min-vh-100 pb-5">
-    <StudentNavbar />
+    <TimerBar durationMinutes={durationMinutes} customTimeLimit={customTimeLimit} onTimeUp={handleTimeUp} onSubmitEarly={handleSubmitEarly} practiceMode={practiceMode} />
     <main className="container-fluid px-3 px-md-5 mt-4" style={{ maxWidth: '900px' }}>
       <div className="d-flex align-items-center gap-3 mb-4 flex-wrap">
         <button
@@ -208,18 +240,43 @@ const WritingTestScreen = ({ task, exam, onBack, onSubmitSuccess }) => (
       </div>
 
       <WritingEditor
+        ref={editorRef}
         testId={task.id}
         taskNumber={task.task_number}
         promptText={task.prompt_text}
         status="new"
-        onSubmitSuccess={onSubmitSuccess}
+        onSubmitSuccess={handleSuccess}
       />
+      <AutoSubmitModal isOpen={showAutoSubmit} />
     </main>
   </div>
-);
+  );
+};
 
 // ─── Level 2: Tasks của một đề ───────────────────────────────────────────────
-const WritingTaskList = ({ exam, onSelectTask, onBack }) => (
+const WritingTaskList = ({ exam, onSelectTask, onBack }) => {
+  const { isAuthenticated } = useAuth();
+  const navigate = useNavigate();
+  const [showModeModal, setShowModeModal] = useState(false);
+  const [taskToStart, setTaskToStart] = useState(null);
+
+  const handleTaskClick = (task) => {
+    // EARS[Event]: WHEN user tries to start task
+    if (!isAuthenticated) {
+      // EARS[Unwanted]: IF user is not authenticated THEN redirect to login
+      navigate('/login', { state: { message: 'Vui lòng đăng nhập để bắt đầu làm bài' } });
+      return;
+    }
+    setTaskToStart(task);
+    setShowModeModal(true);
+  };
+
+  const handleModeSelect = (modeConfig) => {
+    setShowModeModal(false);
+    onSelectTask(taskToStart, modeConfig);
+  };
+
+  return (
   <div className="bg-white min-vh-100 pb-5">
     <StudentNavbar />
     <main className="container-fluid px-3 px-md-5 mt-4 mt-md-5" style={{ maxWidth: '1200px' }}>
@@ -274,22 +331,51 @@ const WritingTaskList = ({ exam, onSelectTask, onBack }) => (
             <button
               className="btn btn-dark rounded-pill px-4 py-2 fw-medium flex-shrink-0"
               style={{ fontFamily: 'UberMoveText, system-ui, sans-serif', fontSize: '15px' }}
-              onClick={(e) => { e.stopPropagation(); onSelectTask(task); }}
+              onClick={(e) => { e.stopPropagation(); handleTaskClick(task); }}
             >
               Làm bài →
             </button>
           </div>
         ))}
       </div>
+
+      <ModeSelector
+        show={showModeModal}
+        onHide={() => setShowModeModal(false)}
+        onSelectMode={handleModeSelect}
+        examType="Writing"
+        fullDuration={taskToStart ? parseInt(taskToStart.duration) : null}
+      />
     </main>
   </div>
-);
+  );
+};
 
 // ─── Level 1: Danh sách đề thi ───────────────────────────────────────────────
 const WritingPage = () => {
   const [selectedExam, setSelectedExam] = useState(null);
   const [selectedTask, setSelectedTask] = useState(null);
+  const [practiceMode, setPracticeMode] = useState(false);
+  const [customTimeLimit, setCustomTimeLimit] = useState(null);
   const [submittedId, setSubmittedId] = useState(null);
+  const navigate = useNavigate();
+  const { isAuthenticated } = useAuth();
+
+  const handleViewExam = (exam) => {
+    // EARS[Event]: WHEN user tries to view exam details
+    if (!isAuthenticated) {
+      // EARS[Unwanted]: IF user is not authenticated THEN redirect to login
+      navigate('/login', { state: { message: 'Vui lòng đăng nhập để xem chi tiết đề thi' } });
+      return;
+    }
+    setSelectedExam(exam);
+  };
+
+  const handleSelectTask = (task, modeConfig) => {
+    setPracticeMode(modeConfig.isPractice);
+    setCustomTimeLimit(modeConfig.customTimeLimit);
+    setSelectedTask(task);
+  };
 
   const handleSubmitSuccess = (response) => {
     const id = response?.data?.submission_id || 'mock-write-demo';
@@ -324,6 +410,8 @@ const WritingPage = () => {
       <WritingTestScreen
         task={selectedTask}
         exam={selectedExam}
+        practiceMode={practiceMode}
+        customTimeLimit={customTimeLimit}
         onBack={() => setSelectedTask(null)}
         onSubmitSuccess={handleSubmitSuccess}
       />
@@ -335,7 +423,7 @@ const WritingPage = () => {
     return (
       <WritingTaskList
         exam={selectedExam}
-        onSelectTask={setSelectedTask}
+        onSelectTask={handleSelectTask}
         onBack={() => setSelectedExam(null)}
       />
     );
@@ -367,7 +455,7 @@ const WritingPage = () => {
                   style={{ border: '1px solid #e2e2e2', cursor: 'pointer', transition: 'box-shadow 0.2s ease' }}
                   onMouseEnter={e => e.currentTarget.style.boxShadow = 'rgba(0,0,0,0.12) 0px 4px 16px 0px'}
                   onMouseLeave={e => e.currentTarget.style.boxShadow = 'none'}
-                  onClick={() => setSelectedExam(exam)}
+                  onClick={() => handleViewExam(exam)}
                 >
                   <div>
                     <div className="d-flex justify-content-between align-items-start mb-3">
@@ -391,7 +479,7 @@ const WritingPage = () => {
                   <button
                     className="btn btn-dark rounded-pill px-4 py-2 fw-medium align-self-start"
                     style={{ fontFamily: 'UberMoveText, system-ui, sans-serif', fontSize: '15px' }}
-                    onClick={(e) => { e.stopPropagation(); setSelectedExam(exam); }}
+                    onClick={(e) => { e.stopPropagation(); handleViewExam(exam); }}
                   >
                     Xem đề →
                   </button>

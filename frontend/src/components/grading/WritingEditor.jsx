@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, forwardRef, useImperativeHandle } from 'react';
 import PropTypes from 'prop-types';
 import gradingService from '../../services/grading.service';
 import ToastNotification from '../common/ToastNotification';
@@ -8,13 +8,13 @@ const MAX_CHARS = 5000;
 
 // EARS[Event]: WHEN user submits writing THEN send text and grader preference
 // EARS[State-driven]: WHILE bài làm có status = 'pending', THE hệ thống SHALL vô hiệu hóa nút "Nộp lại" hoặc "Chỉnh sửa" của bài thi đó trên giao diện.
-const WritingEditor = ({ 
+const WritingEditor = forwardRef(({ 
   testId, 
   taskNumber, 
   promptText, 
   status = 'new', 
   onSubmitSuccess 
-}) => {
+}, ref) => {
   const { user } = useAuth();
   const aiQuotaRemaining = user?.ai_grading_quota_remaining ?? 0;
   const [text, setText] = useState('');
@@ -29,8 +29,14 @@ const WritingEditor = ({
     setText(e.target.value.slice(0, MAX_CHARS));
   };
 
+  useImperativeHandle(ref, () => ({
+    submit: () => {
+      handleSubmit(new Event('submit'));
+    }
+  }));
+
   const handleSubmit = async (e) => {
-    e.preventDefault();
+    if (e && e.preventDefault) e.preventDefault();
     
     if (charCount === 0) {
       setToast({ message: 'Vui lòng nhập bài làm của bạn.', type: 'warning' });
@@ -155,7 +161,7 @@ const WritingEditor = ({
       )}
     </div>
   );
-};
+});
 
 WritingEditor.propTypes = {
   testId: PropTypes.string,

@@ -9,6 +9,7 @@
  * Design: Uber-inspired split view, form-check, form-control.
  */
 import React, { useState, useCallback } from 'react';
+import { useLocation } from 'react-router-dom';
 import TimerBar from '../../components/objective-testing/TimerBar';
 import QuestionNavigation from '../../components/objective-testing/QuestionNavigation';
 import AutoSubmitModal from '../../components/objective-testing/AutoSubmitModal';
@@ -32,17 +33,25 @@ const MOCK_PASSAGE = `
 
 /* Mock questions — mix of MCQ and Fill-in-blank */
 const MOCK_QUESTIONS = [
-  { id: 1, order: 1, type: 'mcq', text: 'The earliest known glass objects were:', options: [{ label: 'A', text: 'Windows' }, { label: 'B', text: 'Beads' }, { label: 'C', text: 'Bottles' }, { label: 'D', text: 'Mirrors' }], correctAnswer: 'B' },
-  { id: 2, order: 2, type: 'mcq', text: 'Glassblowing was invented around:', options: [{ label: 'A', text: '3500 BC' }, { label: 'B', text: '13th century' }, { label: 'C', text: '1st century BC' }, { label: 'D', text: '17th century' }], correctAnswer: 'C' },
-  { id: 3, order: 3, type: 'fill', text: 'The Venetians established their glass industry on the island of ________.', correctAnswer: 'Murano' },
-  { id: 4, order: 4, type: 'mcq', text: 'George Ravenscroft added ________ to the glass formula.', options: [{ label: 'A', text: 'Silver oxide' }, { label: 'B', text: 'Lead oxide' }, { label: 'C', text: 'Iron oxide' }, { label: 'D', text: 'Copper oxide' }], correctAnswer: 'B' },
-  { id: 5, order: 5, type: 'fill', text: 'Float glass was invented by Sir Alastair ________.', correctAnswer: 'Pilkington' },
-  { id: 6, order: 6, type: 'mcq', text: 'Early glass-making techniques were:', options: [{ label: 'A', text: 'Widely shared' }, { label: 'B', text: 'Well documented' }, { label: 'C', text: 'Closely guarded' }, { label: 'D', text: 'Easily learned' }], correctAnswer: 'C' },
-  { id: 7, order: 7, type: 'fill', text: 'In the float glass process, molten glass is poured onto ________.', correctAnswer: 'molten tin' },
-  { id: 8, order: 8, type: 'mcq', text: 'Lead crystal glass is ideal for:', options: [{ label: 'A', text: 'Windows only' }, { label: 'B', text: 'Cutting and engraving' }, { label: 'C', text: 'Industrial use' }, { label: 'D', text: 'Scientific instruments' }], correctAnswer: 'B' },
+  { id: 1, order: 1, passage: 'Passage 1', type: 'mcq', text: 'The earliest known glass objects were:', options: [{ label: 'A', text: 'Windows' }, { label: 'B', text: 'Beads' }, { label: 'C', text: 'Bottles' }, { label: 'D', text: 'Mirrors' }], correctAnswer: 'B' },
+  { id: 2, order: 2, passage: 'Passage 1', type: 'mcq', text: 'Glassblowing was invented around:', options: [{ label: 'A', text: '3500 BC' }, { label: 'B', text: '13th century' }, { label: 'C', text: '1st century BC' }, { label: 'D', text: '17th century' }], correctAnswer: 'C' },
+  { id: 3, order: 3, passage: 'Passage 1', type: 'fill', text: 'The Venetians established their glass industry on the island of ________.', correctAnswer: 'Murano' },
+  { id: 4, order: 4, passage: 'Passage 1', type: 'mcq', text: 'George Ravenscroft added ________ to the glass formula.', options: [{ label: 'A', text: 'Silver oxide' }, { label: 'B', text: 'Lead oxide' }, { label: 'C', text: 'Iron oxide' }, { label: 'D', text: 'Copper oxide' }], correctAnswer: 'B' },
+  { id: 5, order: 5, passage: 'Passage 2', type: 'fill', text: 'Float glass was invented by Sir Alastair ________.', correctAnswer: 'Pilkington' },
+  { id: 6, order: 6, passage: 'Passage 2', type: 'mcq', text: 'Early glass-making techniques were:', options: [{ label: 'A', text: 'Widely shared' }, { label: 'B', text: 'Well documented' }, { label: 'C', text: 'Closely guarded' }, { label: 'D', text: 'Easily learned' }], correctAnswer: 'C' },
+  { id: 7, order: 7, passage: 'Passage 2', type: 'fill', text: 'In the float glass process, molten glass is poured onto ________.', correctAnswer: 'molten tin' },
+  { id: 8, order: 8, passage: 'Passage 2', type: 'mcq', text: 'Lead crystal glass is ideal for:', options: [{ label: 'A', text: 'Windows only' }, { label: 'B', text: 'Cutting and engraving' }, { label: 'C', text: 'Industrial use' }, { label: 'D', text: 'Scientific instruments' }], correctAnswer: 'B' },
 ];
 
 function ReadingTestPage() {
+  const location = useLocation();
+  const practiceMode = location.state?.practiceMode || false;
+  const customTimeLimit = location.state?.customTimeLimit || null;
+  const selectedPartIds = location.state?.selectedPartIds || ['p1', 'p2', 'p3'];
+
+  const allowedPassages = practiceMode ? selectedPartIds.map(id => `Passage ${id.replace('p', '')}`) : ['Passage 1', 'Passage 2', 'Passage 3'];
+  const filteredQuestions = MOCK_QUESTIONS.filter(q => allowedPassages.includes(q.passage));
+
   const [answers, setAnswers] = useState({});
   const [currentQuestion, setCurrentQuestion] = useState(1);
   const [showAutoSubmit, setShowAutoSubmit] = useState(false);
@@ -74,7 +83,7 @@ function ReadingTestPage() {
   return (
     <div id="reading-test-page" style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
       {/* Timer */}
-      <TimerBar durationMinutes={60} onTimeUp={handleTimeUp} onSubmitEarly={handleSubmitEarly} />
+      <TimerBar durationMinutes={60} customTimeLimit={customTimeLimit} onTimeUp={handleTimeUp} onSubmitEarly={handleSubmitEarly} practiceMode={practiceMode} />
 
       {/* Split View */}
       <div className="split-view">
@@ -94,7 +103,7 @@ function ReadingTestPage() {
         <div className="split-right" id="reading-questions-panel">
           <div className="mb-4">
             <QuestionNavigation
-              totalQuestions={MOCK_QUESTIONS.length}
+              totalQuestions={filteredQuestions.length}
               currentQuestion={currentQuestion}
               answeredQuestions={answeredQuestions}
               onNavigate={scrollToQuestion}
@@ -103,7 +112,7 @@ function ReadingTestPage() {
 
           {/* Questions List */}
           <div>
-            {MOCK_QUESTIONS.map((q) => (
+            {filteredQuestions.map((q) => (
               <div
                 key={q.id}
                 id={`question-${q.order}`}

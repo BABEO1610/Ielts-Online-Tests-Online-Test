@@ -9,6 +9,7 @@
  * Design: Uber-inspired — sticky audio player, clean question cards.
  */
 import React, { useState, useCallback } from 'react';
+import { useLocation } from 'react-router-dom';
 import TimerBar from '../../components/objective-testing/TimerBar';
 import QuestionNavigation from '../../components/objective-testing/QuestionNavigation';
 import AutoSubmitModal from '../../components/objective-testing/AutoSubmitModal';
@@ -27,6 +28,14 @@ const MOCK_QUESTIONS = [
 ];
 
 function ListeningTestPage() {
+  const location = useLocation();
+  const practiceMode = location.state?.practiceMode || false;
+  const customTimeLimit = location.state?.customTimeLimit || null;
+  const selectedPartIds = location.state?.selectedPartIds || ['s1', 's2', 's3', 's4'];
+
+  const allowedSections = practiceMode ? selectedPartIds.map(id => `Section ${id.replace('s', '')}`) : ['Section 1', 'Section 2', 'Section 3', 'Section 4'];
+  const filteredQuestions = MOCK_QUESTIONS.filter(q => allowedSections.includes(q.section));
+
   const [answers, setAnswers] = useState({});
   const [currentQuestion, setCurrentQuestion] = useState(1);
   const [showAutoSubmit, setShowAutoSubmit] = useState(false);
@@ -56,7 +65,7 @@ function ListeningTestPage() {
   }, []);
 
   /* Group by section */
-  const sections = MOCK_QUESTIONS.reduce((acc, q) => {
+  const sections = filteredQuestions.reduce((acc, q) => {
     if (!acc[q.section]) acc[q.section] = [];
     acc[q.section].push(q);
     return acc;
@@ -65,7 +74,7 @@ function ListeningTestPage() {
   return (
     <div id="listening-test-page" style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
       {/* Timer */}
-      <TimerBar durationMinutes={30} onTimeUp={handleTimeUp} onSubmitEarly={handleSubmitEarly} />
+      <TimerBar durationMinutes={30} customTimeLimit={customTimeLimit} onTimeUp={handleTimeUp} onSubmitEarly={handleSubmitEarly} practiceMode={practiceMode} />
 
       {/* Sticky Audio Player */}
       <div className="audio-player-sticky" id="audio-player">
@@ -168,7 +177,7 @@ function ListeningTestPage() {
           <div className="col-lg-4">
             <div style={{ position: 'sticky', top: 180 }}>
               <QuestionNavigation
-                totalQuestions={MOCK_QUESTIONS.length}
+                totalQuestions={filteredQuestions.length}
                 currentQuestion={currentQuestion}
                 answeredQuestions={answeredQuestions}
                 onNavigate={scrollToQuestion}

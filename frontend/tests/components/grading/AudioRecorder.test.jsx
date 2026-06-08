@@ -197,4 +197,19 @@ describe('AudioRecorder Component', () => {
     expect(screen.getByText(/Bạn đã hết lượt chấm chữa bằng AI/i)).toBeInTheDocument();
     expect(screen.getByText(/Bạn đã hết lượt chấm chữa bằng AI/i)).toHaveClass('text-danger');
   });
+
+  it('does not stop automatically when maxDuration is reached in practice mode', async () => {
+    const mockOnUploadComplete = vi.fn();
+    render(<AudioRecorder onUploadComplete={mockOnUploadComplete} maxDuration={1} practiceMode={true} />);
+
+    fireEvent.click(screen.getByTestId('start-recording-btn'));
+
+    await waitFor(() => {
+      expect(screen.getByText(/Practice mode/i)).toBeInTheDocument();
+    });
+
+    // Wait 2.5 seconds, verify it has NOT called post yet
+    await new Promise(resolve => setTimeout(resolve, 2500));
+    expect(api.post).not.toHaveBeenCalled();
+  });
 });

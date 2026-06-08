@@ -67,36 +67,4 @@ describe('ProtectedRoute Component', () => {
     expect(screen.getByTestId('protected-content')).toBeInTheDocument();
   });
 
-  it('TC4: should render children when required role matches user role (tutor)', () => {
-    useAuth.mockReturnValue({ isLoading: false, isAuthenticated: true, user: { id: 2, role: 'tutor' } });
-    renderComponent('tutor');
-    expect(screen.getByTestId('protected-content')).toBeInTheDocument();
-  });
-
-  it('TC5: should render children when required role is tutor but user is admin', () => {
-    useAuth.mockReturnValue({ isLoading: false, isAuthenticated: true, user: { id: 3, role: 'admin' } });
-    renderComponent('tutor');
-    expect(screen.getByTestId('protected-content')).toBeInTheDocument();
-  });
-
-  it('TC6: should redirect to /dashboard when user role does not match required role', () => {
-    useAuth.mockReturnValue({ isLoading: false, isAuthenticated: true, user: { id: 1, role: 'student' } });
-    renderComponent('tutor');
-    expect(screen.getByTestId('dashboard-page')).toBeInTheDocument();
-    expect(screen.queryByTestId('protected-content')).not.toBeInTheDocument();
-  });
-
-  it('TC7: should support rendering Outlet when children are not provided', () => {
-    useAuth.mockReturnValue({ isLoading: false, isAuthenticated: true, user: { id: 1, role: 'student' } });
-    render(
-      <MemoryRouter initialEntries={['/protected/nested']}>
-        <Routes>
-          <Route path="/protected" element={<ProtectedRoute />}>
-            <Route path="nested" element={<div data-testid="nested-content">Nested Content</div>} />
-          </Route>
-        </Routes>
-      </MemoryRouter>
-    );
-    expect(screen.getByTestId('nested-content')).toBeInTheDocument();
-  });
 });

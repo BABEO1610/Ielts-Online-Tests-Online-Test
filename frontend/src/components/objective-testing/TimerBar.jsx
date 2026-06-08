@@ -2,42 +2,50 @@
  * TimerBar.jsx — Task 4.2.6
  * Thanh Timer & Trạng thái
  * 
- * Hiển thị đồng hồ đếm ngược. Chuyển sang ĐỎ khi dưới 5 phút.
- * Có nút "Nộp bài sớm".
- * 
- * Component navbar cố định. text-danger khi cạn giờ.
- * Design: Uber-inspired — dark bar, white text, tabular-nums.
+ * TimerBar.jsx
+ * Thanh trạng thái hiển thị thời gian làm bài ở trên cùng màn hình.
  */
 import React, { useState, useEffect, useCallback } from 'react';
 import '../../styles/objective-testing.css';
 
-function TimerBar({ durationMinutes = 60, onTimeUp, onSubmitEarly }) {
-  const [secondsLeft, setSecondsLeft] = useState(durationMinutes * 60);
+const TimerBar = ({ durationMinutes = 60, onTimeUp, onSubmitEarly, practiceMode = false, customTimeLimit = null }) => {
+  const isCountDown = !practiceMode || customTimeLimit !== null;
+  const initialTime = isCountDown ? (practiceMode ? customTimeLimit * 60 : durationMinutes * 60) : 0;
+  
+  const [timeLeft, setTimeLeft] = useState(initialTime);
 
   useEffect(() => {
-    if (secondsLeft <= 0) {
-      if (onTimeUp) onTimeUp();
-      return;
-    }
     const timer = setInterval(() => {
-      setSecondsLeft((prev) => prev - 1);
+      setTimeLeft(prev => {
+        if (isCountDown) {
+          if (prev <= 1) {
+            clearInterval(timer);
+            if (onTimeUp) onTimeUp();
+            return 0;
+          }
+          return prev - 1;
+        } else {
+          return prev + 1; // Count up indefinitely
+        }
+      });
     }, 1000);
     return () => clearInterval(timer);
-  }, [secondsLeft, onTimeUp]);
+  }, [isCountDown, onTimeUp]);
 
   const formatTime = useCallback((totalSecs) => {
-    const mins = Math.floor(totalSecs / 60);
-    const secs = totalSecs % 60;
+    const absSecs = Math.abs(totalSecs);
+    const mins = Math.floor(absSecs / 60);
+    const secs = absSecs % 60;
     return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
   }, []);
 
-  const isDanger = secondsLeft <= 300; // 5 minutes
+  const isDanger = isCountDown && timeLeft <= 300; // 5 minutes
 
   return (
     <div className="timer-bar" id="timer-bar">
       <div className="d-flex align-items-center gap-3">
-        <span className="body-md-strong" style={{ color: 'var(--mute)' }}>
-          IELTS Mock Test
+        <span className="fw-medium text-white px-2 py-1 rounded" style={{ fontSize: '13px', backgroundColor: 'rgba(255,255,255,0.2)' }}>
+          {practiceMode ? `Practice Mode${customTimeLimit ? ' (Custom Time)' : ''}` : 'Real Test Mode'}
         </span>
       </div>
 
@@ -52,7 +60,7 @@ function TimerBar({ durationMinutes = 60, onTimeUp, onSubmitEarly }) {
             className={`timer-display ${isDanger ? 'danger' : ''}`}
             id="timer-display"
           >
-            {formatTime(secondsLeft)}
+            {formatTime(timeLeft)}
           </span>
         </div>
 
@@ -75,6 +83,16 @@ function TimerBar({ durationMinutes = 60, onTimeUp, onSubmitEarly }) {
       </div>
     </div>
   );
-}
+};
+
+import PropTypes from 'prop-types';
+
+TimerBar.propTypes = {
+  durationMinutes: PropTypes.number,
+  onTimeUp: PropTypes.func,
+  onSubmitEarly: PropTypes.func,
+  practiceMode: PropTypes.bool,
+  customTimeLimit: PropTypes.number
+};
 
 export default TimerBar;

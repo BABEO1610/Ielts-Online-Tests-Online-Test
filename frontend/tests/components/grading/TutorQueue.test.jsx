@@ -105,7 +105,7 @@ describe('TutorQueue Component', () => {
     expect(gradingService.claimSubmission).toHaveBeenCalledWith('sub-1', 'writing');
     
     await waitFor(() => {
-      expect(mockNavigate).toHaveBeenCalledWith('sub-1', 'writing');
+      expect(mockNavigate).toHaveBeenCalledWith('sub-1', 'writing', 'stu-1');
     });
   });
 
