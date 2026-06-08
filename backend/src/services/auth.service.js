@@ -163,6 +163,7 @@ const verifyLogin = async (email, password) => {
     // 7. Get updated user to return without hash
     const updatedUser = await findUserByEmail(email);
     const { password_hash, ...safeUser } = updatedUser;
+    safeUser.has_password = !!password_hash;
     
     return safeUser;
 };
@@ -480,6 +481,7 @@ const loginWithGoogle = async (googleProfile, ipAddress, userAgent) => {
 
     // 8. Return safeUser and tokens
     const { password_hash, ...safeUser } = user;
+    safeUser.has_password = !!password_hash;
 
     return {
         user: safeUser,
@@ -556,6 +558,58 @@ const handleGoogleCallback = async (code, { ip, userAgent }) => {
     return await loginWithGoogle(googleProfile, ip, userAgent);
 };
 
+
+/**
+ * Change password for an authenticated user
+ * @param {string} userId
+ * @param {string} oldPassword
+ * @param {string} newPassword
+ * @param {string} ipAddress
+ * @returns {Promise<Object>}
+ */
+const changePassword = async (userId, oldPassword, newPassword, ipAddress) => {
+    const user = await findUserById(userId);
+    if (!user) {
+        const error = new Error('Người dùng không tồn tại');
+        error.statusCode = 404;
+        throw error;
+    }
+
+    if (!user.password_hash) {
+        const error = new Error('Tài khoản này đăng nhập bằng Google, vui lòng tạo mật khẩu bằng cách Đặt lại mật khẩu qua email.');
+        error.statusCode = 400;
+        throw error;
+    }
+
+    const isValidPassword = await verifyPassword(oldPassword, user.password_hash);
+    if (!isValidPassword) {
+        const error = new Error('Mật khẩu cũ không chính xác');
+        error.statusCode = 400;
+        throw error;
+    }
+
+    const newPasswordHash = await hashPassword(newPassword);
+
+    await updatePasswordHash(pool, {
+        user_id: userId,
+        new_hash: newPasswordHash,
+        reason: 'user_initiated',
+        ip_address: ipAddress
+    });
+
+    await AuditLogService.logAction(
+        userId,
+        'password_changed',
+        'users',
+        userId,
+        { status: user.status },
+        { status: user.status },
+        ipAddress
+    );
+
+    return { message: "Mật khẩu đã được thay đổi thành công." };
+};
+
 module.exports = {
     register,
     verifyEmail,
@@ -566,5 +620,6 @@ module.exports = {
     forgotPassword,
     resetPassword,
     loginWithGoogle,
-    handleGoogleCallback
+    handleGoogleCallback,
+    changePassword
 };

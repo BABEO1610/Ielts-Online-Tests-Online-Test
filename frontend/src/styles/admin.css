@@ -1,0 +1,254 @@
+/* ============================================================
+ *  admin.css — Admin design system (Uber-inspired, DESIGN.md)
+ *  Black/white duet · pill controls · rounded-xl cards · Inter
+ *  Cross-ref: DESIGN.md, src/index.css (design tokens)
+ * ============================================================ */
+
+/* ── Shell layout ───────────────────────────────────────────── */
+.admin-shell {
+  display: flex;
+  min-height: 100vh;
+  background-color: var(--canvas-soft);
+}
+
+.admin-sidebar {
+  width: 256px;
+  flex-shrink: 0;
+  background-color: var(--canvas);
+  border-right: 1px solid var(--surface-pressed);
+  display: flex;
+  flex-direction: column;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+}
+
+.admin-sidebar__brand {
+  padding: var(--spacing-2xl) var(--spacing-2xl) var(--spacing-lg);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 22px;
+  color: #e02424; /* IELTSZone brand accent on the wordmark only */
+  text-decoration: none;
+  display: block;
+}
+
+.admin-sidebar__nav {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xxs);
+  padding: var(--spacing-sm) var(--spacing-md);
+  flex: 1;
+  overflow-y: auto;
+}
+
+.admin-nav-eyebrow {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--mute);
+  padding: var(--spacing-lg) var(--spacing-md) var(--spacing-xs);
+}
+
+/* ex-app-shell-row — active uses brand primary as left-edge bar */
+.admin-nav-row {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  padding: var(--spacing-md) var(--spacing-lg);
+  border-radius: var(--rounded-md);
+  border-left: 3px solid transparent;
+  color: var(--body);
+  text-decoration: none;
+  font-size: 15px;
+  font-weight: 500;
+  transition: background-color 0.15s, color 0.15s;
+  cursor: pointer;
+}
+.admin-nav-row:hover {
+  background-color: var(--canvas-soft);
+  color: var(--ink);
+}
+.admin-nav-row.active {
+  background-color: var(--canvas-soft);
+  color: var(--ink);
+  border-left-color: var(--ink);
+  font-weight: 600;
+}
+
+.admin-sidebar__footer {
+  padding: var(--spacing-lg) var(--spacing-2xl);
+  border-top: 1px solid var(--surface-pressed);
+  font-size: 12px;
+  color: var(--mute);
+}
+
+/* ── Main column ────────────────────────────────────────────── */
+.admin-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.admin-topbar {
+  background-color: var(--canvas);
+  border-bottom: 1px solid var(--surface-pressed);
+  padding: var(--spacing-lg) var(--spacing-3xl);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: sticky;
+  top: 0;
+  z-index: 20;
+}
+
+.admin-content {
+  flex: 1;
+  padding: var(--spacing-3xl);
+  max-width: 1320px;
+  width: 100%;
+}
+
+.admin-footer {
+  border-top: 1px solid var(--surface-pressed);
+  background-color: var(--canvas);
+  padding: var(--spacing-xl) var(--spacing-3xl);
+  font-size: 13px;
+  color: var(--body);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--spacing-sm);
+}
+
+/* ── Cards & surfaces ───────────────────────────────────────── */
+.admin-card {
+  background-color: var(--canvas);
+  border-radius: var(--rounded-xl);
+  border: 1px solid var(--surface-pressed);
+  box-shadow: var(--shadow-subtle);
+  box-sizing: border-box;
+}
+.admin-card__header {
+  padding: var(--spacing-lg) var(--spacing-2xl);
+  border-bottom: 1px solid var(--surface-pressed);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-md);
+}
+.admin-card__title {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 18px;
+  margin: 0;
+}
+.admin-card__body { padding: var(--spacing-2xl); }
+
+/* ── Stat cards ─────────────────────────────────────────────── */
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--spacing-lg);
+}
+.stat-card {
+  border-radius: var(--rounded-xl);
+  padding: var(--spacing-2xl);
+  border: 1px solid var(--surface-pressed);
+  background-color: var(--canvas);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  box-shadow: var(--shadow-subtle);
+}
+.stat-card--dark { background-color: var(--ink); border-color: var(--ink); color: var(--on-dark); }
+.stat-card__label { font-size: 13px; font-weight: 500; opacity: 0.75; }
+.stat-card__value { font-family: var(--font-display); font-weight: 700; font-size: 34px; line-height: 1.1; }
+.stat-card__delta { font-size: 12px; font-weight: 500; }
+.stat-card__delta.up { color: #1e7e34; }
+.stat-card__delta.down { color: #c92a2a; }
+.stat-card--dark .stat-card__delta.up { color: #69db7c; }
+.stat-card--dark .stat-card__delta.down { color: #ff8787; }
+
+/* ── Pills / chips ──────────────────────────────────────────── */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: var(--rounded-pill);
+  padding: 4px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+.pill--neutral { background: var(--canvas-soft); color: var(--ink); }
+.pill--success { background: #e6f4ea; color: #1e7e34; }
+.pill--warning { background: #fff4e0; color: #b06f00; }
+.pill--danger  { background: #fdecec; color: #c92a2a; }
+.pill--info    { background: #e7f0ff; color: #1c4ed8; }
+.pill--admin   { background: #fdecec; color: #c92a2a; }
+.pill--tutor   { background: #fff4e0; color: #b06f00; }
+.pill--student { background: #e7f0ff; color: #1c4ed8; }
+
+/* ── Table ──────────────────────────────────────────────────── */
+.admin-table { width: 100%; border-collapse: collapse; }
+.admin-table thead th {
+  background-color: var(--canvas-soft);
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--body);
+  padding: var(--spacing-md) var(--spacing-lg);
+  text-align: left;
+  white-space: nowrap;
+}
+.admin-table tbody td {
+  padding: var(--spacing-md) var(--spacing-lg);
+  border-bottom: 1px solid var(--surface-pressed);
+  font-size: 14px;
+  vertical-align: middle;
+}
+.admin-table tbody tr:hover { background-color: var(--canvas-softer); }
+.admin-table tbody tr.row--suspicious { background-color: #fff6f6; }
+.admin-table tbody tr.row--suspicious:hover { background-color: #ffeaea; }
+
+/* ── Buttons ────────────────────────────────────────────────── */
+.btn-pill {
+  border-radius: var(--rounded-pill);
+  font-weight: 500;
+  padding: 8px 18px;
+  font-size: 14px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: background-color 0.15s, color 0.15s, border-color 0.15s;
+}
+.btn-pill--dark { background: var(--ink); color: var(--on-dark); }
+.btn-pill--dark:hover { background: var(--black-elevated); }
+.btn-pill--ghost { background: var(--canvas); color: var(--ink); border-color: var(--surface-pressed); }
+.btn-pill--ghost:hover { background: var(--canvas-soft); }
+
+/* ── Misc ───────────────────────────────────────────────────── */
+.admin-data-note {
+  font-size: 12px;
+  color: var(--mute);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.mini-bar {
+  height: 6px;
+  border-radius: var(--rounded-pill);
+  background: var(--canvas-soft);
+  overflow: hidden;
+}
+.mini-bar__fill { height: 100%; background: var(--ink); border-radius: var(--rounded-pill); }
+
+@media (max-width: 992px) {
+  .admin-sidebar { display: none; }
+  .admin-content { padding: var(--spacing-lg); }
+  .admin-topbar { padding: var(--spacing-md) var(--spacing-lg); }
+}

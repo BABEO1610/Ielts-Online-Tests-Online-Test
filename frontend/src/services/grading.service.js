@@ -1,0 +1,149 @@
+import api from './api';
+
+const gradingService = {
+  // EARS[Event]: WHEN user submits audio file THEN call upload endpoint with multipart/form-data
+  uploadAudio: async (audioBlob) => {
+    const formData = new FormData();
+    formData.append('audio_file', audioBlob);
+    
+    const response = await api.post('/submissions/speaking/upload', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
+  },
+
+  // EARS[Event]: WHEN user submits writing THEN send text and grader preference
+  submitWriting: async (data) => {
+    const response = await api.post('/submissions/writing', data);
+    return response.data;
+  },
+
+  // EARS[Event]: WHEN user submits speaking THEN send temp_s3_key and grader preference
+  submitSpeaking: async (data) => {
+    const response = await api.post('/submissions/speaking', data);
+    return response.data;
+  },
+
+  // EARS[State-driven]: WHEN student wants to view feedback THEN fetch feedback report
+  getFeedback: async (submissionId, type) => {
+    const response = await api.get(`/submissions/${submissionId}/feedback`, {
+      params: { type },
+    });
+    return response.data;
+  },
+
+  // EARS[Event]: WHEN tutor or student needs to listen to audio THEN get presigned URL
+  getAudioUrl: async (submissionId, type = 'speaking') => {
+    const response = await api.get(`/submissions/${submissionId}/audio-url`, {
+      params: { type },
+    });
+    return response.data;
+  },
+
+  // EARS[State-driven]: WHEN tutor wants to view pending submissions THEN fetch queue
+  getTutorQueue: async (filters) => {
+    const response = await api.get('/tutors/queue', { params: filters });
+    return response.data;
+  },
+
+  // EARS[Event]: WHEN tutor claims a submission THEN call claim endpoint
+  claimSubmission: async (submissionId, type) => {
+    const response = await api.post(`/tutors/submissions/${submissionId}/claim`, { type });
+    return response.data;
+  },
+
+  // EARS[Event]: WHEN tutor submits grading result THEN call grade endpoint
+  gradeSubmission: async (submissionId, gradeData) => {
+    const response = await api.post(`/tutors/submissions/${submissionId}/grade`, gradeData);
+    return response.data;
+  },
+
+  // EARS[Event]: WHEN tutor requests AI grammar check THEN call prelim-check endpoint
+  runPrelimCheck: async (submissionId) => {
+    const response = await api.post(`/tutors/submissions/${submissionId}/prelim-check`);
+    return response.data;
+  },
+
+  // EARS[Event]: WHEN tutor adds a note for a student THEN call notes endpoint
+  addTutorNote: async (studentId, note) => {
+    const response = await api.post(`/tutors/students/${studentId}/notes`, { note });
+    return response.data;
+  },
+
+  // EARS[State-driven]: WHEN tutor views student context THEN fetch previous notes
+  getTutorNotes: async (studentId) => {
+    const response = await api.get(`/tutors/students/${studentId}/notes`);
+    return response.data;
+  },
+
+  // TODO: Replace with real API call when backend is ready
+  // EARS[State-driven]: WHEN student views dashboard THEN fetch stats
+  getDashboardStats: async () => {
+    return new Promise((resolve) => {
+      setTimeout(() => {
+        resolve({
+          success: true,
+          data: {
+            target_band_score: 7.0,
+            avg_band_score: 6.8,
+            ai_grading_quota_remaining: 8
+          }
+        });
+      }, 500);
+    });
+  },
+
+  // TODO: Replace with real API call (GET /api/v1/submissions) when backend is ready
+  // EARS[Event]: WHEN student views history THEN fetch their submissions
+  getSubmissionHistory: async () => {
+    return new Promise((resolve) => {
+      setTimeout(() => {
+        resolve({
+          success: true,
+          data: [
+            {
+              id: 'sub-1',
+              type: 'writing',
+              task_number: 1,
+              submitted_at: '2026-06-01T10:00:00Z',
+              status: 'ai_graded',
+              band_score: 6.5,
+              grader: 'ai'
+            },
+            {
+              id: 'sub-2',
+              type: 'speaking',
+              part_number: 2,
+              submitted_at: '2026-06-02T15:30:00Z',
+              status: 'tutor_graded',
+              band_score: 7.0,
+              grader: 'tutor'
+            },
+            {
+              id: 'sub-3',
+              type: 'writing',
+              task_number: 2,
+              submitted_at: '2026-06-03T09:15:00Z',
+              status: 'pending',
+              band_score: null,
+              grader: 'tutor'
+            },
+            {
+              id: 'sub-4',
+              type: 'speaking',
+              part_number: 1,
+              submitted_at: '2026-06-03T18:45:00Z',
+              status: 'failed',
+              band_score: null,
+              grader: 'ai'
+            }
+          ]
+        });
+      }, 800);
+    });
+  }
+};
+
+export default gradingService;

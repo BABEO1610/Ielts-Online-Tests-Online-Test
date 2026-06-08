@@ -6,6 +6,7 @@ process.exit = function (code) {
 };
 const path = require('path');
 require('dotenv').config({ path: path.resolve(__dirname, '../.env') });
+require('node:dns').setDefaultResultOrder('ipv4first'); // Fix lỗi UND_ERR_CONNECT_TIMEOUT do Node ưu tiên IPv6
 const express = require('express');
 const cors = require('cors');
 const cookieParser = require('cookie-parser');

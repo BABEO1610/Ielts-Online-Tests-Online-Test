@@ -1,10 +1,12 @@
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import ChangePwdModal from '../profile/ChangePwdModal';
 
 const StudentNavbar = () => {
   const { user, isAuthenticated, logout } = useAuth();
   const navigate = useNavigate();
+  const [showPwdModal, setShowPwdModal] = React.useState(false);
 
   // EARS[Event]: WHEN the user clicks logout THEN trigger the logout API call and navigate to login.
   const handleLogout = async () => {
@@ -48,9 +50,8 @@ const StudentNavbar = () => {
           </ul>
 
           <div className="d-flex align-items-center gap-3 mt-3 mt-lg-0">
-            {/* EARS[State-driven]: WHEN user is authenticated THEN render the profile dropdown, ELSE render the login and register button pills. */}
-            {isAuthenticated ? (
-              <div className="dropdown" data-testid="profile-dropdown">
+            {user ? (
+              <div className="dropdown">
                 <button
                   className="btn btn-light rounded-pill px-4 py-2 fw-medium border-0 d-flex align-items-center gap-2"
                   type="button"
@@ -69,33 +70,38 @@ const StudentNavbar = () => {
                 <ul className="dropdown-menu dropdown-menu-end rounded-4 shadow border-0 mt-2 p-2">
                   <li><Link className="dropdown-item rounded-3 py-2" to="/profile">Hồ sơ cá nhân</Link></li>
                   <li><Link className="dropdown-item rounded-3 py-2" to="/history">Lịch sử làm bài</Link></li>
+                  <li><button className="dropdown-item rounded-3 py-2" onClick={() => setShowPwdModal(true)}>Đổi mật khẩu</button></li>
                   <li><hr className="dropdown-divider" /></li>
-                  <li><button className="dropdown-item rounded-3 py-2 text-danger" onClick={handleLogout} data-testid="logout-btn">Đăng xuất</button></li>
+                  <li><button className="dropdown-item rounded-3 py-2 text-danger" onClick={handleLogout}>Đăng xuất</button></li>
                 </ul>
               </div>
             ) : (
-              <div className="d-flex gap-2" data-testid="guest-auth-buttons">
-                <Link
-                  to="/login"
+              // EARS[Event]: WHEN user is not logged in THEN show login/register options
+              <>
+                <Link 
+                  to="/login" 
                   className="btn btn-light rounded-pill px-4 py-2 fw-medium border-0"
-                  style={{ backgroundColor: '#efefef', color: '#000000', fontSize: '16px' }}
-                  data-testid="login-link"
+                  style={{ backgroundColor: '#efefef', fontSize: '15px' }}
                 >
                   Đăng nhập
                 </Link>
-                <Link
-                  to="/register"
-                  className="btn btn-dark rounded-pill px-4 py-2 fw-medium border-0 text-white"
-                  style={{ backgroundColor: '#000000', fontSize: '16px' }}
-                  data-testid="register-link"
+                <Link 
+                  to="/register" 
+                  className="btn btn-dark rounded-pill px-4 py-2 fw-medium border-0"
+                  style={{ fontSize: '15px' }}
                 >
                   Đăng ký
                 </Link>
-              </div>
+              </>
             )}
           </div>
         </div>
       </div>
+      
+      <ChangePwdModal 
+        isOpen={showPwdModal}
+        onClose={() => setShowPwdModal(false)}
+      />
     </nav>
   );
 };

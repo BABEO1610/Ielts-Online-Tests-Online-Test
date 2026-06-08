@@ -42,11 +42,11 @@ describe('AuthLayout Component', () => {
       </AuthLayout>
     );
 
-    // Kiểm tra UI của container hiển thị form (Uber card style)
-    const cardWrapper = container.querySelector('.auth-card-wrapper');
-    expect(cardWrapper).toBeInTheDocument();
+    // Kiểm tra UI của container hiển thị form
+    const card = container.querySelector('.auth-card-wrapper');
+    expect(card).toBeInTheDocument();
     
-    const cardContent = container.querySelector('.card-content');
-    expect(cardContent).toBeInTheDocument();
+    const content = container.querySelector('.card-content');
+    expect(content).toBeInTheDocument();
   });
 });

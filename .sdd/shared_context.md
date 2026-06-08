@@ -1,3 +1,4 @@
+
 DB Schema
 ```-- ============================================================
 --  IELTS Platform - PostgreSQL Database Schema

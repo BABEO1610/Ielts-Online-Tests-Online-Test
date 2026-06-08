@@ -10,7 +10,6 @@ export const AuthProvider = ({ children }) => {
 
   const refreshUser = async () => {
     try {
-      setIsLoading(true);
       // EARS[Event]: WHEN refreshing user THEN fetch profile from API
       const response = await api.get('/users/me');
       if (response.data && response.data.data) {
@@ -38,7 +37,8 @@ export const AuthProvider = ({ children }) => {
       if (response.data && response.data.data) {
         setUser(response.data.data);
         setIsAuthenticated(true);
-        return { success: true };
+        // Return user data (including role) so caller can redirect appropriately
+        return { success: true, user: response.data.data };
       }
       return { success: false, error: { message: 'Invalid response format' } };
     } catch (error) {

@@ -46,7 +46,7 @@ describe('ResetPwdForm Component', () => {
   test('shows error if token is missing', () => {
     renderWithRouter(<ResetPwdForm />, '/reset-password');
     expect(screen.getByTestId('error-alert')).toBeInTheDocument();
-    expect(screen.getByTestId('error-alert')).toHaveTextContent('Đường dẫn không hợp lệ hoặc đã hết hạn.');
+    expect(screen.getByTestId('error-alert')).toHaveTextContent('Đường dẫn đặt lại mật khẩu không hợp lệ hoặc đã hết hạn.');
     expect(screen.getByTestId('submit-btn')).toBeDisabled();
   });
 
@@ -78,8 +78,8 @@ describe('ResetPwdForm Component', () => {
 
   test('handles successful password reset and redirects (USER-06)', async () => {
     const setTimeoutSpy = vi.spyOn(global, 'setTimeout');
-    api.put.mockResolvedValueOnce({ data: { success: true } });
-
+    api.post.mockResolvedValueOnce({ data: { success: true } });
+    
     renderWithRouter(<ResetPwdForm />);
 
     fireEvent.change(screen.getByTestId('password-input'), { target: { value: 'secret123' } });
@@ -88,9 +88,9 @@ describe('ResetPwdForm Component', () => {
     fireEvent.click(screen.getByTestId('submit-btn'));
 
     await waitFor(() => {
-      expect(api.put).toHaveBeenCalledWith('/auth/reset-password', {
+      expect(api.post).toHaveBeenCalledWith('/auth/reset-password', {
         token: 'valid-token',
-        new_password: 'secret123'
+        password: 'secret123'
       });
       expect(screen.getByTestId('success-alert')).toBeInTheDocument();
       expect(screen.getByTestId('password-input')).toBeDisabled(); // Form disabled after success
@@ -109,7 +109,7 @@ describe('ResetPwdForm Component', () => {
 
   test('handles reset failure due to used password (AUTH_PWD_001)', async () => {
     const errorMsg = 'This password has been used recently.';
-    api.put.mockRejectedValueOnce({
+    api.post.mockRejectedValueOnce({
       response: { data: { error: errorMsg } }
     });
 
