@@ -25,7 +25,7 @@ describe('ForgotPwdForm Component', () => {
     renderWithRouter(<ForgotPwdForm />);
     expect(screen.getByTestId('email-input')).toBeInTheDocument();
     expect(screen.getByTestId('submit-btn')).toBeInTheDocument();
-    expect(screen.getByText('Quay lại đăng nhập')).toBeInTheDocument();
+    expect(screen.getByText('Đăng nhập ngay')).toBeInTheDocument();
   });
 
   test('handles successful request and shows anti-enumeration message', async () => {

@@ -1,8 +1,9 @@
 import React from 'react';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import StudentHistoryPage from '../../../../src/pages/grading/StudentHistoryPage';
-import gradingService from '../../../../src/services/grading.service';
+import { MemoryRouter } from 'react-router-dom';
+import StudentHistoryPage from '../../../src/pages/grading/StudentHistoryPage';
+import gradingService from '../../../src/services/grading.service';
 
 /*
  * TRACEABILITY MATRIX
@@ -16,14 +17,18 @@ import gradingService from '../../../../src/services/grading.service';
  */
 
 // Mock gradingService
-vi.mock('../../../../src/services/grading.service', () => ({
-  default: {
-    getSubmissionHistory: vi.fn(),
-  },
+vi.mock('../../../src/services/grading.service');
+
+// Mock useAuth
+vi.mock('../../../src/context/AuthContext', () => ({
+  useAuth: () => ({
+    user: { id: 'stu-1', role: 'student', full_name: 'John Doe' },
+    logout: vi.fn(),
+  }),
 }));
 
 // Mock FeedbackReport
-vi.mock('../../../../src/components/grading/FeedbackReport', () => ({
+vi.mock('../../../src/components/grading/FeedbackReport', () => ({
   default: ({ submissionId, type }) => (
     <div data-testid="mock-feedback-report">
       Feedback for {type} {submissionId}
@@ -40,7 +45,7 @@ describe('StudentHistoryPage', () => {
     // Return a promise that never resolves to keep it in loading state
     gradingService.getSubmissionHistory.mockReturnValue(new Promise(() => {}));
     
-    render(<StudentHistoryPage />);
+    render(<MemoryRouter><StudentHistoryPage /></MemoryRouter>);
     
     expect(screen.getByText('Đang tải lịch sử bài nộp...')).toBeInTheDocument();
     expect(screen.getByRole('status')).toBeInTheDocument();
@@ -52,7 +57,7 @@ describe('StudentHistoryPage', () => {
       data: [],
     });
 
-    render(<StudentHistoryPage />);
+    render(<MemoryRouter><StudentHistoryPage /></MemoryRouter>);
 
     await waitFor(() => {
       expect(screen.getByText('Bạn chưa có bài nộp nào.')).toBeInTheDocument();
@@ -88,7 +93,7 @@ describe('StudentHistoryPage', () => {
       data: mockData,
     });
 
-    render(<StudentHistoryPage />);
+    render(<MemoryRouter><StudentHistoryPage /></MemoryRouter>);
 
     await waitFor(() => {
       // Check Desktop table headers
@@ -98,20 +103,20 @@ describe('StudentHistoryPage', () => {
       // Check Data rendering
       expect(screen.getAllByText('writing').length).toBeGreaterThan(0);
       expect(screen.getByText('Task 1')).toBeInTheDocument();
-      expect(screen.getByText('Đã có điểm (AI)')).toBeInTheDocument();
+      expect(screen.getByText('Đã chấm (AI)')).toBeInTheDocument();
       expect(screen.getAllByText('6.5').length).toBeGreaterThan(0);
 
       expect(screen.getAllByText('speaking').length).toBeGreaterThan(0);
       expect(screen.getByText('Part 2')).toBeInTheDocument();
       expect(screen.getByText('Đang chấm')).toBeInTheDocument();
-      expect(screen.getAllByText('N/A').length).toBeGreaterThan(0);
+      expect(screen.getAllByText('—').length).toBeGreaterThan(0);
     });
   });
 
   it('renders error state on API failure (error case)', async () => {
     gradingService.getSubmissionHistory.mockRejectedValue(new Error('Network error'));
 
-    render(<StudentHistoryPage />);
+    render(<MemoryRouter><StudentHistoryPage /></MemoryRouter>);
 
     await waitFor(() => {
       expect(screen.getByText('Lỗi!')).toBeInTheDocument();
@@ -125,7 +130,7 @@ describe('StudentHistoryPage', () => {
       error: { message: 'Custom error from backend' },
     });
 
-    render(<StudentHistoryPage />);
+    render(<MemoryRouter><StudentHistoryPage /></MemoryRouter>);
 
     await waitFor(() => {
       expect(screen.getByText('Custom error from backend')).toBeInTheDocument();
@@ -150,7 +155,7 @@ describe('StudentHistoryPage', () => {
       data: mockData,
     });
 
-    render(<StudentHistoryPage />);
+    render(<MemoryRouter><StudentHistoryPage /></MemoryRouter>);
 
     await waitFor(() => {
       expect(screen.getByText('Task 1')).toBeInTheDocument();
@@ -163,14 +168,14 @@ describe('StudentHistoryPage', () => {
     // Modal should appear
     await waitFor(() => {
       expect(screen.getByTestId('mock-feedback-report')).toBeInTheDocument();
-      expect(screen.getByText('Chi tiết kết quả chấm điểm - Writing')).toBeInTheDocument();
+      expect(screen.getByText(/Kết quả — Writing Task 1/i)).toBeInTheDocument();
     });
 
     // Verify props passed to FeedbackReport
     expect(screen.getByText('Feedback for writing sub-1')).toBeInTheDocument();
 
     // Close the modal
-    const closeBtn = screen.getByText('Đóng');
+    const closeBtn = screen.getByText('✕ Đóng');
     fireEvent.click(closeBtn);
 
     await waitFor(() => {

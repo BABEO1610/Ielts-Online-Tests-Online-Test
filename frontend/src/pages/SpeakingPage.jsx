@@ -1,7 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 import StudentNavbar from '../components/layout/StudentNavbar';
 import AudioRecorder from '../components/grading/AudioRecorder';
 import FeedbackReport from '../components/grading/FeedbackReport';
+import ModeSelector from '../components/objective-testing/ModeSelector';
+import TimerBar from '../components/objective-testing/TimerBar';
+import AutoSubmitModal from '../components/objective-testing/AutoSubmitModal';
 
 // ─── MOCK DATA — Danh sách đề thi Speaking ───────────────────────────────────
 // Mỗi exam có 3 parts đúng chuẩn IELTS Speaking format
@@ -235,9 +240,37 @@ const DIFFICULTY_STYLE = {
 };
 
 // ─── Level 3: Giao diện thu âm ───────────────────────────────────────────────
-const SpeakingTestScreen = ({ part, exam, onBack, onSubmitSuccess }) => (
+const SpeakingTestScreen = ({ part, exam, onBack, onSubmitSuccess, practiceMode, customTimeLimit }) => {
+  const recorderRef = useRef(null);
+  const [showAutoSubmit, setShowAutoSubmit] = useState(false);
+
+  const durationMinutes = Math.ceil(part.duration / 60);
+  const audioMaxDuration = customTimeLimit ? customTimeLimit * 60 : part.duration;
+
+  const handleTimeUp = useCallback(() => {
+    setShowAutoSubmit(true);
+    if (recorderRef.current) {
+      recorderRef.current.stopRecording();
+    }
+  }, []);
+
+  const handleSubmitEarly = useCallback(() => {
+    if (window.confirm('Bạn có chắc chắn muốn kết thúc bài thi?')) {
+      setShowAutoSubmit(true);
+      if (recorderRef.current) {
+        recorderRef.current.stopRecording();
+      }
+    }
+  }, []);
+
+  const handleSuccess = (res) => {
+    setShowAutoSubmit(false);
+    if (onSubmitSuccess) onSubmitSuccess(res);
+  };
+
+  return (
   <div className="bg-white min-vh-100 pb-5">
-    <StudentNavbar />
+    <TimerBar durationMinutes={durationMinutes} customTimeLimit={customTimeLimit} onTimeUp={handleTimeUp} onSubmitEarly={handleSubmitEarly} practiceMode={practiceMode} />
     <main className="container-fluid px-3 px-md-5 mt-4" style={{ maxWidth: '900px' }}>
       <div className="d-flex align-items-center gap-3 mb-4 flex-wrap">
         <button
@@ -290,17 +323,43 @@ const SpeakingTestScreen = ({ part, exam, onBack, onSubmitSuccess }) => (
       </div>
 
       <AudioRecorder
+        ref={recorderRef}
         testId={part.id}
         partNumber={part.part_number}
-        maxDuration={part.duration}
-        onSubmitSuccess={onSubmitSuccess}
+        maxDuration={audioMaxDuration}
+        practiceMode={practiceMode}
+        onSubmitSuccess={handleSuccess}
       />
+      <AutoSubmitModal isOpen={showAutoSubmit} />
     </main>
   </div>
-);
+  );
+};
 
 // ─── Level 2: Parts của một đề ───────────────────────────────────────────────
-const SpeakingPartList = ({ exam, onSelectPart, onBack }) => (
+const SpeakingPartList = ({ exam, onSelectPart, onBack }) => {
+  const { isAuthenticated } = useAuth();
+  const navigate = useNavigate();
+  const [showModeModal, setShowModeModal] = useState(false);
+  const [partToStart, setPartToStart] = useState(null);
+
+  const handlePartClick = (part) => {
+    // EARS[Event]: WHEN user tries to start part
+    if (!isAuthenticated) {
+      // EARS[Unwanted]: IF user is not authenticated THEN redirect to login
+      navigate('/login', { state: { message: 'Vui lòng đăng nhập để bắt đầu làm bài' } });
+      return;
+    }
+    setPartToStart(part);
+    setShowModeModal(true);
+  };
+
+  const handleModeSelect = (modeConfig) => {
+    setShowModeModal(false);
+    onSelectPart(partToStart, modeConfig);
+  };
+
+  return (
   <div className="bg-white min-vh-100 pb-5">
     <StudentNavbar />
     <main className="container-fluid px-3 px-md-5 mt-4 mt-md-5" style={{ maxWidth: '1200px' }}>
@@ -331,7 +390,7 @@ const SpeakingPartList = ({ exam, onSelectPart, onBack }) => (
           <div
             key={part.id}
             className="rounded-4 overflow-hidden"
-            style={{ border: '1px solid #e2e2e2', cursor: 'pointer', transition: 'all 0.15s ease', backgroundColor: idx === 1 ? '#000' : '#fff' }}
+            style={{ border: '1px solid #e2e2e2', cursor: 'pointer', transition: 'all 0.15s ease', backgroundColor: '#fff' }}
             onMouseEnter={e => { e.currentTarget.style.boxShadow = 'rgba(0,0,0,0.15) 0px 4px 16px'; }}
             onMouseLeave={e => { e.currentTarget.style.boxShadow = 'none'; }}
             onClick={() => onSelectPart(part)}
@@ -343,8 +402,8 @@ const SpeakingPartList = ({ exam, onSelectPart, onBack }) => (
                   className="d-flex align-items-center justify-content-center fw-bold flex-shrink-0"
                   style={{
                     width: '56px', height: '56px', borderRadius: '999px',
-                    backgroundColor: idx === 1 ? '#fff' : '#000',
-                    color: idx === 1 ? '#000' : '#fff',
+                    backgroundColor: '#000',
+                    color: '#fff',
                     fontSize: '20px', fontFamily: 'UberMove, system-ui, sans-serif'
                   }}
                 >
@@ -353,19 +412,19 @@ const SpeakingPartList = ({ exam, onSelectPart, onBack }) => (
                 <div>
                   <h4
                     className="fw-bold mb-1"
-                    style={{ fontFamily: 'UberMove, system-ui, sans-serif', fontSize: '20px', color: idx === 1 ? '#fff' : '#000' }}
+                    style={{ fontFamily: 'UberMove, system-ui, sans-serif', fontSize: '20px', color: '#000' }}
                   >
                     {part.title}
                   </h4>
                   <p
                     className="mb-1"
-                    style={{ fontSize: '14px', fontFamily: 'UberMoveText, system-ui, sans-serif', color: idx === 1 ? '#afafaf' : '#5e5e5e' }}
+                    style={{ fontSize: '14px', fontFamily: 'UberMoveText, system-ui, sans-serif', color: '#5e5e5e' }}
                   >
                     {part.description}
                   </p>
                   <span
                     className="fw-medium"
-                    style={{ fontSize: '13px', color: idx === 1 ? '#afafaf' : '#5e5e5e' }}
+                    style={{ fontSize: '13px', color: '#5e5e5e' }}
                   >
                     ⏱ Tối đa {Math.floor(part.duration / 60)} phút · {part.questions.length} câu hỏi
                   </span>
@@ -374,13 +433,13 @@ const SpeakingPartList = ({ exam, onSelectPart, onBack }) => (
               <button
                 className="btn rounded-pill px-4 py-2 fw-medium flex-shrink-0"
                 style={{
-                  backgroundColor: idx === 1 ? '#fff' : '#000',
-                  color: idx === 1 ? '#000' : '#fff',
+                  backgroundColor: '#000',
+                  color: '#fff',
                   fontFamily: 'UberMoveText, system-ui, sans-serif',
                   fontSize: '15px',
                   border: 'none'
                 }}
-                onClick={(e) => { e.stopPropagation(); onSelectPart(part); }}
+                onClick={(e) => { e.stopPropagation(); handlePartClick(part); }}
               >
                 Vào phòng thi →
               </button>
@@ -388,15 +447,44 @@ const SpeakingPartList = ({ exam, onSelectPart, onBack }) => (
           </div>
         ))}
       </div>
+
+      <ModeSelector
+        show={showModeModal}
+        onHide={() => setShowModeModal(false)}
+        onSelectMode={handleModeSelect}
+        examType="Speaking"
+        fullDuration={partToStart ? Math.ceil(partToStart.duration / 60) : null}
+      />
     </main>
   </div>
-);
+  );
+};
 
 // ─── Level 1: Danh sách đề thi ───────────────────────────────────────────────
 const SpeakingPage = () => {
   const [selectedExam, setSelectedExam] = useState(null);
   const [selectedPart, setSelectedPart] = useState(null);
+  const [practiceMode, setPracticeMode] = useState(false);
+  const [customTimeLimit, setCustomTimeLimit] = useState(null);
   const [submittedId, setSubmittedId] = useState(null);
+  const navigate = useNavigate();
+  const { isAuthenticated } = useAuth();
+
+  const handleViewExam = (exam) => {
+    // EARS[Event]: WHEN user tries to view exam details
+    if (!isAuthenticated) {
+      // EARS[Unwanted]: IF user is not authenticated THEN redirect to login
+      navigate('/login', { state: { message: 'Vui lòng đăng nhập để xem chi tiết đề thi' } });
+      return;
+    }
+    setSelectedExam(exam);
+  };
+
+  const handleSelectPart = (part, modeConfig) => {
+    setPracticeMode(modeConfig.isPractice);
+    setCustomTimeLimit(modeConfig.customTimeLimit);
+    setSelectedPart(part);
+  };
 
   const handleSubmitSuccess = (response) => {
     const id = response?.data?.submission_id || 'mock-speak-demo';
@@ -431,6 +519,8 @@ const SpeakingPage = () => {
       <SpeakingTestScreen
         part={selectedPart}
         exam={selectedExam}
+        practiceMode={practiceMode}
+        customTimeLimit={customTimeLimit}
         onBack={() => setSelectedPart(null)}
         onSubmitSuccess={handleSubmitSuccess}
       />
@@ -442,7 +532,7 @@ const SpeakingPage = () => {
     return (
       <SpeakingPartList
         exam={selectedExam}
-        onSelectPart={setSelectedPart}
+        onSelectPart={handleSelectPart}
         onBack={() => setSelectedExam(null)}
       />
     );
@@ -473,7 +563,7 @@ const SpeakingPage = () => {
                   style={{ border: '1px solid #e2e2e2', cursor: 'pointer', transition: 'box-shadow 0.2s ease' }}
                   onMouseEnter={e => e.currentTarget.style.boxShadow = 'rgba(0,0,0,0.12) 0px 4px 16px 0px'}
                   onMouseLeave={e => e.currentTarget.style.boxShadow = 'none'}
-                  onClick={() => setSelectedExam(exam)}
+                  onClick={() => handleViewExam(exam)}
                 >
                   <div>
                     <div className="d-flex justify-content-between align-items-start mb-3">
@@ -500,7 +590,7 @@ const SpeakingPage = () => {
                   <button
                     className="btn btn-dark rounded-pill px-4 py-2 fw-medium align-self-start"
                     style={{ fontFamily: 'UberMoveText, system-ui, sans-serif', fontSize: '15px' }}
-                    onClick={(e) => { e.stopPropagation(); setSelectedExam(exam); }}
+                    onClick={(e) => { e.stopPropagation(); handleViewExam(exam); }}
                   >
                     Xem đề →
                   </button>

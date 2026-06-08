@@ -481,6 +481,7 @@ const loginWithGoogle = async (googleProfile, ipAddress, userAgent) => {
 
     // 8. Return safeUser and tokens
     const { password_hash, ...safeUser } = user;
+    safeUser.has_password = !!password_hash;
 
     return {
         user: safeUser,

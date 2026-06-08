@@ -131,12 +131,8 @@ function App() {
         </Route>
 
         {/* ── Subjective — Student Skill Pages (Navbar: Writing / Speaking) ─── */}
-        <Route path="/writing" element={
-          <ProtectedRoute><WritingPage /></ProtectedRoute>
-        } />
-        <Route path="/speaking" element={
-          <ProtectedRoute><SpeakingPage /></ProtectedRoute>
-        } />
+        <Route path="/writing" element={<WritingPage />} />
+        <Route path="/speaking" element={<SpeakingPage />} />
 
         {/* ── Subjective — Student History (Profile Dropdown) ───────────────── */}
         <Route path="/history" element={
@@ -152,9 +148,7 @@ function App() {
         } />
 
         {/* ── Objective Testing — Student: Browsing ─────────────────────────── */}
-        <Route path="/tests" element={
-          <ProtectedRoute><TestListPage /></ProtectedRoute>
-        } />
+        <Route path="/tests" element={<TestListPage />} />
         <Route path="/tests/history" element={
           <ProtectedRoute><TestHistoryPage /></ProtectedRoute>
         } />
@@ -163,12 +157,8 @@ function App() {
         } />
 
         {/* ── Objective Testing — Navbar: Reading / Listening (riêng biệt) ───── */}
-        <Route path="/reading" element={
-          <ProtectedRoute><ReadingPage /></ProtectedRoute>
-        } />
-        <Route path="/listening" element={
-          <ProtectedRoute><ListeningPage /></ProtectedRoute>
-        } />
+        <Route path="/reading" element={<ReadingPage />} />
+        <Route path="/listening" element={<ListeningPage />} />
 
         {/* ── Objective Testing — Student: Live Test ────────────────────────── */}
         <Route path="/tests/:id/reading" element={

@@ -1,9 +1,9 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, forwardRef, useImperativeHandle } from 'react';
 import api from '../../services/api';
 import gradingService from '../../services/grading.service';
 import { useAuth } from '../../context/AuthContext';
 
-const AudioRecorder = ({ testId, partNumber, onUploadComplete, onSubmitSuccess, maxDuration = 300 }) => {
+const AudioRecorder = forwardRef(({ testId, partNumber, onUploadComplete, onSubmitSuccess, maxDuration = 300, practiceMode = false }, ref) => {
   const { user } = useAuth();
   const aiQuotaRemaining = user?.ai_grading_quota_remaining ?? 0;
 
@@ -17,6 +17,14 @@ const AudioRecorder = ({ testId, partNumber, onUploadComplete, onSubmitSuccess, 
   const audioChunksRef = useRef([]);
   const timerRef = useRef(null);
   const streamRef = useRef(null);
+
+  useImperativeHandle(ref, () => ({
+    stopRecording: () => {
+      if (status === 'recording') {
+        stopRecording();
+      }
+    }
+  }));
 
   useEffect(() => {
     return () => {
@@ -81,19 +89,21 @@ const AudioRecorder = ({ testId, partNumber, onUploadComplete, onSubmitSuccess, 
       setStatus('recording');
       setTimeLeft(maxDuration);
 
-      // EARS[State-driven]: WHILE recording, THE system SHALL automatically stop recording WHEN maxDuration is reached
-      timerRef.current = setInterval(() => {
-        setTimeLeft((prev) => {
-          if (prev <= 1) {
-            clearInterval(timerRef.current);
-            if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
-              mediaRecorderRef.current.stop();
+      // EARS[State-driven]: WHILE recording, THE system SHALL automatically stop recording WHEN maxDuration is reached (only in Real Test mode)
+      if (!practiceMode) {
+        timerRef.current = setInterval(() => {
+          setTimeLeft((prev) => {
+            if (prev <= 1) {
+              clearInterval(timerRef.current);
+              if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+                mediaRecorderRef.current.stop();
+              }
+              return 0;
             }
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
+            return prev - 1;
+          });
+        }, 1000);
+      }
       
     } catch (err) {
       // EARS[Unwanted]: WHERE browser denies microphone permission, THE system SHALL show error
@@ -187,7 +197,7 @@ const AudioRecorder = ({ testId, partNumber, onUploadComplete, onSubmitSuccess, 
       
       {status === 'idle' && (
         <div>
-          <p className="text-muted">Click the button below to start recording. Max duration: {formatTime(maxDuration)}</p>
+          <p className="text-muted">Click the button below to start recording. {practiceMode ? 'Practice mode (no time limit).' : `Max duration: ${formatTime(maxDuration)}`}</p>
           <button 
             className="btn btn-dark rounded-pill px-4 py-2" 
             onClick={startRecording}
@@ -202,7 +212,7 @@ const AudioRecorder = ({ testId, partNumber, onUploadComplete, onSubmitSuccess, 
         <div>
           <div className="text-danger mb-3 fw-bold">
             <span className="spinner-grow spinner-grow-sm me-2" role="status" aria-hidden="true"></span>
-            Recording... {formatTime(timeLeft)}
+            Recording... {!practiceMode && formatTime(timeLeft)}
           </div>
           <button 
             className="btn btn-light rounded-pill border px-4 py-2" 
@@ -317,6 +327,6 @@ const AudioRecorder = ({ testId, partNumber, onUploadComplete, onSubmitSuccess, 
       )}
     </div>
   );
-};
+});
 
 export default AudioRecorder;

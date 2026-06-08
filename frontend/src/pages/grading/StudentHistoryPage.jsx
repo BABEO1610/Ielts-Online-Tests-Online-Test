@@ -1,74 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import StudentNavbar from '../../components/layout/StudentNavbar';
 import StudentDashboardWidgets from '../../components/grading/StudentDashboardWidgets';
 import FeedbackReport from '../../components/grading/FeedbackReport';
-
-/**
- * MOCK DATA — Dữ liệu tĩnh dùng cho demo
- * Phản ánh cấu trúc DB thực tế (shared_context.md):
- * writing_submissions: id, user_id, test_id, task_number, status, band_score, submitted_at
- * speaking_submissions: id, user_id, test_id, part_number, status, band_score, submitted_at
- */
-const MOCK_HISTORY = [
-  {
-    id: 'sub-writing-001',
-    type: 'writing',
-    task_number: 2,
-    part_number: null,
-    status: 'tutor_graded',
-    band_score: 7.0,
-    submitted_at: '2026-06-04T10:30:00Z',
-    grader: 'tutor'
-  },
-  {
-    id: 'sub-speaking-001',
-    type: 'speaking',
-    task_number: null,
-    part_number: 1,
-    status: 'ai_graded',
-    band_score: 6.5,
-    submitted_at: '2026-06-04T08:15:00Z',
-    grader: 'ai'
-  },
-  {
-    id: 'sub-writing-002',
-    type: 'writing',
-    task_number: 1,
-    status: 'ai_graded',
-    band_score: 6.0,
-    submitted_at: '2026-06-03T14:00:00Z',
-    grader: 'ai'
-  },
-  {
-    id: 'sub-speaking-002',
-    type: 'speaking',
-    task_number: null,
-    part_number: 2,
-    status: 'pending',
-    band_score: null,
-    submitted_at: '2026-06-03T11:45:00Z',
-    grader: 'ai'
-  },
-  {
-    id: 'sub-writing-003',
-    type: 'writing',
-    task_number: 2,
-    status: 'tutor_graded',
-    band_score: 7.5,
-    submitted_at: '2026-06-02T09:20:00Z',
-    grader: 'tutor'
-  },
-  {
-    id: 'sub-speaking-003',
-    type: 'speaking',
-    task_number: null,
-    part_number: 3,
-    status: 'failed',
-    band_score: null,
-    submitted_at: '2026-06-01T16:00:00Z',
-    grader: 'ai'
-  }
-];
+import gradingService from '../../services/grading.service';
 
 const MOCK_STATS = {
   targetBand: 7.0,
@@ -108,7 +42,30 @@ const StudentHistoryPage = () => {
   const [selectedSubmission, setSelectedSubmission] = useState(null);
   const [filterType, setFilterType] = useState('all');
 
-  const filtered = filterType === 'all' ? MOCK_HISTORY : MOCK_HISTORY.filter(s => s.type === filterType);
+  const [history, setHistory] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    const fetchHistory = async () => {
+      try {
+        setLoading(true);
+        const res = await gradingService.getSubmissionHistory();
+        if (res.success) {
+          setHistory(res.data || []);
+        } else {
+          setError(res.error?.message || 'Lỗi không xác định');
+        }
+      } catch (err) {
+        setError(err.message || 'Lỗi kết nối');
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchHistory();
+  }, []);
+
+  const filtered = filterType === 'all' ? history : history.filter(s => s.type === filterType);
 
   return (
     <div className="bg-white min-vh-100 pb-5">
@@ -190,10 +147,23 @@ const StudentHistoryPage = () => {
         </div>
 
         {/* Submission Table */}
-        {filtered.length === 0 ? (
+        {loading ? (
+          <div className="text-center py-5 rounded-4" style={{ backgroundColor: '#efefef' }} role="status">
+            <p className="fw-bold text-dark mb-0" style={{ fontFamily: 'UberMoveText, system-ui, sans-serif', fontSize: '18px' }}>
+              Đang tải lịch sử bài nộp...
+            </p>
+          </div>
+        ) : error ? (
+          <div className="text-center py-5 rounded-4" style={{ backgroundColor: '#fee' }}>
+            <p className="fw-bold text-danger mb-0" style={{ fontFamily: 'UberMoveText, system-ui, sans-serif', fontSize: '18px' }}>
+              Lỗi!
+            </p>
+            <p className="text-danger mb-0">{error}</p>
+          </div>
+        ) : filtered.length === 0 ? (
           <div className="text-center py-5 rounded-4" style={{ backgroundColor: '#efefef' }}>
             <p className="fw-bold text-dark mb-0" style={{ fontFamily: 'UberMoveText, system-ui, sans-serif', fontSize: '18px' }}>
-              Chưa có bài nộp nào.
+              Bạn chưa có bài nộp nào.
             </p>
           </div>
         ) : (
