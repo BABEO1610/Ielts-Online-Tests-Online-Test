@@ -45,7 +45,7 @@ const StudentNavbar = () => {
             </li>
             {/* EARS[Ubiquitous]: The "Thư viện" link must be public and visible to both Guest and authenticated users. */}
             <li className="nav-item">
-              <Link className="nav-link fw-medium text-dark px-0" to="/library" style={{ fontSize: '16px' }} data-testid="library-nav-link">Thư viện</Link>
+              <Link className="nav-link fw-medium text-dark px-0" to="/library" style={{ fontSize: '16px' }} data-testid="library-nav-link">Library</Link>
             </li>
           </ul>
 
@@ -78,15 +78,15 @@ const StudentNavbar = () => {
             ) : (
               // EARS[Event]: WHEN user is not logged in THEN show login/register options
               <>
-                <Link 
-                  to="/login" 
+                <Link
+                  to="/login"
                   className="btn btn-light rounded-pill px-4 py-2 fw-medium border-0"
                   style={{ backgroundColor: '#efefef', fontSize: '15px' }}
                 >
                   Đăng nhập
                 </Link>
-                <Link 
-                  to="/register" 
+                <Link
+                  to="/register"
                   className="btn btn-dark rounded-pill px-4 py-2 fw-medium border-0"
                   style={{ fontSize: '15px' }}
                 >
@@ -97,8 +97,8 @@ const StudentNavbar = () => {
           </div>
         </div>
       </div>
-      
-      <ChangePwdModal 
+
+      <ChangePwdModal
         isOpen={showPwdModal}
         onClose={() => setShowPwdModal(false)}
       />
