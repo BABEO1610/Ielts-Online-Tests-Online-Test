@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
-import ChangePwdModal from '../components/profile/ChangePwdModal';
+import { useAuth } from '../../context/AuthContext';
+import ChangePwdModal from '../../components/profile/ChangePwdModal';
 
 /**
  * TutorDashboard.jsx — Trang chủ của Tutor

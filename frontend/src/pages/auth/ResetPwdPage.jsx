@@ -1,6 +1,6 @@
 import React from 'react';
-import AuthLayout from '../components/layout/AuthLayout';
-import ResetPwdForm from '../components/auth/ResetPwdForm';
+import AuthLayout from '../../components/layout/AuthLayout';
+import ResetPwdForm from '../../components/auth/ResetPwdForm';
 
 const ResetPwdPage = () => {
   return (

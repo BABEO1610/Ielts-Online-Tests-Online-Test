@@ -139,7 +139,7 @@ const logout = async (req, res, next) => {
     // Tuy nhiên theo luồng chuẩn, logout cần được gọi qua middleware authenticate.
     // Assuming req.user is set by authenticate middleware.
     let sessionToken = null;
-    if (req.user && req.user.session_token) {
+    if (req.user?.session_token) {
       sessionToken = req.user.session_token;
     } else {
       // Fallback đọc từ token nếu không qua authenticate middleware

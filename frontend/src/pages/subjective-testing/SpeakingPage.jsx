@@ -1,16 +1,11 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
-import StudentNavbar from '../components/layout/StudentNavbar';
-import AudioRecorder from '../components/grading/AudioRecorder';
-import FeedbackReport from '../components/grading/FeedbackReport';
-import ModeSelector from '../components/objective-testing/ModeSelector';
-import TimerBar from '../components/objective-testing/TimerBar';
-import AutoSubmitModal from '../components/objective-testing/AutoSubmitModal';
+import { useAuth } from '../../context/AuthContext';
+import StudentNavbar from '../../components/layout/StudentNavbar';
+import ModeSelector from '../../components/objective-testing/ModeSelector';
 
 // ─── MOCK DATA — Danh sách đề thi Speaking ───────────────────────────────────
-// Mỗi exam có 3 parts đúng chuẩn IELTS Speaking format
-const MOCK_EXAMS = [
+export const MOCK_EXAMS = [
   {
     id: 'speaking-2025-06',
     title: 'Đề thi tháng 6/2025',
@@ -239,138 +234,6 @@ const DIFFICULTY_STYLE = {
   'Khó':       { bg: '#282828', color: '#afafaf'  }
 };
 
-// ─── Level 3: Giao diện thu âm ───────────────────────────────────────────────
-const SpeakingTestScreen = ({ exam, onBack, onSubmitSuccess, practiceMode, customTimeLimit }) => {
-  const recorderRefs = useRef([]);
-  const [showAutoSubmit, setShowAutoSubmit] = useState(false);
-  const [activePartIndex, setActivePartIndex] = useState(0);
-
-  const totalDurationSeconds = exam.parts.reduce((total, p) => total + (parseInt(p.duration) || 0), 0);
-  const durationMinutes = Math.ceil(totalDurationSeconds / 60);
-
-  const handleTimeUp = useCallback(() => {
-    setShowAutoSubmit(true);
-    recorderRefs.current.forEach(ref => {
-      if (ref && ref.stopRecording) ref.stopRecording();
-    });
-  }, []);
-
-  const handleSubmitEarly = useCallback(() => {
-    if (window.confirm('Bạn có chắc chắn muốn kết thúc bài thi? (Hệ thống sẽ nộp toàn bộ 3 phần)')) {
-      setShowAutoSubmit(true);
-      recorderRefs.current.forEach(ref => {
-        if (ref && ref.stopRecording) ref.stopRecording();
-      });
-    }
-  }, []);
-
-  const handleSuccess = (res) => {
-    setShowAutoSubmit(false);
-    if (onSubmitSuccess) onSubmitSuccess(res);
-  };
-
-  const activePart = exam.parts[activePartIndex];
-  const examinerImage = "https://images.unsplash.com/photo-1560250097-0b93528c311a?q=80&w=800&auto=format&fit=crop";
-
-  return (
-  <div className="bg-white min-vh-100 d-flex flex-column" style={{ overflowX: 'hidden' }}>
-    <TimerBar durationMinutes={durationMinutes} customTimeLimit={customTimeLimit} onTimeUp={handleTimeUp} onSubmitEarly={handleSubmitEarly} practiceMode={practiceMode} />
-    
-    <div style={{ flex: 1, paddingBottom: '80px', display: 'flex', flexDirection: 'column' }}>
-      <main className="container-fluid px-3 px-md-5 mt-4" style={{ maxWidth: '1000px', flex: 1, display: 'flex', flexDirection: 'column' }}>
-        <div className="d-flex align-items-center gap-3 mb-3 flex-wrap">
-          <p className="mb-0 text-muted text-uppercase fw-bold" style={{ fontSize: '13px', fontFamily: 'UberMoveText, system-ui, sans-serif', letterSpacing: 1 }}>
-            {exam.title} · {exam.topic}
-          </p>
-        </div>
-
-        <div className="text-center mb-4">
-           <h2 className="fw-bold text-dark text-uppercase" style={{ fontFamily: 'UberMove, system-ui, sans-serif', fontSize: '24px', letterSpacing: 1 }}>
-             PART {activePart.part_number}: <span style={{ color: '#5e5e5e' }}>{activePart.title.split('—')[1]?.trim() || 'Topic'}</span>
-           </h2>
-        </div>
-
-        {/* Content Layout */}
-        <div className="row g-4 mb-4 flex-grow-1">
-          {/* Left: Examiner Image */}
-          <div className="col-md-5 col-lg-6 d-flex align-items-center justify-content-center">
-            <div className="rounded-4 overflow-hidden w-100 position-relative" style={{ backgroundColor: '#000', aspectRatio: '16/9' }}>
-               <img src={examinerImage} alt="Examiner" className="img-fluid w-100 h-100" style={{ objectFit: 'cover', opacity: 0.9 }} />
-               <div className="position-absolute bottom-0 start-0 p-3 w-100" style={{ background: 'linear-gradient(transparent, rgba(0,0,0,0.7))' }}>
-                 <span className="badge bg-danger">IELTS Examiner</span>
-               </div>
-            </div>
-          </div>
-
-          {/* Right: Prompt & Questions */}
-          <div className="col-md-7 col-lg-6 d-flex flex-column">
-            <div className="p-4 rounded-4 h-100 d-flex flex-column" style={{ backgroundColor: '#efefef' }}>
-              <div className="d-flex gap-3 mb-3 flex-wrap">
-                <span className="rounded-pill px-3 py-1 fw-medium" style={{ backgroundColor: '#000', color: '#fff', fontSize: '13px' }}>
-                  ⏱ Tối đa {Math.floor(activePart.duration / 60)} phút
-                </span>
-              </div>
-              <p className="fw-bold mb-3 text-dark" style={{ fontSize: '14px', fontFamily: 'UberMoveText, system-ui, sans-serif', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                CÂU HỎI
-              </p>
-              <ul className="mb-4 ps-3">
-                {activePart.questions.map((q, i) => (
-                  <li key={i} className="mb-2 text-dark" style={{ fontSize: '16px', fontFamily: 'UberMoveText, system-ui, sans-serif', lineHeight: '1.8', listStyle: q.startsWith('—') || q.startsWith('  ') ? 'none' : 'disc' }}>
-                    {q}
-                  </li>
-                ))}
-              </ul>
-              <div className="p-3 rounded-3 mt-auto" style={{ backgroundColor: '#e2e2e2', borderLeft: '3px solid #000' }}>
-                <p className="mb-0 fw-medium text-dark" style={{ fontSize: '14px', fontFamily: 'UberMoveText, system-ui, sans-serif' }}>
-                  💡 {activePart.tip}
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Audio Recorders */}
-        <div className="d-flex justify-content-center mt-3">
-          {exam.parts.map((part, idx) => (
-             <div key={part.id} style={{ display: idx === activePartIndex ? 'block' : 'none', width: '100%' }}>
-               <AudioRecorder
-                  ref={el => recorderRefs.current[idx] = el}
-                  testId={part.id}
-                  partNumber={part.part_number}
-                  maxDuration={customTimeLimit ? customTimeLimit * 60 : part.duration}
-                  practiceMode={practiceMode}
-                  onSubmitSuccess={handleSuccess}
-               />
-             </div>
-          ))}
-        </div>
-        
-        <AutoSubmitModal isOpen={showAutoSubmit} />
-      </main>
-    </div>
-
-    {/* Bottom Nav */}
-    <div className="bottom-nav-bar">
-      <div className="bottom-nav-tabs justify-content-center">
-        {exam.parts.map((part, idx) => {
-          const isActive = activePartIndex === idx;
-          return (
-            <div 
-              key={part.id}
-              className={`bottom-nav-tab ${isActive ? 'active' : ''}`}
-              style={{ minWidth: '150px', justifyContent: 'center' }}
-              onClick={() => setActivePartIndex(idx)}
-            >
-              <span className="fw-bold">Part {part.part_number}</span>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  </div>
-  );
-};
-
 // ─── Level 2: Parts của một đề ───────────────────────────────────────────────
 const SpeakingPartList = ({ exam, onStartExam, onBack }) => {
   const { isAuthenticated } = useAuth();
@@ -378,9 +241,7 @@ const SpeakingPartList = ({ exam, onStartExam, onBack }) => {
   const [showModeModal, setShowModeModal] = useState(false);
 
   const handleStartClick = () => {
-    // EARS[Event]: WHEN user tries to start exam
     if (!isAuthenticated) {
-      // EARS[Unwanted]: IF user is not authenticated THEN redirect to login
       navigate('/login', { state: { message: 'Vui lòng đăng nhập để bắt đầu làm bài' } });
       return;
     }
@@ -393,109 +254,103 @@ const SpeakingPartList = ({ exam, onStartExam, onBack }) => {
   };
 
   return (
-  <div className="bg-white min-vh-100 pb-5">
-    <StudentNavbar />
-    <main className="container-fluid px-3 px-md-5 mt-4 mt-md-5" style={{ maxWidth: '1200px' }}>
-      <div className="d-flex align-items-center gap-3 mb-2">
-        <button
-          className="btn btn-light rounded-pill px-4 py-2 fw-medium border-0"
-          style={{ backgroundColor: '#efefef', fontSize: '14px' }}
-          onClick={onBack}
-        >
-          ← Tất cả đề thi
-        </button>
-      </div>
-
-      <div className="mb-5 mt-3">
-        <p className="text-muted mb-1 fw-medium" style={{ fontSize: '14px', fontFamily: 'UberMoveText, system-ui, sans-serif', textTransform: 'uppercase', letterSpacing: '1px' }}>
-          CHỦ ĐỀ: {exam.topic}
-        </p>
-        <h1 className="fw-bold mb-1 text-dark" style={{ fontFamily: 'UberMove, system-ui, sans-serif', fontSize: '40px' }}>
-          {exam.title}
-        </h1>
-        <div className="d-flex justify-content-between align-items-center mb-0 mt-4">
-          <p className="text-muted mb-0" style={{ fontFamily: 'UberMoveText, system-ui, sans-serif', fontSize: '18px' }}>
-            {exam.parts.length} phần · Hoàn thành toàn bộ để nhận phản hồi đánh giá
-          </p>
-          <button className="btn btn-dark rounded-pill px-5 py-3 fw-bold" style={{ fontSize: '16px' }} onClick={handleStartClick}>
-            Bắt đầu làm bài thi
+    <div className="bg-white min-vh-100 pb-5">
+      <StudentNavbar />
+      <main className="container-fluid px-3 px-md-5 mt-4 mt-md-5" style={{ maxWidth: '1200px' }}>
+        <div className="d-flex align-items-center gap-3 mb-2">
+          <button
+            className="btn btn-light rounded-pill px-4 py-2 fw-medium border-0"
+            style={{ backgroundColor: '#efefef', fontSize: '14px' }}
+            onClick={onBack}
+          >
+            ← Tất cả đề thi
           </button>
         </div>
-      </div>
 
-      <div className="d-flex flex-column gap-3">
-        {exam.parts.map((part, idx) => (
-          <div
-            key={part.id}
-            className="rounded-4 overflow-hidden bg-white"
-            style={{ border: '1px solid #e2e2e2' }}
-          >
-            <div className="d-flex align-items-center justify-content-between p-4 gap-4 flex-wrap">
-              <div className="d-flex align-items-center gap-4">
-                {/* Part Badge */}
-                <div
-                  className="d-flex align-items-center justify-content-center fw-bold flex-shrink-0"
-                  style={{
-                    width: '56px', height: '56px', borderRadius: '999px',
-                    backgroundColor: '#000',
-                    color: '#fff',
-                    fontSize: '20px', fontFamily: 'UberMove, system-ui, sans-serif'
-                  }}
-                >
-                  {idx + 1}
-                </div>
-                <div>
-                  <h4
-                    className="fw-bold mb-1"
-                    style={{ fontFamily: 'UberMove, system-ui, sans-serif', fontSize: '20px', color: '#000' }}
+        <div className="mb-5 mt-3">
+          <p className="text-muted mb-1 fw-medium" style={{ fontSize: '14px', fontFamily: 'UberMoveText, system-ui, sans-serif', textTransform: 'uppercase', letterSpacing: '1px' }}>
+            CHỦ ĐỀ: {exam.topic}
+          </p>
+          <h1 className="fw-bold mb-1 text-dark" style={{ fontFamily: 'UberMove, system-ui, sans-serif', fontSize: '40px' }}>
+            {exam.title}
+          </h1>
+          <div className="d-flex justify-content-between align-items-center mb-0 mt-4">
+            <p className="text-muted mb-0" style={{ fontFamily: 'UberMoveText, system-ui, sans-serif', fontSize: '18px' }}>
+              {exam.parts.length} phần · Hoàn thành toàn bộ để nhận phản hồi đánh giá
+            </p>
+            <button className="btn btn-dark rounded-pill px-5 py-3 fw-bold" style={{ fontSize: '16px' }} onClick={handleStartClick}>
+              Bắt đầu làm bài thi
+            </button>
+          </div>
+        </div>
+
+        <div className="d-flex flex-column gap-3">
+          {exam.parts.map((part, idx) => (
+            <div
+              key={part.id}
+              className="rounded-4 overflow-hidden bg-white"
+              style={{ border: '1px solid #e2e2e2' }}
+            >
+              <div className="d-flex align-items-center justify-content-between p-4 gap-4 flex-wrap">
+                <div className="d-flex align-items-center gap-4">
+                  {/* Part Badge */}
+                  <div
+                    className="d-flex align-items-center justify-content-center fw-bold flex-shrink-0"
+                    style={{
+                      width: '56px', height: '56px', borderRadius: '999px',
+                      backgroundColor: '#000',
+                      color: '#fff',
+                      fontSize: '20px', fontFamily: 'UberMove, system-ui, sans-serif'
+                    }}
                   >
-                    {part.title}
-                  </h4>
-                  <p
-                    className="mb-1"
-                    style={{ fontSize: '14px', fontFamily: 'UberMoveText, system-ui, sans-serif', color: '#5e5e5e' }}
-                  >
-                    {part.description}
-                  </p>
-                  <span
-                    className="fw-medium"
-                    style={{ fontSize: '13px', color: '#5e5e5e' }}
-                  >
-                    ⏱ Tối đa {Math.floor(part.duration / 60)} phút · {part.questions.length} câu hỏi
-                  </span>
+                    {idx + 1}
+                  </div>
+                  <div>
+                    <h4
+                      className="fw-bold mb-1"
+                      style={{ fontFamily: 'UberMove, system-ui, sans-serif', fontSize: '20px', color: '#000' }}
+                    >
+                      {part.title}
+                    </h4>
+                    <p
+                      className="mb-1"
+                      style={{ fontSize: '14px', fontFamily: 'UberMoveText, system-ui, sans-serif', color: '#5e5e5e' }}
+                    >
+                      {part.description}
+                    </p>
+                    <span
+                      className="fw-medium"
+                      style={{ fontSize: '13px', color: '#5e5e5e' }}
+                    >
+                      ⏱ Tối đa {Math.floor(part.duration / 60)} phút · {part.questions.length} câu hỏi
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
 
-      <ModeSelector
-        show={showModeModal}
-        onHide={() => setShowModeModal(false)}
-        onSelectMode={handleModeSelect}
-        examType="Speaking"
-        fullDuration={Math.ceil(exam.parts.reduce((total, p) => total + (parseInt(p.duration) || 0), 0) / 60)}
-      />
-    </main>
-  </div>
+        <ModeSelector
+          show={showModeModal}
+          onHide={() => setShowModeModal(false)}
+          onSelectMode={handleModeSelect}
+          examType="Speaking"
+          fullDuration={Math.ceil(exam.parts.reduce((total, p) => total + (parseInt(p.duration) || 0), 0) / 60)}
+        />
+      </main>
+    </div>
   );
 };
 
 // ─── Level 1: Danh sách đề thi ───────────────────────────────────────────────
 const SpeakingPage = () => {
   const [selectedExam, setSelectedExam] = useState(null);
-  const [isTesting, setIsTesting] = useState(false);
-  const [practiceMode, setPracticeMode] = useState(false);
-  const [customTimeLimit, setCustomTimeLimit] = useState(null);
-  const [submittedId, setSubmittedId] = useState(null);
   const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
 
   const handleViewExam = (exam) => {
-    // EARS[Event]: WHEN user tries to view exam details
     if (!isAuthenticated) {
-      // EARS[Unwanted]: IF user is not authenticated THEN redirect to login
       navigate('/login', { state: { message: 'Vui lòng đăng nhập để xem chi tiết đề thi' } });
       return;
     }
@@ -503,53 +358,15 @@ const SpeakingPage = () => {
   };
 
   const handleStartExam = (modeConfig) => {
-    setPracticeMode(modeConfig.isPractice);
-    setCustomTimeLimit(modeConfig.customTimeLimit);
-    setIsTesting(true);
+    if (selectedExam) {
+      navigate(`/tests/${selectedExam.id}/speaking`, {
+        state: {
+          practiceMode: modeConfig.isPractice,
+          customTimeLimit: modeConfig.customTimeLimit
+        }
+      });
+    }
   };
-
-  const handleSubmitSuccess = (response) => {
-    const id = response?.data?.submission_id || 'mock-speak-demo';
-    setSubmittedId(id);
-    setIsTesting(false);
-  };
-
-  // Level 3: Đang làm bài
-  if (isTesting && selectedExam) {
-    return (
-      <SpeakingTestScreen
-        exam={selectedExam}
-        practiceMode={practiceMode}
-        customTimeLimit={customTimeLimit}
-        onBack={() => setIsTesting(false)}
-        onSubmitSuccess={handleSubmitSuccess}
-      />
-    );
-  }
-
-  // Level 3.1: Sau khi nộp bài → xem kết quả
-  if (submittedId) {
-    return (
-      <div className="bg-white min-vh-100 pb-5">
-        <StudentNavbar />
-        <main className="container-fluid px-3 px-md-5 mt-4" style={{ maxWidth: '900px' }}>
-          <div className="d-flex align-items-center gap-3 mb-4">
-            <button
-              className="btn btn-light rounded-pill px-4 py-2 fw-medium border-0"
-              style={{ backgroundColor: '#efefef' }}
-              onClick={() => { setSubmittedId(null); setSelectedExam(null); }}
-            >
-              ← Trở về trang chủ
-            </button>
-            <h2 className="fw-bold mb-0" style={{ fontFamily: 'UberMove, system-ui, sans-serif', fontSize: '28px' }}>
-              Kết quả chấm điểm
-            </h2>
-          </div>
-          <FeedbackReport submissionId={submittedId} type="speaking" />
-        </main>
-      </div>
-    );
-  }
 
   // Level 2: Danh sách parts của một đề
   if (selectedExam) {
