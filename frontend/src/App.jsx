@@ -52,6 +52,9 @@ import StudentHistoryPage from './pages/grading/StudentHistoryPage';
 // ── Tutor Workspace — Subjective Grading ──────────────────────────────────────
 import TutorQueuePage from './pages/grading/TutorQueuePage';
 import TutorGradingPage from './pages/grading/TutorGradingPage';
+import TutorTestManagePage from './pages/tutor/TutorTestManagePage';
+import TutorTestFormPage from './pages/tutor/TutorTestFormPage';
+import TutorQuestionFormPage from './pages/tutor/TutorQuestionFormPage';
 
 // ── Objective Testing — Student Views ─────────────────────────────────────────
 import TestListPage from './pages/objective-testing/TestListPage';
@@ -65,9 +68,7 @@ import TestResultPage from './pages/objective-testing/TestResultPage';
 import TestResultDetailPage from './pages/objective-testing/TestResultDetailPage';
 
 // ── Objective Testing — Tutor / Admin Views ────────────────────────────────────
-import TutorTestManagePage from './pages/tutor/TutorTestManagePage';
-import TutorTestFormPage from './pages/tutor/TutorTestFormPage';
-import TutorQuestionFormPage from './pages/tutor/TutorQuestionFormPage';
+
 import AuditLogPage from './pages/objective-testing/AuditLogPage';
 
 import './App.css';
