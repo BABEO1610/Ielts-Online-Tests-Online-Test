@@ -1,22 +1,21 @@
 import React from 'react';
-import AuthLayout from '../components/layout/AuthLayout';
-import RegisterForm from '../components/auth/RegisterForm';
+import AuthLayout from '../../components/layout/AuthLayout';
+import LoginForm from '../../components/auth/LoginForm';
 
-const RegisterPage = () => {
+const Login = () => {
   return (
     <AuthLayout>
       <div className="text-center mb-4">
         <h2 className="fw-bold mb-2" style={{ fontFamily: 'UberMove, UberMoveText, system-ui, Helvetica Neue, Arial, sans-serif' }}>
-          Tạo tài khoản mới
+          Đăng nhập
         </h2>
         <p className="text-muted" style={{ fontSize: '16px' }}>
-          Điền thông tin bên dưới để bắt đầu luyện thi IELTS
+          Chào mừng trở lại! Vui lòng đăng nhập vào tài khoản của bạn.
         </p>
       </div>
-      
-      <RegisterForm />
+      <LoginForm />
     </AuthLayout>
   );
 };
 
-export default RegisterPage;
+export default Login;

@@ -1,7 +1,7 @@
 import React, { useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, useScroll, useTransform, useSpring, useMotionValue } from 'framer-motion';
-import StudentNavbar from '../components/layout/StudentNavbar';
+import StudentNavbar from '../../components/layout/StudentNavbar';
 
 // --- Sub-components for heavy animations ---
 

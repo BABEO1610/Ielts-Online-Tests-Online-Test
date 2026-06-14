@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import api from '../services/api';
-import { useAuth } from '../context/AuthContext';
-import UserModals from '../components/admin/UserModals';
-import AdminNavbar from '../components/layout/AdminNavbar';
+import api from '../../services/api';
+import { useAuth } from '../../context/AuthContext';
+import UserModals from '../../components/admin/UserModals';
+import AdminNavbar from '../../components/layout/AdminNavbar';
 
 const ROLES = ['', 'student', 'tutor', 'admin'];
 const STATUSES = ['', 'active', 'inactive', 'pending', 'banned'];

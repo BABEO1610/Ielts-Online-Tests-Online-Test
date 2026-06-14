@@ -82,3 +82,17 @@
 | Date | Agent | File Changed | Summary |
 |------|-------|-------------|---------|
 | 2026-06-07 | Kiro | `frontend/src/layouts/AdminLayout.jsx` | Thêm nút "↗ Xem website" vào topbar admin (bên trái, cạnh "Thêm Giảng viên"), trỏ về `/` và mở tab mới (`target="_blank" rel="noopener noreferrer"`). Dùng `btn-pill--ghost` theo design system. Build PASS (exit 0). |
+
+## 2026-06-14
+
+| Date | Agent | File Changed | Summary |
+|------|-------|-------------|---------|
+| 2026-06-14 | Antigravity | `frontend/src/pages/subjective-testing/WritingTestPage.jsx` | **Tạo mới trang thi Writing:** Tách màn hình làm bài và xem kết quả từ `WritingPage.jsx`, hỗ trợ route-driven thi theo ID: `/tests/:id/writing`. |
+| 2026-06-14 | Antigravity | `frontend/src/pages/subjective-testing/SpeakingTestPage.jsx` | **Tạo mới trang thi Speaking:** Tách màn hình làm bài và xem kết quả từ `SpeakingPage.jsx`, hỗ trợ route-driven thi theo ID: `/tests/:id/speaking`. |
+| 2026-06-14 | Antigravity | `frontend/src/pages/subjective-testing/WritingPage.jsx` | **Refactor WritingPage:** Xóa code màn hình làm bài, chuyển hướng `ModeSelector` sang trang thi route-driven mới. Sửa relative imports. |
+| 2026-06-14 | Antigravity | `frontend/src/pages/subjective-testing/SpeakingPage.jsx` | **Refactor SpeakingPage:** Xóa code màn hình làm bài, chuyển hướng `ModeSelector` sang trang thi route-driven mới. Sửa relative imports. |
+| 2026-06-14 | Antigravity | `frontend/src/App.jsx` | **Cấu hình Router:** Thêm route `/tests/:id/writing` và `/tests/:id/speaking` được bảo vệ bằng `ProtectedRoute` cho học viên. Cập nhật đường dẫn import cho các trang Tutor di chuyển từ `pages/objective-testing/` sang `pages/tutor/`. |
+| 2026-06-14 | Antigravity | Các file thuộc `pages/auth/*`, `pages/student/*`, `pages/tutor/*`, `pages/public/*` | **Sửa lỗi imports:** Điều chỉnh relative imports của `components`, `context`, `services` từ `../` thành `../../` trong tất cả các file bị dời trước đó để sửa lỗi build. |
+| 2026-06-14 | Antigravity | `frontend/src/pages/tutor/AdminDashboard.jsx` -> `frontend/src/pages/admin/AdminDashboard.jsx` | **Tổ chức lại folder admin:** Di chuyển tệp `AdminDashboard.jsx` từ thư mục `pages/tutor/` sang đúng thư mục `pages/admin/`. |
+| 2026-06-14 | Antigravity | Các file Tutor trong `pages/objective-testing/` -> `pages/tutor/` | **Tổ chức lại folder tutor:** Di chuyển các tệp `TutorQuestionFormPage.jsx`, `TutorTestFormPage.jsx`, `TutorTestManagePage.jsx` sang thư mục `pages/tutor/`. |
+

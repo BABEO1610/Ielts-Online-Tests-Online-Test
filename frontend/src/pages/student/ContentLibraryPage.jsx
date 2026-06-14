@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useRef } from 'react';
 import { Toaster, toast } from 'react-hot-toast';
-import StudentNavbar from '../components/layout/StudentNavbar';
-import { mockTests } from '../data/libraryMockData';
+import StudentNavbar from '../../components/layout/StudentNavbar';
+import { mockTests } from '../../data/libraryMockData';
 import html2pdf from 'html2pdf.js';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
