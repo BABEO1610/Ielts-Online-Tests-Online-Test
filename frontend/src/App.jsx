@@ -121,9 +121,19 @@ function App() {
         <Route path="/dashboard" element={
           <ProtectedRoute><Dashboard /></ProtectedRoute>
         } />
-        <Route path="/tutor/dashboard" element={
-          <ProtectedRoute role="tutor"><TutorDashboard /></ProtectedRoute>
-        } />
+        <Route element={<TutorLayout />}>
+          <Route path="/tutor/dashboard" element={
+            <ProtectedRoute role="tutor"><TutorDashboard /></ProtectedRoute>
+          } />
+          {/* Activity log cho Tutor */}
+          <Route path="/tutor/activity-log" element={
+            <ProtectedRoute role="tutor"><TutorActivityLogPage /></ProtectedRoute>
+          } />
+          {/* Hàng chờ chấm */}
+          <Route path="/grading/tutor/queue" element={
+            <ProtectedRoute role="tutor"><TutorQueuePage /></ProtectedRoute>
+          } />
+        </Route>
         <Route path="/profile" element={
           <ProtectedRoute><UserProfilePage /></ProtectedRoute>
         } />
@@ -163,9 +173,7 @@ function App() {
         } />
 
         {/* ── Subjective — Tutor Workspace (role guard) ─────────────────────── */}
-        <Route path="/grading/tutor/queue" element={
-          <ProtectedRoute role="tutor"><TutorQueuePage /></ProtectedRoute>
-        } />
+        {/* /grading/tutor/queue đã được chuyển vào TutorLayout */}
         <Route path="/grading/tutor/grade/:type/:submissionId" element={
           <ProtectedRoute role="tutor"><TutorGradingPage /></ProtectedRoute>
         } />
