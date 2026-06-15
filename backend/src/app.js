@@ -22,11 +22,11 @@ app.use(cors({
   credentials: true
 }));
 
-// Parse JSON bodies
-app.use(express.json());
+// Parse JSON bodies. Writing Task 1 images are stored as data URLs in test metadata.
+app.use(express.json({ limit: '10mb' }));
 
 // Parse URL-encoded bodies
-app.use(express.urlencoded({ extended: true }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Parse cookies
 app.use(cookieParser());

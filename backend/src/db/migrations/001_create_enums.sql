@@ -28,4 +28,14 @@ BEGIN
             'password_reset_requested', 'oauth_linked', 'oauth_unlinked'
         );
     END IF;
+
+    -- skill_type Enum
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'skill_type') THEN
+        CREATE TYPE skill_type AS ENUM ('reading', 'listening', 'writing', 'speaking');
+    END IF;
 END $$;
+
+ALTER TYPE skill_type ADD VALUE IF NOT EXISTS 'reading';
+ALTER TYPE skill_type ADD VALUE IF NOT EXISTS 'listening';
+ALTER TYPE skill_type ADD VALUE IF NOT EXISTS 'writing';
+ALTER TYPE skill_type ADD VALUE IF NOT EXISTS 'speaking';
