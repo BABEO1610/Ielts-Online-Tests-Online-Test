@@ -11,25 +11,32 @@
 import React, { useState, useCallback } from 'react';
 import { useLocation } from 'react-router-dom';
 import TimerBar from '../../components/objective-testing/TimerBar';
-import QuestionNavigation from '../../components/objective-testing/QuestionNavigation';
 import AutoSubmitModal from '../../components/objective-testing/AutoSubmitModal';
 import '../../styles/objective-testing.css';
 
-/* Mock passage */
-const MOCK_PASSAGE = `
-<h3 style="margin-bottom: 16px">The History of Glass</h3>
-<p>When people think of glass, they usually think of a transparent substance used primarily for windows. Glass, however, has a history stretching back thousands of years and has been utilised in a remarkable variety of ways.</p>
-
-<p>The earliest known man-made glass objects are beads dating from around 3500 BC, found in Egypt and Eastern Mesopotamia. These first glass-making techniques were closely guarded secrets. Glass production flourished in Egypt and Mesopotamia and later spread to the Levant and the Mediterranean coast.</p>
-
-<p>The invention of glassblowing around the 1st century BC was a major breakthrough in glass technology. This technique made glass production faster, easier, and cheaper than older methods. Glass could now be shaped into a wider variety of forms and began to be used as a household item.</p>
-
-<p>During the Middle Ages, glass-making centres developed throughout Europe. The Venetians, in particular, became famous for their high-quality glass and by the 13th century had established a flourishing glass industry on the island of Murano. Venetian glass was renowned for its exceptional clarity and the artistry of its designs.</p>
-
-<p>In the 17th century, an Englishman named George Ravenscroft discovered that adding lead oxide to the glass formula produced a type of glass with a particularly brilliant lustre and a slightly softer quality that made it ideal for cutting and engraving. This 'lead crystal' glass became highly prized for drinking vessels, chandeliers, and decorative objects.</p>
-
-<p>The Industrial Revolution brought mechanised production methods that greatly reduced the cost of glass and made it widely available. Float glass, invented in the 1950s by Sir Alastair Pilkington, revolutionised the manufacture of flat glass. In this process, molten glass is poured onto a bath of molten tin, where it spreads out and forms a flat, uniform sheet.</p>
-`;
+/* Mock passages */
+const MOCK_PASSAGES = {
+  'Passage 1': `
+    <h3 style="margin-bottom: 16px">The History of Glass</h3>
+    <p>When people think of glass, they usually think of a transparent substance used primarily for windows. Glass, however, has a history stretching back thousands of years and has been utilised in a remarkable variety of ways.</p>
+    <p>The earliest known man-made glass objects are beads dating from around 3500 BC, found in Egypt and Eastern Mesopotamia. These first glass-making techniques were closely guarded secrets. Glass production flourished in Egypt and Mesopotamia and later spread to the Levant and the Mediterranean coast.</p>
+    <p>The invention of glassblowing around the 1st century BC was a major breakthrough in glass technology. This technique made glass production faster, easier, and cheaper than older methods. Glass could now be shaped into a wider variety of forms and began to be used as a household item.</p>
+    <p>During the Middle Ages, glass-making centres developed throughout Europe. The Venetians, in particular, became famous for their high-quality glass and by the 13th century had established a flourishing glass industry on the island of Murano. Venetian glass was renowned for its exceptional clarity and the artistry of its designs.</p>
+    <p>In the 17th century, an Englishman named George Ravenscroft discovered that adding lead oxide to the glass formula produced a type of glass with a particularly brilliant lustre and a slightly softer quality that made it ideal for cutting and engraving.</p>
+    <p>The Industrial Revolution brought mechanised production methods that greatly reduced the cost of glass and made it widely available. Float glass, invented in the 1950s by Sir Alastair Pilkington, revolutionised the manufacture of flat glass.</p>
+  `,
+  'Passage 2': `
+    <h3 style="margin-bottom: 16px">Money Transfers by Mobile</h3>
+    <p>The ping of a text message has never sounded so sweet. In what is being touted as a world first, Kenya's biggest mobile operator is allowing subscribers to send cash to other phone users by SMS. Known as M-Pesa, or mobile money, the service is expected to revolutionise banking in a country where more than 80% of people are excluded from the formal financial sector.</p>
+    <p>Developed by Vodafone, which holds a 35% share in Safaricom, M-Pesa was formally launched in Kenya two weeks ago. More than 10,000 people have signed up for the service, with around 8 million shillings transferred so far, mostly in tiny denominations.</p>
+    <p>M-Pesa is simple. There is no need for a new handset or SIM card. To send money, you hand over the cash to a registered agent - typically a retailer - who credits your virtual account.</p>
+  `,
+  'Passage 3': `
+    <h3 style="margin-bottom: 16px">The Future of Urban Transport</h3>
+    <p>As cities continue to grow, the demand for efficient and sustainable urban transport has never been greater. Innovations such as autonomous vehicles, electric scooters, and integrated public transit systems are transforming the way we move through urban landscapes.</p>
+    <p>Urban planners are focusing on reducing congestion and emissions by promoting active transport and investing in smart infrastructure. The ultimate goal is to create livable cities where mobility is seamless and environmentally friendly.</p>
+  `
+};
 
 /* Mock questions — mix of MCQ and Fill-in-blank */
 const MOCK_QUESTIONS = [
@@ -41,6 +48,8 @@ const MOCK_QUESTIONS = [
   { id: 6, order: 6, passage: 'Passage 2', type: 'mcq', text: 'Early glass-making techniques were:', options: [{ label: 'A', text: 'Widely shared' }, { label: 'B', text: 'Well documented' }, { label: 'C', text: 'Closely guarded' }, { label: 'D', text: 'Easily learned' }], correctAnswer: 'C' },
   { id: 7, order: 7, passage: 'Passage 2', type: 'fill', text: 'In the float glass process, molten glass is poured onto ________.', correctAnswer: 'molten tin' },
   { id: 8, order: 8, passage: 'Passage 2', type: 'mcq', text: 'Lead crystal glass is ideal for:', options: [{ label: 'A', text: 'Windows only' }, { label: 'B', text: 'Cutting and engraving' }, { label: 'C', text: 'Industrial use' }, { label: 'D', text: 'Scientific instruments' }], correctAnswer: 'B' },
+  { id: 9, order: 9, passage: 'Passage 3', type: 'fill', text: 'Urban planners promote ________ transport.', correctAnswer: 'active' },
+  { id: 10, order: 10, passage: 'Passage 3', type: 'mcq', text: 'The ultimate goal is to create:', options: [{ label: 'A', text: 'Larger cities' }, { label: 'B', text: 'Livable cities' }, { label: 'C', text: 'More highways' }, { label: 'D', text: 'Industrial zones' }], correctAnswer: 'B' },
 ];
 
 function ReadingTestPage() {
@@ -54,6 +63,7 @@ function ReadingTestPage() {
 
   const [answers, setAnswers] = useState({});
   const [currentQuestion, setCurrentQuestion] = useState(1);
+  const [activeSection, setActiveSection] = useState(allowedPassages[0]);
   const [showAutoSubmit, setShowAutoSubmit] = useState(false);
 
   const handleAnswer = useCallback((qOrder, value) => {
@@ -86,7 +96,7 @@ function ReadingTestPage() {
       <TimerBar durationMinutes={60} customTimeLimit={customTimeLimit} onTimeUp={handleTimeUp} onSubmitEarly={handleSubmitEarly} practiceMode={practiceMode} />
 
       {/* Split View */}
-      <div className="split-view">
+      <div className="split-view" style={{ paddingBottom: '80px' }}>
         {/* Left — Passage */}
         <div className="split-left" id="reading-passage-panel">
           <div className="body-sm-strong mb-2" style={{ color: 'var(--mute)', textTransform: 'uppercase', letterSpacing: 1 }}>
@@ -95,24 +105,16 @@ function ReadingTestPage() {
           <div
             className="body-md"
             style={{ lineHeight: '28px' }}
-            dangerouslySetInnerHTML={{ __html: MOCK_PASSAGE }}
+            dangerouslySetInnerHTML={{ __html: MOCK_PASSAGES[activeSection] }}
           />
         </div>
 
         {/* Right — Questions + Nav */}
-        <div className="split-right" id="reading-questions-panel">
-          <div className="mb-4">
-            <QuestionNavigation
-              totalQuestions={filteredQuestions.length}
-              currentQuestion={currentQuestion}
-              answeredQuestions={answeredQuestions}
-              onNavigate={scrollToQuestion}
-            />
-          </div>
+        <div className="split-right" id="reading-questions-panel" style={{ paddingBottom: '80px' }}>
 
           {/* Questions List */}
           <div>
-            {filteredQuestions.map((q) => (
+            {filteredQuestions.filter(q => q.passage === activeSection).map((q) => (
               <div
                 key={q.id}
                 id={`question-${q.order}`}
@@ -122,7 +124,7 @@ function ReadingTestPage() {
                 }}
                 onClick={() => setCurrentQuestion(q.order)}
               >
-                <div className="d-flex align-items-center gap-2 mb-2">
+                <div className="d-flex align-items-center gap-2 mb-3">
                   <span
                     className="body-sm-strong"
                     style={{
@@ -147,24 +149,25 @@ function ReadingTestPage() {
 
                 {q.type === 'mcq' ? (
                   /* MCQ Options */
-                  <div>
+                  <div className="d-flex flex-column gap-2">
                     {q.options.map((opt) => (
                       <label
                         key={opt.label}
                         className={`option-card ${answers[q.order] === opt.label ? 'selected' : ''}`}
                         id={`option-${q.order}-${opt.label}`}
+                        style={{ margin: 0, padding: '12px 16px', alignItems: 'flex-start' }}
                       >
                         <input
                           type="radio"
                           name={`q-${q.order}`}
-                          className="form-check-input"
+                          className="form-check-input flex-shrink-0 mt-1"
                           value={opt.label}
                           checked={answers[q.order] === opt.label}
                           onChange={() => handleAnswer(q.order, opt.label)}
                           style={{ margin: 0 }}
                         />
-                        <span className="body-md-strong" style={{ minWidth: 20 }}>{opt.label}.</span>
-                        <span className="body-md">{opt.text}</span>
+                        <span className="body-md-strong flex-shrink-0 mt-1" style={{ minWidth: 24 }}>{opt.label}.</span>
+                        <span className="body-md mt-1">{opt.text}</span>
                       </label>
                     ))}
                   </div>
@@ -182,6 +185,45 @@ function ReadingTestPage() {
               </div>
             ))}
           </div>
+        </div>
+      </div>
+
+      {/* Bottom Navigation */}
+      <div className="bottom-nav-bar">
+        <div className="bottom-nav-tabs">
+          {allowedPassages.map((passageName, index) => {
+            const partNum = index + 1;
+            const isActive = activeSection === passageName;
+            const partQuestions = filteredQuestions.filter(q => q.passage === passageName);
+            
+            return (
+              <div 
+                key={passageName} 
+                className={`bottom-nav-tab ${isActive ? 'active' : ''}`}
+                onClick={() => setActiveSection(passageName)}
+              >
+                <span className="fw-bold">Part {partNum}</span>
+                {isActive ? (
+                  <div className="d-flex gap-2 ms-2">
+                    {partQuestions.map(q => (
+                      <div 
+                        key={q.id}
+                        className={`q-circle ${answeredQuestions.includes(q.order) ? 'answered' : ''} ${currentQuestion === q.order ? 'current' : ''}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          scrollToQuestion(q.order);
+                        }}
+                      >
+                        {q.order}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <span style={{ color: 'var(--body)' }}>: {partQuestions.filter(q => answeredQuestions.includes(q.order)).length} of {partQuestions.length} questions</span>
+                )}
+              </div>
+            )
+          })}
         </div>
       </div>
 

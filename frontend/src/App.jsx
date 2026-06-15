@@ -5,20 +5,27 @@ import { BrowserRouter, Routes, Route, Link } from 'react-router-dom';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 
 // ── Public Pages ───────────────────────────────────────────────────────────────
-import LandingPage from './pages/LandingPage';
-import Login from './pages/Login';
-import RegisterPage from './pages/RegisterPage';
-import ForgotPwdPage from './pages/ForgotPwdPage';
-import ResetPwdPage from './pages/ResetPwdPage';
-import OnboardingPage from './pages/OnboardingPage';
-import ContentLibraryPage from './pages/ContentLibraryPage';
+import LandingPage from './pages/public/LandingPage';
+
+// ── Auth Pages ─────────────────────────────────────────────────────────────────
+import Login from './pages/auth/Login';
+import RegisterPage from './pages/auth/RegisterPage';
+import ForgotPwdPage from './pages/auth/ForgotPwdPage';
+import ResetPwdPage from './pages/auth/ResetPwdPage';
+import OnboardingPage from './pages/auth/OnboardingPage';
+import VerifyEmailPage from './pages/auth/VerifyEmailPage';
+
+// ── Student Pages ──────────────────────────────────────────────────────────────
+import ContentLibraryPage from './pages/student/ContentLibraryPage';
 
 // ── Core Protected Pages ───────────────────────────────────────────────────────
-import Dashboard from './pages/Dashboard';
-import UserProfilePage from './pages/UserProfilePage';
-import TutorDashboard from './pages/TutorDashboard';
-import TutorActivityLogPage from './pages/TutorActivityLogPage';
+import Dashboard from './pages/student/Dashboard';
+import UserProfilePage from './pages/student/UserProfilePage';
+
+// ── Tutor Pages ────────────────────────────────────────────────────────────────
 import TutorLayout from './layouts/TutorLayout';
+import TutorDashboard from './pages/tutor/TutorDashboard';
+import TutorActivityLogPage from './pages/TutorActivityLogPage';
 
 // ── Admin Section — Layout + nested pages ──────────────────────────────────────
 import AdminLayout from './layouts/AdminLayout';
@@ -36,8 +43,10 @@ import AdminChangeLogPage from './pages/admin/AdminChangeLogPage';
 import AdminProfilePage from './pages/admin/AdminProfilePage';
 
 // ── Student Skill Pages — Subjective (Navbar: Writing / Speaking) ──────────────
-import WritingPage from './pages/WritingPage';
-import SpeakingPage from './pages/SpeakingPage';
+import WritingPage from './pages/subjective-testing/WritingPage';
+import SpeakingPage from './pages/subjective-testing/SpeakingPage';
+import WritingTestPage from './pages/subjective-testing/WritingTestPage';
+import SpeakingTestPage from './pages/subjective-testing/SpeakingTestPage';
 
 // ── Student History (Profile Dropdown → /history) ─────────────────────────────
 import StudentHistoryPage from './pages/grading/StudentHistoryPage';
@@ -46,6 +55,9 @@ import StudentHistoryPage from './pages/grading/StudentHistoryPage';
 import TutorQueuePage from './pages/grading/TutorQueuePage';
 import TutorGradingPage from './pages/grading/TutorGradingPage';
 import TutorGradingHistoryPage from './pages/grading/TutorGradingHistoryPage';
+import TutorTestManagePage from './pages/tutor/TutorTestManagePage';
+import TutorTestFormPage from './pages/tutor/TutorTestFormPage';
+import TutorQuestionFormPage from './pages/tutor/TutorQuestionFormPage';
 
 // ── Objective Testing — Student Views ─────────────────────────────────────────
 import TestListPage from './pages/objective-testing/TestListPage';
@@ -59,9 +71,7 @@ import TestResultPage from './pages/objective-testing/TestResultPage';
 import TestResultDetailPage from './pages/objective-testing/TestResultDetailPage';
 
 // ── Objective Testing — Tutor / Admin Views ────────────────────────────────────
-import TutorTestManagePage from './pages/objective-testing/TutorTestManagePage';
-import TutorTestFormPage from './pages/objective-testing/TutorTestFormPage';
-import TutorQuestionFormPage from './pages/objective-testing/TutorQuestionFormPage';
+
 import AuditLogPage from './pages/objective-testing/AuditLogPage';
 
 import './App.css';
@@ -102,6 +112,8 @@ function App() {
         <Route path="/" element={<LandingPage />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<RegisterPage />} />
+        <Route path="/verify-email" element={<VerifyEmailPage />} />
+        <Route path="/verify email" element={<VerifyEmailPage />} />
         <Route path="/forgot-password" element={<ForgotPwdPage />} />
         <Route path="/reset-password" element={<ResetPwdPage />} />
         <Route path="/onboarding" element={<OnboardingPage />} />
@@ -153,6 +165,14 @@ function App() {
         {/* ── Subjective — Student Skill Pages (Navbar: Writing / Speaking) ─── */}
         <Route path="/writing" element={<WritingPage />} />
         <Route path="/speaking" element={<SpeakingPage />} />
+
+        {/* ── Subjective — Student Live Test (Route-Driven) ────────────────────── */}
+        <Route path="/tests/:id/writing" element={
+          <ProtectedRoute><WritingTestPage /></ProtectedRoute>
+        } />
+        <Route path="/tests/:id/speaking" element={
+          <ProtectedRoute><SpeakingTestPage /></ProtectedRoute>
+        } />
 
         {/* ── Subjective — Student History (Profile Dropdown) ───────────────── */}
         <Route path="/history" element={

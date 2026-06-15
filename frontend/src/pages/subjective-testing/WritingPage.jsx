@@ -1,16 +1,11 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
-import StudentNavbar from '../components/layout/StudentNavbar';
-import WritingEditor from '../components/grading/WritingEditor';
-import FeedbackReport from '../components/grading/FeedbackReport';
-import ModeSelector from '../components/objective-testing/ModeSelector';
-import TimerBar from '../components/objective-testing/TimerBar';
-import AutoSubmitModal from '../components/objective-testing/AutoSubmitModal';
+import { useAuth } from '../../context/AuthContext';
+import StudentNavbar from '../../components/layout/StudentNavbar';
+import ModeSelector from '../../components/objective-testing/ModeSelector';
 
 // ─── MOCK DATA — Danh sách đề thi (cấu trúc như IELTS Online Tests) ──────────
-// Mỗi exam có nhiều tasks, mỗi task có prompt riêng
-const MOCK_EXAMS = [
+export const MOCK_EXAMS = [
   {
     id: 'writing-2025-06',
     title: 'Đề thi tháng 6/2025',
@@ -169,261 +164,126 @@ const DIFFICULTY_STYLE = {
   'Khó': { bg: '#282828', color: '#afafaf' }
 };
 
-// ─── Level 3: Giao diện làm bài ──────────────────────────────────────────────
-const WritingTestScreen = ({ task, exam, onBack, onSubmitSuccess, practiceMode, customTimeLimit }) => {
-  const editorRef = useRef(null);
-  const [showAutoSubmit, setShowAutoSubmit] = useState(false);
-
-  const durationMinutes = parseInt(task.duration) || 20;
-
-  const handleTimeUp = useCallback(() => {
-    setShowAutoSubmit(true);
-    if (editorRef.current) {
-      editorRef.current.submit();
-    }
-  }, []);
-
-  const handleSubmitEarly = useCallback(() => {
-    if (window.confirm('Bạn có chắc chắn muốn nộp bài?')) {
-      setShowAutoSubmit(true);
-      if (editorRef.current) {
-        editorRef.current.submit();
-      }
-    }
-  }, []);
-
-  const handleSuccess = (res) => {
-    setShowAutoSubmit(false);
-    if (onSubmitSuccess) onSubmitSuccess(res);
-  };
-
-  return (
-  <div className="bg-white min-vh-100 pb-5">
-    <TimerBar durationMinutes={durationMinutes} customTimeLimit={customTimeLimit} onTimeUp={handleTimeUp} onSubmitEarly={handleSubmitEarly} practiceMode={practiceMode} />
-    <main className="container-fluid px-3 px-md-5 mt-4" style={{ maxWidth: '900px' }}>
-      <div className="d-flex align-items-center gap-3 mb-4 flex-wrap">
-        <button
-          className="btn btn-light rounded-pill px-4 py-2 fw-medium border-0"
-          style={{ backgroundColor: '#efefef', fontSize: '14px' }}
-          onClick={onBack}
-        >
-          ← Quay lại
-        </button>
-        <div>
-          <p className="mb-0 text-muted" style={{ fontSize: '13px', fontFamily: 'UberMoveText, system-ui, sans-serif' }}>
-            {exam.title}
-          </p>
-          <h2 className="fw-bold mb-0 text-dark" style={{ fontFamily: 'UberMove, system-ui, sans-serif', fontSize: '24px' }}>
-            {task.title}
-          </h2>
-        </div>
-      </div>
-
-      {/* Prompt */}
-      <div className="p-4 rounded-4 mb-4" style={{ backgroundColor: '#efefef' }}>
-        <div className="d-flex gap-3 mb-3 flex-wrap">
-          <span className="rounded-pill px-3 py-1 fw-medium" style={{ backgroundColor: '#000', color: '#fff', fontSize: '13px' }}>
-            ⏱ {task.duration}
-          </span>
-          <span className="rounded-pill px-3 py-1 fw-medium" style={{ backgroundColor: '#e2e2e2', color: '#000', fontSize: '13px' }}>
-            ✍ Tối thiểu {task.min_words} từ
-          </span>
-        </div>
-        <p className="mb-3 text-dark" style={{ fontSize: '16px', fontFamily: 'UberMoveText, system-ui, sans-serif', whiteSpace: 'pre-line', lineHeight: '1.8' }}>
-          {task.prompt_text}
-        </p>
-        <div className="p-3 rounded-3" style={{ backgroundColor: '#e2e2e2', borderLeft: '3px solid #000' }}>
-          <p className="mb-0 fw-medium text-dark" style={{ fontSize: '14px', fontFamily: 'UberMoveText, system-ui, sans-serif' }}>
-            💡 {task.hint}
-          </p>
-        </div>
-      </div>
-
-      <WritingEditor
-        ref={editorRef}
-        testId={task.id}
-        taskNumber={task.task_number}
-        promptText={task.prompt_text}
-        status="new"
-        onSubmitSuccess={handleSuccess}
-      />
-      <AutoSubmitModal isOpen={showAutoSubmit} />
-    </main>
-  </div>
-  );
-};
-
 // ─── Level 2: Tasks của một đề ───────────────────────────────────────────────
-const WritingTaskList = ({ exam, onSelectTask, onBack }) => {
+const WritingTaskList = ({ exam, onStartExam, onBack }) => {
   const { isAuthenticated } = useAuth();
   const navigate = useNavigate();
   const [showModeModal, setShowModeModal] = useState(false);
-  const [taskToStart, setTaskToStart] = useState(null);
 
-  const handleTaskClick = (task) => {
-    // EARS[Event]: WHEN user tries to start task
+  const handleStartClick = () => {
     if (!isAuthenticated) {
-      // EARS[Unwanted]: IF user is not authenticated THEN redirect to login
       navigate('/login', { state: { message: 'Vui lòng đăng nhập để bắt đầu làm bài' } });
       return;
     }
-    setTaskToStart(task);
     setShowModeModal(true);
   };
 
   const handleModeSelect = (modeConfig) => {
     setShowModeModal(false);
-    onSelectTask(taskToStart, modeConfig);
+    onStartExam(modeConfig);
   };
 
   return (
-  <div className="bg-white min-vh-100 pb-5">
-    <StudentNavbar />
-    <main className="container-fluid px-3 px-md-5 mt-4 mt-md-5" style={{ maxWidth: '1200px' }}>
-      <div className="d-flex align-items-center gap-3 mb-2">
-        <button
-          className="btn btn-light rounded-pill px-4 py-2 fw-medium border-0"
-          style={{ backgroundColor: '#efefef', fontSize: '14px' }}
-          onClick={onBack}
-        >
-          ← Tất cả đề thi
-        </button>
-      </div>
-
-      <div className="mb-5 mt-3">
-        <h1 className="fw-bold mb-1 text-dark" style={{ fontFamily: 'UberMove, system-ui, sans-serif', fontSize: '40px' }}>
-          {exam.title}
-        </h1>
-        <p className="text-muted mb-0" style={{ fontFamily: 'UberMoveText, system-ui, sans-serif', fontSize: '18px' }}>
-          Gồm {exam.tasks.length} phần · Hoàn thành từng Task để nhận điểm chấm
-        </p>
-      </div>
-
-      <div className="d-flex flex-column gap-3">
-        {exam.tasks.map((task, idx) => (
-          <div
-            key={task.id}
-            className="d-flex align-items-center justify-content-between p-4 rounded-4"
-            style={{ border: '1px solid #e2e2e2', cursor: 'pointer', transition: 'all 0.15s ease' }}
-            onMouseEnter={e => { e.currentTarget.style.backgroundColor = '#efefef'; e.currentTarget.style.borderColor = '#000'; }}
-            onMouseLeave={e => { e.currentTarget.style.backgroundColor = '#fff'; e.currentTarget.style.borderColor = '#e2e2e2'; }}
-            onClick={() => onSelectTask(task)}
+    <div className="bg-white min-vh-100 pb-5">
+      <StudentNavbar />
+      <main className="container-fluid px-3 px-md-5 mt-4 mt-md-5" style={{ maxWidth: '1200px' }}>
+        <div className="d-flex align-items-center gap-3 mb-2">
+          <button
+            className="btn btn-light rounded-pill px-4 py-2 fw-medium border-0"
+            style={{ backgroundColor: '#efefef', fontSize: '14px' }}
+            onClick={onBack}
           >
-            <div className="d-flex align-items-center gap-4">
-              {/* Task Number Badge */}
-              <div
-                className="d-flex align-items-center justify-content-center fw-bold flex-shrink-0"
-                style={{ width: '56px', height: '56px', borderRadius: '999px', backgroundColor: '#000', color: '#fff', fontSize: '20px', fontFamily: 'UberMove, system-ui, sans-serif' }}
-              >
-                {idx + 1}
-              </div>
-              <div>
-                <h4 className="fw-bold mb-1 text-dark" style={{ fontFamily: 'UberMove, system-ui, sans-serif', fontSize: '20px' }}>
-                  {task.title}
-                </h4>
-                <div className="d-flex gap-2 flex-wrap">
-                  <span className="text-muted fw-medium" style={{ fontSize: '14px' }}>⏱ {task.duration}</span>
-                  <span className="text-muted" style={{ fontSize: '14px' }}>·</span>
-                  <span className="text-muted fw-medium" style={{ fontSize: '14px' }}>✍ Tối thiểu {task.min_words} từ</span>
+            ← Tất cả đề thi
+          </button>
+        </div>
+
+        <div className="mb-5 mt-3">
+          <h1 className="fw-bold mb-1 text-dark" style={{ fontFamily: 'UberMove, system-ui, sans-serif', fontSize: '40px' }}>
+            {exam.title}
+          </h1>
+          <div className="d-flex justify-content-between align-items-center mb-0 mt-4">
+            <p className="text-muted mb-0" style={{ fontFamily: 'UberMoveText, system-ui, sans-serif', fontSize: '18px' }}>
+              Gồm {exam.tasks.length} phần · Hoàn thành toàn bộ để nhận điểm chấm
+            </p>
+            <button className="btn btn-dark rounded-pill px-5 py-3 fw-bold" style={{ fontSize: '16px' }} onClick={handleStartClick}>
+              Bắt đầu làm bài thi
+            </button>
+          </div>
+        </div>
+
+        <div className="d-flex flex-column gap-3">
+          {exam.tasks.map((task, idx) => (
+            <div
+              key={task.id}
+              className="d-flex align-items-center justify-content-between p-4 rounded-4 bg-white"
+              style={{ border: '1px solid #e2e2e2' }}
+            >
+              <div className="d-flex align-items-center gap-4">
+                {/* Task Number Badge */}
+                <div
+                  className="d-flex align-items-center justify-content-center fw-bold flex-shrink-0"
+                  style={{ width: '56px', height: '56px', borderRadius: '999px', backgroundColor: '#000', color: '#fff', fontSize: '20px', fontFamily: 'UberMove, system-ui, sans-serif' }}
+                >
+                  {idx + 1}
+                </div>
+                <div>
+                  <h4 className="fw-bold mb-1 text-dark" style={{ fontFamily: 'UberMove, system-ui, sans-serif', fontSize: '20px' }}>
+                    {task.title}
+                  </h4>
+                  <div className="d-flex gap-2 flex-wrap">
+                    <span className="text-muted fw-medium" style={{ fontSize: '14px' }}>⏱ {task.duration}</span>
+                    <span className="text-muted" style={{ fontSize: '14px' }}>·</span>
+                    <span className="text-muted fw-medium" style={{ fontSize: '14px' }}>✍ Tối thiểu {task.min_words} từ</span>
+                  </div>
                 </div>
               </div>
             </div>
-            <button
-              className="btn btn-dark rounded-pill px-4 py-2 fw-medium flex-shrink-0"
-              style={{ fontFamily: 'UberMoveText, system-ui, sans-serif', fontSize: '15px' }}
-              onClick={(e) => { e.stopPropagation(); handleTaskClick(task); }}
-            >
-              Làm bài →
-            </button>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
 
-      <ModeSelector
-        show={showModeModal}
-        onHide={() => setShowModeModal(false)}
-        onSelectMode={handleModeSelect}
-        examType="Writing"
-        fullDuration={taskToStart ? parseInt(taskToStart.duration) : null}
-      />
-    </main>
-  </div>
+        <ModeSelector
+          show={showModeModal}
+          onHide={() => setShowModeModal(false)}
+          onSelectMode={handleModeSelect}
+          examType="Writing"
+          fullDuration={exam.tasks.reduce((acc, t) => acc + (parseInt(t.duration) || 0), 0)}
+        />
+      </main>
+    </div>
   );
 };
 
 // ─── Level 1: Danh sách đề thi ───────────────────────────────────────────────
 const WritingPage = () => {
   const [selectedExam, setSelectedExam] = useState(null);
-  const [selectedTask, setSelectedTask] = useState(null);
-  const [practiceMode, setPracticeMode] = useState(false);
-  const [customTimeLimit, setCustomTimeLimit] = useState(null);
-  const [submittedId, setSubmittedId] = useState(null);
   const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
 
   const handleViewExam = (exam) => {
-    // EARS[Event]: WHEN user tries to view exam details
     if (!isAuthenticated) {
-      // EARS[Unwanted]: IF user is not authenticated THEN redirect to login
       navigate('/login', { state: { message: 'Vui lòng đăng nhập để xem chi tiết đề thi' } });
       return;
     }
     setSelectedExam(exam);
   };
 
-  const handleSelectTask = (task, modeConfig) => {
-    setPracticeMode(modeConfig.isPractice);
-    setCustomTimeLimit(modeConfig.customTimeLimit);
-    setSelectedTask(task);
-  };
-
-  const handleSubmitSuccess = (response) => {
-    const id = response?.data?.submission_id || 'mock-write-demo';
-    setSubmittedId(id);
-  };
-
-  // Level 3: Đang làm bài
-  if (selectedTask && selectedExam) {
-    if (submittedId) {
-      return (
-        <div className="bg-white min-vh-100 pb-5">
-          <StudentNavbar />
-          <main className="container-fluid px-3 px-md-5 mt-4" style={{ maxWidth: '900px' }}>
-            <div className="d-flex align-items-center gap-3 mb-4">
-              <button
-                className="btn btn-light rounded-pill px-4 py-2 fw-medium border-0"
-                style={{ backgroundColor: '#efefef' }}
-                onClick={() => { setSubmittedId(null); setSelectedTask(null); }}
-              >
-                ← Quay lại đề
-              </button>
-              <h2 className="fw-bold mb-0" style={{ fontFamily: 'UberMove, system-ui, sans-serif', fontSize: '28px' }}>
-                Kết quả chấm điểm
-              </h2>
-            </div>
-            <FeedbackReport submissionId={submittedId} type="writing" />
-          </main>
-        </div>
-      );
+  const handleStartExam = (modeConfig) => {
+    if (selectedExam) {
+      navigate(`/tests/${selectedExam.id}/writing`, {
+        state: {
+          practiceMode: modeConfig.isPractice,
+          customTimeLimit: modeConfig.customTimeLimit
+        }
+      });
     }
-    return (
-      <WritingTestScreen
-        task={selectedTask}
-        exam={selectedExam}
-        practiceMode={practiceMode}
-        customTimeLimit={customTimeLimit}
-        onBack={() => setSelectedTask(null)}
-        onSubmitSuccess={handleSubmitSuccess}
-      />
-    );
-  }
+  };
 
   // Level 2: Danh sách task của một đề
   if (selectedExam) {
     return (
       <WritingTaskList
         exam={selectedExam}
-        onSelectTask={handleSelectTask}
+        onStartExam={handleStartExam}
         onBack={() => setSelectedExam(null)}
       />
     );

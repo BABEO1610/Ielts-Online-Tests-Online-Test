@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import GoogleLoginButton from './GoogleLoginButton';
 
@@ -10,6 +10,23 @@ const LoginForm = () => {
   const [isLoading, setIsLoading] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+
+  React.useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const errorCode = params.get('error');
+    if (errorCode) {
+      if (errorCode === 'AUTH_PERM_001') {
+        setErrorMsg('Tài khoản của bạn đã bị khóa hoặc không có quyền truy cập.');
+      } else if (errorCode === 'AUTH_OAUTH_001') {
+        setErrorMsg('Phiên đăng nhập không hợp lệ hoặc đã hết hạn.');
+      } else if (errorCode === 'DB_CONNECTION_ERROR') {
+        setErrorMsg('Lỗi kết nối hệ thống. Vui lòng thử lại sau.');
+      } else {
+        setErrorMsg('Đã có lỗi xảy ra trong quá trình đăng nhập qua Google. Vui lòng thử lại.');
+      }
+    }
+  }, [location.search]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -46,8 +63,21 @@ const LoginForm = () => {
   return (
     <form onSubmit={handleSubmit} data-testid="login-form">
       {errorMsg && (
-        <div className="alert alert-danger d-flex align-items-center mb-4 rounded-3 shadow-sm" role="alert" data-testid="error-message">
-          <i className="bi bi-exclamation-circle-fill me-2"></i>
+        <div 
+          className="d-flex align-items-center mb-4 shadow-sm" 
+          style={{ 
+            backgroundColor: '#efefef', 
+            color: '#000000', 
+            padding: '16px 20px', 
+            borderRadius: '16px',
+            fontFamily: 'UberMoveText, system-ui, Helvetica Neue, Arial, sans-serif',
+            fontSize: '16px',
+            fontWeight: '500'
+          }}
+          role="alert" 
+          data-testid="error-message"
+        >
+          <i className="bi bi-exclamation-triangle-fill me-3" style={{ fontSize: '20px' }}></i>
           <div>{errorMsg}</div>
         </div>
       )}

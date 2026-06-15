@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { Navigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
-import useLibrary from '../hooks/useLibrary';
-import ResourceCard from '../components/library/ResourceCard';
-import TutorLibraryToolbar from '../components/library/TutorLibraryToolbar';
-import ResourceUploadModal from '../components/library/ResourceUploadModal';
-import ResourceEditModal from '../components/library/ResourceEditModal';
+import { useAuth } from '../../context/AuthContext';
+import useLibrary from '../../hooks/useLibrary';
+import ResourceCard from '../../components/library/ResourceCard';
+import TutorLibraryToolbar from '../../components/library/TutorLibraryToolbar';
+import ResourceUploadModal from '../../components/library/ResourceUploadModal';
+import ResourceEditModal from '../../components/library/ResourceEditModal';
 
 const TutorLibraryManagementPage = () => {
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();

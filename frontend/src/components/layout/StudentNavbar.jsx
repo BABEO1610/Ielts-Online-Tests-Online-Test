@@ -1,11 +1,48 @@
 import React from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import ChangePwdModal from '../profile/ChangePwdModal';
+import { motion } from 'framer-motion';
+
+const NavItem = ({ to, label, currentPath }) => {
+  const isActive = currentPath === to || currentPath.startsWith(to + '/');
+  return (
+    <li className="nav-item" style={{ position: 'relative' }}>
+      <Link 
+        className="nav-link fw-medium px-0 text-dark" 
+        to={to} 
+        style={{ 
+          fontSize: '16px', 
+          opacity: isActive ? 1 : 0.6,
+          transition: 'opacity 0.2s ease',
+          fontFamily: 'UberMoveText, system-ui, sans-serif'
+        }}
+      >
+        {label}
+        {isActive && (
+          <motion.div
+            layoutId="nav-indicator"
+            style={{
+              position: 'absolute',
+              bottom: '0px',
+              left: 0,
+              width: '100%',
+              height: '3px',
+              backgroundColor: '#000',
+              borderRadius: '2px'
+            }}
+            transition={{ type: 'spring', bounce: 0.2, duration: 0.6 }}
+          />
+        )}
+      </Link>
+    </li>
+  );
+};
 
 const StudentNavbar = () => {
   const { user, isAuthenticated, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [showPwdModal, setShowPwdModal] = React.useState(false);
 
   // EARS[Event]: WHEN the user clicks logout THEN trigger the logout API call and navigate to login.
@@ -31,22 +68,11 @@ const StudentNavbar = () => {
 
         <div className="collapse navbar-collapse" id="studentNavbar">
           <ul className="navbar-nav mx-auto mb-2 mb-lg-0 gap-2 gap-md-4">
-            <li className="nav-item">
-              <Link className="nav-link fw-medium text-dark px-0" to="/listening" style={{ fontSize: '16px' }}>Listening</Link>
-            </li>
-            <li className="nav-item">
-              <Link className="nav-link fw-medium text-dark px-0" to="/reading" style={{ fontSize: '16px' }}>Reading</Link>
-            </li>
-            <li className="nav-item">
-              <Link className="nav-link fw-medium text-dark px-0" to="/writing" style={{ fontSize: '16px' }}>Writing</Link>
-            </li>
-            <li className="nav-item">
-              <Link className="nav-link fw-medium text-dark px-0" to="/speaking" style={{ fontSize: '16px' }}>Speaking</Link>
-            </li>
-            {/* EARS[Ubiquitous]: The "Thư viện" link must be public and visible to both Guest and authenticated users. */}
-            <li className="nav-item">
-              <Link className="nav-link fw-medium text-dark px-0" to="/library" style={{ fontSize: '16px' }} data-testid="library-nav-link">Thư viện</Link>
-            </li>
+            <NavItem to="/listening" label="Listening" currentPath={location.pathname} />
+            <NavItem to="/reading" label="Reading" currentPath={location.pathname} />
+            <NavItem to="/writing" label="Writing" currentPath={location.pathname} />
+            <NavItem to="/speaking" label="Speaking" currentPath={location.pathname} />
+            <NavItem to="/library" label="Library" currentPath={location.pathname} />
           </ul>
 
           <div className="d-flex align-items-center gap-3 mt-3 mt-lg-0">
@@ -78,15 +104,15 @@ const StudentNavbar = () => {
             ) : (
               // EARS[Event]: WHEN user is not logged in THEN show login/register options
               <>
-                <Link 
-                  to="/login" 
+                <Link
+                  to="/login"
                   className="btn btn-light rounded-pill px-4 py-2 fw-medium border-0"
                   style={{ backgroundColor: '#efefef', fontSize: '15px' }}
                 >
                   Đăng nhập
                 </Link>
-                <Link 
-                  to="/register" 
+                <Link
+                  to="/register"
                   className="btn btn-dark rounded-pill px-4 py-2 fw-medium border-0"
                   style={{ fontSize: '15px' }}
                 >
@@ -97,8 +123,8 @@ const StudentNavbar = () => {
           </div>
         </div>
       </div>
-      
-      <ChangePwdModal 
+
+      <ChangePwdModal
         isOpen={showPwdModal}
         onClose={() => setShowPwdModal(false)}
       />

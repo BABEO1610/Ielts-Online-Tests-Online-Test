@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { Link, NavLink, useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+import { Link, useNavigate } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
+import ChangePwdModal from '../../components/profile/ChangePwdModal';
 
 /**
  * TutorDashboard.jsx — Trang chủ của Tutor
@@ -24,15 +25,15 @@ const MOCK_STATS = {
 };
 
 const MOCK_QUEUE = [
-  { id: 'sub-w-001', type: 'writing', taskName: 'Tên bài 1', student: 'Nguyễn Văn A', avatar: null, status: 'pending',     deadline: '1 giờ', priority: false },
-  { id: 'sub-s-002', type: 'speaking', taskName: 'Tên bài B', student: 'Trần Thị B',  avatar: null, status: 'pending',     deadline: '1 giờ', priority: false },
-  { id: 'sub-w-003', type: 'writing', taskName: 'Tên bài C', student: 'Lê Văn C',     avatar: null, status: 'in_progress', deadline: '1 giờ', priority: true  },
+  { id: 'sub-w-001', type: 'writing', taskName: 'Tên bài 1', student: 'Nguyễn Văn A', avatar: null, status: 'pending', deadline: '1 giờ', priority: false },
+  { id: 'sub-s-002', type: 'speaking', taskName: 'Tên bài B', student: 'Trần Thị B', avatar: null, status: 'pending', deadline: '1 giờ', priority: false },
+  { id: 'sub-w-003', type: 'writing', taskName: 'Tên bài C', student: 'Lê Văn C', avatar: null, status: 'in_progress', deadline: '1 giờ', priority: true },
   { id: 'sub-s-004', type: 'speaking', taskName: 'Phạm Thị D', student: 'Phạm Thị D', avatar: null, status: 'in_progress', deadline: '1 giờ', priority: false },
 ];
 
 const MOCK_RECENT_TESTS = [
   { id: '1', title: 'Cambridge IELTS 18 — Reading Test 1', attempts: 47, chartData: [22, 18, 30, 47, 25, 35, 20] },
-  { id: '2', title: 'Cambridge IELTS 18 — Listening',      attempts: 38, chartData: [10, 15, 38, 22, 30, 25, 18] },
+  { id: '2', title: 'Cambridge IELTS 18 — Listening', attempts: 38, chartData: [10, 15, 38, 22, 30, 25, 18] },
 ];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -284,7 +285,7 @@ const RecentTestsWidget = () => (
 
     {/* Full chart legend */}
     <div style={{ marginTop: '16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-      {['T2','T3','T4','T5','T6','T7','CN'].map(d => (
+      {['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'].map(d => (
         <span key={d} style={{ fontSize: '10px', color: '#bbb', fontFamily: 'UberMoveText, system-ui, sans-serif' }}>{d}</span>
       ))}
     </div>
