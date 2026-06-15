@@ -1,23 +1,50 @@
-/**
- * TutorTestManagePage.jsx — Task 4.4.1
- * Trang Quản lý Đề thi (Tutor View)
- * 
- * Bảng danh sách tất cả đề (Published / Draft).
- * Nút Tạo mới, Sửa, Xóa. Badge trạng thái.
- * Bootstrap: table, btn-group, badge bg-warning/bg-success.
- */
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { testService } from '../../services/test.service';
 import '../../styles/objective-testing.css';
 
-const MOCK_TESTS = [
-  { id: '1', title: 'Cambridge IELTS 18 — Reading Test 1', skill: 'reading', difficulty: 'intermediate', status: 'published', questions: 40, createdAt: '2026-05-20' },
-  { id: '2', title: 'Cambridge IELTS 18 — Listening Test 1', skill: 'listening', difficulty: 'intermediate', status: 'published', questions: 40, createdAt: '2026-05-21' },
-  { id: '3', title: 'Advanced Reading — Climate Change', skill: 'reading', difficulty: 'advanced', status: 'draft', questions: 28, createdAt: '2026-06-01' },
-  { id: '4', title: 'Listening Mini — Travel Booking', skill: 'listening', difficulty: 'beginner', status: 'draft', questions: 15, createdAt: '2026-06-02' },
-  { id: '5', title: 'IELTS 17 — Reading Test 2', skill: 'reading', difficulty: 'intermediate', status: 'published', questions: 40, createdAt: '2026-05-15' },
-];
+const formatLabel = (value) => {
+  if (!value) return '-';
+  return value.charAt(0).toUpperCase() + value.slice(1);
+};
 
 function TutorTestManagePage() {
+  const [tests, setTests] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const fetchTests = async () => {
+    try {
+      const res = await testService.getTests();
+      if (res.success) {
+        setTests(res.data || []);
+      }
+    } catch (error) {
+      console.error('Failed to fetch tests', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchTests();
+  }, []);
+
+  const handleDeleteTest = async (id) => {
+    if (!window.confirm('Are you sure you want to delete this test? This action cannot be undone.')) return;
+
+    try {
+      const res = await testService.deleteTest(id);
+      if (res.success) {
+        setTests(prev => prev.filter(t => t.id !== id));
+      } else {
+        alert('Failed to delete test: ' + (res.error?.message || 'Unknown error'));
+      }
+    } catch (err) {
+      console.error('Failed to delete test', err);
+      alert('An error occurred while deleting the test');
+    }
+  };
+
   return (
     <div className="container py-4" style={{ maxWidth: 1100 }}>
       <div className="d-flex justify-content-between align-items-center mb-4">
@@ -25,9 +52,9 @@ function TutorTestManagePage() {
           <h1>Test management</h1>
           <p>Create, edit, and manage your mock tests.</p>
         </div>
-        <a href="/tutor/tests/new" className="button-primary" id="btn-create-test" style={{ width: 'auto', padding: '12px 28px', textDecoration: 'none', whiteSpace: 'nowrap' }}>
+        <Link to="/tutor/tests/new" className="button-primary" id="btn-create-test" style={{ width: 'auto', padding: '12px 28px', textDecoration: 'none', whiteSpace: 'nowrap' }}>
           + Create test
-        </a>
+        </Link>
       </div>
 
       <div className="filter-bar">
@@ -40,15 +67,17 @@ function TutorTestManagePage() {
           <option value="">All Skills</option>
           <option value="reading">Reading</option>
           <option value="listening">Listening</option>
+          <option value="writing">Writing</option>
+          <option value="speaking">Speaking</option>
         </select>
       </div>
 
-      <div className="card-content p-0" style={{ overflow: 'hidden' }}>
+      <div className="card-content tutor-test-card p-0">
         <div className="table-responsive">
           <table className="table tutor-table mb-0" id="tutor-test-table">
             <thead>
               <tr>
-                <th>#</th>
+                <th className="col-index">#</th>
                 <th>Title</th>
                 <th>Skill</th>
                 <th>Difficulty</th>
@@ -59,27 +88,37 @@ function TutorTestManagePage() {
               </tr>
             </thead>
             <tbody>
-              {MOCK_TESTS.map((t, idx) => (
-                <tr key={t.id} id={`tutor-row-${t.id}`}>
-                  <td>{idx + 1}</td>
-                  <td><span className="body-md-strong">{t.title}</span></td>
-                  <td><span className="badge-skill">{t.skill}</span></td>
-                  <td><span className="badge-difficulty">{t.difficulty}</span></td>
-                  <td>{t.questions}/40</td>
-                  <td>
-                    <span className={`badge-status ${t.status}`}>
-                      {t.status === 'published' ? '● Published' : '○ Draft'}
-                    </span>
-                  </td>
-                  <td className="body-sm" style={{ color: 'var(--body)' }}>{t.createdAt}</td>
-                  <td>
-                    <div className="d-flex gap-1">
-                      <a href={`/tutor/tests/${t.id}/edit`} className="button-secondary" id={`btn-edit-${t.id}`} style={{ width: 'auto', padding: '4px 12px', fontSize: 13, border: '1px solid var(--surface-pressed)', textDecoration: 'none' }}>Edit</a>
-                      <button className="button-secondary" id={`btn-delete-${t.id}`} style={{ width: 'auto', padding: '4px 12px', fontSize: 13, border: '1px solid var(--surface-pressed)', color: '#e02424' }}>Delete</button>
-                    </div>
-                  </td>
+              {isLoading ? (
+                <tr>
+                  <td colSpan="8" className="text-center py-4">Loading tests...</td>
                 </tr>
-              ))}
+              ) : tests.length === 0 ? (
+                <tr>
+                  <td colSpan="8" className="text-center py-4">No tests found. Create your first test!</td>
+                </tr>
+              ) : (
+                tests.map((t, idx) => (
+                  <tr key={t.id} id={`tutor-row-${t.id}`}>
+                    <td className="col-index">{idx + 1}</td>
+                    <td><span className="test-title-cell">{t.title}</span></td>
+                    <td><span className="badge-skill">{formatLabel(t.skill)}</span></td>
+                    <td><span className="badge-difficulty">{formatLabel(t.difficulty)}</span></td>
+                    <td className="text-nowrap">{t.skill === 'writing' ? '2 tasks' : `${t.questions || 0}/40`}</td>
+                    <td>
+                      <span className={`badge-status ${t.status}`}>
+                        {t.status === 'published' ? 'Published' : 'Draft'}
+                      </span>
+                    </td>
+                    <td className="body-sm text-nowrap" style={{ color: 'var(--body)' }}>{t.createdAt}</td>
+                    <td>
+                      <div className="tutor-table-actions">
+                        <Link to={`/tutor/tests/${t.id}/edit`} className="table-action-btn" id={`btn-edit-${t.id}`}>Edit</Link>
+                        <button className="table-action-btn danger" id={`btn-delete-${t.id}`} onClick={() => handleDeleteTest(t.id)}>Delete</button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>

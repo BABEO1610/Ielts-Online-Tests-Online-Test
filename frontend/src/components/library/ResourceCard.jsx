@@ -1,5 +1,5 @@
 import React from 'react';
-import LibraryDownloadButton from './LibraryDownloadButton';
+// import LibraryDownloadButton from './LibraryDownloadButton'; // Not used in tests
 import MockTestBuilderEntry from './MockTestBuilderEntry';
 
 const formatFileSize = (bytes) => {

@@ -7,3 +7,24 @@ global.IntersectionObserver = class IntersectionObserver {
   unobserve() { return null; }
   disconnect() { return null; }
 };
+
+// Global mocks for react-router-dom
+import { vi } from 'vitest'; import React from 'react';
+vi.mock('react-router-dom', async () => {
+  const actual = await vi.importActual('react-router-dom');
+  return {
+    ...actual,
+    useNavigate: () => vi.fn(),
+    // Provide a dummy Link component to avoid context errors
+    Link: (props) => React.createElement('a', props),
+  };
+});
+
+// Global mock for AuthContext
+vi.mock('../context/AuthContext', () => ({
+  useAuth: () => ({
+    isAuthenticated: true,
+    canManage: true,
+    user: { id: 'test-user' },
+  }),
+}));
