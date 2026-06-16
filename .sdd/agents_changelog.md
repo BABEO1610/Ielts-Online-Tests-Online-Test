@@ -95,4 +95,6 @@
 | 2026-06-14 | Antigravity | Các file thuộc `pages/auth/*`, `pages/student/*`, `pages/tutor/*`, `pages/public/*` | **Sửa lỗi imports:** Điều chỉnh relative imports của `components`, `context`, `services` từ `../` thành `../../` trong tất cả các file bị dời trước đó để sửa lỗi build. |
 | 2026-06-14 | Antigravity | `frontend/src/pages/tutor/AdminDashboard.jsx` -> `frontend/src/pages/admin/AdminDashboard.jsx` | **Tổ chức lại folder admin:** Di chuyển tệp `AdminDashboard.jsx` từ thư mục `pages/tutor/` sang đúng thư mục `pages/admin/`. |
 | 2026-06-14 | Antigravity | Các file Tutor trong `pages/objective-testing/` -> `pages/tutor/` | **Tổ chức lại folder tutor:** Di chuyển các tệp `TutorQuestionFormPage.jsx`, `TutorTestFormPage.jsx`, `TutorTestManagePage.jsx` sang thư mục `pages/tutor/`. |
+| 2026-06-14 | Antigravity | `frontend/src/App.jsx` | **Sửa lỗi trắng màn hình:** Thêm các import còn thiếu cho `TutorLayout` và `TutorActivityLogPage` vào `App.jsx` để tránh ReferenceError lúc khởi động ứng dụng React. |
 
+| 2026-06-14 | Antigravity | `frontend/src/pages/subjective-testing/SpeakingPage.jsx`, `frontend/src/App.jsx` | **Sửa lỗi build:** Cập nhật import `ModeSelector`, xóa `ProgressBar` không sử dụng ở `SpeakingPage.jsx`, và sửa đường dẫn import của `TutorActivityLogPage` trong `App.jsx` để build thành công. |

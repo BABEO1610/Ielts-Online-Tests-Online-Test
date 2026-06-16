@@ -24,6 +24,11 @@ import UserProfilePage from './pages/student/UserProfilePage';
 
 // ── Tutor Pages ────────────────────────────────────────────────────────────────
 import TutorDashboard from './pages/tutor/TutorDashboard';
+import TutorLayout from './layouts/TutorLayout';
+import TutorActivityLogPage from './pages/tutor/TutorActivityLogPage';
+import TutorLibraryPage from './pages/tutor/TutorLibraryPage';
+import TutorLibraryCreatePage from './pages/tutor/TutorLibraryCreatePage';
+import TutorLibraryEditPage from './pages/tutor/TutorLibraryEditPage';
 
 // ── Admin Section — Layout + nested pages ──────────────────────────────────────
 import AdminLayout from './layouts/AdminLayout';
@@ -133,6 +138,20 @@ function App() {
           <Route path="/grading/tutor/queue" element={
             <ProtectedRoute role="tutor"><TutorQueuePage /></ProtectedRoute>
           } />
+          {/* Thư viện tài liệu cho Tutor */}
+          <Route path="/tutor/library" element={
+            <ProtectedRoute role="tutor"><TutorLibraryPage /></ProtectedRoute>
+          } />
+          <Route path="/tutor/library/create" element={
+            <ProtectedRoute role="tutor"><TutorLibraryCreatePage /></ProtectedRoute>
+          } />
+          <Route path="/tutor/library/edit/:id" element={
+            <ProtectedRoute role="tutor"><TutorLibraryEditPage /></ProtectedRoute>
+          } />
+          {/* Trang chấm điểm cho Tutor (Split view) */}
+          <Route path="/grading/tutor/grade/:type/:submissionId" element={
+            <ProtectedRoute role="tutor"><TutorGradingPage /></ProtectedRoute>
+          } />
         </Route>
         <Route path="/profile" element={
           <ProtectedRoute><UserProfilePage /></ProtectedRoute>
@@ -173,10 +192,7 @@ function App() {
         } />
 
         {/* ── Subjective — Tutor Workspace (role guard) ─────────────────────── */}
-        {/* /grading/tutor/queue đã được chuyển vào TutorLayout */}
-        <Route path="/grading/tutor/grade/:type/:submissionId" element={
-          <ProtectedRoute role="tutor"><TutorGradingPage /></ProtectedRoute>
-        } />
+        {/* Các route của Tutor đã được chuyển vào TutorLayout phía trên */}
 
         {/* ── Objective Testing — Student: Browsing ─────────────────────────── */}
         <Route path="/tests" element={<TestListPage />} />
