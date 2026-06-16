@@ -15,7 +15,10 @@ import OnboardingPage from './pages/OnboardingPage';
 // ── Core Protected Pages ───────────────────────────────────────────────────────
 import Dashboard from './pages/Dashboard';
 import UserProfilePage from './pages/UserProfilePage';
+import PracticeHistoryPage from './pages/PracticeHistoryPage';
+import StudyPlanPage from './pages/StudyPlanPage';
 import TutorDashboard from './pages/TutorDashboard';
+import StudentLayout from './layouts/StudentLayout';
 
 // ── Admin Section — Layout + nested pages ──────────────────────────────────────
 import AdminLayout from './layouts/AdminLayout';
@@ -102,15 +105,21 @@ function App() {
         <Route path="/reset-password" element={<ResetPwdPage />} />
         <Route path="/onboarding" element={<OnboardingPage />} />
 
-        {/* ── Protected Core ────────────────────────────────────────────────── */}
-        <Route path="/dashboard" element={
-          <ProtectedRoute><Dashboard /></ProtectedRoute>
-        } />
+        {/* ── Protected Core (Student Dashboard / Profile) ──────────────────────── */}
+        <Route element={<ProtectedRoute><StudentLayout /></ProtectedRoute>}>
+          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/profile" element={<UserProfilePage />} />
+          <Route path="/practice-history" element={<PracticeHistoryPage />} />
+          <Route path="/study-plan" element={<StudyPlanPage />} />
+          <Route path="/prep" element={<div className="p-4 text-center">Tính năng đang phát triển</div>} />
+          <Route path="/lessons" element={<div className="p-4 text-center">Tính năng đang phát triển</div>} />
+          <Route path="/wallet" element={<div className="p-4 text-center">Tính năng đang phát triển</div>} />
+          <Route path="/referral" element={<div className="p-4 text-center">Tính năng đang phát triển</div>} />
+        </Route>
+
+        {/* ── Tutor ─────────────────────────────────────────────────────────── */}
         <Route path="/tutor/dashboard" element={
           <ProtectedRoute role="tutor"><TutorDashboard /></ProtectedRoute>
-        } />
-        <Route path="/profile" element={
-          <ProtectedRoute><UserProfilePage /></ProtectedRoute>
         } />
         {/* ── Admin Section — nested under AdminLayout (sidebar + topbar + footer) ── */}
         <Route path="/admin" element={
