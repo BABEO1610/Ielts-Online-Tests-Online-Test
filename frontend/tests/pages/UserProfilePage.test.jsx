@@ -1,4 +1,3 @@
-import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { describe, test, expect, vi, beforeEach } from 'vitest';
@@ -30,6 +29,10 @@ vi.mock('../../src/context/AuthContext', () => ({
   })
 }));
 
+const openEditForm = () => {
+  fireEvent.click(screen.getAllByText('Chỉnh sửa hồ sơ')[0]);
+};
+
 describe('UserProfilePage Component', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -39,9 +42,11 @@ describe('UserProfilePage Component', () => {
     render(<MemoryRouter><UserProfilePage /></MemoryRouter>);
 
     // Read-only fields
-    expect(screen.getByText('test@example.com')).toBeInTheDocument();
-    expect(screen.getByText('student')).toBeInTheDocument();
-    expect(screen.getByText('active')).toBeInTheDocument();
+    expect(screen.getAllByText('test@example.com').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('student').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('active').length).toBeGreaterThan(0);
+
+    openEditForm();
 
     // Editable fields
     expect(screen.getByTestId('fullname-input')).toHaveValue('Test User');
@@ -51,6 +56,7 @@ describe('UserProfilePage Component', () => {
 
   test('generates band score options from 0.0 to 9.0 in 0.5 steps', () => {
     render(<MemoryRouter><UserProfilePage /></MemoryRouter>);
+    openEditForm();
     const select = screen.getByTestId('bandscore-select');
     const options = Array.from(select.options).map(opt => opt.value);
 
@@ -63,10 +69,11 @@ describe('UserProfilePage Component', () => {
   });
 
   test('handles successful profile update (USER-09)', async () => {
-    api.patch.mockResolvedValueOnce({ data: { success: true } });
+    api.put.mockResolvedValueOnce({ data: { success: true } });
     mockRefreshUser.mockResolvedValueOnce(undefined);
 
     render(<MemoryRouter><UserProfilePage /></MemoryRouter>);
+    openEditForm();
 
     fireEvent.change(screen.getByTestId('fullname-input'), {
       target: { name: 'full_name', value: 'Updated Name' }
@@ -78,7 +85,7 @@ describe('UserProfilePage Component', () => {
     fireEvent.click(screen.getByTestId('submit-btn'));
 
     await waitFor(() => {
-      expect(api.patch).toHaveBeenCalledWith('/users/me', {
+      expect(api.put).toHaveBeenCalledWith('/users/me', {
         full_name: 'Updated Name',
         avatar_url: '',
         target_band_score: 7.0
@@ -91,11 +98,12 @@ describe('UserProfilePage Component', () => {
 
   test('handles update failure with AUTH_PROF_001 error message', async () => {
     const errorMsg = 'Target Band Score must be between 0 and 9, in 0.5 increments.';
-    api.patch.mockRejectedValueOnce({
+    api.put.mockRejectedValueOnce({
       response: { data: { error: errorMsg } }
     });
 
     render(<MemoryRouter><UserProfilePage /></MemoryRouter>);
+    openEditForm();
 
     fireEvent.click(screen.getByTestId('submit-btn'));
 
