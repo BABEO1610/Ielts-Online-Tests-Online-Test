@@ -26,6 +26,7 @@ import UserProfilePage from './pages/student/UserProfilePage';
 import TutorLayout from './layouts/TutorLayout';
 
 // ── Tutor Pages ────────────────────────────────────────────────────────────────
+import TutorLayout from './layouts/TutorLayout';
 import TutorDashboard from './pages/tutor/TutorDashboard';
 import TutorActivityLogPage from './pages/TutorActivityLogPage';
 
@@ -56,6 +57,7 @@ import StudentHistoryPage from './pages/grading/StudentHistoryPage';
 // ── Tutor Workspace — Subjective Grading ──────────────────────────────────────
 import TutorQueuePage from './pages/grading/TutorQueuePage';
 import TutorGradingPage from './pages/grading/TutorGradingPage';
+import TutorGradingHistoryPage from './pages/grading/TutorGradingHistoryPage';
 import TutorTestManagePage from './pages/tutor/TutorTestManagePage';
 import TutorTestFormPage from './pages/tutor/TutorTestFormPage';
 import TutorReadingFormPage from './pages/tutor/TutorReadingFormPage';
@@ -140,6 +142,10 @@ function App() {
           {/* Hàng chờ chấm */}
           <Route path="/grading/tutor/queue" element={
             <ProtectedRoute role="tutor"><TutorQueuePage /></ProtectedRoute>
+          } />
+          {/* Lịch sử chấm */}
+          <Route path="/grading/tutor/schedule" element={
+            <ProtectedRoute role="tutor"><TutorGradingHistoryPage /></ProtectedRoute>
           } />
         </Route>
         <Route path="/profile" element={

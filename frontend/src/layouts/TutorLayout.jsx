@@ -109,14 +109,12 @@ const TutorSidebar = () => {
         <SidebarSection title="Chấm bài">
           <SidebarLink to="/grading/tutor/queue" label="Hàng chờ chấm" />
           <SidebarLink to="/grading/tutor/schedule" label="Lịch sử chấm" />
-          <SidebarLink to="/grading/tutor/feedback" label="Phản hồi" />
         </SidebarSection>
 
         {/* TÀI NGUYÊN */}
         <SidebarSection title="Tài nguyên">
           <SidebarLink to="/tutor/tests" label="Ngân hàng đề" />
           <SidebarLink to="/library" label="Thư viện tài liệu (TUT-07)" />
-          <SidebarLink to="/tutor/explain" label="Thêm giải thích đáp án (new)" />
         </SidebarSection>
 
         {/* CÀI ĐẶT */}

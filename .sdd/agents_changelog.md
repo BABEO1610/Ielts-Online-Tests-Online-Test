@@ -83,16 +83,22 @@
 |------|-------|-------------|---------|
 | 2026-06-07 | Kiro | `frontend/src/layouts/AdminLayout.jsx` | Thêm nút "↗ Xem website" vào topbar admin (bên trái, cạnh "Thêm Giảng viên"), trỏ về `/` và mở tab mới (`target="_blank" rel="noopener noreferrer"`). Dùng `btn-pill--ghost` theo design system. Build PASS (exit 0). |
 
-## 2026-06-14
+## 2026-06-15
 
 | Date | Agent | File Changed | Summary |
 |------|-------|-------------|---------|
-| 2026-06-14 | Antigravity | `frontend/src/pages/subjective-testing/WritingTestPage.jsx` | **Tạo mới trang thi Writing:** Tách màn hình làm bài và xem kết quả từ `WritingPage.jsx`, hỗ trợ route-driven thi theo ID: `/tests/:id/writing`. |
-| 2026-06-14 | Antigravity | `frontend/src/pages/subjective-testing/SpeakingTestPage.jsx` | **Tạo mới trang thi Speaking:** Tách màn hình làm bài và xem kết quả từ `SpeakingPage.jsx`, hỗ trợ route-driven thi theo ID: `/tests/:id/speaking`. |
-| 2026-06-14 | Antigravity | `frontend/src/pages/subjective-testing/WritingPage.jsx` | **Refactor WritingPage:** Xóa code màn hình làm bài, chuyển hướng `ModeSelector` sang trang thi route-driven mới. Sửa relative imports. |
-| 2026-06-14 | Antigravity | `frontend/src/pages/subjective-testing/SpeakingPage.jsx` | **Refactor SpeakingPage:** Xóa code màn hình làm bài, chuyển hướng `ModeSelector` sang trang thi route-driven mới. Sửa relative imports. |
-| 2026-06-14 | Antigravity | `frontend/src/App.jsx` | **Cấu hình Router:** Thêm route `/tests/:id/writing` và `/tests/:id/speaking` được bảo vệ bằng `ProtectedRoute` cho học viên. Cập nhật đường dẫn import cho các trang Tutor di chuyển từ `pages/objective-testing/` sang `pages/tutor/`. |
-| 2026-06-14 | Antigravity | Các file thuộc `pages/auth/*`, `pages/student/*`, `pages/tutor/*`, `pages/public/*` | **Sửa lỗi imports:** Điều chỉnh relative imports của `components`, `context`, `services` từ `../` thành `../../` trong tất cả các file bị dời trước đó để sửa lỗi build. |
-| 2026-06-14 | Antigravity | `frontend/src/pages/tutor/AdminDashboard.jsx` -> `frontend/src/pages/admin/AdminDashboard.jsx` | **Tổ chức lại folder admin:** Di chuyển tệp `AdminDashboard.jsx` từ thư mục `pages/tutor/` sang đúng thư mục `pages/admin/`. |
-| 2026-06-14 | Antigravity | Các file Tutor trong `pages/objective-testing/` -> `pages/tutor/` | **Tổ chức lại folder tutor:** Di chuyển các tệp `TutorQuestionFormPage.jsx`, `TutorTestFormPage.jsx`, `TutorTestManagePage.jsx` sang thư mục `pages/tutor/`. |
+| 2026-06-15 | Antigravity | `frontend/src/layouts/TutorLayout.jsx` | **UI Cleanup:** Xóa 2 mục sidebar của Tutor: "Phản hồi" (`/grading/tutor/feedback`) và "Thêm giải thích đáp án" (`/tutor/explain`) theo yêu cầu của team. |
+| 2026-06-15 | Antigravity | `frontend/src/pages/grading/TutorGradingHistoryPage.jsx` | **[NEW] Trang Lịch sử chấm bài:** Xây dựng đầy đủ theo DESIGN.md (Uber-inspired, black/white, pill radius 999px). Bao gồm: (1) 3 StatCards tổng quan (tổng bài chấm, band trung bình - dark variant, số khiếu nại); (2) Bảng 7 cột với avatar học sinh, kỹ năng pill, band score, feedback tags, status pill màu; (3) Bộ lọc: search, thời gian, kỹ năng, band điểm — đều là FilterDropdown pill tự build; (4) Phân trang client-side; (5) Modal xem chi tiết; (6) Modal xác nhận thu hồi kết quả; (7) Icon action buttons (xem/sửa/thu hồi). Dữ liệu mock — cần nối API khi backend sẵn sàng. |
+| 2026-06-15 | Antigravity | `frontend/src/App.jsx` | **Routing:** Thêm import + route `/grading/tutor/schedule` → `TutorGradingHistoryPage` dưới `TutorLayout` (ProtectedRoute role="tutor"). |
 
+## 2026-06-15 (refactor — Constitution compliance)
+
+| Date | Agent | File Changed | Summary |
+|------|-------|-------------|---------|
+| 2026-06-15 | Antigravity | `frontend/src/pages/grading/TutorGradingHistoryPage.jsx` | **[FIX] Bước 1:** Xóa unused `Link` import; sửa `TIME_RANGES` duplicate ('7 ngày qua' × 2 → '7 ngày qua' + '30 ngày qua'); thay `console.log` vi phạm Constitution ARTICLE 2 bằng TODO comment + proper handler. |
+| 2026-06-15 | Antigravity | `frontend/src/components/common/FilterDropdown.jsx` | **[NEW] Bước 2 — Tách file:** Extract `FilterDropdown` thành component tái sử dụng riêng. Hỗ trợ string[] và object[] options. 83 dòng. |
+| 2026-06-15 | Antigravity | `frontend/src/components/grading/GradingDetailModal.jsx` | **[NEW] Bước 2:** Extract modal xem chi tiết bài chấm. Props-driven (statusMap, skillMap). 152 dòng. |
+| 2026-06-15 | Antigravity | `frontend/src/components/grading/GradingRevokeModal.jsx` | **[NEW] Bước 2:** Extract modal thu hồi kết quả — cải tiến UX: thêm warning icon ⚠️, center layout, highlight text cảnh báo đỏ. 82 dòng. |
+| 2026-06-15 | Antigravity | `frontend/src/components/grading/GradingHistoryTable.jsx` | **[NEW] Bước 2:** Extract bảng + rows + IconBtn thành component riêng. Props: rows, statusMap, skillMap, onView, onRevoke. 193 dòng. |
+| 2026-06-15 | Antigravity | `frontend/src/pages/grading/TutorGradingHistoryPage.jsx` | **Bước 2 — Rewrite:** Giảm từ 768 dòng → 170 dòng (tuân thủ Constitution ARTICLE 2 max 300). Chỉ còn StatCard, Pagination inline + orchestrate các component đã tách. |
+| 2026-06-15 | Antigravity | `frontend/src/services/gradingHistory.service.js` | **[NEW] Bước 3 — Service layer:** Mock data dời ra service; export `getGradingHistory`, `getGradingHistoryById`, `revokeGradingResult`, `updateGradingScore` — tất cả đều có TODO comment hướng dẫn nối API backend. Response format tuân thủ `{ success, data, error, meta }` (Constitution ARTICLE 2). |
