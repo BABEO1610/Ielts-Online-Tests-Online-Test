@@ -19,12 +19,13 @@ import VerifyEmailPage from './pages/auth/VerifyEmailPage';
 import ContentLibraryPage from './pages/student/ContentLibraryPage';
 
 // ── Core Protected Pages ───────────────────────────────────────────────────────
-import Dashboard from './pages/student/Dashboard';
 import UserProfilePage from './pages/student/UserProfilePage';
 import TutorDashboard from './pages/tutor/TutorDashboard';
+import TutorProfilePage from './pages/tutor/TutorProfilePage';
 import TutorLayout from './layouts/TutorLayout';
 import TutorActivityLogPage from './pages/TutorActivityLogPage';
 import StudentLayout from './layouts/StudentLayout';
+import ProfileLayout from './layouts/ProfileLayout';
 
 // ── Admin Section — Layout + nested pages ──────────────────────────────────────
 import AdminLayout from './layouts/AdminLayout';
@@ -89,7 +90,7 @@ const NotFoundPage = () => (
       Trang bạn tìm kiếm không tồn tại.
     </p>
     <Link
-      to="/student/dashboard"
+      to="/"
       style={{
         display: 'inline-block',
         backgroundColor: '#000',
@@ -124,17 +125,21 @@ function App() {
         <Route path="/library" element={<ContentLibraryPage />} />
 
         {/* ── Protected Core (Student) ────────────────────────────────────────── */}
-        <Route element={<StudentLayout />}>
-          <Route path="/student/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-          <Route path="/student/profile" element={<ProtectedRoute><UserProfilePage /></ProtectedRoute>} />
-          <Route path="/student/practice-history" element={<ProtectedRoute><UserProfilePage /></ProtectedRoute>} />
-          <Route path="/student/study-plan" element={<ProtectedRoute><UserProfilePage /></ProtectedRoute>} />
+
+
+        <Route element={<ProfileLayout />}>
+          <Route path="/profile" element={<ProtectedRoute><UserProfilePage /></ProtectedRoute>} />
+          <Route path="/practice-history" element={<ProtectedRoute><UserProfilePage /></ProtectedRoute>} />
+          <Route path="/study-plan" element={<ProtectedRoute><UserProfilePage /></ProtectedRoute>} />
         </Route>
 
         {/* ── Tutor Section ── */}
         <Route element={<TutorLayout />}>
           <Route path="/tutor/dashboard" element={
             <ProtectedRoute role="tutor"><TutorDashboard /></ProtectedRoute>
+          } />
+          <Route path="/tutor/profile" element={
+            <ProtectedRoute role="tutor"><TutorProfilePage /></ProtectedRoute>
           } />
           <Route path="/tutor/activity-log" element={
             <ProtectedRoute role="tutor"><TutorActivityLogPage /></ProtectedRoute>
@@ -247,7 +252,7 @@ function App() {
           <ProtectedRoute><AuditLogPage /></ProtectedRoute>
         } />
 
-        {/* ── 404 — "Về trang chủ" → /student/dashboard ────────────────────────────── */}
+        {/* ── 404 — "Về trang chủ" → / ────────────────────────────── */}
         <Route path="*" element={<NotFoundPage />} />
 
       </Routes>

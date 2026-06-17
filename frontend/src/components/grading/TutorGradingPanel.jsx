@@ -40,23 +40,28 @@ const calculatePreviewBand = (scores) => {
   return intPart;
 };
 
-const TutorGradingPanel = ({ submissionId, type, studentId, onGradingComplete }) => {
+const TutorGradingPanel = ({ submissionId, type, studentId, onGradingComplete, tasks, activeTaskId }) => {
   const [audioUrl, setAudioUrl] = useState(null);
-  const [scores, setScores] = useState({
-    task_achievement_score: '',
-    coherence_score: '',
-    lexical_score: '',
-    grammar_score: '',
-    fluency_score: '',
-    pronunciation_score: ''
-  });
-  const [writtenFeedback, setWrittenFeedback] = useState('');
+  
+  const [taskScores, setTaskScores] = useState({});
+  const [taskFeedbacks, setTaskFeedbacks] = useState({});
+  const [showNotesModal, setShowNotesModal] = useState(false);
   const [highlights, setHighlights] = useState(null);
   
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [prelimLoading, setPrelimLoading] = useState(false);
   const [error, setError] = useState(null);
+
+  const currentScores = taskScores[activeTaskId] || {
+    task_achievement_score: '',
+    coherence_score: '',
+    lexical_score: '',
+    grammar_score: '',
+    fluency_score: '',
+    pronunciation_score: ''
+  };
+  const currentFeedback = taskFeedbacks[activeTaskId] || '';
 
   useEffect(() => {
     // EARS[Event]: WHEN component mounts and type is speaking THEN fetch audio url
@@ -79,7 +84,20 @@ const TutorGradingPanel = ({ submissionId, type, studentId, onGradingComplete })
   }, [submissionId, type]);
 
   const handleScoreChange = (key, value) => {
-    setScores(prev => ({ ...prev, [key]: value }));
+    setTaskScores(prev => ({ 
+      ...prev, 
+      [activeTaskId]: {
+        ...(prev[activeTaskId] || {}),
+        [key]: value
+      }
+    }));
+  };
+
+  const handleFeedbackChange = (value) => {
+    setTaskFeedbacks(prev => ({
+      ...prev,
+      [activeTaskId]: value
+    }));
   };
 
   const getCriteriaList = () => {
@@ -88,9 +106,9 @@ const TutorGradingPanel = ({ submissionId, type, studentId, onGradingComplete })
 
   const previewBandScore = () => {
     const criteria = getCriteriaList();
-    const currentScores = criteria.map(c => parseFloat(scores[c.key])).filter(s => !isNaN(s));
-    if (currentScores.length < 4) return null;
-    return calculatePreviewBand(currentScores);
+    const scoresArray = criteria.map(c => parseFloat(currentScores[c.key])).filter(s => !isNaN(s));
+    if (scoresArray.length < 4) return null;
+    return calculatePreviewBand(scoresArray);
   };
 
   const handleRunPrelimCheck = async () => {
@@ -119,13 +137,13 @@ const TutorGradingPanel = ({ submissionId, type, studentId, onGradingComplete })
       const criteria = getCriteriaList();
       const payload = {
         type,
-        written_feedback: writtenFeedback,
+        written_feedback: currentFeedback,
         // band_score sent as reference according to Tech Lead instruction
         band_score: previewBandScore() || 0 
       };
       
       criteria.forEach(c => {
-        payload[c.key] = parseFloat(scores[c.key]);
+        payload[c.key] = parseFloat(currentScores[c.key]);
       });
 
       const response = await gradingService.gradeSubmission(submissionId, payload);
@@ -142,10 +160,33 @@ const TutorGradingPanel = ({ submissionId, type, studentId, onGradingComplete })
   };
 
   return (
-    <div className="row g-4">
-      <div className="col-lg-8">
-        <div className="bg-canvas rounded-4 p-4">
-          <h4 className="mb-4 text-ink fw-bold">Grading Panel</h4>
+    <>
+      <div className="bg-canvas rounded-4 p-4 h-100 d-flex flex-column">
+        <div className="d-flex justify-content-between align-items-center mb-4">
+          <h4 className="text-ink fw-bold mb-0">Grading Panel - {tasks?.find(t => t.id === activeTaskId)?.name || 'Task'}</h4>
+          
+          <div className="dropdown">
+            <button 
+              className="btn btn-light rounded-circle p-2 border-0 shadow-none dropdown-toggle-no-caret" 
+              data-bs-toggle="dropdown" 
+              aria-expanded="false"
+              style={{ backgroundColor: 'transparent' }}
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#000" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="1.5"></circle>
+                <circle cx="12" cy="5" r="1.5"></circle>
+                <circle cx="12" cy="19" r="1.5"></circle>
+              </svg>
+            </button>
+            <ul className="dropdown-menu dropdown-menu-end shadow-sm border-0 rounded-4 p-2 mt-1">
+              <li>
+                <button className="dropdown-item rounded-3 py-2 fw-medium" onClick={() => setShowNotesModal(true)}>
+                  <i className="bi bi-journal-text me-2"></i>Student Notes
+                </button>
+              </li>
+            </ul>
+          </div>
+        </div>
           
           {error && (
             <div className="bg-canvas-soft border-start border-4 border-dark text-ink p-3 mb-4 rounded" role="alert">
@@ -169,20 +210,43 @@ const TutorGradingPanel = ({ submissionId, type, studentId, onGradingComplete })
           <div className="mb-4 d-flex justify-content-between align-items-center">
             <button 
               type="button"
-              className="btn btn-light rounded-pill px-4 py-2 fw-medium"
+              className="btn btn-light rounded-pill px-4 py-2 fw-medium d-flex align-items-center gap-2"
               onClick={handleRunPrelimCheck}
               disabled={prelimLoading}
+              style={{ backgroundColor: '#efefef' }}
             >
-              {prelimLoading ? 'Running...' : 'Run AI Prelim Check'}
+              {prelimLoading ? (
+                <>
+                  <span className="spinner-border spinner-border-sm text-dark" role="status" aria-hidden="true"></span>
+                  Đang phân tích...
+                </>
+              ) : (
+                'Run AI Prelim Check'
+              )}
             </button>
           </div>
 
           {highlights && (
-            <div className="bg-canvas-soft p-4 rounded-4 mb-4 text-ink">
-              <h6 className="fw-bold mb-3">AI Prelim Highlights</h6>
-              <pre className="mb-0 text-ink fw-medium" style={{ whiteSpace: 'pre-wrap', fontFamily: 'inherit' }}>
-                {JSON.stringify(highlights, null, 2)}
-              </pre>
+            <div className="p-4 rounded-4 mb-4 text-dark" style={{ backgroundColor: '#e3f2fd', border: '1px solid #bbdefb' }}>
+              <div className="d-flex align-items-center mb-3 gap-2">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0d6efd" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+                </svg>
+                <h6 className="fw-bold mb-0 text-primary" style={{ fontFamily: 'UberMove, system-ui, sans-serif' }}>Gợi ý của AI (AI Highlights)</h6>
+              </div>
+              {typeof highlights === 'object' ? (
+                <ul className="mb-0 ps-3">
+                  {Object.keys(highlights).map(key => (
+                    <li key={key} className="mb-1" style={{ fontSize: '14px' }}>
+                      <strong className="text-capitalize">{key.replace(/_/g, ' ')}:</strong> {highlights[key]}
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <pre className="mb-0 text-dark fw-medium" style={{ whiteSpace: 'pre-wrap', fontFamily: 'inherit', fontSize: '14px' }}>
+                  {JSON.stringify(highlights, null, 2)}
+                </pre>
+              )}
             </div>
           )}
 
@@ -191,17 +255,19 @@ const TutorGradingPanel = ({ submissionId, type, studentId, onGradingComplete })
               {getCriteriaList().map(criteria => (
                 <div className="col-md-6" key={criteria.key}>
                   <label className="form-label fw-bold text-ink">{criteria.label}</label>
-                  <input 
-                    type="number" 
-                    className="form-control bg-canvas-soft border-0 px-3 py-2 fw-medium" 
-                    min="0" 
-                    max="9" 
-                    step="0.5" 
+                  <select 
+                    className="form-select bg-canvas-soft border-0 px-3 py-2 fw-medium" 
                     required
-                    value={scores[criteria.key]}
+                    value={currentScores[criteria.key]}
                     onChange={(e) => handleScoreChange(criteria.key, e.target.value)}
                     data-testid={`input-${criteria.key}`}
-                  />
+                    style={{ backgroundColor: '#efefef', borderRadius: '8px' }}
+                  >
+                    <option value="" disabled>Chọn điểm...</option>
+                    {Array.from({ length: 19 }, (_, i) => i * 0.5).map(val => (
+                      <option key={val} value={val}>{val.toFixed(1)}</option>
+                    ))}
+                  </select>
                 </div>
               ))}
             </div>
@@ -222,8 +288,8 @@ const TutorGradingPanel = ({ submissionId, type, studentId, onGradingComplete })
                 className="form-control bg-canvas-soft border-0 p-3 fw-medium" 
                 rows="5"
                 required
-                value={writtenFeedback}
-                onChange={(e) => setWrittenFeedback(e.target.value)}
+                value={currentFeedback}
+                onChange={(e) => handleFeedbackChange(e.target.value)}
                 placeholder="Provide detailed feedback here..."
                 data-testid="textarea-feedback"
               ></textarea>
@@ -241,11 +307,24 @@ const TutorGradingPanel = ({ submissionId, type, studentId, onGradingComplete })
             </div>
           </form>
         </div>
-      </div>
-      <div className="col-lg-4">
-        <TutorContextSidebar studentId={studentId} />
-      </div>
-    </div>
+
+      {/* Student Notes Modal */}
+      {showNotesModal && (
+        <div className="modal" style={{ display: 'block', backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1050 }} onClick={() => setShowNotesModal(false)}>
+          <div className="modal-dialog modal-dialog-centered modal-dialog-scrollable" onClick={e => e.stopPropagation()}>
+            <div className="modal-content border-0 rounded-4">
+              <div className="modal-header border-bottom-0 pb-0">
+                <h5 className="modal-title fw-bold">Student Notes</h5>
+                <button type="button" className="btn-close shadow-none" onClick={() => setShowNotesModal(false)}></button>
+              </div>
+              <div className="modal-body">
+                <TutorContextSidebar studentId={studentId} />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 };
 

@@ -13,7 +13,8 @@
     "test": "jest --runInBand",
     "test:coverage": "jest --runInBand --coverage",
     "lint": "eslint src/ tests/ --ext .js",
-    "migrate": "node scripts/migrate.js"
+    "migrate": "node scripts/migrate.js",
+    "test:api": "newman run \"DemoNewMan/IeltsZone Test API.postman_collection.json\" -e \"DemoNewMan/IeltsZone.postman_environment.json\" -r htmlextra"
   },
   "dependencies": {
     "bcrypt": "^6.0.0",
