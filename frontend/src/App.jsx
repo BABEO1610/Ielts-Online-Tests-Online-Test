@@ -130,8 +130,9 @@ function App() {
         <Route path="/library" element={<ContentLibraryPage />} />
 
         {/* ── Protected Core ────────────────────────────────────────────────── */}
+
         <Route path="/dashboard" element={
-          <ProtectedRoute><Dashboard /></ProtectedRoute>
+          <ProtectedRoute role="student"><Dashboard /></ProtectedRoute>
         } />
         <Route element={<TutorLayout />}>
           <Route path="/tutor/dashboard" element={
