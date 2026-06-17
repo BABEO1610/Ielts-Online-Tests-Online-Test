@@ -98,3 +98,17 @@
 | 2026-06-14 | Antigravity | `frontend/src/App.jsx` | **Sửa lỗi trắng màn hình:** Thêm các import còn thiếu cho `TutorLayout` và `TutorActivityLogPage` vào `App.jsx` để tránh ReferenceError lúc khởi động ứng dụng React. |
 
 | 2026-06-14 | Antigravity | `frontend/src/pages/subjective-testing/SpeakingPage.jsx`, `frontend/src/App.jsx` | **Sửa lỗi build:** Cập nhật import `ModeSelector`, xóa `ProgressBar` không sử dụng ở `SpeakingPage.jsx`, và sửa đường dẫn import của `TutorActivityLogPage` trong `App.jsx` để build thành công. |
+
+## 2026-06-17
+
+| Date | Agent | File Changed | Summary |
+|------|-------|-------------|---------|
+| 2026-06-17 | Antigravity | `backend/src/db/migrations/010_patch_sessions_add_oauth.sql` | **[NEW] Migration patch:** Thêm 3 cột còn thiếu vào `user_sessions` (is_oauth BOOLEAN, oauth_provider oauth_provider, last_active_at TIMESTAMPTZ) so với schema chuẩn trong `shared_context.md`. Cập nhật view `v_active_sessions` để JOIN `users` và trả về đầy đủ fields (email, full_name, is_oauth, oauth_provider, last_active_at). |
+| 2026-06-17 | Antigravity | `backend/src/db/queries/sessions.queries.js` | **[MODIFY] Thêm 2 query mới cho Admin Sessions API:** `listAllActiveSessions()` — SELECT từ view `v_active_sessions` (đã JOIN users), ORDER BY last_active_at DESC; `revokeSessionById(sessionId)` — UPDATE user_sessions SET revoked_at = NOW() WHERE id = $1 (revoke theo UUID, không phải session_token, vì frontend gọi `revokeSession(r.id)`). Export thêm 2 hàm mới. |
+| 2026-06-17 | Antigravity | `backend/src/services/sessions.service.js` | **[NEW] Service layer Sessions:** `getAllActiveSessions()` — map DB rows sang shape SessionsPage.jsx cần (user, email, device, ip, is_oauth, provider, last_active_at, expires_at); `revokeSessionById(sessionId, actorId, ip)` — throw 404 + errorCode SES_ADM_001 nếu không tìm thấy, ghi audit log action 'logout'; `parseDevice(userAgent)` — parse user_agent TEXT → chuỗi "Browser · OS" thân thiện. |
+| 2026-06-17 | Antigravity | `backend/src/controllers/admin.controller.js` | **[MODIFY] Thêm 2 handler vào adminControllerFactory:** Factory signature mở rộng nhận thêm `sessionsService` (DI). `listSessions` handler: GET /admin/sessions → gọi sessionsService.getAllActiveSessions(), trả về { success, data, error, meta: { total } }. `revokeSession` handler: DELETE /admin/sessions/:id → actorId lấy từ req.user (SEC-10), gọi sessionsService.revokeSessionById(). |
+| 2026-06-17 | Antigravity | `backend/src/routes/api/v1/admin.routes.js` | **[MODIFY] Thêm 2 route Sessions:** Import sessionsService, inject vào factory. `GET /api/v1/admin/sessions` và `DELETE /api/v1/admin/sessions/:id` — cả 2 đều có middleware `authenticate + authorize('admin')` theo SEC-07. |
+| 2026-06-17 | Antigravity | `backend/tests/services/sessions.service.test.js` | **[NEW] Unit tests sessions.service.js:** 11 test cases bao gồm: parseDevice (5 cases: Chrome/Windows, Safari/iOS, Firefox/Linux, null, empty); getAllActiveSessions (3 cases: happy path mapping + fallback email khi full_name null, empty array, DB error); revokeSessionById (3 cases: happy path + audit log verified, 404 not found, audit log failure). Tất cả dependencies được mock. Coverage ≥ 80% theo ARTICLE 5. |
+
+> **Frontend đã nối API:** `adminOps.service.js` tại lines 119-126 đã gọi `GET /admin/sessions` và `DELETE /admin/sessions/:id`. Sau khi chạy migration `010_patch_sessions_add_oauth.sql`, frontend SessionsPage.jsx sẽ hiển thị dữ liệu thực thay vì sample data (cờ `isSample` từ service sẽ là `false`).
+

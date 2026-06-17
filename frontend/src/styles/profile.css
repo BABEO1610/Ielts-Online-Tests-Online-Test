@@ -1,0 +1,1294 @@
+:root {
+  --iot-red: #e71d3c;
+  --iot-red-dark: #c91530;
+  --iot-red-soft: #fff1f4;
+  --iot-green: #20a85a;
+  --iot-green-soft: #e9f8ef;
+  --iot-yellow-soft: #fff8e8;
+  --iot-blue-soft: #eef7ff;
+}
+
+/* ============================================================
+   Page shell
+   ============================================================ */
+.iot-profile-page {
+  padding: var(--spacing-2xl) 0 var(--spacing-3xl);
+  position: relative;
+}
+
+/* Soft ambient background wash behind the whole page */
+.iot-profile-page::before {
+  content: '';
+  position: absolute;
+  inset: -10% -20% auto -20%;
+  height: 420px;
+  background:
+    radial-gradient(60% 80% at 15% 0%, rgba(231, 29, 60, 0.10) 0%, transparent 60%),
+    radial-gradient(50% 70% at 90% 10%, rgba(91, 91, 242, 0.10) 0%, transparent 55%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.iot-profile-page > * {
+  position: relative;
+  z-index: 1;
+}
+
+.iot-page-header {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: var(--spacing-2xl);
+}
+
+.iot-page-header h1 {
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: 30px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 38px;
+  margin: 0;
+}
+
+.iot-page-header p {
+  align-items: center;
+  color: var(--body);
+  display: flex;
+  gap: var(--spacing-sm);
+  font-size: 14px;
+  line-height: 20px;
+  margin: var(--spacing-xs) 0 0;
+}
+
+.profile-single-section,
+.profile-performance-section {
+  scroll-margin-top: 96px;
+}
+
+/* ============================================================
+   Generic card
+   ============================================================ */
+.iot-card {
+  background-color: var(--canvas);
+  border: 1px solid rgba(16, 24, 40, 0.06);
+  border-radius: var(--rounded-xl);
+  box-shadow: var(--elevation-md);
+  color: var(--ink);
+  padding: var(--spacing-2xl);
+  position: relative;
+  transition: transform 0.4s var(--ease-out-soft), box-shadow 0.4s var(--ease-out-soft);
+}
+
+/* Lift cards (except the hero, which has its own treatment) on hover */
+.iot-card:not(.iot-hero-card):hover {
+  box-shadow: var(--elevation-lg);
+  transform: translateY(-4px);
+}
+
+.iot-card__header {
+  align-items: center;
+  border-bottom: 1px solid rgba(16, 24, 40, 0.07);
+  display: flex;
+  gap: var(--spacing-md);
+  justify-content: space-between;
+  margin: calc(var(--spacing-2xl) * -1) calc(var(--spacing-2xl) * -1) var(--spacing-lg);
+  padding: var(--spacing-lg) var(--spacing-2xl);
+}
+
+.iot-card__title {
+  align-items: center;
+  display: flex;
+  gap: var(--spacing-md);
+}
+
+.iot-card__title i {
+  align-items: center;
+  background: var(--gradient-brand-soft);
+  border-radius: var(--rounded-md);
+  color: var(--iot-red);
+  display: inline-flex;
+  font-size: 18px;
+  height: 36px;
+  justify-content: center;
+  width: 36px;
+}
+
+.iot-card-action {
+  color: var(--iot-red);
+}
+
+.iot-card__title h2 {
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 28px;
+  margin: 0;
+}
+
+.iot-card-action {
+  background: none;
+  border: 0;
+  border-radius: var(--rounded-pill);
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  padding: var(--spacing-xs) var(--spacing-md);
+  text-decoration: none;
+  transition: background-color 0.2s var(--ease-out-soft), color 0.2s var(--ease-out-soft);
+}
+
+.iot-card-action:hover {
+  background-color: var(--iot-red-soft);
+  color: var(--iot-red-dark);
+}
+
+.iot-card-subtitle {
+  color: var(--body);
+  font-size: 14px;
+  line-height: 20px;
+  margin: 0 0 var(--spacing-lg);
+}
+
+/* ============================================================
+   Hero card
+   ============================================================ */
+.iot-hero-card {
+  align-items: center;
+  background: var(--gradient-hero);
+  border: 0;
+  box-shadow: var(--elevation-brand);
+  color: var(--on-dark);
+  display: grid;
+  grid-template-columns: 1.15fr 1.35fr 250px;
+  gap: var(--spacing-2xl);
+  margin-bottom: var(--spacing-2xl);
+  overflow: hidden;
+}
+
+/* Decorative glow blobs inside the hero */
+.iot-hero-card::before,
+.iot-hero-card::after {
+  content: '';
+  position: absolute;
+  border-radius: var(--rounded-full);
+  pointer-events: none;
+}
+
+.iot-hero-card::before {
+  width: 320px;
+  height: 320px;
+  top: -140px;
+  right: -60px;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.18) 0%, transparent 70%);
+}
+
+.iot-hero-card::after {
+  width: 260px;
+  height: 260px;
+  bottom: -150px;
+  left: 18%;
+  background: radial-gradient(circle, rgba(91, 91, 242, 0.35) 0%, transparent 70%);
+}
+
+.iot-hero-identity {
+  align-items: center;
+  display: flex;
+  gap: var(--spacing-2xl);
+  min-width: 0;
+}
+
+.iot-hero-avatar {
+  background: var(--canvas);
+  border: 4px solid rgba(255, 255, 255, 0.65);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  border-radius: var(--rounded-full);
+  flex: 0 0 auto;
+  height: 132px;
+  object-fit: cover;
+  width: 132px;
+}
+
+.iot-hero-avatar--placeholder {
+  align-items: center;
+  background: var(--gradient-indigo);
+  color: var(--on-dark);
+  display: flex;
+  font-family: var(--font-display);
+  font-size: 56px;
+  font-weight: 700;
+  justify-content: center;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+}
+
+.iot-hero-name-row {
+  align-items: center;
+  display: flex;
+  gap: var(--spacing-md);
+}
+
+.iot-hero-name-row h2 {
+  font-family: var(--font-display);
+  font-size: 30px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 38px;
+  margin: 0;
+}
+
+.iot-hero-identity p {
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 16px;
+  line-height: 24px;
+  margin: var(--spacing-xs) 0 var(--spacing-lg);
+}
+
+.iot-icon-link {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.16);
+  backdrop-filter: blur(6px);
+  border: 0;
+  border-radius: var(--rounded-full);
+  color: var(--on-dark);
+  cursor: pointer;
+  display: inline-flex;
+  height: 34px;
+  justify-content: center;
+  transition: background-color 0.2s var(--ease-out-soft), transform 0.2s var(--ease-out-soft);
+  width: 34px;
+}
+
+.iot-icon-link:hover {
+  background: rgba(255, 255, 255, 0.3);
+  transform: rotate(-8deg) scale(1.05);
+}
+
+.iot-badge-row,
+.iot-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-sm);
+}
+
+.iot-badge {
+  align-items: center;
+  border-radius: var(--rounded-pill);
+  display: inline-flex;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  line-height: 16px;
+  padding: var(--spacing-xs) var(--spacing-lg);
+  text-transform: capitalize;
+}
+
+/* Inside the hero, badges sit on a translucent glass chip */
+.iot-hero-card .iot-badge {
+  background-color: rgba(255, 255, 255, 0.16);
+  backdrop-filter: blur(6px);
+  color: var(--on-dark);
+}
+
+.iot-badge--neutral {
+  background-color: var(--canvas-soft);
+  color: var(--body);
+}
+
+.iot-badge--success {
+  background-color: var(--iot-green-soft);
+  color: var(--iot-green);
+}
+
+.iot-badge--accent {
+  background-color: var(--iot-red-soft);
+  border: 1px solid rgba(231, 29, 60, 0.2);
+  color: var(--iot-red);
+}
+
+.iot-hero-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.iot-metric {
+  border-left: 1px solid rgba(255, 255, 255, 0.18);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  padding: 0 var(--spacing-2xl);
+}
+
+.iot-metric span,
+.iot-metric small {
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.iot-metric strong {
+  color: var(--on-dark);
+  font-family: var(--font-display);
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 36px;
+}
+
+.iot-text-accent {
+  background: linear-gradient(120deg, #ffd1d9, #ffffff);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.iot-hero-actions {
+  display: grid;
+  gap: var(--spacing-md);
+}
+
+/* ============================================================
+   Buttons
+   ============================================================ */
+.iot-button,
+.iot-small-button {
+  align-items: center;
+  border-radius: var(--rounded-md);
+  cursor: pointer;
+  display: inline-flex;
+  font-weight: 700;
+  gap: var(--spacing-sm);
+  justify-content: center;
+  min-height: 48px;
+  padding: var(--spacing-md) var(--spacing-xl);
+  transition: transform 0.2s var(--ease-out-soft), box-shadow 0.25s var(--ease-out-soft),
+    background-color 0.2s var(--ease-out-soft), filter 0.2s var(--ease-out-soft);
+}
+
+.iot-button--primary {
+  background: var(--gradient-brand);
+  border: 0;
+  box-shadow: 0 8px 18px -6px rgba(231, 29, 60, 0.6);
+  color: var(--on-dark);
+}
+
+.iot-button--primary:hover {
+  box-shadow: 0 12px 24px -6px rgba(231, 29, 60, 0.7);
+  filter: brightness(1.05);
+  transform: translateY(-2px);
+}
+
+.iot-button--primary:active {
+  transform: translateY(0);
+}
+
+/* On the dark hero, the secondary button becomes a glass button */
+.iot-hero-card .iot-button--secondary {
+  background-color: rgba(255, 255, 255, 0.14);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  color: var(--on-dark);
+}
+
+.iot-hero-card .iot-button--secondary:hover {
+  background-color: rgba(255, 255, 255, 0.24);
+  transform: translateY(-2px);
+}
+
+.iot-button--secondary,
+.iot-small-button {
+  background-color: var(--canvas);
+  border: 1px solid var(--surface-pressed);
+  color: var(--ink);
+}
+
+.iot-button--secondary:hover,
+.iot-small-button:hover {
+  background-color: var(--canvas-soft);
+  border-color: var(--mute);
+  transform: translateY(-1px);
+}
+
+.iot-small-button {
+  min-height: 38px;
+  padding: var(--spacing-sm) var(--spacing-lg);
+}
+
+.iot-link-button {
+  background: transparent;
+  border: 0;
+  color: var(--iot-red);
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.iot-link-button:hover {
+  color: var(--iot-red-dark);
+  text-decoration: underline;
+}
+
+/* Visible focus rings for keyboard users */
+.iot-button:focus-visible,
+.iot-small-button:focus-visible,
+.iot-link-button:focus-visible,
+.iot-card-action:focus-visible,
+.iot-icon-link:focus-visible {
+  outline: 2px solid var(--accent-indigo);
+  outline-offset: 2px;
+}
+
+/* ============================================================
+   Profile grid + columns
+   ============================================================ */
+.iot-profile-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(0, 0.95fr) minmax(300px, 0.95fr);
+  gap: var(--spacing-2xl);
+}
+
+.iot-main-column,
+.iot-middle-column,
+.iot-side-column {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-2xl);
+  min-width: 0;
+}
+
+.iot-edit-card {
+  margin-bottom: var(--spacing-2xl);
+}
+
+/* ============================================================
+   Personal info card
+   ============================================================ */
+.iot-info-split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--spacing-xl);
+}
+
+.iot-info-list {
+  display: grid;
+  gap: var(--spacing-xs);
+}
+
+.iot-info-line {
+  align-items: center;
+  border-radius: var(--rounded-md);
+  display: grid;
+  gap: var(--spacing-md);
+  grid-template-columns: 22px 130px minmax(0, 1fr);
+  padding: var(--spacing-sm) var(--spacing-md);
+  transition: background-color 0.2s var(--ease-out-soft);
+}
+
+.iot-info-line:hover {
+  background-color: var(--canvas-soft);
+}
+
+.iot-info-line i {
+  color: var(--iot-red);
+}
+
+.iot-info-line span {
+  color: var(--body);
+  font-size: 14px;
+}
+
+.iot-info-line strong {
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.iot-upload-preview > span {
+  display: block;
+  font-size: 14px;
+  font-weight: 700;
+  margin-bottom: var(--spacing-md);
+}
+
+.iot-upload-preview > div {
+  align-items: center;
+  background: var(--gradient-brand-soft);
+  border: 1px dashed rgba(231, 29, 60, 0.4);
+  border-radius: var(--rounded-xl);
+  color: var(--iot-red);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  justify-content: center;
+  min-height: 120px;
+  text-align: center;
+  transition: border-color 0.2s var(--ease-out-soft), transform 0.2s var(--ease-out-soft);
+}
+
+.iot-upload-preview > div:hover {
+  border-color: var(--iot-red);
+  transform: scale(1.01);
+}
+
+.iot-upload-preview i {
+  font-size: 26px;
+}
+
+.iot-upload-preview small {
+  color: var(--body);
+  font-size: 12px;
+}
+
+/* ============================================================
+   Goal card
+   ============================================================ */
+.iot-goal-list {
+  display: grid;
+}
+
+.iot-goal-row {
+  align-items: center;
+  border-bottom: 1px solid rgba(16, 24, 40, 0.07);
+  display: flex;
+  justify-content: space-between;
+  gap: var(--spacing-lg);
+  padding: var(--spacing-lg) 0;
+}
+
+.iot-goal-row:first-child {
+  padding-top: 0;
+}
+
+.iot-goal-row:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.iot-goal-row span {
+  align-items: center;
+  color: var(--body);
+  display: inline-flex;
+  gap: var(--spacing-sm);
+  font-size: 14px;
+}
+
+.iot-goal-row strong {
+  background: var(--gradient-brand);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  font-family: var(--font-display);
+  font-size: 24px;
+  line-height: 32px;
+}
+
+.iot-goal-row--skills {
+  align-items: flex-start;
+  flex-direction: column;
+}
+
+.iot-goal-row--skills strong {
+  -webkit-text-fill-color: initial;
+}
+
+/* ============================================================
+   Skill progress
+   ============================================================ */
+.iot-skill-list {
+  display: grid;
+  gap: var(--spacing-lg);
+}
+
+.iot-skill-row {
+  align-items: center;
+  display: grid;
+  gap: var(--spacing-lg);
+  grid-template-columns: 54px minmax(0, 1fr);
+}
+
+.iot-skill-icon {
+  align-items: center;
+  background: var(--gradient-indigo);
+  border-radius: var(--rounded-md);
+  box-shadow: 0 6px 14px -6px rgba(64, 64, 214, 0.7);
+  color: var(--on-dark);
+  display: flex;
+  font-size: 24px;
+  height: 54px;
+  justify-content: center;
+  width: 54px;
+}
+
+.iot-skill-row:nth-child(2) .iot-skill-icon { background: var(--gradient-brand); box-shadow: 0 6px 14px -6px rgba(231, 29, 60, 0.7); }
+.iot-skill-row:nth-child(3) .iot-skill-icon { background: var(--gradient-teal); box-shadow: 0 6px 14px -6px rgba(15, 181, 166, 0.7); }
+.iot-skill-row:nth-child(4) .iot-skill-icon { background: var(--gradient-amber); box-shadow: 0 6px 14px -6px rgba(245, 165, 36, 0.7); }
+
+.iot-skill-main {
+  display: grid;
+  gap: var(--spacing-sm);
+}
+
+.iot-skill-main > div:first-child {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+}
+
+.iot-skill-main strong,
+.iot-skill-main span {
+  font-size: 14px;
+}
+
+.iot-skill-main span {
+  color: var(--iot-red);
+  font-weight: 700;
+}
+
+.iot-progress {
+  background-color: var(--canvas-soft);
+  border-radius: var(--rounded-pill);
+  height: 8px;
+  overflow: hidden;
+}
+
+.iot-progress span {
+  background: var(--gradient-brand);
+  border-radius: inherit;
+  display: block;
+  height: 100%;
+  position: relative;
+  transform-origin: left center;
+  animation: iot-bar-grow 1s var(--ease-out-soft) both;
+}
+
+/* Shimmer sweep over the progress fill */
+.iot-progress span::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--gradient-sheen);
+  transform: translateX(-100%);
+  animation: iot-shimmer 2.4s ease-in-out 0.6s infinite;
+}
+
+@keyframes iot-bar-grow {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+
+@keyframes iot-shimmer {
+  0% { transform: translateX(-100%); }
+  60%, 100% { transform: translateX(100%); }
+}
+
+/* ============================================================
+   Achievements
+   ============================================================ */
+.iot-achievement-grid {
+  display: grid;
+  gap: var(--spacing-lg);
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.iot-achievement {
+  align-items: center;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  text-align: center;
+}
+
+.iot-achievement div {
+  align-items: center;
+  border-radius: 22px;
+  color: var(--on-dark);
+  display: flex;
+  font-size: 28px;
+  height: 70px;
+  justify-content: center;
+  transition: transform 0.3s var(--ease-spring), box-shadow 0.3s var(--ease-out-soft);
+  width: 70px;
+}
+
+.iot-achievement:hover div {
+  transform: translateY(-4px) scale(1.06);
+}
+
+.iot-achievement--hot div { background: var(--gradient-amber); box-shadow: 0 8px 18px -6px rgba(245, 165, 36, 0.7); }
+.iot-achievement--goal div { background: var(--gradient-brand); box-shadow: 0 8px 18px -6px rgba(231, 29, 60, 0.6); }
+.iot-achievement--practice div { background: var(--gradient-indigo); box-shadow: 0 8px 18px -6px rgba(64, 64, 214, 0.6); }
+.iot-achievement--time div { background: var(--gradient-teal); box-shadow: 0 8px 18px -6px rgba(15, 181, 166, 0.6); }
+
+.iot-achievement--locked div {
+  background: var(--canvas-soft);
+  box-shadow: none;
+  color: var(--mute);
+}
+
+.iot-achievement strong {
+  font-size: 13px;
+  line-height: 18px;
+}
+
+.iot-achievement span {
+  color: var(--body);
+  font-size: 12px;
+  line-height: 16px;
+}
+
+/* ============================================================
+   Practice history table
+   ============================================================ */
+.iot-history-table {
+  display: grid;
+  gap: var(--spacing-xs);
+}
+
+.iot-history-head,
+.iot-history-row {
+  align-items: center;
+  display: grid;
+  gap: var(--spacing-md);
+  grid-template-columns: minmax(180px, 1.6fr) 110px 70px 100px 100px;
+}
+
+.iot-history-head {
+  color: var(--body);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  padding: 0 var(--spacing-md) var(--spacing-sm);
+  text-transform: uppercase;
+}
+
+.iot-history-row {
+  border-radius: var(--rounded-md);
+  font-size: 13px;
+  padding: var(--spacing-md);
+  transition: background-color 0.2s var(--ease-out-soft);
+}
+
+.iot-history-row:nth-child(odd) {
+  background-color: var(--canvas-soft);
+}
+
+.iot-history-row:hover {
+  background-color: var(--iot-red-soft);
+}
+
+.iot-history-row strong {
+  font-size: 13px;
+}
+
+.iot-history-skill {
+  color: var(--iot-red);
+  font-weight: 700;
+}
+
+/* ============================================================
+   Upcoming schedule
+   ============================================================ */
+.iot-schedule-item {
+  align-items: center;
+  background: var(--gradient-brand-soft);
+  border: 1px solid rgba(231, 29, 60, 0.14);
+  border-radius: var(--rounded-lg);
+  display: grid;
+  gap: var(--spacing-lg);
+  grid-template-columns: 110px minmax(0, 1fr) 70px 16px;
+  padding: var(--spacing-lg);
+  transition: transform 0.25s var(--ease-out-soft), box-shadow 0.25s var(--ease-out-soft);
+}
+
+.iot-schedule-item:hover {
+  box-shadow: var(--elevation-md);
+  transform: translateX(4px);
+}
+
+.iot-schedule-item strong {
+  color: var(--iot-red);
+}
+
+.iot-schedule-item div {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.iot-schedule-item span,
+.iot-schedule-item small {
+  color: var(--body);
+  font-size: 13px;
+}
+
+/* ============================================================
+   Quick note
+   ============================================================ */
+.iot-note {
+  background: var(--gradient-amber);
+  border: 0;
+  border-radius: var(--rounded-lg);
+  box-shadow: 0 8px 18px -10px rgba(245, 165, 36, 0.8);
+  color: #5a3d05;
+  padding: var(--spacing-lg);
+  position: relative;
+}
+
+.iot-note p {
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 22px;
+  margin: 0 28px var(--spacing-md) 0;
+}
+
+.iot-note span {
+  color: #7a5708;
+  font-size: 13px;
+}
+
+.iot-note i {
+  color: #7a5708;
+  position: absolute;
+  right: var(--spacing-lg);
+  top: var(--spacing-lg);
+}
+
+/* ============================================================
+   Edit form
+   ============================================================ */
+.profile-form-grid {
+  display: grid;
+  gap: var(--spacing-lg);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.profile-field--full {
+  grid-column: 1 / -1;
+}
+
+.profile-label {
+  color: var(--ink);
+  display: block;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 20px;
+  margin-bottom: var(--spacing-sm);
+}
+
+.profile-input {
+  background-color: var(--canvas-soft);
+  border: 1px solid transparent;
+  border-radius: var(--rounded-md);
+  color: var(--ink);
+  font-family: var(--font-text);
+  font-size: 16px;
+  line-height: 24px;
+  min-height: 48px;
+  outline: none;
+  padding: var(--spacing-md) var(--spacing-lg);
+  transition: background-color 0.2s var(--ease-out-soft), border-color 0.2s var(--ease-out-soft),
+    box-shadow 0.2s var(--ease-out-soft);
+  width: 100%;
+}
+
+.profile-input:focus {
+  background-color: var(--canvas);
+  border-color: var(--iot-red);
+  box-shadow: 0 0 0 3px rgba(231, 29, 60, 0.16);
+}
+
+.profile-input[readonly] {
+  color: var(--body);
+  cursor: not-allowed;
+}
+
+.profile-textarea {
+  min-height: 116px;
+  resize: vertical;
+}
+
+.profile-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-md);
+  justify-content: flex-end;
+  margin-top: var(--spacing-2xl);
+}
+
+.profile-alert {
+  border-radius: var(--rounded-md);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 20px;
+  margin-bottom: var(--spacing-lg);
+  padding: var(--spacing-md) var(--spacing-lg);
+}
+
+.profile-alert--success {
+  background-color: var(--iot-green-soft);
+  color: var(--iot-green);
+}
+
+.profile-alert--error {
+  background-color: var(--iot-red-soft);
+  border: 1px solid rgba(231, 29, 60, 0.25);
+  color: var(--iot-red);
+}
+
+.profile-loading {
+  padding: var(--spacing-3xl);
+  text-align: center;
+}
+
+/* ============================================================
+   Mount animation for cards
+   ============================================================ */
+.iot-profile-grid > .iot-main-column > .iot-card,
+.iot-profile-grid > .iot-middle-column > .iot-card,
+.iot-profile-grid > .iot-middle-column .iot-card,
+.iot-profile-grid > .iot-side-column > .iot-card,
+.iot-hero-card,
+.iot-edit-card {
+  animation: iot-card-in 0.5s var(--ease-out-soft) both;
+}
+
+.iot-main-column > *:nth-child(2),
+.iot-side-column > *:nth-child(2) { animation-delay: 0.06s; }
+.iot-side-column > *:nth-child(3) { animation-delay: 0.12s; }
+
+@keyframes iot-card-in {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ============================================================
+   Stat grid (Practice History summary)
+   ============================================================ */
+.iot-stat-grid {
+  display: grid;
+  gap: var(--spacing-lg);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin-bottom: var(--spacing-xl);
+}
+
+.iot-stat-card {
+  align-items: center;
+  background-color: var(--canvas);
+  border-radius: var(--rounded-lg);
+  box-shadow: var(--elevation-sm);
+  display: flex;
+  gap: var(--spacing-lg);
+  padding: var(--spacing-lg);
+  transition: transform 0.25s var(--ease-out-soft), box-shadow 0.25s var(--ease-out-soft);
+}
+
+.iot-stat-card:hover {
+  box-shadow: var(--elevation-md);
+  transform: translateY(-3px);
+}
+
+.iot-stat-icon {
+  align-items: center;
+  background: var(--gradient-brand);
+  border-radius: var(--rounded-md);
+  color: var(--on-dark);
+  display: flex;
+  flex-shrink: 0;
+  font-size: 24px;
+  height: 56px;
+  justify-content: center;
+  width: 56px;
+}
+
+.iot-stat-card--accent .iot-stat-icon { background: var(--gradient-brand); box-shadow: 0 6px 14px -6px rgba(231, 29, 60, 0.7); }
+.iot-stat-card--goal .iot-stat-icon { background: var(--gradient-indigo); box-shadow: 0 6px 14px -6px rgba(64, 64, 214, 0.7); }
+.iot-stat-card--practice .iot-stat-icon { background: var(--gradient-teal); box-shadow: 0 6px 14px -6px rgba(15, 181, 166, 0.7); }
+.iot-stat-card--time .iot-stat-icon { background: var(--gradient-amber); box-shadow: 0 6px 14px -6px rgba(245, 165, 36, 0.7); }
+
+.iot-stat-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.iot-stat-body span {
+  color: var(--body);
+  font-size: 13px;
+}
+
+.iot-stat-body strong {
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: 26px;
+  line-height: 32px;
+}
+
+.iot-stat-body small {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+/* ============================================================
+   Filter chips
+   ============================================================ */
+.iot-filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-lg);
+}
+
+.iot-filter-chip {
+  background-color: var(--canvas-soft);
+  border: 1px solid transparent;
+  border-radius: var(--rounded-pill);
+  color: var(--body);
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  padding: 8px 18px;
+  transition: background-color 0.2s var(--ease-out-soft), color 0.2s var(--ease-out-soft),
+    box-shadow 0.2s var(--ease-out-soft);
+}
+
+.iot-filter-chip:hover {
+  background-color: var(--iot-red-soft);
+  color: var(--iot-red);
+}
+
+.iot-filter-chip.active {
+  background: var(--gradient-brand);
+  box-shadow: 0 6px 14px -6px rgba(231, 29, 60, 0.7);
+  color: var(--on-dark);
+}
+
+/* ============================================================
+   Empty state
+   ============================================================ */
+.iot-empty-state {
+  align-items: center;
+  color: var(--muted);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-2xl);
+  text-align: center;
+}
+
+.iot-empty-state i {
+  font-size: 40px;
+  opacity: 0.5;
+}
+
+.iot-empty-state p {
+  font-size: 15px;
+  margin: 0;
+}
+
+/* ============================================================
+   Study plan
+   ============================================================ */
+.iot-plan-grid {
+  display: grid;
+  gap: var(--spacing-xl);
+  grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr);
+}
+
+.iot-progress--lg {
+  height: 12px;
+  margin-bottom: var(--spacing-lg);
+}
+
+.iot-plan-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+.iot-plan-item {
+  align-items: center;
+  background-color: var(--canvas-soft);
+  border-radius: var(--rounded-md);
+  display: grid;
+  gap: var(--spacing-lg);
+  grid-template-columns: auto 64px minmax(0, 1fr) auto;
+  padding: var(--spacing-md) var(--spacing-lg);
+  transition: transform 0.2s var(--ease-out-soft), box-shadow 0.2s var(--ease-out-soft);
+}
+
+.iot-plan-item:hover {
+  box-shadow: var(--elevation-sm);
+  transform: translateX(4px);
+}
+
+.iot-plan-item.done {
+  opacity: 0.62;
+}
+
+.iot-plan-item.done .iot-plan-main strong {
+  text-decoration: line-through;
+}
+
+.iot-plan-check {
+  background: none;
+  border: 0;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 22px;
+  line-height: 1;
+  padding: 0;
+}
+
+.iot-plan-item.done .iot-plan-check {
+  color: var(--iot-green);
+}
+
+.iot-plan-day {
+  color: var(--ink);
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.iot-plan-main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  min-width: 0;
+}
+
+.iot-plan-main strong {
+  color: var(--ink);
+  font-size: 15px;
+}
+
+.iot-plan-main .iot-badge {
+  align-self: flex-start;
+}
+
+.iot-plan-time {
+  align-items: center;
+  color: var(--body);
+  display: inline-flex;
+  font-size: 13px;
+  font-weight: 600;
+  gap: var(--spacing-xs);
+  white-space: nowrap;
+}
+
+/* ============================================================
+   Responsive
+   ============================================================ */
+@media (max-width: 1280px) {
+  .iot-hero-card,
+  .iot-profile-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .iot-hero-stats {
+    border-top: 1px solid rgba(255, 255, 255, 0.18);
+    padding-top: var(--spacing-xl);
+  }
+
+  .iot-metric:first-child {
+    border-left: 0;
+  }
+}
+
+@media (max-width: 768px) {
+  .iot-profile-page {
+    padding-top: var(--spacing-lg);
+  }
+
+  .iot-card {
+    padding: var(--spacing-lg);
+  }
+
+  .iot-card__header {
+    margin: calc(var(--spacing-lg) * -1) calc(var(--spacing-lg) * -1) var(--spacing-lg);
+    padding: var(--spacing-lg);
+  }
+
+  .iot-hero-identity,
+  .iot-page-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .iot-hero-stats,
+  .iot-info-split,
+  .profile-form-grid,
+  .iot-achievement-grid,
+  .iot-stat-grid,
+  .iot-plan-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .iot-plan-item {
+    grid-template-columns: auto minmax(0, 1fr);
+    row-gap: var(--spacing-sm);
+  }
+
+  .iot-plan-day,
+  .iot-plan-time {
+    grid-column: 2;
+  }
+
+  .iot-metric {
+    border-left: 0;
+    border-top: 1px solid rgba(255, 255, 255, 0.18);
+    padding: var(--spacing-lg) 0 0;
+  }
+
+  .iot-history-head {
+    display: none;
+  }
+
+  .iot-history-row,
+  .iot-schedule-item {
+    align-items: flex-start;
+    grid-template-columns: 1fr;
+  }
+
+  .profile-actions {
+    justify-content: stretch;
+  }
+
+  .profile-actions > * {
+    width: 100%;
+  }
+}
+
+/* ============================================================
+   Reduced motion
+   ============================================================ */
+@media (prefers-reduced-motion: reduce) {
+  .iot-card,
+  .iot-button,
+  .iot-small-button,
+  .iot-icon-link,
+  .iot-schedule-item,
+  .iot-achievement div,
+  .iot-upload-preview > div {
+    transition: none;
+  }
+
+  .iot-progress span,
+  .iot-progress span::after,
+  .iot-profile-grid > .iot-main-column > .iot-card,
+  .iot-profile-grid > .iot-middle-column > .iot-card,
+  .iot-profile-grid > .iot-middle-column .iot-card,
+  .iot-profile-grid > .iot-side-column > .iot-card,
+  .iot-hero-card,
+  .iot-edit-card {
+    animation: none;
+  }
+
+  .iot-card:not(.iot-hero-card):hover,
+  .iot-button--primary:hover,
+  .iot-schedule-item:hover,
+  .iot-achievement:hover div {
+    transform: none;
+  }
+}

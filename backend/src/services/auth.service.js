@@ -195,7 +195,7 @@ const login = async (email, password, ipAddress, userAgent) => {
 
     // 4. Create new session expiring in 7 days
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-    await createSession(user.id, sessionToken, ipAddress, userAgent, expiresAt);
+    await createSession(user.id, sessionToken, ipAddress, userAgent, expiresAt, false, null);
 
     // 5. Generate JWT tokens
     const accessToken = generateAccessToken({ 
@@ -465,7 +465,7 @@ const loginWithGoogle = async (googleProfile, ipAddress, userAgent) => {
 
     // 6. Create new session expiring in 7 days
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-    await createSession(userId, sessionToken, ipAddress, userAgent, expiresAt);
+    await createSession(userId, sessionToken, ipAddress, userAgent, expiresAt, true, 'google');
 
     // 7. Generate JWT tokens
     const accessToken = generateAccessToken({ 

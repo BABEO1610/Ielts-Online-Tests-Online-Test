@@ -22,9 +22,11 @@ import ContentLibraryPage from './pages/student/ContentLibraryPage';
 import Dashboard from './pages/student/Dashboard';
 import UserProfilePage from './pages/student/UserProfilePage';
 
+// ── Tutor Layout ──────────────────────────────────────────────────────────────
+import TutorLayout from './layouts/TutorLayout';
+
 // ── Tutor Pages ────────────────────────────────────────────────────────────────
 import TutorDashboard from './pages/tutor/TutorDashboard';
-import TutorLayout from './layouts/TutorLayout';
 import TutorActivityLogPage from './pages/tutor/TutorActivityLogPage';
 import TutorLibraryPage from './pages/tutor/TutorLibraryPage';
 import TutorLibraryCreatePage from './pages/tutor/TutorLibraryCreatePage';
@@ -59,6 +61,10 @@ import TutorQueuePage from './pages/grading/TutorQueuePage';
 import TutorGradingPage from './pages/grading/TutorGradingPage';
 import TutorTestManagePage from './pages/tutor/TutorTestManagePage';
 import TutorTestFormPage from './pages/tutor/TutorTestFormPage';
+import TutorReadingFormPage from './pages/tutor/TutorReadingFormPage';
+import TutorListeningFormPage from './pages/tutor/TutorListeningFormPage';
+import TutorWritingFormPage from './pages/tutor/TutorWritingFormPage';
+import TutorSpeakingFormPage from './pages/tutor/TutorSpeakingFormPage';
 import TutorQuestionFormPage from './pages/tutor/TutorQuestionFormPage';
 
 // ── Objective Testing — Student Views ─────────────────────────────────────────
@@ -229,6 +235,18 @@ function App() {
         } />
         <Route path="/tutor/tests/new" element={
           <ProtectedRoute role="tutor"><TutorTestFormPage /></ProtectedRoute>
+        } />
+        <Route path="/tutor/tests/new/reading" element={
+          <ProtectedRoute role="tutor"><TutorReadingFormPage /></ProtectedRoute>
+        } />
+        <Route path="/tutor/tests/new/listening" element={
+          <ProtectedRoute role="tutor"><TutorListeningFormPage /></ProtectedRoute>
+        } />
+        <Route path="/tutor/tests/new/writing" element={
+          <ProtectedRoute role="tutor"><TutorWritingFormPage /></ProtectedRoute>
+        } />
+        <Route path="/tutor/tests/new/speaking" element={
+          <ProtectedRoute role="tutor"><TutorSpeakingFormPage /></ProtectedRoute>
         } />
         <Route path="/tutor/tests/:id/edit" element={
           <ProtectedRoute role="tutor"><TutorTestFormPage /></ProtectedRoute>

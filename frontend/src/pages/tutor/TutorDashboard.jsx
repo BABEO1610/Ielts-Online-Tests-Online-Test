@@ -295,7 +295,7 @@ const RecentTestsWidget = () => (
 // ─── TutorDashboard ────────────────────────────────────────────────────────────
 const TutorDashboard = () => {
   const { user } = useAuth();
-  const firstName = user?.full_name?.split(' ').pop() || 'Tutor';
+  const firstName = user?.full_name ? user.full_name.split(' ').pop() : 'Tutor';
   const total = MOCK_STATS.pendingWriting + MOCK_STATS.pendingSpeaking;
 
   return (
