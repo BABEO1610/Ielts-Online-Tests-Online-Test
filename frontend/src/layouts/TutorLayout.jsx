@@ -114,7 +114,8 @@ const TutorSidebar = () => {
         {/* TÀI NGUYÊN */}
         <SidebarSection title="Tài nguyên">
           <SidebarLink to="/tutor/tests" label="Ngân hàng đề" />
-          <SidebarLink to="/library" label="Thư viện tài liệu (TUT-07)" />
+          <SidebarLink to="/tutor/library" label="Thư viện tài liệu" />
+          <SidebarLink to="/tutor/explain" label="Thêm giải thích đáp án (new)" />
         </SidebarSection>
 
         {/* CÀI ĐẶT */}

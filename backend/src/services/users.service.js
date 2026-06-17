@@ -84,7 +84,7 @@ const sessionsQueries = require('../db/queries/sessions.queries');
  * @param {Object} filters
  * @returns {Promise<Object>} Paginated users.
  */
-const listUsers = async (actorRole, { page, limit, role, status }) => {
+const listUsers = async (actorRole, { page, limit, role, status, search }) => {
   if (actorRole !== 'admin') {
     const error = new Error('You do not have permission to perform this action.');
     error.code = 'AUTH_PERM_001';
@@ -92,7 +92,7 @@ const listUsers = async (actorRole, { page, limit, role, status }) => {
     throw error;
   }
   
-  const result = await usersQueries.listUsers({ page, limit, role, status });
+  const result = await usersQueries.listUsers({ page, limit, role, status, search });
   
   const safeUsers = result.rows.map(user => {
     const { password_hash, ...safeUser } = user;

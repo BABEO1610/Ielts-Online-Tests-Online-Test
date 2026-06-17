@@ -15,8 +15,7 @@ const SpeakingTestScreen = ({ exam, onBack, onSubmitSuccess, practiceMode, custo
   const [showAutoSubmit, setShowAutoSubmit] = useState(false);
   const [activePartIndex, setActivePartIndex] = useState(0);
 
-  const totalDurationSeconds = exam.parts.reduce((total, p) => total + (parseInt(p.duration) || 0), 0);
-  const durationMinutes = Math.ceil(totalDurationSeconds / 60);
+  const durationMinutes = exam.duration || 15;
 
   const handleTimeUp = useCallback(() => {
     setShowAutoSubmit(true);
@@ -26,7 +25,7 @@ const SpeakingTestScreen = ({ exam, onBack, onSubmitSuccess, practiceMode, custo
   }, []);
 
   const handleSubmitEarly = useCallback(() => {
-    if (window.confirm('Bạn có chắc chắn muốn kết thúc bài thi? (Hệ thống sẽ nộp toàn bộ 3 phần)')) {
+    if (window.confirm('Bạn có chắc chắn muốn kết thúc bài thi? (Hệ thống sẽ nộp toàn bộ các phần)')) {
       setShowAutoSubmit(true);
       recorderRefs.current.forEach(ref => {
         if (ref && ref.stopRecording) ref.stopRecording();
@@ -41,6 +40,7 @@ const SpeakingTestScreen = ({ exam, onBack, onSubmitSuccess, practiceMode, custo
 
   const activePart = exam.parts[activePartIndex];
   const examinerImage = "https://images.unsplash.com/photo-1560250097-0b93528c311a?q=80&w=800&auto=format&fit=crop";
+  const [partPrefix, partTitle] = activePart.partName ? activePart.partName.split(':') : [`Part ${activePartIndex + 1}`, ''];
 
   return (
     <div className="bg-white min-vh-100 d-flex flex-column" style={{ overflowX: 'hidden' }}>
@@ -50,13 +50,13 @@ const SpeakingTestScreen = ({ exam, onBack, onSubmitSuccess, practiceMode, custo
         <main className="container-fluid px-3 px-md-5 mt-4" style={{ maxWidth: '1000px', flex: 1, display: 'flex', flexDirection: 'column' }}>
           <div className="d-flex align-items-center gap-3 mb-3 flex-wrap">
             <p className="mb-0 text-muted text-uppercase fw-bold" style={{ fontSize: '13px', fontFamily: 'UberMoveText, system-ui, sans-serif', letterSpacing: 1 }}>
-              {exam.title} · {exam.topic}
+              {exam.title} · {exam.topic || 'Speaking Practice'}
             </p>
           </div>
 
           <div className="text-center mb-4">
              <h2 className="fw-bold text-dark text-uppercase" style={{ fontFamily: 'UberMove, system-ui, sans-serif', fontSize: '24px', letterSpacing: 1 }}>
-               PART {activePart.part_number}: <span style={{ color: '#5e5e5e' }}>{activePart.title.split('—')[1]?.trim() || 'Topic'}</span>
+               {partPrefix}: <span style={{ color: '#5e5e5e' }}>{partTitle?.trim() || 'Topic'}</span>
              </h2>
           </div>
 
@@ -77,22 +77,30 @@ const SpeakingTestScreen = ({ exam, onBack, onSubmitSuccess, practiceMode, custo
               <div className="p-4 rounded-4 h-100 d-flex flex-column" style={{ backgroundColor: '#efefef' }}>
                 <div className="d-flex gap-3 mb-3 flex-wrap">
                   <span className="rounded-pill px-3 py-1 fw-medium" style={{ backgroundColor: '#000', color: '#fff', fontSize: '13px' }}>
-                    ⏱ Tối đa {Math.floor(activePart.duration / 60)} phút
+                    ⏱ Thời gian ước tính: {activePart.duration || '4-5 phút'}
                   </span>
                 </div>
                 <p className="fw-bold mb-3 text-dark" style={{ fontSize: '14px', fontFamily: 'UberMoveText, system-ui, sans-serif', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                   CÂU HỎI
                 </p>
-                <ul className="mb-4 ps-3">
-                  {activePart.questions.map((q, i) => (
-                    <li key={i} className="mb-2 text-dark" style={{ fontSize: '16px', fontFamily: 'UberMoveText, system-ui, sans-serif', lineHeight: '1.8', listStyle: q.startsWith('—') || q.startsWith('  ') ? 'none' : 'disc' }}>
-                      {q}
-                    </li>
-                  ))}
-                </ul>
+                
+                {activePart.questions ? (
+                  <ul className="mb-4 ps-3">
+                    {activePart.questions.map((q, i) => (
+                      <li key={i} className="mb-2 text-dark" style={{ fontSize: '16px', fontFamily: 'UberMoveText, system-ui, sans-serif', lineHeight: '1.8', listStyle: 'disc' }}>
+                        {q.text}
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <div className="prompt-content mb-4 text-dark" style={{ fontSize: '16px', fontFamily: 'UberMoveText, system-ui, sans-serif', whiteSpace: 'pre-line', lineHeight: '1.8' }}>
+                    {activePart.prompt}
+                  </div>
+                )}
+                
                 <div className="p-3 rounded-3 mt-auto" style={{ backgroundColor: '#e2e2e2', borderLeft: '3px solid #000' }}>
                   <p className="mb-0 fw-medium text-dark" style={{ fontSize: '14px', fontFamily: 'UberMoveText, system-ui, sans-serif' }}>
-                    💡 {activePart.tip}
+                    💡 {activePart.description}
                   </p>
                 </div>
               </div>
@@ -102,12 +110,12 @@ const SpeakingTestScreen = ({ exam, onBack, onSubmitSuccess, practiceMode, custo
           {/* Audio Recorders */}
           <div className="d-flex justify-content-center mt-3">
             {exam.parts.map((part, idx) => (
-               <div key={part.id} style={{ display: idx === activePartIndex ? 'block' : 'none', width: '100%' }}>
+               <div key={idx} style={{ display: idx === activePartIndex ? 'block' : 'none', width: '100%' }}>
                  <AudioRecorder
                     ref={el => recorderRefs.current[idx] = el}
-                    testId={part.id}
-                    partNumber={part.part_number}
-                    maxDuration={customTimeLimit ? customTimeLimit * 60 : part.duration}
+                    testId={`part-${idx + 1}`}
+                    partNumber={idx + 1}
+                    maxDuration={customTimeLimit ? customTimeLimit * 60 : 300}
                     practiceMode={practiceMode}
                     onSubmitSuccess={handleSuccess}
                  />
@@ -126,12 +134,12 @@ const SpeakingTestScreen = ({ exam, onBack, onSubmitSuccess, practiceMode, custo
             const isActive = activePartIndex === idx;
             return (
               <div 
-                key={part.id}
+                key={idx}
                 className={`bottom-nav-tab ${isActive ? 'active' : ''}`}
-                style={{ minWidth: '150px', justifyContent: 'center' }}
+                style={{ minWidth: '150px', justifyContent: 'center', cursor: 'pointer' }}
                 onClick={() => setActivePartIndex(idx)}
               >
-                <span className="fw-bold">Part {part.part_number}</span>
+                <span className="fw-bold">Part {idx + 1}</span>
               </div>
             );
           })}
@@ -151,7 +159,7 @@ function SpeakingTestPage() {
   const practiceMode = location.state?.practiceMode || false;
   const customTimeLimit = location.state?.customTimeLimit || null;
 
-  const exam = MOCK_EXAMS.find(e => e.id === id);
+  const exam = MOCK_EXAMS.find(e => e.id.toString() === id);
   const [submittedId, setSubmittedId] = useState(null);
 
   const handleSubmitSuccess = (response) => {

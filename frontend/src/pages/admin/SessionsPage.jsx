@@ -7,6 +7,8 @@ const SessionsPage = () => {
   const [isSample, setIsSample] = useState(false);
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterType, setFilterType] = useState('all'); // 'all', 'password', 'oauth'
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -25,6 +27,17 @@ const SessionsPage = () => {
     setBusyId(null);
   };
 
+  const filteredRows = rows.filter(r => {
+    const searchLower = searchTerm.toLowerCase();
+    const userStr = r.user || '';
+    const emailStr = r.email || '';
+    const matchesSearch = userStr.toLowerCase().includes(searchLower) || emailStr.toLowerCase().includes(searchLower);
+    const matchesFilter = filterType === 'all' 
+      ? true 
+      : filterType === 'oauth' ? r.is_oauth : !r.is_oauth;
+    return matchesSearch && matchesFilter;
+  });
+
   return (
     <div>
       <div className="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-4">
@@ -40,6 +53,38 @@ const SessionsPage = () => {
         <div className="stat-card"><span className="stat-card__label">Đăng nhập OAuth</span><span className="stat-card__value">{rows.filter((r) => r.is_oauth).length}</span></div>
       </div>
 
+      <div className="d-flex align-items-center justify-content-between flex-wrap gap-3 mb-4">
+        <div className="d-flex align-items-center gap-2">
+          <button 
+            className={`btn-pill ${filterType === 'all' ? 'btn-pill--dark' : 'btn-pill--ghost'}`}
+            onClick={() => setFilterType('all')}
+          >
+            Tất cả
+          </button>
+          <button 
+            className={`btn-pill ${filterType === 'password' ? 'btn-pill--dark' : 'btn-pill--ghost'}`}
+            onClick={() => setFilterType('password')}
+          >
+            Mật khẩu
+          </button>
+          <button 
+            className={`btn-pill ${filterType === 'oauth' ? 'btn-pill--dark' : 'btn-pill--ghost'}`}
+            onClick={() => setFilterType('oauth')}
+          >
+            OAuth
+          </button>
+        </div>
+        <div>
+          <input 
+            type="text" 
+            className="admin-input" 
+            placeholder="Tìm kiếm email, tên..." 
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </div>
+      </div>
+
       <div className="admin-card">
         <div className="table-responsive">
           <table className="admin-table">
@@ -47,10 +92,10 @@ const SessionsPage = () => {
             <tbody>
               {loading ? (
                 <tr><td colSpan={8} className="text-center py-4 text-secondary">Đang tải…</td></tr>
-              ) : rows.length === 0 ? (
-                <tr><td colSpan={8} className="text-center py-4 text-secondary">Không có phiên hoạt động.</td></tr>
+              ) : filteredRows.length === 0 ? (
+                <tr><td colSpan={8} className="text-center py-4 text-secondary">Không có dữ liệu phù hợp.</td></tr>
               ) : (
-                rows.map((r) => (
+                filteredRows.map((r) => (
                   <tr key={r.id}>
                     <td className="fw-semibold">{r.user}</td>
                     <td className="text-secondary">{r.email}</td>

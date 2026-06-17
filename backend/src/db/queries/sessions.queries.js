@@ -9,13 +9,13 @@ const { pool } = require('../pool');
  * Create a new user session
  * EARS[Event]: WHEN a User submits valid credentials and the account is active, THE system SHALL create a new record in user_sessions
  */
-const createSession = async (userId, sessionToken, ipAddress, userAgent, expiresAt) => {
+const createSession = async (userId, sessionToken, ipAddress, userAgent, expiresAt, isOauth = false, oauthProvider = null) => {
   const query = `
-    INSERT INTO user_sessions (user_id, session_token, ip_address, user_agent, expires_at)
-    VALUES ($1, $2, $3, $4, $5)
+    INSERT INTO user_sessions (user_id, session_token, ip_address, user_agent, expires_at, is_oauth, oauth_provider)
+    VALUES ($1, $2, $3, $4, $5, $6, $7)
     RETURNING *;
   `;
-  const values = [userId, sessionToken, ipAddress, userAgent, expiresAt];
+  const values = [userId, sessionToken, ipAddress, userAgent, expiresAt, isOauth, oauthProvider];
   const { rows } = await pool.query(query, values);
   return rows[0];
 };
@@ -103,11 +103,57 @@ const revokeAllSessionsForUser = async (userId) => {
   return rows;
 };
 
+/**
+ * List all active sessions — dùng cho Admin panel
+ * Sử dụng view v_active_sessions (JOIN users) từ migration 010
+ * EARS[Event]: WHEN an Admin requests the active sessions list, THE system SHALL return all active sessions with user info.
+ */
+const listAllActiveSessions = async () => {
+  const query = `
+    SELECT
+      id,
+      user_id,
+      email,
+      full_name,
+      ip_address,
+      user_agent,
+      is_oauth,
+      oauth_provider,
+      last_active_at,
+      expires_at,
+      created_at
+    FROM v_active_sessions
+    ORDER BY last_active_at DESC;
+  `;
+  const { rows } = await pool.query(query);
+  return rows;
+};
+
+/**
+ * Revoke a session by its UUID (id column)
+ * Frontend gọi revokeSession(r.id) → cần revoke theo UUID, không phải session_token
+ * EARS[Event]: WHEN an Admin revokes a specific session, THE system SHALL set revoked_at = NOW() for that session.
+ */
+const revokeSessionById = async (sessionId) => {
+  const query = `
+    UPDATE user_sessions
+    SET revoked_at = NOW()
+    WHERE id = $1
+      AND revoked_at IS NULL
+    RETURNING id, user_id, session_token, expires_at, revoked_at;
+  `;
+  const values = [sessionId];
+  const { rows } = await pool.query(query, values);
+  return rows[0] || null;
+};
+
 module.exports = {
   createSession,
   findActiveSession,
   revokeSession,
   countActiveSessions,
   revokeOldestSession,
-  revokeAllSessionsForUser
+  revokeAllSessionsForUser,
+  listAllActiveSessions,
+  revokeSessionById
 };
