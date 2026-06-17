@@ -19,16 +19,9 @@ import VerifyEmailPage from './pages/auth/VerifyEmailPage';
 import ContentLibraryPage from './pages/student/ContentLibraryPage';
 
 // ── Core Protected Pages ───────────────────────────────────────────────────────
-import Dashboard from './pages/student/Dashboard';
-import UserProfilePage from './pages/student/UserProfilePage';
-
-// ── Tutor Layout ──────────────────────────────────────────────────────────────
-import TutorLayout from './layouts/TutorLayout';
-
-// ── Tutor Pages ────────────────────────────────────────────────────────────────
-import TutorLayout from './layouts/TutorLayout';
-import TutorDashboard from './pages/tutor/TutorDashboard';
-import TutorActivityLogPage from './pages/TutorActivityLogPage';
+import Dashboard from './pages/Dashboard';
+import UserProfilePage from './pages/UserProfilePage';
+import TutorDashboard from './pages/TutorDashboard';
 
 // ── Admin Section — Layout + nested pages ──────────────────────────────────────
 import AdminLayout from './layouts/AdminLayout';
@@ -131,23 +124,9 @@ function App() {
         <Route path="/dashboard" element={
           <ProtectedRoute><Dashboard /></ProtectedRoute>
         } />
-        <Route element={<TutorLayout />}>
-          <Route path="/tutor/dashboard" element={
-            <ProtectedRoute role="tutor"><TutorDashboard /></ProtectedRoute>
-          } />
-          {/* Activity log cho Tutor */}
-          <Route path="/tutor/activity-log" element={
-            <ProtectedRoute role="tutor"><TutorActivityLogPage /></ProtectedRoute>
-          } />
-          {/* Hàng chờ chấm */}
-          <Route path="/grading/tutor/queue" element={
-            <ProtectedRoute role="tutor"><TutorQueuePage /></ProtectedRoute>
-          } />
-          {/* Lịch sử chấm */}
-          <Route path="/grading/tutor/schedule" element={
-            <ProtectedRoute role="tutor"><TutorGradingHistoryPage /></ProtectedRoute>
-          } />
-        </Route>
+        <Route path="/tutor/dashboard" element={
+          <ProtectedRoute role="tutor"><TutorDashboard /></ProtectedRoute>
+        } />
         <Route path="/profile" element={
           <ProtectedRoute><UserProfilePage /></ProtectedRoute>
         } />

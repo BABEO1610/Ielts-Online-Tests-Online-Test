@@ -78,18 +78,61 @@ const gradingService = {
     return response.data;
   },
 
-  // TODO: Replace with real API call when backend is ready
+  // PLACEHOLDER DATA — no backend endpoint exists yet.
+  // The backend currently only exposes GET/PUT /users/me. There is no
+  // dashboard-stats, attempts, or score-history endpoint. The values below
+  // (except target_band_score, which the Dashboard overrides with the real
+  // value from /users/me) are illustrative placeholders.
+  //
+  // When the backend is ready, replace the body with a single call, e.g.:
+  //   const response = await api.get('/students/me/dashboard-stats');
+  //   return response.data;
+  // and keep this same response shape so consumers don't change:
+  //   {
+  //     success: boolean,
+  //     data: {
+  //       target_band_score, avg_band_score, ai_grading_quota_remaining,
+  //       total_tests_taken, avg_time_label, accuracy_pct,
+  //       chart: { LISTENING: [{ name, score }], READING: [...], ... },
+  //       skills: [{ label, icon, score }]
+  //     }
+  //   }
+  //
   // EARS[State-driven]: WHEN student views dashboard THEN fetch stats
   getDashboardStats: async () => {
+    const buildSeries = (base) =>
+      Array.from({ length: 10 }, (_, index) => ({
+        name: `Test ${index + 1}`,
+        score: Number(Math.min(9, Math.max(4, base + Math.sin(index) * 0.8)).toFixed(1)),
+      }));
+
     return new Promise((resolve) => {
       setTimeout(() => {
         resolve({
           success: true,
           data: {
+            // Widget tiles (StudentDashboardWidgets relies on the first three keys)
             target_band_score: 7.0,
             avg_band_score: 6.8,
-            ai_grading_quota_remaining: 8
-          }
+            ai_grading_quota_remaining: 8,
+            total_tests_taken: 74,
+            avg_time_label: '00:52 mins',
+            accuracy_pct: 63.57,
+            // Per-skill score history for the performance chart
+            chart: {
+              LISTENING: buildSeries(6.5),
+              READING: buildSeries(6.2),
+              WRITING: buildSeries(5.8),
+              SPEAKING: buildSeries(6.0),
+            },
+            // Per-skill current band for the profile skill-progress card
+            skills: [
+              { label: 'Listening', icon: 'bi-headphones', score: 6.5 },
+              { label: 'Reading', icon: 'bi-book', score: 6.0 },
+              { label: 'Writing', icon: 'bi-pencil', score: 5.5 },
+              { label: 'Speaking', icon: 'bi-mic', score: 6.0 },
+            ],
+          },
         });
       }, 500);
     });
