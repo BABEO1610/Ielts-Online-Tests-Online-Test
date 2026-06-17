@@ -59,6 +59,7 @@ import StudentHistoryPage from './pages/grading/StudentHistoryPage';
 // ── Tutor Workspace — Subjective Grading ──────────────────────────────────────
 import TutorQueuePage from './pages/grading/TutorQueuePage';
 import TutorGradingPage from './pages/grading/TutorGradingPage';
+import TutorGradingHistoryPage from './pages/grading/TutorGradingHistoryPage';
 import TutorTestManagePage from './pages/tutor/TutorTestManagePage';
 import TutorTestFormPage from './pages/tutor/TutorTestFormPage';
 import TutorReadingFormPage from './pages/tutor/TutorReadingFormPage';
@@ -130,7 +131,7 @@ function App() {
 
         {/* ── Protected Core ────────────────────────────────────────────────── */}
         <Route path="/dashboard" element={
-          <ProtectedRoute><Dashboard /></ProtectedRoute>
+          <ProtectedRoute role="student"><Dashboard /></ProtectedRoute>
         } />
         <Route element={<TutorLayout />}>
           <Route path="/tutor/dashboard" element={
