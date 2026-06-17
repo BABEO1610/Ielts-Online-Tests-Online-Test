@@ -120,7 +120,7 @@ const TutorSidebar = () => {
 
         {/* CÀI ĐẶT */}
         <SidebarSection title="Cài đặt">
-          <SidebarLink to="/profile" label="Cài đặt" />
+          <SidebarLink to="/tutor/profile" label="Cài đặt" />
         </SidebarSection>
       </div>
 
@@ -210,7 +210,7 @@ const TutorTopbar = () => {
               }}
             >
               {[
-                { label: 'Hồ sơ cá nhân', onClick: () => { setDropdownOpen(false); navigate('/profile'); } },
+                { label: 'Hồ sơ cá nhân', onClick: () => { setDropdownOpen(false); navigate('/tutor/profile'); } },
                 { label: 'Đổi mật khẩu',  onClick: () => { setDropdownOpen(false); setShowPwdModal(true); } },
               ].map(item => (
                 <li key={item.label}>
