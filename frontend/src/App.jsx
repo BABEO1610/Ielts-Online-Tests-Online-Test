@@ -89,7 +89,7 @@ const NotFoundPage = () => (
       Trang bạn tìm kiếm không tồn tại.
     </p>
     <Link
-      to="/dashboard"
+      to="/student/dashboard"
       style={{
         display: 'inline-block',
         backgroundColor: '#000',
@@ -125,10 +125,10 @@ function App() {
 
         {/* ── Protected Core (Student) ────────────────────────────────────────── */}
         <Route element={<StudentLayout />}>
-          <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-          <Route path="/profile" element={<ProtectedRoute><UserProfilePage /></ProtectedRoute>} />
-          <Route path="/practice-history" element={<ProtectedRoute><UserProfilePage /></ProtectedRoute>} />
-          <Route path="/study-plan" element={<ProtectedRoute><UserProfilePage /></ProtectedRoute>} />
+          <Route path="/student/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+          <Route path="/student/profile" element={<ProtectedRoute><UserProfilePage /></ProtectedRoute>} />
+          <Route path="/student/practice-history" element={<ProtectedRoute><UserProfilePage /></ProtectedRoute>} />
+          <Route path="/student/study-plan" element={<ProtectedRoute><UserProfilePage /></ProtectedRoute>} />
         </Route>
 
         {/* ── Tutor Section ── */}
@@ -247,7 +247,7 @@ function App() {
           <ProtectedRoute><AuditLogPage /></ProtectedRoute>
         } />
 
-        {/* ── 404 — "Về trang chủ" → /dashboard ────────────────────────────── */}
+        {/* ── 404 — "Về trang chủ" → /student/dashboard ────────────────────────────── */}
         <Route path="*" element={<NotFoundPage />} />
 
       </Routes>

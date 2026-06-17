@@ -5,24 +5,12 @@ import ChangePwdModal from '../components/profile/ChangePwdModal';
 import '../styles/admin.css';
 
 const NAV_ITEMS = [
-  { to: '/dashboard', label: 'My Dashboard', icon: 'bi-house' },
-  { to: '/prep', label: 'My IELTS Prep Services', icon: 'bi-cart' },
-  { to: '/lessons', label: 'My Live Lessons', icon: 'bi-play-btn' },
-  { to: '/history', label: 'Practice Test History', icon: 'bi-clock-history' },
-  { to: '/wallet', label: 'My Wallet', icon: 'bi-wallet2' },
-  { to: '/profile', label: 'My Profile', icon: 'bi-person', suffix: '+' },
-  { to: '/referral', label: 'Referral', icon: 'bi-share', suffix: '+' },
+  { to: '/student/dashboard', label: 'My Dashboard', icon: 'bi-house' },
+  { to: '/student/practice-history', label: 'Practice Test History', icon: 'bi-clock-history' },
+  { to: '/student/profile', label: 'My Profile', icon: 'bi-person', suffix: '+' },
 ];
 
-const WORKSPACE_NAV_ITEMS = [
-  { to: '/dashboard', label: 'Dashboard', icon: 'bi-house-door' },
-  { to: '/profile', label: 'My Profile', icon: 'bi-person', primary: true },
-  { to: '/practice-history', label: 'Practice History', icon: 'bi-clock-history' },
-  { to: '/study-plan', label: 'Study Plan', icon: 'bi-calendar3' },
-  { to: '/profile', label: 'Settings', icon: 'bi-gear', noActive: true },
-];
-
-const WORKSPACE_PATHS = ['/profile', '/practice-history', '/study-plan'];
+const WORKSPACE_PATHS = ['/student/profile', '/student/practice-history', '/student/study-plan'];
 
 const StudentLayout = () => {
   const { user, logout } = useAuth();
@@ -32,8 +20,8 @@ const StudentLayout = () => {
   const isProfileWorkspace = WORKSPACE_PATHS.includes(location.pathname);
 
   const workspaceTitle =
-    location.pathname === '/practice-history' ? 'Practice History Workspace'
-      : location.pathname === '/study-plan' ? 'Study Plan Workspace'
+    location.pathname === '/student/practice-history' ? 'Practice History Workspace'
+      : location.pathname === '/student/study-plan' ? 'Study Plan Workspace'
         : 'Profile Workspace';
 
   const handleLogout = async () => {
@@ -49,7 +37,7 @@ const StudentLayout = () => {
     <div className="admin-shell">
       {/* ── Sidebar ───────────────────────────────────────────── */}
       <aside className="admin-sidebar student-sidebar">
-        <Link to="/profile" className="student-brand">
+        <Link to="/student/dashboard" className="student-brand">
           <div className="rounded-circle d-flex align-items-center justify-content-center" style={{ width: '40px', height: '40px', backgroundColor: '#e11d48' }}>
             <span className="text-white fw-bold fs-5">iot</span>
           </div>
@@ -57,43 +45,20 @@ const StudentLayout = () => {
         </Link>
         
         <nav className="admin-sidebar__nav student-sidebar-nav">
-          {isProfileWorkspace ? WORKSPACE_NAV_ITEMS.map((item) => {
-            const active = !item.noActive && location.pathname === item.to;
+          {NAV_ITEMS.map((item) => {
+            const isActive = location.pathname === item.to || location.pathname.startsWith(item.to + '/');
             return (
               <Link
-                key={item.label}
+                key={item.to}
                 to={item.to}
-                className={`admin-nav-row student-section-nav ${active ? 'active' : ''}`}
+                className={`admin-nav-item student-nav-item ${isActive ? 'active' : ''}`}
               >
-                <div className="d-flex align-items-center gap-3">
-                  <i className={`bi ${item.icon} fs-5`}></i>
-                  <span>{item.label}</span>
-                </div>
+                <i className={`bi ${item.icon}`}></i>
+                <span className="ms-3 flex-grow-1">{item.label}</span>
+                {item.suffix && <span className="student-nav-suffix">{item.suffix}</span>}
               </Link>
             );
-          }) : NAV_ITEMS.map((item) => (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              end={item.to === '/dashboard'}
-              className={({ isActive }) => `admin-nav-row d-flex justify-content-between align-items-center ${isActive ? ' active' : ''}`}
-              style={({ isActive }) => ({
-                borderRadius: '12px',
-                padding: '12px 16px',
-                backgroundColor: isActive ? '#e0f2fe' : 'transparent',
-                color: isActive ? '#0369a1' : '#475569',
-                borderLeft: 'none',
-                fontWeight: isActive ? '600' : '400',
-                transition: 'all 0.2s ease'
-              })}
-            >
-              <div className="d-flex align-items-center gap-3">
-                <i className={`bi ${item.icon} fs-5`}></i>
-                <span style={{ fontSize: '15px' }}>{item.label}</span>
-              </div>
-              {item.suffix && <span className="fs-5 fw-medium" style={{ color: '#94a3b8' }}>{item.suffix}</span>}
-            </NavLink>
-          ))}
+          })}
         </nav>
 
         {isProfileWorkspace && (
@@ -149,8 +114,9 @@ const StudentLayout = () => {
                   <div className="caption text-secondary text-truncate">{user?.email || ''}</div>
                 </li>
                 <li><hr className="dropdown-divider" /></li>
-                <li><Link className="dropdown-item rounded-3 py-2" to="/profile">Hồ sơ cá nhân</Link></li>
-                <li><button className="dropdown-item rounded-3 py-2" onClick={() => setShowPwdModal(true)}>Đổi mật khẩu</button></li>
+                <li><Link className="dropdown-item py-2" to="/student/profile"><i className="bi bi-person me-2"></i> Hồ sơ cá nhân</Link></li>
+                <li><Link className="dropdown-item py-2" to="/student/practice-history"><i className="bi bi-clock-history me-2"></i> Lịch sử làm bài</Link></li>
+                <li><button className="dropdown-item py-2" onClick={() => setShowPwdModal(true)}><i className="bi bi-shield-lock me-2"></i> Đổi mật khẩu</button></li>
                 <li><hr className="dropdown-divider" /></li>
                 <li><button className="dropdown-item rounded-3 py-2 text-danger" onClick={handleLogout}>Đăng xuất</button></li>
               </ul>
@@ -165,9 +131,9 @@ const StudentLayout = () => {
         <footer className="admin-footer student-footer">
           <span>&copy; {new Date().getFullYear()} IELTSZone. All rights reserved.</span>
           <div className="student-footer__links">
-            <Link to="/profile">My Profile</Link>
-            <Link to="/practice-history">Practice History</Link>
-            <Link to="/study-plan">Study Plan</Link>
+            <Link to="/student/profile">My Profile</Link>
+            <Link to="/student/practice-history">Practice History</Link>
+            <Link to="/student/study-plan">Study Plan</Link>
           </div>
         </footer>
       </div>

@@ -62,7 +62,7 @@ const Dashboard = () => {
         {/* Target Score (Full width on mobile, span 12) */}
         <div className="col-12">
           <div className="card border-0 shadow-sm rounded-4 text-center py-4 position-relative">
-            <a href="/profile" className="position-absolute top-0 end-0 m-3 text-decoration-none" style={{ color: '#0ea5e9', fontWeight: '500' }}>Edit</a>
+            <a href="/student/profile" className="position-absolute top-0 end-0 m-3 text-decoration-none" style={{ color: '#0ea5e9', fontWeight: '500' }}>Edit</a>
             <div className="mb-2">
               <i className="bi bi-bullseye fs-3 text-secondary"></i>
             </div>
