@@ -341,8 +341,14 @@ const googleCallback = async (req, res, next) => {
     });
 
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-    // Consistent with local login: always redirect to dashboard
-    return res.redirect(`${frontendUrl}/dashboard`);
+    // Redirect to role-specific dashboard after OAuth login
+    if (user?.role === 'admin') {
+      return res.redirect(`${frontendUrl}/admin`);
+    } else if (user?.role === 'tutor') {
+      return res.redirect(`${frontendUrl}/tutor/dashboard`);
+    } else {
+      return res.redirect(`${frontendUrl}/dashboard`);
+    }
   } catch (error) {
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
     let errorCode = error.code || 'UNKNOWN_ERROR';
