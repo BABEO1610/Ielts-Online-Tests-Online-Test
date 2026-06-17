@@ -19,9 +19,12 @@ import VerifyEmailPage from './pages/auth/VerifyEmailPage';
 import ContentLibraryPage from './pages/student/ContentLibraryPage';
 
 // ── Core Protected Pages ───────────────────────────────────────────────────────
-import Dashboard from './pages/Dashboard';
-import UserProfilePage from './pages/UserProfilePage';
-import TutorDashboard from './pages/TutorDashboard';
+import Dashboard from './pages/student/Dashboard';
+import UserProfilePage from './pages/student/UserProfilePage';
+import TutorDashboard from './pages/tutor/TutorDashboard';
+import TutorLayout from './layouts/TutorLayout';
+import TutorActivityLogPage from './pages/TutorActivityLogPage';
+import StudentLayout from './layouts/StudentLayout';
 
 // ── Admin Section — Layout + nested pages ──────────────────────────────────────
 import AdminLayout from './layouts/AdminLayout';
@@ -120,16 +123,26 @@ function App() {
         {/* EARS[Event]: WHEN user navigates to /library THEN route to ContentLibraryPage */}
         <Route path="/library" element={<ContentLibraryPage />} />
 
-        {/* ── Protected Core ────────────────────────────────────────────────── */}
-        <Route path="/dashboard" element={
-          <ProtectedRoute><Dashboard /></ProtectedRoute>
-        } />
-        <Route path="/tutor/dashboard" element={
-          <ProtectedRoute role="tutor"><TutorDashboard /></ProtectedRoute>
-        } />
-        <Route path="/profile" element={
-          <ProtectedRoute><UserProfilePage /></ProtectedRoute>
-        } />
+        {/* ── Protected Core (Student) ────────────────────────────────────────── */}
+        <Route element={<StudentLayout />}>
+          <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+          <Route path="/profile" element={<ProtectedRoute><UserProfilePage /></ProtectedRoute>} />
+          <Route path="/practice-history" element={<ProtectedRoute><UserProfilePage /></ProtectedRoute>} />
+          <Route path="/study-plan" element={<ProtectedRoute><UserProfilePage /></ProtectedRoute>} />
+        </Route>
+
+        {/* ── Tutor Section ── */}
+        <Route element={<TutorLayout />}>
+          <Route path="/tutor/dashboard" element={
+            <ProtectedRoute role="tutor"><TutorDashboard /></ProtectedRoute>
+          } />
+          <Route path="/tutor/activity-log" element={
+            <ProtectedRoute role="tutor"><TutorActivityLogPage /></ProtectedRoute>
+          } />
+          <Route path="/grading/tutor/queue" element={
+            <ProtectedRoute role="tutor"><TutorQueuePage /></ProtectedRoute>
+          } />
+        </Route>
         {/* ── Admin Section — nested under AdminLayout (sidebar + topbar + footer) ── */}
         <Route path="/admin" element={
           <ProtectedRoute role="admin"><AdminLayout /></ProtectedRoute>
