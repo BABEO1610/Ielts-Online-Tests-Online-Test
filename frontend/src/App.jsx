@@ -24,6 +24,9 @@ import TutorDashboard from './pages/tutor/TutorDashboard';
 import TutorProfilePage from './pages/tutor/TutorProfilePage';
 import TutorLayout from './layouts/TutorLayout';
 import TutorActivityLogPage from './pages/TutorActivityLogPage';
+import TutorLibraryPage from './pages/tutor/TutorLibraryPage';
+import TutorLibraryCreatePage from './pages/tutor/TutorLibraryCreatePage';
+import TutorLibraryEditPage from './pages/tutor/TutorLibraryEditPage';
 import StudentLayout from './layouts/StudentLayout';
 import ProfileLayout from './layouts/ProfileLayout';
 
@@ -143,6 +146,15 @@ function App() {
           } />
           <Route path="/tutor/activity-log" element={
             <ProtectedRoute role="tutor"><TutorActivityLogPage /></ProtectedRoute>
+          } />
+          <Route path="/tutor/library" element={
+            <ProtectedRoute role="tutor"><TutorLibraryPage /></ProtectedRoute>
+          } />
+          <Route path="/tutor/library/create" element={
+            <ProtectedRoute role="tutor"><TutorLibraryCreatePage /></ProtectedRoute>
+          } />
+          <Route path="/tutor/library/edit/:id" element={
+            <ProtectedRoute role="tutor"><TutorLibraryEditPage /></ProtectedRoute>
           } />
           <Route path="/grading/tutor/queue" element={
             <ProtectedRoute role="tutor"><TutorQueuePage /></ProtectedRoute>
