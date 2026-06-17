@@ -4,237 +4,91 @@ import { useAuth } from '../../context/AuthContext';
 import StudentNavbar from '../../components/layout/StudentNavbar';
 import ModeSelector from '../../components/objective-testing/ModeSelector';
 
-// ─── MOCK DATA — Danh sách đề thi Speaking ───────────────────────────────────
 export const MOCK_EXAMS = [
   {
-    id: 'speaking-2025-06',
-    title: 'Đề thi tháng 6/2025',
-    date: 'Tháng 6, 2025',
-    difficulty: 'Trung bình',
-    topic: 'Technology & Society',
-    parts: [
-      {
-        id: 'speaking-2025-06-p1',
-        part_number: 1,
-        title: 'Part 1 — Introduction & Interview',
-        duration: 120,
-        description: 'The examiner asks general questions about yourself and familiar topics.',
-        questions: [
-          'Do you use technology a lot in your daily life? How?',
-          'What is your favourite app or digital tool? Why?',
-          'Do you think young people use technology too much?',
-          'How has technology changed the way you communicate with friends and family?',
-          'Do you prefer reading physical books or e-books?'
-        ],
-        tip: 'Trả lời tự nhiên, dùng câu hoàn chỉnh. Không cần trả lời quá dài cho Part 1.'
-      },
-      {
-        id: 'speaking-2025-06-p2',
-        part_number: 2,
-        title: 'Part 2 — Individual Long Turn',
-        duration: 180,
-        description: 'You have 1 minute to prepare, then speak for 1–2 minutes on the topic card.',
-        questions: [
-          'Describe a piece of technology that you find useful.',
-          '— You should say:',
-          '   • What it is',
-          '   • How often you use it',
-          '   • What you use it for',
-          '   • And explain why you find it so useful.'
-        ],
-        tip: 'Chuẩn bị trước 1 phút, ghi chú các điểm chính. Nói đủ 2 phút. Dùng cấu trúc: mở đầu → thân bài → kết luận.'
-      },
-      {
-        id: 'speaking-2025-06-p3',
-        part_number: 3,
-        title: 'Part 3 — Two-way Discussion',
-        duration: 240,
-        description: 'The examiner asks further questions related to Part 2 for a deeper discussion.',
-        questions: [
-          'How has technology changed the workplace in recent years?',
-          'Do you think technology has made people more or less productive? Why?',
-          'What are the risks of society becoming too dependent on technology?',
-          'How might artificial intelligence affect employment in the future?',
-          'Should there be limits on the development of new technologies? Why or why not?'
-        ],
-        tip: 'Part 3 cần thể hiện khả năng phân tích và lập luận. Dùng cấu trúc: Opinion + Reason + Example.'
-      }
-    ]
-  },
-  {
-    id: 'speaking-2025-05',
-    title: 'Đề thi tháng 5/2025',
-    date: 'Tháng 5, 2025',
+    id: 1,
+    title: 'Cambridge IELTS 18 - Speaking Test 1',
+    topic: 'Daily Life, Travel, Reading',
+    description: 'Đề thi chuẩn Cambridge với các câu hỏi bám sát format bài thi Speaking thực tế.',
+    questions: 15,
     difficulty: 'Khó',
-    topic: 'Environment & Climate',
+    duration: 15,
     parts: [
       {
-        id: 'speaking-2025-05-p1',
-        part_number: 1,
-        title: 'Part 1 — Introduction & Interview',
-        duration: 120,
-        description: 'The examiner asks general questions about yourself and familiar topics.',
+        partName: 'Part 1: Introduction and Interview',
+        description: 'You will answer questions about yourself and familiar topics.',
         questions: [
-          'Do you care about environmental issues? Why?',
-          'What do you do in your daily life to help the environment?',
-          'Have you ever participated in any environmental activities?',
-          'Is the environment better or worse in your hometown compared to years ago?',
-          'Do you think individuals can make a difference to the environment?'
+          { id: 'q1', text: 'Where are you from?' },
+          { id: 'q2', text: 'What do you like about your hometown?' },
+          { id: 'q3', text: 'Do you prefer living in a city or the countryside?' }
         ],
-        tip: 'Dùng từ vựng liên quan đến môi trường: renewable energy, carbon footprint, sustainable, recycle.'
+        duration: '4-5 phút'
       },
       {
-        id: 'speaking-2025-05-p2',
-        part_number: 2,
-        title: 'Part 2 — Individual Long Turn',
-        duration: 180,
-        description: 'You have 1 minute to prepare, then speak for 1–2 minutes on the topic card.',
-        questions: [
-          'Describe an environmental problem in your area.',
-          '— You should say:',
-          '   • What the problem is',
-          '   • What the causes of the problem are',
-          '   • What effects it has had on the local community',
-          '   • And explain what you think should be done about it.'
-        ],
-        tip: 'Liên kết nguyên nhân-hậu quả-giải pháp một cách rõ ràng. Sử dụng ví dụ cụ thể từ địa phương của bạn.'
+        partName: 'Part 2: Long Turn',
+        description: 'You will have 1 minute to prepare and 1-2 minutes to speak on a specific topic.',
+        prompt: 'Describe a memorable journey you have made.\nYou should say:\n- where you went\n- how you traveled\n- why you went on this journey\n- and explain why it was memorable.',
+        preparationTime: 60,
+        speakingTime: 120,
+        duration: '3-4 phút'
       },
       {
-        id: 'speaking-2025-05-p3',
-        part_number: 3,
-        title: 'Part 3 — Two-way Discussion',
-        duration: 240,
-        description: 'The examiner asks further questions related to Part 2 for a deeper discussion.',
+        partName: 'Part 3: Discussion',
+        description: 'You will answer more abstract questions related to the topic in Part 2.',
         questions: [
-          'Do you think governments are doing enough to address climate change?',
-          'Should big corporations be held more responsible for environmental damage?',
-          'How can education help promote environmental awareness?',
-          'Is it realistic to expect people to significantly reduce their carbon footprint?',
-          'What role should international cooperation play in solving global environmental problems?'
+          { id: 'q4', text: 'How have travel habits changed in your country over the last few decades?' },
+          { id: 'q5', text: 'What impact does tourism have on local cultures?' },
+          { id: 'q6', text: 'Do you think international travel will become more or less common in the future?' }
         ],
-        tip: 'Thể hiện khả năng nhìn nhận vấn đề đa chiều. Dùng hedging language: "It could be argued that...", "From one perspective..."'
+        duration: '4-5 phút'
       }
     ]
   },
   {
-    id: 'speaking-2025-04',
-    title: 'Đề thi tháng 4/2025',
-    date: 'Tháng 4, 2025',
-    difficulty: 'Dễ',
-    topic: 'Travel & Tourism',
-    parts: [
-      {
-        id: 'speaking-2025-04-p1',
-        part_number: 1,
-        title: 'Part 1 — Introduction & Interview',
-        duration: 120,
-        description: 'The examiner asks general questions about yourself and familiar topics.',
-        questions: [
-          'Do you enjoy travelling? Why or why not?',
-          'Where is the most interesting place you have ever visited?',
-          'Do you prefer travelling alone or with others?',
-          'How do you usually plan your trips?',
-          'Do you think travelling abroad is important? Why?'
-        ],
-        tip: 'Đây là chủ đề quen thuộc và dễ nói. Hãy chia sẻ những trải nghiệm du lịch thực tế của bạn.'
-      },
-      {
-        id: 'speaking-2025-04-p2',
-        part_number: 2,
-        title: 'Part 2 — Individual Long Turn',
-        duration: 180,
-        description: 'You have 1 minute to prepare, then speak for 1–2 minutes on the topic card.',
-        questions: [
-          'Describe a memorable trip you have taken.',
-          '— You should say:',
-          '   • Where you went',
-          '   • Who you went with',
-          '   • What you did there',
-          '   • And explain why this trip was memorable for you.'
-        ],
-        tip: 'Kể chuyện theo trình tự thời gian. Thêm cảm xúc và chi tiết cụ thể để bài nói thêm sinh động.'
-      },
-      {
-        id: 'speaking-2025-04-p3',
-        part_number: 3,
-        title: 'Part 3 — Two-way Discussion',
-        duration: 240,
-        description: 'The examiner asks further questions related to Part 2 for a deeper discussion.',
-        questions: [
-          'How has tourism changed in your country over the past decade?',
-          'What are the economic benefits and drawbacks of tourism for a country?',
-          'Do you think mass tourism has a negative impact on local cultures?',
-          'How might travel habits change in the future due to environmental concerns?',
-          'Should governments limit the number of tourists visiting popular destinations?'
-        ],
-        tip: 'Mở rộng quan điểm cá nhân ra bức tranh xã hội rộng hơn. Trích dẫn số liệu hoặc ví dụ cụ thể nếu có thể.'
-      }
-    ]
-  },
-  {
-    id: 'speaking-2025-03',
-    title: 'Đề thi tháng 3/2025',
-    date: 'Tháng 3, 2025',
+    id: 2,
+    title: 'Recent Actual Test - Speaking Practice 2',
+    topic: 'Hobbies, Books, Literature',
+    description: 'Đề thi thật được thu thập gần đây, giúp bạn quen với các chủ đề đang phổ biến.',
+    questions: 14,
     difficulty: 'Trung bình',
-    topic: 'Education & Learning',
+    duration: 14,
     parts: [
       {
-        id: 'speaking-2025-03-p1',
-        part_number: 1,
-        title: 'Part 1 — Introduction & Interview',
-        duration: 120,
-        description: 'The examiner asks general questions about yourself and familiar topics.',
+        partName: 'Part 1: Introduction and Interview',
+        description: 'Questions about hobbies, work, and daily life.',
         questions: [
-          'Are you a student or do you work?',
-          'What subject do you enjoy most? Why?',
-          'Did you enjoy school when you were younger?',
-          'Do you think it is important to continue learning after leaving school?',
-          'How do you prefer to learn new things — in a class or by yourself?'
+          { id: 'q1', text: 'Do you have any hobbies?' },
+          { id: 'q2', text: 'What do you usually do in your free time?' }
         ],
-        tip: 'Chủ đề Education rất phổ biến trong IELTS. Chuẩn bị sẵn từ vựng: curriculum, extracurricular, lifelong learning.'
+        duration: '4-5 phút'
       },
       {
-        id: 'speaking-2025-03-p2',
-        part_number: 2,
-        title: 'Part 2 — Individual Long Turn',
-        duration: 180,
-        description: 'You have 1 minute to prepare, then speak for 1–2 minutes on the topic card.',
-        questions: [
-          'Describe a teacher who has had a positive influence on you.',
-          '— You should say:',
-          '   • Who this person is / was',
-          '   • What subject they taught',
-          '   • How they taught',
-          '   • And explain why this teacher was so influential.'
-        ],
-        tip: 'Mô tả cụ thể phong cách dạy, tính cách và những điều mà người thầy/cô đó đã truyền cảm hứng cho bạn.'
+        partName: 'Part 2: Long Turn',
+        description: 'Describe a book you read recently.',
+        prompt: 'Describe a book that you enjoyed reading.\nYou should say:\n- what the book is\n- what it is about\n- why you decided to read it\n- and explain why you enjoyed it.',
+        preparationTime: 60,
+        speakingTime: 120,
+        duration: '3-4 phút'
       },
       {
-        id: 'speaking-2025-03-p3',
-        part_number: 3,
-        title: 'Part 3 — Two-way Discussion',
-        duration: 240,
-        description: 'The examiner asks further questions related to Part 2 for a deeper discussion.',
+        partName: 'Part 3: Discussion',
+        description: 'Abstract questions about reading and literature.',
         questions: [
-          'What qualities make a good teacher?',
-          'How important is it for schools to teach life skills, not just academic subjects?',
-          'Do you think online education can replace traditional classroom learning?',
-          'Should education be free for everyone at all levels?',
-          'How can countries improve their education systems?'
+          { id: 'q3', text: 'Is reading still popular in your country?' },
+          { id: 'q4', text: 'Do you think e-books will replace printed books?' }
         ],
-        tip: 'Thể hiện tư duy phê phán. Không chỉ đồng ý/phản đối — hãy phân tích ưu nhược điểm của mỗi quan điểm.'
+        duration: '4-5 phút'
       }
     ]
   }
 ];
 
 const DIFFICULTY_STYLE = {
-  'Dễ':        { bg: '#efefef', color: '#5e5e5e' },
-  'Trung bình':{ bg: '#000',    color: '#fff'     },
-  'Khó':       { bg: '#282828', color: '#afafaf'  }
+  'Dễ': { bg: '#efefef', color: '#5e5e5e' },
+  'Trung bình': { bg: '#000', color: '#fff' },
+  'Khó': { bg: '#282828', color: '#afafaf' }
 };
 
-// ─── Level 2: Parts của một đề ───────────────────────────────────────────────
 const SpeakingPartList = ({ exam, onStartExam, onBack }) => {
   const { isAuthenticated } = useAuth();
   const navigate = useNavigate();
@@ -268,15 +122,12 @@ const SpeakingPartList = ({ exam, onStartExam, onBack }) => {
         </div>
 
         <div className="mb-5 mt-3">
-          <p className="text-muted mb-1 fw-medium" style={{ fontSize: '14px', fontFamily: 'UberMoveText, system-ui, sans-serif', textTransform: 'uppercase', letterSpacing: '1px' }}>
-            CHỦ ĐỀ: {exam.topic}
-          </p>
           <h1 className="fw-bold mb-1 text-dark" style={{ fontFamily: 'UberMove, system-ui, sans-serif', fontSize: '40px' }}>
             {exam.title}
           </h1>
-          <div className="d-flex justify-content-between align-items-center mb-0 mt-4">
+          <div className="d-flex justify-content-between align-items-center mb-0 mt-4 flex-wrap gap-3">
             <p className="text-muted mb-0" style={{ fontFamily: 'UberMoveText, system-ui, sans-serif', fontSize: '18px' }}>
-              {exam.parts.length} phần · Hoàn thành toàn bộ để nhận phản hồi đánh giá
+              Gồm {exam.parts.length} phần · Hoàn thành toàn bộ để nhận điểm chấm
             </p>
             <button className="btn btn-dark rounded-pill px-5 py-3 fw-bold" style={{ fontSize: '16px' }} onClick={handleStartClick}>
               Bắt đầu làm bài thi
@@ -287,43 +138,25 @@ const SpeakingPartList = ({ exam, onStartExam, onBack }) => {
         <div className="d-flex flex-column gap-3">
           {exam.parts.map((part, idx) => (
             <div
-              key={part.id}
-              className="rounded-4 overflow-hidden bg-white"
+              key={idx}
+              className="d-flex align-items-center justify-content-between p-4 rounded-4 bg-white"
               style={{ border: '1px solid #e2e2e2' }}
             >
-              <div className="d-flex align-items-center justify-content-between p-4 gap-4 flex-wrap">
-                <div className="d-flex align-items-center gap-4">
-                  {/* Part Badge */}
-                  <div
-                    className="d-flex align-items-center justify-content-center fw-bold flex-shrink-0"
-                    style={{
-                      width: '56px', height: '56px', borderRadius: '999px',
-                      backgroundColor: '#000',
-                      color: '#fff',
-                      fontSize: '20px', fontFamily: 'UberMove, system-ui, sans-serif'
-                    }}
-                  >
-                    {idx + 1}
-                  </div>
-                  <div>
-                    <h4
-                      className="fw-bold mb-1"
-                      style={{ fontFamily: 'UberMove, system-ui, sans-serif', fontSize: '20px', color: '#000' }}
-                    >
-                      {part.title}
-                    </h4>
-                    <p
-                      className="mb-1"
-                      style={{ fontSize: '14px', fontFamily: 'UberMoveText, system-ui, sans-serif', color: '#5e5e5e' }}
-                    >
-                      {part.description}
-                    </p>
-                    <span
-                      className="fw-medium"
-                      style={{ fontSize: '13px', color: '#5e5e5e' }}
-                    >
-                      ⏱ Tối đa {Math.floor(part.duration / 60)} phút · {part.questions.length} câu hỏi
-                    </span>
+              <div className="d-flex align-items-center gap-4">
+                <div
+                  className="d-flex align-items-center justify-content-center fw-bold flex-shrink-0"
+                  style={{ width: '56px', height: '56px', borderRadius: '999px', backgroundColor: '#000', color: '#fff', fontSize: '20px', fontFamily: 'UberMove, system-ui, sans-serif' }}
+                >
+                  {idx + 1}
+                </div>
+                <div>
+                  <h4 className="fw-bold mb-1 text-dark" style={{ fontFamily: 'UberMove, system-ui, sans-serif', fontSize: '20px' }}>
+                    {part.partName}
+                  </h4>
+                  <div className="d-flex gap-2 flex-wrap">
+                    <span className="text-muted fw-medium" style={{ fontSize: '14px' }}>⏱ {part.duration}</span>
+                    <span className="text-muted" style={{ fontSize: '14px' }}>·</span>
+                    <span className="text-muted fw-medium" style={{ fontSize: '14px' }}>🗣 {part.description}</span>
                   </div>
                 </div>
               </div>
@@ -336,14 +169,13 @@ const SpeakingPartList = ({ exam, onStartExam, onBack }) => {
           onHide={() => setShowModeModal(false)}
           onSelectMode={handleModeSelect}
           examType="Speaking"
-          fullDuration={Math.ceil(exam.parts.reduce((total, p) => total + (parseInt(p.duration) || 0), 0) / 60)}
+          fullDuration={exam.duration}
         />
       </main>
     </div>
   );
 };
 
-// ─── Level 1: Danh sách đề thi ───────────────────────────────────────────────
 const SpeakingPage = () => {
   const [selectedExam, setSelectedExam] = useState(null);
   const navigate = useNavigate();
@@ -358,45 +190,36 @@ const SpeakingPage = () => {
   };
 
   const handleStartExam = (modeConfig) => {
-    if (selectedExam) {
-      navigate(`/tests/${selectedExam.id}/speaking`, {
-        state: {
-          practiceMode: modeConfig.isPractice,
-          customTimeLimit: modeConfig.customTimeLimit
-        }
-      });
-    }
+    navigate(`/tests/${selectedExam.id}/speaking`, { 
+      state: { 
+        exam: selectedExam, 
+        practiceMode: modeConfig.isPractice,
+        selectedPartIds: modeConfig.selectedPartIds,
+        customTimeLimit: modeConfig.customTimeLimit
+      } 
+    });
   };
 
-  // Level 2: Danh sách parts của một đề
   if (selectedExam) {
-    return (
-      <SpeakingPartList
-        exam={selectedExam}
-        onStartExam={handleStartExam}
-        onBack={() => setSelectedExam(null)}
-      />
-    );
+    return <SpeakingPartList exam={selectedExam} onStartExam={handleStartExam} onBack={() => setSelectedExam(null)} />;
   }
 
-  // Level 1: Danh sách đề thi
   return (
     <div className="bg-white min-vh-100 pb-5">
       <StudentNavbar />
       <main className="container-fluid px-3 px-md-5 mt-4 mt-md-5" style={{ maxWidth: '1200px' }}>
-
         <div className="mb-5">
           <h1 className="fw-bold mb-2 text-dark" style={{ fontFamily: 'UberMove, system-ui, sans-serif', fontSize: '52px' }}>
             Speaking
           </h1>
           <p className="text-muted" style={{ fontFamily: 'UberMoveText, system-ui, sans-serif', fontSize: '20px' }}>
-            Chọn đề thi để luyện nói. Nộp bài để nhận phản hồi từ AI hoặc giáo viên.
+            Chọn đề thi để luyện nói. Chấm điểm chi tiết độ trôi chảy và phát âm bằng AI.
           </p>
         </div>
 
         <div className="row g-4">
           {MOCK_EXAMS.map((exam) => {
-            const diff = DIFFICULTY_STYLE[exam.difficulty];
+            const diff = DIFFICULTY_STYLE[exam.difficulty] || DIFFICULTY_STYLE['Trung bình'];
             return (
               <div key={exam.id} className="col-md-6">
                 <div
@@ -415,17 +238,17 @@ const SpeakingPage = () => {
                         {exam.difficulty}
                       </span>
                       <span className="text-muted fw-medium" style={{ fontSize: '13px' }}>
-                        {exam.parts.length} Parts
+                        {exam.parts.length} phần · {exam.duration} phút
                       </span>
                     </div>
                     <h3 className="fw-bold mb-1 text-dark" style={{ fontFamily: 'UberMove, system-ui, sans-serif', fontSize: '24px' }}>
                       {exam.title}
                     </h3>
                     <p className="fw-medium mb-3" style={{ fontSize: '14px', fontFamily: 'UberMoveText, system-ui, sans-serif', color: '#5e5e5e' }}>
-                      Chủ đề: {exam.topic}
+                      Chủ đề: {exam.topic || 'Tổng hợp'}
                     </p>
                     <p className="text-muted mb-4" style={{ fontSize: '14px', fontFamily: 'UberMoveText, system-ui, sans-serif', lineHeight: '1.6' }}>
-                      {exam.parts.map(p => p.title.split('—')[0].trim()).join(' · ')}
+                      {exam.description || `Đề thi luyện tập Speaking mô phỏng format IELTS thực tế.`}
                     </p>
                   </div>
                   <button

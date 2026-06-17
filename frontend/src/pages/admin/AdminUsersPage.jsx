@@ -14,7 +14,8 @@ const AdminUsersPage = () => {
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [selectedUser, setSelectedUser] = useState(null);
-  const [filters, setFilters] = useState({ role: '', status: '', page: 1, limit: 10 });
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filters, setFilters] = useState({ role: '', status: '', search: '', page: 1, limit: 10 });
 
   // EARS[Event]: WHEN Admin loads page or changes filters, THE system SHALL fetch the user list
   const fetchUsers = useCallback(async () => {
@@ -26,6 +27,7 @@ const AdminUsersPage = () => {
       params.set('limit', filters.limit);
       if (filters.role) params.set('role', filters.role);
       if (filters.status) params.set('status', filters.status);
+      if (filters.search) params.set('search', filters.search);
 
       const response = await api.get(`/admin/users?${params.toString()}`);
       const { data, meta: respMeta } = response.data;
@@ -41,6 +43,17 @@ const AdminUsersPage = () => {
   }, [filters]);
 
   useEffect(() => { fetchUsers(); }, [fetchUsers]);
+
+  // Debounce search
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setFilters(prev => {
+        if (prev.search === searchTerm) return prev;
+        return { ...prev, search: searchTerm, page: 1 };
+      });
+    }, 500);
+    return () => clearTimeout(handler);
+  }, [searchTerm]);
 
   const handleFilterChange = (e) =>
     setFilters((prev) => ({ ...prev, [e.target.name]: e.target.value, page: 1 }));
@@ -73,20 +86,30 @@ const AdminUsersPage = () => {
       <div className="admin-card mb-4">
         <div className="admin-card__body">
           <div className="row g-3 align-items-end">
-            <div className="col-md-4">
+            <div className="col-md-3">
+              <label className="form-label fw-semibold text-secondary">Tìm kiếm</label>
+              <input 
+                type="text" 
+                className="admin-input" 
+                placeholder="Tìm email, họ tên..." 
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+            <div className="col-md-3">
               <label className="form-label fw-semibold text-secondary">Vai trò</label>
               <select className="form-select" name="role" value={filters.role} onChange={handleFilterChange} data-testid="role-filter">
                 {ROLES.map((r) => <option key={r} value={r}>{r ? r[0].toUpperCase() + r.slice(1) : 'Tất cả'}</option>)}
               </select>
             </div>
-            <div className="col-md-4">
+            <div className="col-md-3">
               <label className="form-label fw-semibold text-secondary">Trạng thái</label>
               <select className="form-select" name="status" value={filters.status} onChange={handleFilterChange} data-testid="status-filter">
                 {STATUSES.map((s) => <option key={s} value={s}>{s ? s[0].toUpperCase() + s.slice(1) : 'Tất cả'}</option>)}
               </select>
             </div>
-            <div className="col-md-4">
-              <button className="btn-pill btn-pill--ghost w-100" onClick={() => setFilters({ role: '', status: '', page: 1, limit: 10 })} data-testid="reset-filter-btn">
+            <div className="col-md-3">
+              <button className="btn-pill btn-pill--ghost w-100" onClick={() => { setFilters({ role: '', status: '', search: '', page: 1, limit: 10 }); setSearchTerm(''); }} data-testid="reset-filter-btn">
                 Đặt lại bộ lọc
               </button>
             </div>

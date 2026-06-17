@@ -187,7 +187,7 @@ const upsertGoogleUser = async ({ provider_user_id, email, full_name, avatar_url
  * @param {string} [filters.status]
  * @returns {Promise<Object>} An object containing rows (users) and total (count)
  */
-const listUsers = async ({ page, limit, role, status }) => {
+const listUsers = async ({ page, limit, role, status, search }) => {
   const offset = (page - 1) * limit;
   const values = [];
   let whereClause = 'WHERE 1=1';
@@ -202,6 +202,12 @@ const listUsers = async ({ page, limit, role, status }) => {
   if (status) {
     whereClause += ` AND status = $${paramIndex}`;
     values.push(status);
+    paramIndex++;
+  }
+
+  if (search) {
+    whereClause += ` AND (full_name ILIKE $${paramIndex} OR email ILIKE $${paramIndex})`;
+    values.push(`%${search}%`);
     paramIndex++;
   }
 
