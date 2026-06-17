@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter, Routes, Route, Link } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Link, Navigate } from 'react-router-dom';
 
 // ── Auth Guard ─────────────────────────────────────────────────────────────────
 import ProtectedRoute from './components/auth/ProtectedRoute';
@@ -23,7 +23,7 @@ import UserProfilePage from './pages/student/UserProfilePage';
 import TutorDashboard from './pages/tutor/TutorDashboard';
 import TutorProfilePage from './pages/tutor/TutorProfilePage';
 import TutorLayout from './layouts/TutorLayout';
-import TutorActivityLogPage from './pages/TutorActivityLogPage';
+import TutorActivityLogPage from './pages/tutor/TutorActivityLogPage';
 import TutorLibraryPage from './pages/tutor/TutorLibraryPage';
 import TutorLibraryCreatePage from './pages/tutor/TutorLibraryCreatePage';
 import TutorLibraryEditPage from './pages/tutor/TutorLibraryEditPage';
@@ -137,6 +137,7 @@ function App() {
         </Route>
 
         {/* ── Tutor Section ── */}
+        <Route path="/tutor" element={<Navigate to="/tutor/dashboard" replace />} />
         <Route element={<TutorLayout />}>
           <Route path="/tutor/dashboard" element={
             <ProtectedRoute role="tutor"><TutorDashboard /></ProtectedRoute>
@@ -158,6 +159,37 @@ function App() {
           } />
           <Route path="/grading/tutor/queue" element={
             <ProtectedRoute role="tutor"><TutorQueuePage /></ProtectedRoute>
+          } />
+          <Route path="/grading/tutor/schedule" element={
+            <ProtectedRoute role="tutor"><TutorGradingHistoryPage /></ProtectedRoute>
+          } />
+          {/* ── Objective Testing — Tutor: Test Management ────────────────────── */}
+          <Route path="/tutor/tests" element={
+            <ProtectedRoute role="tutor"><TutorTestManagePage /></ProtectedRoute>
+          } />
+          <Route path="/tutor/tests/new" element={
+            <ProtectedRoute role="tutor"><TutorTestFormPage /></ProtectedRoute>
+          } />
+          <Route path="/tutor/tests/new/reading" element={
+            <ProtectedRoute role="tutor"><TutorReadingFormPage /></ProtectedRoute>
+          } />
+          <Route path="/tutor/tests/new/listening" element={
+            <ProtectedRoute role="tutor"><TutorListeningFormPage /></ProtectedRoute>
+          } />
+          <Route path="/tutor/tests/new/writing" element={
+            <ProtectedRoute role="tutor"><TutorWritingFormPage /></ProtectedRoute>
+          } />
+          <Route path="/tutor/tests/new/speaking" element={
+            <ProtectedRoute role="tutor"><TutorSpeakingFormPage /></ProtectedRoute>
+          } />
+          <Route path="/tutor/tests/:id/edit" element={
+            <ProtectedRoute role="tutor"><TutorTestFormPage /></ProtectedRoute>
+          } />
+          <Route path="/tutor/tests/:id/questions/new" element={
+            <ProtectedRoute role="tutor"><TutorQuestionFormPage /></ProtectedRoute>
+          } />
+          <Route path="/tutor/tests/:id/questions/:qId/edit" element={
+            <ProtectedRoute role="tutor"><TutorQuestionFormPage /></ProtectedRoute>
           } />
         </Route>
         {/* ── Admin Section — nested under AdminLayout (sidebar + topbar + footer) ── */}
@@ -230,34 +262,7 @@ function App() {
           <ProtectedRoute><TestResultDetailPage /></ProtectedRoute>
         } />
 
-        {/* ── Objective Testing — Tutor: Test Management ────────────────────── */}
-        <Route path="/tutor/tests" element={
-          <ProtectedRoute role="tutor"><TutorTestManagePage /></ProtectedRoute>
-        } />
-        <Route path="/tutor/tests/new" element={
-          <ProtectedRoute role="tutor"><TutorTestFormPage /></ProtectedRoute>
-        } />
-        <Route path="/tutor/tests/new/reading" element={
-          <ProtectedRoute role="tutor"><TutorReadingFormPage /></ProtectedRoute>
-        } />
-        <Route path="/tutor/tests/new/listening" element={
-          <ProtectedRoute role="tutor"><TutorListeningFormPage /></ProtectedRoute>
-        } />
-        <Route path="/tutor/tests/new/writing" element={
-          <ProtectedRoute role="tutor"><TutorWritingFormPage /></ProtectedRoute>
-        } />
-        <Route path="/tutor/tests/new/speaking" element={
-          <ProtectedRoute role="tutor"><TutorSpeakingFormPage /></ProtectedRoute>
-        } />
-        <Route path="/tutor/tests/:id/edit" element={
-          <ProtectedRoute role="tutor"><TutorTestFormPage /></ProtectedRoute>
-        } />
-        <Route path="/tutor/tests/:id/questions/new" element={
-          <ProtectedRoute role="tutor"><TutorQuestionFormPage /></ProtectedRoute>
-        } />
-        <Route path="/tutor/tests/:id/questions/:qId/edit" element={
-          <ProtectedRoute role="tutor"><TutorQuestionFormPage /></ProtectedRoute>
-        } />
+        {/* ── Objective Testing — Tutor: Test Management (Moved to TutorLayout) ── */}
 
         {/* ── Admin: Audit Logs ─────────────────────────────────────────────── */}
         <Route path="/admin/audit-logs" element={
