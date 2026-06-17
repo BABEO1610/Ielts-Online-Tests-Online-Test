@@ -44,7 +44,7 @@ const LoginForm = () => {
       } else if (role === 'admin') {
         navigate('/admin');
       } else {
-        navigate('/dashboard');
+        navigate('/');
       }
     } else {
       const code = result.error?.code;
