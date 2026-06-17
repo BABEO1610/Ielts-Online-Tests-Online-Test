@@ -19,18 +19,13 @@ import VerifyEmailPage from './pages/auth/VerifyEmailPage';
 import ContentLibraryPage from './pages/student/ContentLibraryPage';
 
 // ── Core Protected Pages ───────────────────────────────────────────────────────
-import Dashboard from './pages/student/Dashboard';
 import UserProfilePage from './pages/student/UserProfilePage';
-
-// ── Tutor Layout ──────────────────────────────────────────────────────────────
-import TutorLayout from './layouts/TutorLayout';
-
-// ── Tutor Pages ────────────────────────────────────────────────────────────────
 import TutorDashboard from './pages/tutor/TutorDashboard';
-import TutorActivityLogPage from './pages/tutor/TutorActivityLogPage';
-import TutorLibraryPage from './pages/tutor/TutorLibraryPage';
-import TutorLibraryCreatePage from './pages/tutor/TutorLibraryCreatePage';
-import TutorLibraryEditPage from './pages/tutor/TutorLibraryEditPage';
+import TutorProfilePage from './pages/tutor/TutorProfilePage';
+import TutorLayout from './layouts/TutorLayout';
+import TutorActivityLogPage from './pages/TutorActivityLogPage';
+import StudentLayout from './layouts/StudentLayout';
+import ProfileLayout from './layouts/ProfileLayout';
 
 // ── Admin Section — Layout + nested pages ──────────────────────────────────────
 import AdminLayout from './layouts/AdminLayout';
@@ -95,7 +90,7 @@ const NotFoundPage = () => (
       Trang bạn tìm kiếm không tồn tại.
     </p>
     <Link
-      to="/dashboard"
+      to="/"
       style={{
         display: 'inline-block',
         backgroundColor: '#000',
@@ -129,40 +124,30 @@ function App() {
         {/* EARS[Event]: WHEN user navigates to /library THEN route to ContentLibraryPage */}
         <Route path="/library" element={<ContentLibraryPage />} />
 
-        {/* ── Protected Core ────────────────────────────────────────────────── */}
-        <Route path="/dashboard" element={
-          <ProtectedRoute><Dashboard /></ProtectedRoute>
-        } />
+        {/* ── Protected Core (Student) ────────────────────────────────────────── */}
+
+
+        <Route element={<ProfileLayout />}>
+          <Route path="/profile" element={<ProtectedRoute><UserProfilePage /></ProtectedRoute>} />
+          <Route path="/practice-history" element={<ProtectedRoute><UserProfilePage /></ProtectedRoute>} />
+          <Route path="/study-plan" element={<ProtectedRoute><UserProfilePage /></ProtectedRoute>} />
+        </Route>
+
+        {/* ── Tutor Section ── */}
         <Route element={<TutorLayout />}>
           <Route path="/tutor/dashboard" element={
             <ProtectedRoute role="tutor"><TutorDashboard /></ProtectedRoute>
           } />
-          {/* Activity log cho Tutor */}
+          <Route path="/tutor/profile" element={
+            <ProtectedRoute role="tutor"><TutorProfilePage /></ProtectedRoute>
+          } />
           <Route path="/tutor/activity-log" element={
             <ProtectedRoute role="tutor"><TutorActivityLogPage /></ProtectedRoute>
           } />
-          {/* Hàng chờ chấm */}
           <Route path="/grading/tutor/queue" element={
             <ProtectedRoute role="tutor"><TutorQueuePage /></ProtectedRoute>
           } />
-          {/* Thư viện tài liệu cho Tutor */}
-          <Route path="/tutor/library" element={
-            <ProtectedRoute role="tutor"><TutorLibraryPage /></ProtectedRoute>
-          } />
-          <Route path="/tutor/library/create" element={
-            <ProtectedRoute role="tutor"><TutorLibraryCreatePage /></ProtectedRoute>
-          } />
-          <Route path="/tutor/library/edit/:id" element={
-            <ProtectedRoute role="tutor"><TutorLibraryEditPage /></ProtectedRoute>
-          } />
-          {/* Trang chấm điểm cho Tutor (Split view) */}
-          <Route path="/grading/tutor/grade/:type/:submissionId" element={
-            <ProtectedRoute role="tutor"><TutorGradingPage /></ProtectedRoute>
-          } />
         </Route>
-        <Route path="/profile" element={
-          <ProtectedRoute><UserProfilePage /></ProtectedRoute>
-        } />
         {/* ── Admin Section — nested under AdminLayout (sidebar + topbar + footer) ── */}
         <Route path="/admin" element={
           <ProtectedRoute role="admin"><AdminLayout /></ProtectedRoute>
@@ -199,7 +184,10 @@ function App() {
         } />
 
         {/* ── Subjective — Tutor Workspace (role guard) ─────────────────────── */}
-        {/* Các route của Tutor đã được chuyển vào TutorLayout phía trên */}
+        {/* /grading/tutor/queue đã được chuyển vào TutorLayout */}
+        <Route path="/grading/tutor/grade/:type/:submissionId" element={
+          <ProtectedRoute role="tutor"><TutorGradingPage /></ProtectedRoute>
+        } />
 
         {/* ── Objective Testing — Student: Browsing ─────────────────────────── */}
         <Route path="/tests" element={<TestListPage />} />
@@ -264,7 +252,7 @@ function App() {
           <ProtectedRoute><AuditLogPage /></ProtectedRoute>
         } />
 
-        {/* ── 404 — "Về trang chủ" → /dashboard ────────────────────────────── */}
+        {/* ── 404 — "Về trang chủ" → / ────────────────────────────── */}
         <Route path="*" element={<NotFoundPage />} />
 
       </Routes>
