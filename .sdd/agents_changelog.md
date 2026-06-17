@@ -97,3 +97,23 @@
 | Date | Agent | File Changed | Summary |
 |------|-------|-------------|---------|
 | 2026-06-15 | Antigravity | `frontend/index.html` | **Fix icon Profile (DESIGN.md):** Trang `/profile` và `StudentLayout` dùng rất nhiều Bootstrap Icons (`bi bi-*`) nhưng `index.html` chỉ nạp Bootstrap CSS/JS, THIẾU font Bootstrap Icons → toàn bộ icon hiển thị trống/lỗi. Thêm `<link>` CDN `bootstrap-icons@1.11.3` để icon render đúng. Không đổi logic, chỉ bổ sung stylesheet. |
+
+## 2026-06-15
+
+| Date | Agent | File Changed | Summary |
+|------|-------|-------------|---------|
+| 2026-06-15 | Antigravity | `frontend/src/layouts/TutorLayout.jsx` | **UI Cleanup:** Xóa 2 mục sidebar của Tutor: "Phản hồi" (`/grading/tutor/feedback`) và "Thêm giải thích đáp án" (`/tutor/explain`) theo yêu cầu của team. |
+| 2026-06-15 | Antigravity | `frontend/src/pages/grading/TutorGradingHistoryPage.jsx` | **[NEW] Trang Lịch sử chấm bài:** Xây dựng đầy đủ theo DESIGN.md (Uber-inspired, black/white, pill radius 999px). Bao gồm: (1) 3 StatCards tổng quan (tổng bài chấm, band trung bình - dark variant, số khiếu nại); (2) Bảng 7 cột với avatar học sinh, kỹ năng pill, band score, feedback tags, status pill màu; (3) Bộ lọc: search, thời gian, kỹ năng, band điểm — đều là FilterDropdown pill tự build; (4) Phân trang client-side; (5) Modal xem chi tiết; (6) Modal xác nhận thu hồi kết quả; (7) Icon action buttons (xem/sửa/thu hồi). Dữ liệu mock — cần nối API khi backend sẵn sàng. |
+| 2026-06-15 | Antigravity | `frontend/src/App.jsx` | **Routing:** Thêm import + route `/grading/tutor/schedule` → `TutorGradingHistoryPage` dưới `TutorLayout` (ProtectedRoute role="tutor"). |
+
+## 2026-06-15 (refactor — Constitution compliance)
+
+| Date | Agent | File Changed | Summary |
+|------|-------|-------------|---------|
+| 2026-06-15 | Antigravity | `frontend/src/pages/grading/TutorGradingHistoryPage.jsx` | **[FIX] Bước 1:** Xóa unused `Link` import; sửa `TIME_RANGES` duplicate ('7 ngày qua' × 2 → '7 ngày qua' + '30 ngày qua'); thay `console.log` vi phạm Constitution ARTICLE 2 bằng TODO comment + proper handler. |
+| 2026-06-15 | Antigravity | `frontend/src/components/common/FilterDropdown.jsx` | **[NEW] Bước 2 — Tách file:** Extract `FilterDropdown` thành component tái sử dụng riêng. Hỗ trợ string[] và object[] options. 83 dòng. |
+| 2026-06-15 | Antigravity | `frontend/src/components/grading/GradingDetailModal.jsx` | **[NEW] Bước 2:** Extract modal xem chi tiết bài chấm. Props-driven (statusMap, skillMap). 152 dòng. |
+| 2026-06-15 | Antigravity | `frontend/src/components/grading/GradingRevokeModal.jsx` | **[NEW] Bước 2:** Extract modal thu hồi kết quả — cải tiến UX: thêm warning icon ⚠️, center layout, highlight text cảnh báo đỏ. 82 dòng. |
+| 2026-06-15 | Antigravity | `frontend/src/components/grading/GradingHistoryTable.jsx` | **[NEW] Bước 2:** Extract bảng + rows + IconBtn thành component riêng. Props: rows, statusMap, skillMap, onView, onRevoke. 193 dòng. |
+| 2026-06-15 | Antigravity | `frontend/src/pages/grading/TutorGradingHistoryPage.jsx` | **Bước 2 — Rewrite:** Giảm từ 768 dòng → 170 dòng (tuân thủ Constitution ARTICLE 2 max 300). Chỉ còn StatCard, Pagination inline + orchestrate các component đã tách. |
+| 2026-06-15 | Antigravity | `frontend/src/services/gradingHistory.service.js` | **[NEW] Bước 3 — Service layer:** Mock data dời ra service; export `getGradingHistory`, `getGradingHistoryById`, `revokeGradingResult`, `updateGradingScore` — tất cả đều có TODO comment hướng dẫn nối API backend. Response format tuân thủ `{ success, data, error, meta }` (Constitution ARTICLE 2). |

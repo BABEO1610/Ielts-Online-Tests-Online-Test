@@ -15,7 +15,9 @@
     "axios": "^1.17.0",
     "bootstrap": "^5.3.8",
     "framer-motion": "^12.40.0",
+    "html2pdf.js": "^0.14.0",
     "json-server": "^1.0.0-beta.15",
+    "lucide-react": "^1.18.0",
     "prop-types": "^15.8.1",
     "react": "^19.2.6",
     "react-bootstrap": "^2.10.10",
@@ -27,7 +29,6 @@
     "recharts": "^3.8.1",
     "socket.io-client": "^4.8.3",
     "zod": "^4.4.3"
-
   },
   "devDependencies": {
     "@babel/core": "^7.29.0",

@@ -2,7 +2,7 @@ import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { BrowserRouter } from 'react-router-dom';
-import SpeakingPage from '../../src/pages/SpeakingPage';
+import SpeakingPage from '../../src/pages/subjective-testing/SpeakingPage';
 
 vi.mock('../../src/components/layout/StudentNavbar', () => ({
   default: () => <nav>StudentNavbar</nav>
@@ -37,8 +37,7 @@ describe('SpeakingPage Component', () => {
     fireEvent.click(xemDeBtns[0]);
 
     // Now in Part List
-    const lamBaiBtns = screen.getAllByText('Vào phòng thi →');
-    fireEvent.click(lamBaiBtns[0]);
+    fireEvent.click(screen.getByText('Bắt đầu làm bài thi'));
 
     // Mode Selector should appear
     expect(screen.getByText('Choose a mode')).toBeInTheDocument();

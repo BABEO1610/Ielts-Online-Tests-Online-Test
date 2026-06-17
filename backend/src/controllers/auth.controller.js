@@ -139,7 +139,7 @@ const logout = async (req, res, next) => {
     // Tuy nhiên theo luồng chuẩn, logout cần được gọi qua middleware authenticate.
     // Assuming req.user is set by authenticate middleware.
     let sessionToken = null;
-    if (req.user && req.user.session_token) {
+    if (req.user?.session_token) {
       sessionToken = req.user.session_token;
     } else {
       // Fallback đọc từ token nếu không qua authenticate middleware
@@ -344,7 +344,13 @@ const googleCallback = async (req, res, next) => {
     // Consistent with local login: always redirect to dashboard
     return res.redirect(`${frontendUrl}/dashboard`);
   } catch (error) {
-    next(error);
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+    let errorCode = error.code || 'UNKNOWN_ERROR';
+    if (error.code === 'ENOTFOUND' || error.message?.includes('ENOTFOUND')) {
+      errorCode = 'DB_CONNECTION_ERROR';
+    }
+    console.error('[OAuth Callback Error]', error);
+    return res.redirect(`${frontendUrl}/login?error=${errorCode}`);
   }
 };
 

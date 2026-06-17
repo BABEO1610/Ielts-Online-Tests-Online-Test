@@ -11,7 +11,6 @@
 import React, { useState, useCallback } from 'react';
 import { useLocation } from 'react-router-dom';
 import TimerBar from '../../components/objective-testing/TimerBar';
-import QuestionNavigation from '../../components/objective-testing/QuestionNavigation';
 import AutoSubmitModal from '../../components/objective-testing/AutoSubmitModal';
 import '../../styles/objective-testing.css';
 
@@ -38,6 +37,7 @@ function ListeningTestPage() {
 
   const [answers, setAnswers] = useState({});
   const [currentQuestion, setCurrentQuestion] = useState(1);
+  const [activeSection, setActiveSection] = useState(allowedSections[0]);
   const [showAutoSubmit, setShowAutoSubmit] = useState(false);
 
   const handleAnswer = useCallback((qOrder, value) => {
@@ -100,16 +100,16 @@ function ListeningTestPage() {
       </div>
 
       {/* Main Content */}
-      <div className="container py-4" style={{ maxWidth: 900 }}>
+      <div className="container py-4" style={{ maxWidth: 900, paddingBottom: '100px' }}>
         <div className="row g-4">
-          {/* Left — Questions */}
-          <div className="col-lg-8">
-            {Object.entries(sections).map(([sectionName, questions]) => (
-              <div key={sectionName} className="mb-4">
-                <h5 className="display-sm mb-3" style={{ borderBottom: '2px solid var(--ink)', paddingBottom: 8, display: 'inline-block' }}>
-                  {sectionName}
+          {/* Main Question Column */}
+          <div className="col-12">
+            {sections[activeSection] && (
+              <div className="mb-4 pb-5">
+                <h5 className="display-sm mb-4" style={{ borderBottom: '2px solid var(--ink)', paddingBottom: 8, display: 'inline-block' }}>
+                  {activeSection.replace('Section', 'Part')}
                 </h5>
-                {questions.map((q) => (
+                {sections[activeSection].map((q) => (
                   <div
                     key={q.id}
                     id={`lq-${q.order}`}
@@ -119,7 +119,7 @@ function ListeningTestPage() {
                     }}
                     onClick={() => setCurrentQuestion(q.order)}
                   >
-                    <div className="d-flex align-items-center gap-2 mb-2">
+                    <div className="d-flex align-items-center gap-2 mb-3">
                       <span style={{
                         width: 28, height: 28, borderRadius: 'var(--rounded-md)',
                         background: answeredQuestions.includes(q.order) ? 'var(--ink)' : 'var(--canvas-soft)',
@@ -136,31 +136,32 @@ function ListeningTestPage() {
                     <p className="body-md-strong mb-3">{q.text}</p>
 
                     {q.type === 'mcq' ? (
-                      <div>
+                      <div className="d-flex flex-column gap-2">
                         {q.options.map((opt) => (
                           <label
                             key={opt.label}
                             className={`option-card ${answers[q.order] === opt.label ? 'selected' : ''}`}
                             id={`l-option-${q.order}-${opt.label}`}
+                            style={{ margin: 0, padding: '12px 16px', alignItems: 'flex-start' }}
                           >
                             <input
                               type="radio"
                               name={`lq-${q.order}`}
-                              className="form-check-input"
+                              className="form-check-input flex-shrink-0 mt-1"
                               value={opt.label}
                               checked={answers[q.order] === opt.label}
                               onChange={() => handleAnswer(q.order, opt.label)}
                               style={{ margin: 0 }}
                             />
-                            <span className="body-md-strong" style={{ minWidth: 20 }}>{opt.label}.</span>
-                            <span className="body-md">{opt.text}</span>
+                            <span className="body-md-strong flex-shrink-0 mt-1" style={{ minWidth: 24 }}>{opt.label}.</span>
+                            <span className="body-md mt-1">{opt.text}</span>
                           </label>
                         ))}
                       </div>
                     ) : (
                       <input
                         type="text"
-                        className="text-input"
+                        className="text-input w-100"
                         id={`l-input-${q.order}`}
                         placeholder="Type your answer..."
                         value={answers[q.order] || ''}
@@ -170,20 +171,47 @@ function ListeningTestPage() {
                   </div>
                 ))}
               </div>
-            ))}
+            )}
           </div>
+        </div>
+      </div>
 
-          {/* Right — Question Nav */}
-          <div className="col-lg-4">
-            <div style={{ position: 'sticky', top: 180 }}>
-              <QuestionNavigation
-                totalQuestions={filteredQuestions.length}
-                currentQuestion={currentQuestion}
-                answeredQuestions={answeredQuestions}
-                onNavigate={scrollToQuestion}
-              />
-            </div>
-          </div>
+      {/* Bottom Navigation */}
+      <div className="bottom-nav-bar">
+        <div className="bottom-nav-tabs">
+          {allowedSections.map((sectionName, index) => {
+            const partNum = index + 1;
+            const isActive = activeSection === sectionName;
+            const partQuestions = sections[sectionName] || [];
+            
+            return (
+              <div 
+                key={sectionName} 
+                className={`bottom-nav-tab ${isActive ? 'active' : ''}`}
+                onClick={() => setActiveSection(sectionName)}
+              >
+                <span className="fw-bold">Part {partNum}</span>
+                {isActive ? (
+                  <div className="d-flex gap-2 ms-2">
+                    {partQuestions.map(q => (
+                      <div 
+                        key={q.id}
+                        className={`q-circle ${answeredQuestions.includes(q.order) ? 'answered' : ''} ${currentQuestion === q.order ? 'current' : ''}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          scrollToQuestion(q.order);
+                        }}
+                      >
+                        {q.order}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <span style={{ color: 'var(--body)' }}>: {partQuestions.filter(q => answeredQuestions.includes(q.order)).length} of {partQuestions.length} questions</span>
+                )}
+              </div>
+            )
+          })}
         </div>
       </div>
 
