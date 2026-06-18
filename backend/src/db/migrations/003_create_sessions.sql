@@ -27,7 +27,8 @@ EXECUTE FUNCTION set_updated_at();
 
 -- EARS[State-driven]: WHILE a request passes through the Authenticated Middleware, THE system SHALL decode the JWT and match the session_token against user_sessions. If revoked_at IS NOT NULL OR expires_at < NOW() OR user status != 'active', deny access.
 -- Tạo view v_active_sessions để query các session hợp lệ dễ dàng
-CREATE OR REPLACE VIEW v_active_sessions AS
+DROP VIEW IF EXISTS v_active_sessions CASCADE;
+CREATE VIEW v_active_sessions AS
 SELECT *
 FROM user_sessions
 WHERE revoked_at IS NULL AND expires_at > NOW();

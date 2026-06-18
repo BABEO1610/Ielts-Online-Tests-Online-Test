@@ -185,12 +185,68 @@ const SAMPLE_CHANGES = [
   },
 ];
 
-export async function fetchChangeLog() {
-  try { return ok((await api.get('/admin/change-log')).data.data); }
-  catch { return sample(SAMPLE_CHANGES); }
+export async function fetchChangeLog(params = {}) {
+  try {
+    const qs = new URLSearchParams();
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== '') qs.set(key, value);
+    });
+    const suffix = qs.toString() ? `?${qs.toString()}` : '';
+    const res = await api.get(`/admin/change-logs${suffix}`);
+    const rows = (res.data.data ?? []).map(normalizeChangeLogRow);
+    return { data: rows, meta: res.data.meta ?? null, isSample: false };
+  }
+  catch {
+    const page = Math.max(1, Number(params.page || 1));
+    const limit = Math.max(1, Number(params.limit || 10));
+    const search = String(params.search || params.action || '').toLowerCase();
+    const filtered = search
+      ? SAMPLE_CHANGES.filter((change) => String(change.action).toLowerCase().includes(search))
+      : SAMPLE_CHANGES;
+    const start = (page - 1) * limit;
+    return {
+      data: filtered.slice(start, start + limit),
+      meta: {
+        page,
+        limit,
+        total: filtered.length,
+        summary: {
+          total: SAMPLE_CHANGES.length,
+          undoable: SAMPLE_CHANGES.filter((change) => change.revertable).length,
+          undone: SAMPLE_CHANGES.filter((change) => change.reverted).length,
+        },
+      },
+      isSample: true,
+    };
+  }
+}
+
+export async function fetchChangeLogDetail(id) {
+  try {
+    const res = await api.get(`/admin/change-logs/${id}`);
+    return ok(normalizeChangeLogRow(res.data.data));
+  } catch {
+    return sample(SAMPLE_CHANGES.find((change) => change.id === id) || null);
+  }
 }
 
 export async function revertChange(id) {
-  try { await api.post(`/admin/change-log/${id}/revert`); return true; }
+  try { await api.post(`/admin/change-logs/${id}/undo`); return true; }
   catch { return true; }
 }
+
+const normalizeChangeLogRow = (row) => ({
+  id: row.id,
+  created_at: row.created_at || row.time,
+  actor: row.actor?.full_name || row.actor?.email || row.admin?.full_name || row.admin?.email || 'System',
+  action: row.action,
+  action_label: row.action_label,
+  target_table: row.target_table,
+  target_id: row.target_id,
+  target_label: row.target_label || row.target_id,
+  old_value: row.old_value || {},
+  new_value: row.new_value || {},
+  reverted: row.status === 'undone' || Boolean(row.undone_at),
+  revertable: Boolean(row.can_undo),
+  undo_log_id: row.undo_log_id,
+});

@@ -144,7 +144,8 @@ const changeUserRole = async (actorId, targetId, role) => {
     targetId,
     { role: oldUser.role },
     { role: updatedUser.role },
-    null
+    null,
+    true
   );
   
   const { password_hash, ...safeUser } = updatedUser;
@@ -193,7 +194,8 @@ const changeUserStatus = async (actorId, targetId, status) => {
     targetId,
     { status: oldUser.status },
     { status: updatedUser.status },
-    null
+    null,
+    true
   );
   
   const { password_hash, ...safeUser } = updatedUser;

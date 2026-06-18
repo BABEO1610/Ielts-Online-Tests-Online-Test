@@ -29,7 +29,7 @@ describe('Audit Logs Database Queries', () => {
 
     describe('insertAuditLog', () => {
         it('should correctly insert an audit log record (Happy Path)', async () => {
-            mockPool.query.mockResolvedValueOnce({ rowCount: 1 });
+            mockPool.query.mockResolvedValueOnce({ rows: [{ id: 'log-1' }] });
 
             const logData = {
                 actor_id: '123e4567-e89b-12d3-a456-426614174000',
@@ -48,6 +48,7 @@ describe('Audit Logs Database Queries', () => {
             const valuesArg = mockPool.query.mock.calls[0][1];
 
             expect(queryArg).toContain('INSERT INTO audit_logs');
+            expect(queryArg).toContain('RETURNING *');
             expect(valuesArg).toEqual([
                 logData.actor_id,
                 logData.action,
@@ -55,12 +56,13 @@ describe('Audit Logs Database Queries', () => {
                 logData.target_id,
                 JSON.stringify(logData.old_value),
                 JSON.stringify(logData.new_value),
-                logData.ip_address
+                logData.ip_address,
+                false
             ]);
         });
 
         it('should insert an audit log record with null optional fields', async () => {
-            mockPool.query.mockResolvedValueOnce({ rowCount: 1 });
+            mockPool.query.mockResolvedValueOnce({ rows: [{ id: 'log-1' }] });
 
             const logData = {
                 action: 'user_created',
@@ -77,7 +79,8 @@ describe('Audit Logs Database Queries', () => {
                 null, // target_id
                 null, // old_value
                 null, // new_value
-                null  // ip_address
+                null, // ip_address
+                false // can_undo
             ]);
         });
 
@@ -110,7 +113,7 @@ describe('Audit Logs Database Queries', () => {
             expect(mockPool.query.mock.calls[0][1]).toEqual([]);
 
             // Second query: SELECT data
-            expect(mockPool.query.mock.calls[1][0]).toContain('ORDER BY created_at DESC');
+            expect(mockPool.query.mock.calls[1][0]).toContain('ORDER BY audit_logs.created_at DESC');
             expect(mockPool.query.mock.calls[1][0]).toContain('LIMIT $1 OFFSET $2');
             expect(mockPool.query.mock.calls[1][1]).toEqual([20, 0]); // limit 20, offset 0
         });
@@ -135,7 +138,7 @@ describe('Audit Logs Database Queries', () => {
 
             const countQueryStr = mockPool.query.mock.calls[0][0];
             const countQueryParams = mockPool.query.mock.calls[0][1];
-            expect(countQueryStr).toContain('WHERE actor_id = $1 AND action = $2 AND target_table = $3 AND target_id = $4');
+            expect(countQueryStr).toContain('WHERE audit_logs.actor_id = $1 AND audit_logs.action = $2 AND audit_logs.target_table = $3 AND audit_logs.target_id = $4');
             expect(countQueryParams).toEqual([
                 'actor-uuid',
                 'role_changed',
