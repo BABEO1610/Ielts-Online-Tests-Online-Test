@@ -77,11 +77,13 @@ const ContentReviewPage = () => {
                       <td><span className="pill pill--info text-capitalize">{t.skill}</span></td>
                       <td className="text-secondary text-capitalize">{t.difficulty}</td>
                       <td>{t.created_by}</td>
-                      <td className="text-secondary">{formatDateTime(t.submitted_at)}</td>
-                      <td className="text-secondary">{t.publish_at ? formatDateTime(t.publish_at) : 'Đăng ngay'}</td>
+                      <td className="text-secondary" style={{ whiteSpace: 'nowrap' }}>{formatDateTime(t.submitted_at)}</td>
+                      <td className="text-secondary" style={{ whiteSpace: 'nowrap' }}>{t.publish_at ? formatDateTime(t.publish_at) : 'Đăng ngay'}</td>
                       <td className="text-end">
-                        <button className="btn-pill btn-pill--dark me-2" onClick={() => onReviewTest(t.id, 'approve')}>Duyệt</button>
-                        <button className="btn-pill btn-pill--ghost" onClick={() => onReviewTest(t.id, 'reject')}>Từ chối</button>
+                        <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', flexWrap: 'nowrap' }}>
+                          <button className="btn-pill btn-pill--dark" onClick={() => onReviewTest(t.id, 'approve')}>Duyệt</button>
+                          <button className="btn-pill btn-pill--reject" onClick={() => onReviewTest(t.id, 'reject')}>Từ chối</button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -98,10 +100,12 @@ const ContentReviewPage = () => {
                       <td><span className="pill pill--neutral text-uppercase">{r.resource_type}</span></td>
                       <td className="text-secondary">{formatBytes(r.file_size_bytes)}</td>
                       <td>{r.uploaded_by}</td>
-                      <td className="text-secondary">{formatDateTime(r.created_at)}</td>
+                      <td className="text-secondary" style={{ whiteSpace: 'nowrap' }}>{formatDateTime(r.created_at)}</td>
                       <td className="text-end">
-                        <button className="btn-pill btn-pill--dark me-2" onClick={() => onReviewResource(r.id, 'approve')}>Duyệt</button>
-                        <button className="btn-pill btn-pill--ghost" onClick={() => onReviewResource(r.id, 'reject')}>Từ chối</button>
+                        <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', flexWrap: 'nowrap' }}>
+                          <button className="btn-pill btn-pill--dark" onClick={() => onReviewResource(r.id, 'approve')}>Duyệt</button>
+                          <button className="btn-pill btn-pill--reject" onClick={() => onReviewResource(r.id, 'reject')}>Từ chối</button>
+                        </div>
                       </td>
                     </tr>
                   ))}

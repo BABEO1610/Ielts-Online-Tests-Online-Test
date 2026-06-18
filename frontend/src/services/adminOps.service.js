@@ -56,11 +56,6 @@ const SAMPLE_SESSIONS = [
   { id: 'se3', user: 'admin@ieltszone.vn', email: 'admin@ieltszone.vn', ip: '45.227.255.206', device: 'Firefox · Linux', is_oauth: false, provider: null, last_active_at: iso(0, -8), expires_at: iso(2) },
 ];
 
-const SAMPLE_CONTACTS = [
-  { id: 'c1', name: 'Phạm Thu Hà', email: 'hapham@gmail.com', subject: 'Không nhận được email xác nhận', message: 'Em đăng ký nhưng chưa nhận được email kích hoạt tài khoản ạ.', resolved: false, created_at: iso(0, -2) },
-  { id: 'c2', name: 'Trần Văn Long', email: 'longtran@gmail.com', subject: 'Lỗi nộp bài Writing', message: 'Khi em nộp bài thì báo lỗi, mong trung tâm hỗ trợ.', resolved: false, created_at: iso(-1) },
-  { id: 'c3', name: 'Lê Minh', email: 'leminh@gmail.com', subject: 'Hỏi về khoá học', message: 'Cho em hỏi lộ trình luyện thi mục tiêu 7.0 ạ.', resolved: true, created_at: iso(-3) },
-];
 
 const SAMPLE_REPORT = [
   { day: iso(-6), new_users: 1, test_attempts: 4, ai_calls: 88, submissions: 6 },
@@ -85,23 +80,23 @@ const SAMPLE_ASSIGNMENTS = [
 
 // ── Content review ───────────────────────────────────────────────────────────
 export async function fetchPendingTests() {
-  try { return ok((await api.get('/admin/tests?status=pending')).data.data); }
+  try { return ok((await api.get('/admin/content/tests')).data.data); }
   catch { return sample(SAMPLE_PENDING_TESTS); }
 }
 export async function fetchPendingResources() {
-  try { return ok((await api.get('/admin/resources?status=pending')).data.data); }
+  try { return ok((await api.get('/admin/content/resources')).data.data); }
   catch { return sample(SAMPLE_PENDING_RESOURCES); }
 }
 export async function fetchPublishSchedule() {
-  try { return ok((await api.get('/admin/publish-schedule')).data.data); }
+  try { return ok((await api.get('/admin/content/schedule')).data.data); }
   catch { return sample(SAMPLE_SCHEDULE); }
 }
 export async function reviewTest(id, action) {
-  try { await api.put(`/admin/tests/${id}/review`, { action }); return true; }
+  try { await api.put(`/admin/content/tests/${id}/review`, { action }); return true; }
   catch { return true; } // dev fallback: optimistic
 }
 export async function reviewResource(id, action) {
-  try { await api.put(`/admin/resources/${id}/review`, { action }); return true; }
+  try { await api.put(`/admin/content/resources/${id}/review`, { action }); return true; }
   catch { return true; }
 }
 
@@ -127,8 +122,13 @@ export async function revokeSession(id) {
 
 // ── Contact inbox ───────────────────────────────────────────────────────────────
 export async function fetchContacts() {
-  try { return ok((await api.get('/admin/contacts')).data.data); }
-  catch { return sample(SAMPLE_CONTACTS); }
+  try {
+    const res = await api.get('/admin/contacts');
+    return ok(res.data.data ?? []);
+  } catch {
+    // Trả mảng rỗng — không dùng sample data vì backend đã có, trang sẽ hiện "Không có liên hệ nào."
+    return ok([]);
+  }
 }
 export async function resolveContact(id) {
   try { await api.put(`/admin/contacts/${id}/resolve`); return true; }

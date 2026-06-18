@@ -11,7 +11,7 @@
  * @param {Object} sessionsService - Injected sessions service
  * @returns {Object} Controller methods
  */
-const adminControllerFactory = (usersService, AppError, sessionsService) => {
+const adminControllerFactory = (usersService, AppError, sessionsService, contactsService) => {
   return {
     /**
      * Handler for listing users with pagination and filters
@@ -161,6 +161,52 @@ const adminControllerFactory = (usersService, AppError, sessionsService) => {
         res.status(200).json({
           success: true,
           data: result,
+          error: null,
+          meta: null
+        });
+      } catch (error) {
+        next(error);
+      }
+    },
+
+    /**
+     * Lấy toàn bộ danh sách liên hệ từ contact_submissions.
+     * EARS[Event]: WHEN Admin requests GET /admin/contacts, THE system SHALL return all contact submissions.
+     *
+     * @param {import('express').Request} req
+     * @param {import('express').Response} res
+     * @param {import('express').NextFunction} next
+     */
+    listContacts: async (req, res, next) => {
+      try {
+        const contacts = await contactsService.listContacts();
+        res.status(200).json({
+          success: true,
+          data: contacts,
+          error: null,
+          meta: { total: contacts.length }
+        });
+      } catch (error) {
+        next(error);
+      }
+    },
+
+    /**
+     * Đánh dấu một liên hệ là đã xử lý.
+     * EARS[Event]: WHEN Admin calls PUT /admin/contacts/:id/resolve,
+     * THE system SHALL set resolved = TRUE on the contact record.
+     *
+     * @param {import('express').Request} req
+     * @param {import('express').Response} res
+     * @param {import('express').NextFunction} next
+     */
+    resolveContact: async (req, res, next) => {
+      try {
+        const { id } = req.params;
+        const updated = await contactsService.resolveContact(id, AppError);
+        res.status(200).json({
+          success: true,
+          data: updated,
           error: null,
           meta: null
         });

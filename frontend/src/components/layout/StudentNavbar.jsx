@@ -58,7 +58,7 @@ const StudentNavbar = () => {
   return (
     <nav className="navbar navbar-expand-lg bg-white border-bottom sticky-top px-3 px-md-5 py-3">
       <div className="container-fluid p-0">
-        <Link className="navbar-brand fw-bold text-dark fs-4" to="/dashboard" style={{ fontFamily: 'UberMove, system-ui, sans-serif' }}>
+        <Link className="navbar-brand fw-bold text-dark fs-4" to="/" style={{ fontFamily: 'UberMove, system-ui, sans-serif' }}>
           IELTSZone
         </Link>
 

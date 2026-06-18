@@ -498,6 +498,22 @@
 .btn-pill--dark:hover { background: var(--black-elevated); }
 .btn-pill--ghost { background: var(--canvas); color: var(--ink); border-color: var(--surface-pressed); }
 .btn-pill--ghost:hover { background: var(--canvas-soft); }
+/* Reject/danger variant — soft red, no fill, pill shape */
+.btn-pill--reject {
+  background: #fdecec;
+  color: #c92a2a;
+  border-color: #f5b8b8;
+}
+.btn-pill--reject:hover {
+  background: #fad7d7;
+  border-color: #e88585;
+}
+
+/* ── Table wrapper inside admin-card ─────────────────────────── */
+.admin-card > .table-responsive {
+  border-radius: var(--rounded-xl);
+  overflow: hidden;
+}
 
 /* ── Inputs ─────────────────────────────────────────────────── */
 .admin-input {

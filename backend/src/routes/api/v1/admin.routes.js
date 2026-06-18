@@ -4,12 +4,13 @@ const router = express.Router();
 const AppError = require('../../../utils/AppError');
 const usersService = require('../../../services/users.service');
 const sessionsService = require('../../../services/sessions.service');
+const contactsService = require('../../../services/contacts.service');
 const adminControllerFactory = require('../../../controllers/admin.controller');
 const authorizeFactory = require('../../../middleware/authorize');
 const authenticate = require('../../../middleware/authenticate');
 
-// Inject sessionsService vào factory (Dependency Injection pattern)
-const adminController = adminControllerFactory(usersService, AppError, sessionsService);
+// Inject dependencies (Dependency Injection pattern)
+const adminController = adminControllerFactory(usersService, AppError, sessionsService, contactsService);
 const authorize = authorizeFactory(AppError);
 
 // T039: API quản lý user dành cho Admin
@@ -21,5 +22,22 @@ router.put('/users/:id/status', authenticate, authorize('admin'), adminControlle
 // SEC-07: Mọi endpoint mutating (DELETE) phải có auth middleware
 router.get('/sessions', authenticate, authorize('admin'), adminController.listSessions);
 router.delete('/sessions/:id', authenticate, authorize('admin'), adminController.revokeSession);
+
+// API hộp thư liên hệ (Contact Inbox)
+// SEC-07: GET read-only cũng cần authenticate vì dữ liệu nhạy cảm
+router.get('/contacts', authenticate, authorize('admin'), adminController.listContacts);
+router.put('/contacts/:id/resolve', authenticate, authorize('admin'), adminController.resolveContact);
+
+// -------------------------------------------------------------
+// T040: API duyệt nội dung (Content Review) dành cho Admin
+// -------------------------------------------------------------
+const adminContentController = require('../../../controllers/adminContent.controller');
+
+router.get('/content/tests', authenticate, authorize('admin'), adminContentController.getPendingTests);
+router.get('/content/resources', authenticate, authorize('admin'), adminContentController.getPendingResources);
+router.get('/content/schedule', authenticate, authorize('admin'), adminContentController.getPublishSchedule);
+
+router.put('/content/tests/:id/review', authenticate, authorize('admin'), adminContentController.reviewTest);
+router.put('/content/resources/:id/review', authenticate, authorize('admin'), adminContentController.reviewResource);
 
 module.exports = router;
