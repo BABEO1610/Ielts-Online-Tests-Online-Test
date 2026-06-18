@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Toaster, toast } from 'react-hot-toast';
 import StudentNavbar from '../../components/layout/StudentNavbar';
 import { getLibraryResources } from '../../services/library.service';
-import html2pdf from 'html2pdf.js';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 const SKILL_FILTERS = [
@@ -257,9 +256,39 @@ const TestPreviewModal = ({ test, onClose, onDownload, downloadingId }) => {
 
   if (!test) return null;
 
+  const getFullUrl = (path) => {
+    if (!path) return '';
+    if (path.startsWith('http')) return path;
+    const baseUrl = import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL.replace('/api/v1', '') : 'http://localhost:3000';
+    return `${baseUrl}${path}`;
+  };
+
   const renderContent = () => {
+    if (test.resource_type === 'pdf' && test.file_url) {
+      return (
+        <div style={{ height: '70vh' }}>
+          <iframe 
+            src={getFullUrl(test.file_url)} 
+            width="100%" 
+            height="100%" 
+            title={test.title}
+            style={{ border: 'none' }}
+          />
+        </div>
+      );
+    }
+
+    if (test.resource_type === 'audio' && test.file_url) {
+      return (
+        <div className="text-center py-5">
+          <i className="bi bi-music-note-beamed text-muted mb-4 d-block" style={{ fontSize: '64px' }}></i>
+          <audio controls src={getFullUrl(test.file_url)} className="w-100" />
+        </div>
+      );
+    }
+
     const { content } = test;
-    if (!content) return <p className="text-muted">Nội dung đang được cập nhật.</p>;
+    if (!content) return <p className="text-muted text-center py-4">Nội dung đang được cập nhật.</p>;
     switch (content.type) {
       case 'reading': return <ReadingPreview content={content} />;
       case 'listening': return <ListeningPreview content={content} />;
@@ -380,7 +409,8 @@ const ContentLibraryPage = () => {
             audioSize: item.resource_type === 'audio' ? (item.file_size_bytes / 1024 / 1024).toFixed(1) + ' MB' : null,
             content: null,
             file_url: item.file_url,
-            resource_type: item.resource_type
+            resource_type: item.resource_type,
+            category: item.category
           }));
           setResources(mapped);
         }
@@ -397,76 +427,46 @@ const ContentLibraryPage = () => {
     return () => clearTimeout(timeoutId);
   }, [searchQuery, activeSkill]);
 
-  const handleDownload = (id, type, title, sourceElement = null) => {
+  const handleDownload = async (id, type, title, sourceElement = null) => {
     if (downloadingId) return;
     setDownloadingId(`${id}-${type}`);
     const toastId = toast.loading(`Đang tải ${type.toUpperCase()}...`);
 
-    setTimeout(() => {
-      if (type === 'pdf') {
-        if (!sourceElement) {
-          toast.error('Vui lòng ấn "Xem đề" và tải xuống từ giao diện xem trước để tạo PDF!', { id: toastId });
-          setDownloadingId(null);
-          return;
-        }
-
-        const opt = {
-          margin: 10,
-          filename: `${title}.pdf`,
-          image: { type: 'jpeg', quality: 0.98 },
-          html2canvas: {
-            scale: 2,
-            useCORS: true,
-            onclone: (clonedDoc) => {
-              // Mở toàn bộ thẻ details (đáp án mẫu) để in ra PDF
-              const details = clonedDoc.querySelectorAll('details');
-              details.forEach(d => d.setAttribute('open', 'true'));
-
-              // Loại bỏ giới hạn chiều cao (max-height) và thanh cuộn để hiển thị đủ toàn bộ chữ
-              const divs = clonedDoc.querySelectorAll('div');
-              divs.forEach(el => {
-                if (el.style.maxHeight) {
-                  el.style.maxHeight = 'none';
-                  el.style.overflow = 'visible';
-                  el.style.overflowY = 'visible';
-                }
-              });
-            }
-          },
-          pagebreak: { mode: ['css', 'legacy'] },
-          jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-        };
-
-        toast.loading('Đang xử lý nội dung trang để xuất PDF...', { id: toastId });
-        html2pdf().set(opt).from(sourceElement).save().then(() => {
-          toast.success(`Xuất PDF thành công!`, { id: toastId });
-          setDownloadingId(null);
-        }).catch(err => {
-          toast.error(`Có lỗi khi tạo file PDF`, { id: toastId });
-          setDownloadingId(null);
-        });
-
-      } else {
-        try {
-          // Download real file
-          const test = resources.find(r => r.id === id);
-          if (test && test.file_url) {
-            const link = document.createElement('a');
-            link.href = test.file_url;
-            link.setAttribute('download', `${title}`);
-            document.body.appendChild(link);
-            link.click();
-            link.parentNode.removeChild(link);
-            toast.success(`Tải AUDIO thành công!`, { id: toastId });
-          } else {
-            toast.error(`Không tìm thấy đường dẫn file`, { id: toastId });
-          }
-        } catch (error) {
-          toast.error(`Có lỗi khi tải file`, { id: toastId });
-        }
-        setDownloadingId(null);
+    try {
+      const test = resources.find(r => r.id === id);
+      if (!test || !test.file_url) {
+        throw new Error('Không tìm thấy đường dẫn file');
       }
-    }, 500);
+
+      const getFullUrl = (path) => {
+        if (!path) return '';
+        if (path.startsWith('http')) return path;
+        const baseUrl = import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL.replace('/api/v1', '') : 'http://localhost:3000';
+        return `${baseUrl}${path}`;
+      };
+
+      // Fetch blob để ép tải xuống với đúng định dạng (tránh tải nhầm file .htm do CORS)
+      const response = await fetch(getFullUrl(test.file_url));
+      if (!response.ok) throw new Error('Không thể fetch file');
+      const blob = await response.blob();
+      
+      const ext = type === 'pdf' ? '.pdf' : '.mp3';
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `${title}${ext}`);
+      document.body.appendChild(link);
+      link.click();
+      link.parentNode.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      
+      toast.success(`Tải file thành công!`, { id: toastId });
+    } catch (error) {
+      console.error('Download error:', error);
+      toast.error(`Có lỗi khi tải file, thử lại sau.`, { id: toastId });
+    } finally {
+      setDownloadingId(null);
+    }
   };
 
   return (
@@ -558,7 +558,7 @@ const ContentLibraryPage = () => {
                     <div className="d-flex justify-content-between align-items-center mb-3">
                       <div className="d-flex gap-2">
                         <span className={`badge rounded-pill ${SKILL_BADGE[test.skill]} text-capitalize`}>{test.resource_type}</span>
-                        <span className={`badge rounded-pill ${LEVEL_BADGE[test.level]}`}>Mới</span>
+                        <span className={`badge rounded-pill text-bg-secondary`}>{test.category || 'Tài liệu'}</span>
                       </div>
                       <span className="text-muted small">{test.resource_type === 'pdf' ? 'PDF' : 'Audio'}</span>
                     </div>
