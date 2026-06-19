@@ -119,9 +119,8 @@ async function uploadFileToSupabase(file) {
  * Lấy TẤT CẢ tài liệu đã published — hiển thị cho toàn bộ team tutor
  * @param {string|null} category - filter category
  */
-async function listResources(category) {
-  const cat = (!category || category === 'All') ? null : category;
-  return libraryQueries.getAllResources(cat);
+async function listResources(filters) {
+  return libraryQueries.getAllResources(filters || {});
 }
 
 /**
