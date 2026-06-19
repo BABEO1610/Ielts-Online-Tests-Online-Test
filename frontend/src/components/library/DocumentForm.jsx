@@ -67,12 +67,16 @@ const DocumentForm = ({ initialData, isEditMode }) => {
 
     try {
       if (isEditMode) {
-        // Chỉ cập nhật metadata (title, description, category)
-        await updateLibraryResource(initialData.id, {
-          title: data.title,
-          description: data.description,
-          category: data.category,
-        });
+        // Cập nhật metadata (title, description, category) và file nếu có
+        await updateLibraryResource(
+          initialData.id,
+          {
+            title: data.title,
+            description: data.description,
+            category: data.category,
+          },
+          selectedFile
+        );
       } else {
         await createLibraryResource(
           { title: data.title, description: data.description, category: data.category },
@@ -93,16 +97,16 @@ const DocumentForm = ({ initialData, isEditMode }) => {
   const getFileIcon = (file) => {
     if (!file) return null;
     const type = file.type || '';
-    const name = file.name || '';
-    if (type.includes('pdf') || name.toLowerCase().endsWith('.pdf')) {
+    const name = file.name?.toLowerCase() || '';
+    if (type.includes('pdf') || name.endsWith('.pdf'))
       return <i className="bi bi-file-earmark-pdf text-danger fs-4"></i>;
-    }
-    if (type.includes('audio') || name.toLowerCase().endsWith('.mp3')) {
+    if (type.includes('audio') || name.endsWith('.mp3') || name.endsWith('.wav') || name.endsWith('.ogg'))
       return <i className="bi bi-file-earmark-music text-primary fs-4"></i>;
-    }
-    if (type.includes('image')) {
+    if (type.includes('image'))
       return <i className="bi bi-file-earmark-image text-success fs-4"></i>;
-    }
+    if (name.endsWith('.zip') || name.endsWith('.rar') || name.endsWith('.7z')
+        || type.includes('zip') || type.includes('rar') || type.includes('7z'))
+      return <i className="bi bi-file-earmark-zip text-warning fs-4"></i>;
     return <i className="bi bi-file-earmark text-secondary fs-4"></i>;
   };
 
@@ -192,13 +196,16 @@ const DocumentForm = ({ initialData, isEditMode }) => {
             >
               <i className="bi bi-cloud-arrow-up text-muted mb-2" style={{ fontSize: '32px' }}></i>
               <h6 className="fw-bold mb-1" style={{ fontSize: '16px' }}>Kéo thả file vào đây hoặc nhấn để chọn</h6>
-              <p className="text-muted small mb-0">Hỗ trợ PDF, Audio (MP3), Hình ảnh (tối đa 50MB/file)</p>
+              <p className="text-muted small mb-0">
+                Hỗ trợ: PDF, Audio (MP3/WAV), Video (MP4)<br />
+                <span className="text-warning fw-medium">📦 ZIP / RAR / 7z</span> — để đóng gói nhiều file (đề + audio)
+              </p>
               <input
                 type="file"
                 className="d-none"
                 ref={fileInputRef}
                 onChange={handleFileInput}
-                accept=".pdf,.mp3,.mp4,.ogg,.wav,.jpg,.jpeg,.png,.gif"
+                accept=".pdf,.mp3,.mp4,.ogg,.wav,.jpg,.jpeg,.png,.gif,.zip,.rar,.7z"
               />
             </div>
           )}

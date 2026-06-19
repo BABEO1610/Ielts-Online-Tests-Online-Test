@@ -2,34 +2,54 @@ const path = require('path');
 const fs = require('fs');
 const libraryQueries = require('../db/queries/library.queries');
 const AppError = require('../utils/AppError');
+const supabase = require('../config/supabase');
 
 // MIME → resource_type enum mapping (theo DB schema)
 const MIME_TO_RESOURCE_TYPE = {
-  'application/pdf': 'pdf',
-  'audio/mpeg': 'audio',
-  'audio/mp4': 'audio',
-  'audio/ogg': 'audio',
-  'audio/wav': 'audio',
-  'video/mp4': 'video',
-  'image/jpeg': 'other',
-  'image/png': 'other',
-  'image/gif': 'other',
+  'application/pdf':             'pdf',
+  'audio/mpeg':                  'audio',
+  'audio/mp4':                   'audio',
+  'audio/ogg':                   'audio',
+  'audio/wav':                   'audio',
+  'video/mp4':                   'video',
+  'image/jpeg':                  'other',
+  'image/png':                   'other',
+  'image/gif':                   'other',
+  // Archive
+  'application/zip':             'other',
+  'application/x-zip-compressed':'other',
+  'application/x-zip':           'other',
+  'application/x-rar-compressed':'other',
+  'application/vnd.rar':         'other',
+  'application/x-7z-compressed': 'other',
 };
 
 /**
  * Validate magic bytes của file (SEC-04)
  * file-type v19 là ESM-only → dùng dynamic import()
- * @param {string} filePath - đường dẫn tuyệt đối tới file đã lưu
+ * @param {Buffer} buffer - buffer của file
+ * @param {string} originalname - tên file gốc
  * @returns {string} MIME type thực của file
  */
-async function validateFileMagicBytes(filePath) {
+async function validateFileMagicBytes(buffer, originalname) {
   const { fileTypeFromBuffer } = await import('file-type');
-  const buffer = await fs.promises.readFile(filePath);
   const result = await fileTypeFromBuffer(buffer);
+
+  // file-type đôi khi không detect được archive rõ ràng,
+  // kiểm tra extension dự phòng để tránh bản rối
+  const ext = require('path').extname(originalname).toLowerCase();
+  const archiveExts = ['.zip', '.rar', '.7z'];
+  if (!result && archiveExts.includes(ext)) {
+    // Tin tưởng extension khởi nguồn từ multer đã filter MIME rồi
+    return 'application/zip';
+  }
+
   if (!result) {
     throw new AppError('Không thể xác định loại file. Vui lòng upload file hợp lệ.', 422, 'FILE_INVALID');
   }
   const allowed = Object.keys(MIME_TO_RESOURCE_TYPE);
+  // Cho phép qua nếu là archive (zip magic bytes = PK)
+  if (result.mime === 'application/zip') return result.mime;
   if (!allowed.includes(result.mime)) {
     throw new AppError(`Loại file không được hỗ trợ: ${result.mime}`, 422, 'FILE_TYPE_ERROR');
   }
@@ -38,25 +58,70 @@ async function validateFileMagicBytes(filePath) {
 
 
 /**
- * Xóa file vật lý khỏi disk
- * @param {string} fileUrl - URL dạng /uploads/library/xxx.pdf
+ * Xóa file khỏi Supabase Storage
+ * @param {string} fileUrl - public URL của file trên Supabase
  */
-async function deleteFileFromDisk(fileUrl) {
+async function deleteFileFromSupabase(fileUrl) {
   try {
-    const relativePath = fileUrl.replace(/^\//, '');
-    const absolutePath = path.resolve(__dirname, '../../', relativePath);
-    await fs.promises.unlink(absolutePath);
-  } catch {
-    // File đã bị xóa hoặc không tồn tại — không throw
+    if (!fileUrl || !fileUrl.includes('supabase.co')) return;
+    
+    // Extract file path from URL (after 'ieltszone_library/')
+    const bucketUrlPart = 'ieltszone_library/';
+    const pathIndex = fileUrl.indexOf(bucketUrlPart);
+    if (pathIndex === -1) return;
+    
+    const filePath = fileUrl.substring(pathIndex + bucketUrlPart.length);
+    
+    const { error } = await supabase
+      .storage
+      .from('ieltszone_library')
+      .remove([filePath]);
+      
+    if (error) {
+      console.error('Supabase remove error:', error.message);
+    }
+  } catch (err) {
+    console.error('Lỗi khi xóa file trên Supabase:', err);
   }
 }
 
 /**
- * Lấy danh sách tài liệu của tutor đang đăng nhập
+ * Upload file lên Supabase Storage
+ * @param {Object} file - multer memory file object
+ * @returns {string} public URL của file
  */
-async function listResources(tutorId, category) {
+async function uploadFileToSupabase(file) {
+  const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
+  const ext = path.extname(file.originalname);
+  const fileName = `${uniqueSuffix}${ext}`;
+  
+  const { data, error } = await supabase
+    .storage
+    .from('ieltszone_library')
+    .upload(fileName, file.buffer, {
+      contentType: file.mimetype,
+      upsert: false
+    });
+
+  if (error) {
+    throw new AppError('Lỗi upload file lên Cloud: ' + error.message, 500, 'UPLOAD_ERROR');
+  }
+
+  const { data: publicUrlData } = supabase
+    .storage
+    .from('ieltszone_library')
+    .getPublicUrl(fileName);
+
+  return publicUrlData.publicUrl;
+}
+
+/**
+ * Lấy TẤT CẢ tài liệu đã published — hiển thị cho toàn bộ team tutor
+ * @param {string|null} category - filter category
+ */
+async function listResources(category) {
   const cat = (!category || category === 'All') ? null : category;
-  return libraryQueries.getResourcesByUploader(tutorId, cat);
+  return libraryQueries.getAllResources(cat);
 }
 
 /**
@@ -84,10 +149,11 @@ async function createResource(fields, file, tutorId) {
   }
 
   // Validate magic bytes (SEC-04)
-  const actualMime = await validateFileMagicBytes(file.path);
+  const actualMime = await validateFileMagicBytes(file.buffer, file.originalname);
   const resourceType = MIME_TO_RESOURCE_TYPE[actualMime] || 'other';
 
-  const fileUrl = `/uploads/library/${file.filename}`;
+  // Upload lên Supabase
+  const fileUrl = await uploadFileToSupabase(file);
 
   const created = await libraryQueries.createResource({
     title,
@@ -103,9 +169,13 @@ async function createResource(fields, file, tutorId) {
 }
 
 /**
- * Cập nhật metadata tài liệu (không thay file)
+ * Cập nhật tài liệu (có thể ghi đè file mới)
+ * @param {string} resourceId 
+ * @param {string} tutorId 
+ * @param {Object} fields - { title, description, category }
+ * @param {Object} [file] - multer file object (optional)
  */
-async function updateResource(resourceId, tutorId, fields) {
+async function updateResource(resourceId, tutorId, fields, file) {
   const { title, description, category } = fields;
 
   const existing = await libraryQueries.getResourceById(resourceId, tutorId);
@@ -113,11 +183,26 @@ async function updateResource(resourceId, tutorId, fields) {
     throw new AppError('Không tìm thấy tài liệu hoặc bạn không có quyền chỉnh sửa.', 404, 'RESOURCE_NOT_FOUND');
   }
 
-  const updated = await libraryQueries.updateResource(resourceId, tutorId, {
+  const updateData = {
     title,
     description,
     category: category || null,
-  });
+  };
+
+  if (file) {
+    // Có file mới -> Validate và cập nhật DB, sau đó xóa file cũ
+    const actualMime = await validateFileMagicBytes(file.buffer, file.originalname);
+    updateData.resource_type = MIME_TO_RESOURCE_TYPE[actualMime] || 'other';
+    updateData.file_url = await uploadFileToSupabase(file);
+    updateData.file_size_bytes = file.size;
+  }
+
+  const updated = await libraryQueries.updateResource(resourceId, tutorId, updateData);
+
+  // Nếu cập nhật thành công và có file mới, xóa file cũ đi
+  if (updated && file && existing.file_url) {
+    await deleteFileFromSupabase(existing.file_url);
+  }
 
   return updated;
 }
@@ -132,7 +217,7 @@ async function deleteResource(resourceId, tutorId) {
   }
 
   // Xóa file vật lý sau khi DB đã thành công
-  await deleteFileFromDisk(deleted.file_url);
+  await deleteFileFromSupabase(deleted.file_url);
 
   return deleted;
 }

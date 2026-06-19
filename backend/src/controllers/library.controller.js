@@ -50,7 +50,7 @@ function checkValidation(req, next) {
 const listResources = async (req, res, next) => {
   try {
     const { category } = req.query;
-    const resources = await libraryService.listResources(req.user.id, category);
+    const resources = await libraryService.listResources(category);
 
     return res.status(200).json({
       success: true,
@@ -109,7 +109,7 @@ const createResource = [
 
 /**
  * PUT /api/v1/library/:id
- * Cập nhật metadata tài liệu
+ * Cập nhật metadata tài liệu (và file đính kèm nếu có)
  */
 const updateResource = [
   ...validateUpdate,
@@ -118,7 +118,7 @@ const updateResource = [
     if (validationErr) return validationErr;
 
     try {
-      const updated = await libraryService.updateResource(req.params.id, req.user.id, req.body);
+      const updated = await libraryService.updateResource(req.params.id, req.user.id, req.body, req.file);
 
       return res.status(200).json({
         success: true,

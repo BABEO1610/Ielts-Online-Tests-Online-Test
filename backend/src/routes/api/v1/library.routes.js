@@ -40,8 +40,12 @@ router.post(
   libraryController.createResource
 );
 
-// PUT    /api/v1/library/:id      — cập nhật metadata
-router.put('/:id', libraryController.updateResource);
+// PUT    /api/v1/library/:id      — cập nhật metadata và file đính kèm
+router.put(
+  '/:id',
+  upload.single('file'),
+  libraryController.updateResource
+);
 
 // DELETE /api/v1/library/:id      — xóa tài liệu
 router.delete('/:id', libraryController.deleteResource);

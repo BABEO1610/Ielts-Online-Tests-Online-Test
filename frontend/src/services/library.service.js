@@ -43,12 +43,21 @@ export async function createLibraryResource(fields, file) {
 }
 
 /**
- * Cập nhật metadata tài liệu
+ * Cập nhật metadata tài liệu (và file nếu có)
  * @param {string} id
  * @param {{ title: string, description?: string, category?: string }} fields
+ * @param {File} [file] - file object từ input (optional)
  */
-export async function updateLibraryResource(id, fields) {
-  const res = await api.put(`${BASE}/${id}`, fields);
+export async function updateLibraryResource(id, fields, file) {
+  const formData = new FormData();
+  if (fields.title) formData.append('title', fields.title);
+  if (fields.description) formData.append('description', fields.description);
+  if (fields.category) formData.append('category', fields.category);
+  if (file) formData.append('file', file);
+
+  const res = await api.put(`${BASE}/${id}`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
   return res.data;
 }
 

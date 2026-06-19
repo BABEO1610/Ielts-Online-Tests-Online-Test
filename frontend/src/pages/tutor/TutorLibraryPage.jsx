@@ -4,6 +4,7 @@ import {
   fetchLibraryResources,
   deleteLibraryResource,
 } from '../../services/library.service';
+import { useAuth } from '../../context/AuthContext';
 
 const BACKEND_URL =
   (import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1').replace('/api/v1', '');
@@ -23,8 +24,12 @@ function formatDate(isoString) {
   return new Date(isoString).toLocaleDateString('vi-VN');
 }
 
-function fileUrl(relativeUrl) {
-  return `${BACKEND_URL}${relativeUrl}`;
+function fileUrl(url) {
+  if (!url) return '';
+  if (url.startsWith('http://') || url.startsWith('https://')) {
+    return url;
+  }
+  return `${BACKEND_URL}${url}`;
 }
 
 // ─── Badges ──────────────────────────────────────────────────────────────────
@@ -80,7 +85,7 @@ function ReviewStatusBadge({ status }) {
 
 // ─── Card ─────────────────────────────────────────────────────────────────────
 
-const ResourceCard = ({ document, onEdit, onDelete, onViewDetail }) => {
+const ResourceCard = ({ document, onEdit, onDelete, onViewDetail, isOwner }) => {
   return (
     <div
       className="card h-100 border-0 p-4 position-relative"
@@ -110,40 +115,42 @@ const ResourceCard = ({ document, onEdit, onDelete, onViewDetail }) => {
           )}
         </div>
 
-        {/* Kebab Menu */}
-        <div className="dropdown" onClick={(e) => e.stopPropagation()}>
-          <button
-            className="btn btn-light rounded-circle p-2 d-flex align-items-center justify-content-center border-0 shadow-none"
-            style={{ width: '32px', height: '32px', backgroundColor: 'transparent' }}
-            data-bs-toggle="dropdown"
-            aria-expanded="false"
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#5e5e5e" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="1.5"></circle>
-              <circle cx="12" cy="5" r="1.5"></circle>
-              <circle cx="12" cy="19" r="1.5"></circle>
-            </svg>
-          </button>
-          <ul className="dropdown-menu dropdown-menu-end shadow-sm border-0 rounded-4 p-2 mt-1" style={{ zIndex: 1050 }}>
-            <li>
-              <button
-                className="dropdown-item rounded-3 py-2 fw-medium"
-                onClick={(e) => { e.stopPropagation(); onEdit(document); }}
-              >
-                <i className="bi bi-pencil me-2 text-muted"></i>Chỉnh sửa
-              </button>
-            </li>
-            <li><hr className="dropdown-divider my-1" /></li>
-            <li>
-              <button
-                className="dropdown-item text-danger rounded-3 py-2 fw-medium"
-                onClick={(e) => { e.stopPropagation(); onDelete(document.id); }}
-              >
-                <i className="bi bi-trash me-2"></i>Xóa
-              </button>
-            </li>
-          </ul>
-        </div>
+        {/* Kebab Menu — chỉ hiển thị cho chủ sở hữu */}
+        {isOwner && (
+          <div className="dropdown" onClick={(e) => e.stopPropagation()}>
+            <button
+              className="btn btn-light rounded-circle p-2 d-flex align-items-center justify-content-center border-0 shadow-none"
+              style={{ width: '32px', height: '32px', backgroundColor: 'transparent' }}
+              data-bs-toggle="dropdown"
+              aria-expanded="false"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#5e5e5e" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="1.5"></circle>
+                <circle cx="12" cy="5" r="1.5"></circle>
+                <circle cx="12" cy="19" r="1.5"></circle>
+              </svg>
+            </button>
+            <ul className="dropdown-menu dropdown-menu-end shadow-sm border-0 rounded-4 p-2 mt-1" style={{ zIndex: 1050 }}>
+              <li>
+                <button
+                  className="dropdown-item rounded-3 py-2 fw-medium"
+                  onClick={(e) => { e.stopPropagation(); onEdit(document); }}
+                >
+                  <i className="bi bi-pencil me-2 text-muted"></i>Chỉnh sửa
+                </button>
+              </li>
+              <li><hr className="dropdown-divider my-1" /></li>
+              <li>
+                <button
+                  className="dropdown-item text-danger rounded-3 py-2 fw-medium"
+                  onClick={(e) => { e.stopPropagation(); onDelete(document.id); }}
+                >
+                  <i className="bi bi-trash me-2"></i>Xóa
+                </button>
+              </li>
+            </ul>
+          </div>
+        )}
       </div>
 
       <h5
@@ -197,9 +204,11 @@ const DocumentViewerModal = ({ document, onClose }) => {
   if (!document) return null;
 
   const url = fileUrl(document.file_url);
-  const isPdf   = document.resource_type === 'pdf';
-  const isAudio = document.resource_type === 'audio';
-  const isVideo = document.resource_type === 'video';
+  const isPdf    = document.resource_type === 'pdf';
+  const isAudio  = document.resource_type === 'audio';
+  const isVideo  = document.resource_type === 'video';
+  const ext      = document.file_url?.split('.').pop()?.toLowerCase();
+  const isArchive = ['zip', 'rar', '7z'].includes(ext);
 
   return (
     <div
@@ -282,12 +291,30 @@ const DocumentViewerModal = ({ document, onClose }) => {
             </div>
           )}
           {!isPdf && !isAudio && !isVideo && (
-            <div className="d-flex flex-column align-items-center justify-content-center p-5 gap-3 text-muted">
-              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                <polyline points="14 2 14 8 20 8"></polyline>
-              </svg>
-              <p>Không thể xem trước loại file này.</p>
+            <div className="d-flex flex-column align-items-center justify-content-center p-5 gap-3 text-center">
+              {isArchive ? (
+                <>
+                  <div style={{ fontSize: '72px' }}>📦</div>
+                  <div>
+                    <h6 className="fw-bold mb-2">{document.file_url?.split('/').pop()}</h6>
+                    <p className="text-muted mb-1" style={{ fontSize: '14px' }}>
+                      File nén không thể xem trực tiếp trên trình duyệt.
+                    </p>
+                    <p className="text-muted mb-0" style={{ fontSize: '13px' }}>
+                      Tải về máy rồi giải nén để lấy tất cả nội dung bên trong<br />
+                      <span className="text-dark fw-medium">(ví dụ: đề bài PDF + file audio MP3)</span>
+                    </p>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#999" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                    <polyline points="14 2 14 8 20 8"></polyline>
+                  </svg>
+                  <p className="text-muted">Không thể xem trước loại file này.</p>
+                </>
+              )}
             </div>
           )}
         </div>
@@ -310,7 +337,7 @@ const DocumentViewerModal = ({ document, onClose }) => {
               Đóng
             </button>
             <a
-              href={url}
+              href={url.includes('supabase.co') ? `${url}?download=` : url}
               download
               className="btn btn-dark rounded-pill px-4 fw-medium"
               style={{ fontSize: '14px' }}
@@ -339,12 +366,15 @@ const TutorLibraryView = ({
   setSearchQuery,
   selectedCategory,
   setSelectedCategory,
+  ownerTab,
+  setOwnerTab,
   isLoading,
   error,
   onUploadClick,
   onEditDocument,
   onDeleteDocument,
   onViewDetail,
+  currentUserId,
 }) => {
   return (
     <div className="container py-5" style={{ backgroundColor: 'transparent' }}>
@@ -389,6 +419,29 @@ const TutorLibraryView = ({
 
       {/* Filters */}
       <div className="d-flex flex-wrap gap-3 mb-4">
+        {/* Tab: Tất cả / Của tôi */}
+        <div className="d-flex gap-2 me-2">
+          {['all', 'mine'].map((tab) => (
+            <button
+              key={tab}
+              onClick={() => setOwnerTab(tab)}
+              style={{
+                padding: '8px 20px',
+                borderRadius: '999px',
+                border: 'none',
+                fontSize: '14px',
+                fontWeight: 500,
+                cursor: 'pointer',
+                backgroundColor: ownerTab === tab ? '#000' : '#efefef',
+                color: ownerTab === tab ? '#fff' : '#333',
+                transition: 'all 0.15s ease',
+              }}
+            >
+              {tab === 'all' ? 'Tất cả' : 'Của tôi'}
+            </button>
+          ))}
+        </div>
+
         <div className="position-relative flex-grow-1" style={{ maxWidth: '400px' }}>
           <div className="position-absolute top-50 translate-middle-y ms-3 text-muted">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -461,6 +514,7 @@ const TutorLibraryView = ({
                 onEdit={onEditDocument}
                 onDelete={onDeleteDocument}
                 onViewDetail={onViewDetail}
+                isOwner={doc.uploaded_by === currentUserId}
               />
             </div>
           ))}
@@ -474,9 +528,11 @@ const TutorLibraryView = ({
 
 const TutorLibraryPage = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [documents, setDocuments] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
+  const [ownerTab, setOwnerTab] = useState('all'); // 'all' | 'mine'
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selectedDocument, setSelectedDocument] = useState(null);
@@ -515,7 +571,8 @@ const TutorLibraryPage = () => {
       doc.title.toLowerCase().includes(s) ||
       (doc.description && doc.description.toLowerCase().includes(s));
     const matchesCategory = selectedCategory === 'All' || doc.category === selectedCategory;
-    return matchesSearch && matchesCategory;
+    const matchesOwner = ownerTab === 'all' || doc.uploaded_by === user?.id;
+    return matchesSearch && matchesCategory && matchesOwner;
   });
 
   return (
@@ -527,12 +584,15 @@ const TutorLibraryPage = () => {
         setSearchQuery={setSearchQuery}
         selectedCategory={selectedCategory}
         setSelectedCategory={setSelectedCategory}
+        ownerTab={ownerTab}
+        setOwnerTab={setOwnerTab}
         isLoading={isLoading}
         error={error}
         onUploadClick={() => navigate('/tutor/library/create')}
         onEditDocument={(doc) => navigate(`/tutor/library/edit/${doc.id}`)}
         onDeleteDocument={handleDeleteDocument}
         onViewDetail={setSelectedDocument}
+        currentUserId={user?.id}
       />
 
       <DocumentViewerModal

@@ -7,6 +7,38 @@ const { pool } = require('../pool');
  * @param {string} uploadedBy - UUID của tutor
  * @param {string|null} category - filter category (hoặc null = tất cả)
  */
+/**
+ * Lấy TẤT CẢ tài liệu đã published — dùng chung cho cả team tutor
+ * @param {string|null} category - filter category (hoặc null = tất cả)
+ */
+async function getAllResources(category = null) {
+  if (category) {
+    const result = await pool.query(
+      `SELECT id, title, description, resource_type, file_url, file_size_bytes,
+              category, is_published, review_status, uploaded_by, created_at, updated_at
+       FROM library_resources
+       WHERE is_published = TRUE AND category = $1
+       ORDER BY updated_at DESC`,
+      [category]
+    );
+    return result.rows;
+  }
+
+  const result = await pool.query(
+    `SELECT id, title, description, resource_type, file_url, file_size_bytes,
+            category, is_published, review_status, uploaded_by, created_at, updated_at
+     FROM library_resources
+     WHERE is_published = TRUE
+     ORDER BY updated_at DESC`
+  );
+  return result.rows;
+}
+
+/**
+ * Lấy danh sách tài liệu của một tutor cụ thể (my documents)
+ * @param {string} uploadedBy - UUID của tutor
+ * @param {string|null} category - filter category (hoặc null = tất cả)
+ */
 async function getResourcesByUploader(uploadedBy, category = null) {
   if (category) {
     const result = await pool.query(
@@ -65,21 +97,32 @@ async function createResource(data) {
 }
 
 /**
- * Cập nhật thông tin tài liệu (chỉ metadata, không thay file)
+ * Cập nhật thông tin tài liệu (có thể cập nhật file đính kèm)
  * @param {string} id - UUID
  * @param {string} uploadedBy - UUID tutor (ownership check)
- * @param {Object} data - { title, description, category }
+ * @param {Object} data - { title, description, category, resource_type, file_url, file_size_bytes }
  */
 async function updateResource(id, uploadedBy, data) {
-  const { title, description, category } = data;
-  const result = await pool.query(
-    `UPDATE library_resources
-     SET title = $1, description = $2, category = $3, updated_at = NOW()
-     WHERE id = $4 AND uploaded_by = $5
-     RETURNING id, title, description, resource_type, file_url, file_size_bytes,
-               category, is_published, review_status, created_at, updated_at`,
-    [title, description || null, category || null, id, uploadedBy]
-  );
+  const { title, description, category, resource_type, file_url, file_size_bytes } = data;
+  let query = `
+    UPDATE library_resources
+    SET title = $1, description = $2, category = $3, updated_at = NOW()
+  `;
+  const values = [title, description || null, category || null];
+
+  if (file_url) {
+    query += `, resource_type = $4, file_url = $5, file_size_bytes = $6`;
+    values.push(resource_type, file_url, file_size_bytes);
+  }
+
+  query += `
+    WHERE id = $${values.length + 1} AND uploaded_by = $${values.length + 2}
+    RETURNING id, title, description, resource_type, file_url, file_size_bytes,
+              category, is_published, review_status, created_at, updated_at
+  `;
+  values.push(id, uploadedBy);
+
+  const result = await pool.query(query, values);
   return result.rows[0] || null;
 }
 
@@ -100,6 +143,7 @@ async function deleteResource(id, uploadedBy) {
 }
 
 module.exports = {
+  getAllResources,
   getResourcesByUploader,
   getResourceById,
   createResource,
