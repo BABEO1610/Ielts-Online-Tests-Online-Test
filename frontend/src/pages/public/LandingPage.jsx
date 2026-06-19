@@ -1,7 +1,8 @@
 import React, { useRef } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, Navigate } from 'react-router-dom';
 import { motion, useScroll, useTransform, useSpring, useMotionValue } from 'framer-motion';
 import StudentNavbar from '../../components/layout/StudentNavbar';
+import { useAuth } from '../../context/AuthContext';
 
 // --- Sub-components for heavy animations ---
 
@@ -197,6 +198,17 @@ const AnimatedBackground = () => {
 // --- Main Page ---
 
 const LandingPage = () => {
+    const { user, isAuthenticated } = useAuth();
+    
+    // Auth guard for admin and tutor: prevent them from seeing the landing page
+    if (isAuthenticated && user) {
+        if (user.role === 'admin') {
+            return <Navigate to="/admin" replace />;
+        } else if (user.role === 'tutor') {
+            return <Navigate to="/tutor/dashboard" replace />;
+        }
+    }
+
     const { scrollYProgress } = useScroll();
     
     // Parallax background elements

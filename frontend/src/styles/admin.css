@@ -498,6 +498,22 @@
 .btn-pill--dark:hover { background: var(--black-elevated); }
 .btn-pill--ghost { background: var(--canvas); color: var(--ink); border-color: var(--surface-pressed); }
 .btn-pill--ghost:hover { background: var(--canvas-soft); }
+/* Reject/danger variant — soft red, no fill, pill shape */
+.btn-pill--reject {
+  background: #fdecec;
+  color: #c92a2a;
+  border-color: #f5b8b8;
+}
+.btn-pill--reject:hover {
+  background: #fad7d7;
+  border-color: #e88585;
+}
+
+/* ── Table wrapper inside admin-card ─────────────────────────── */
+.admin-card > .table-responsive {
+  border-radius: var(--rounded-xl);
+  overflow: hidden;
+}
 
 /* ── Inputs ─────────────────────────────────────────────────── */
 .admin-input {
@@ -525,6 +541,33 @@
   align-items: center;
   gap: 6px;
 }
+
+/* Inline error banner shown above content when a review action fails */
+.admin-error-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-md);
+  background: #fdecec;
+  border: 1px solid #f5b8b8;
+  border-radius: var(--rounded-md);
+  color: #c92a2a;
+  font-size: 14px;
+  font-weight: 500;
+  padding: var(--spacing-md) var(--spacing-lg);
+  margin-bottom: var(--spacing-lg);
+}
+.admin-error-banner button {
+  background: none;
+  border: none;
+  color: #c92a2a;
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  padding: 0 var(--spacing-xs);
+  flex-shrink: 0;
+}
+.admin-error-banner button:hover { opacity: 0.7; }
 .mini-bar {
   height: 6px;
   border-radius: var(--rounded-pill);
@@ -532,6 +575,87 @@
   overflow: hidden;
 }
 .mini-bar__fill { height: 100%; background: var(--ink); border-radius: var(--rounded-pill); }
+
+/* ── Admin Modals (Preview) ─────────────────────────────────────────────────── */
+.admin-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(2px);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-xl);
+}
+.admin-modal {
+  background: var(--canvas);
+  border-radius: var(--rounded-xl);
+  width: 100%;
+  max-width: 800px;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+  overflow: hidden;
+}
+.admin-modal__header {
+  padding: var(--spacing-lg) var(--spacing-xl);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: var(--canvas-soft);
+}
+.admin-modal__title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+.admin-modal__close {
+  background: none;
+  border: none;
+  font-size: 20px;
+  color: var(--mute);
+  cursor: pointer;
+  line-height: 1;
+}
+.admin-modal__close:hover { color: var(--ink); }
+.admin-modal__body {
+  padding: var(--spacing-xl);
+  overflow-y: auto;
+  flex: 1;
+}
+.test-preview__meta h4, .resource-preview__meta h4 {
+  font-size: 20px;
+  font-weight: 600;
+}
+.passage-card {
+  border-left: 4px solid var(--primary);
+  padding-left: var(--spacing-md);
+}
+.passage-title {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: var(--spacing-xs);
+}
+.passage-instruction {
+  color: var(--mute);
+  font-size: 14px;
+}
+.btn-link-table {
+  background: none;
+  border: none;
+  color: var(--primary);
+  text-decoration: underline;
+  cursor: pointer;
+  padding: 0;
+  font-weight: 500;
+  text-align: left;
+}
+.btn-link-table:hover {
+  color: #123e78;
+}
 
 @media (max-width: 992px) {
   .admin-sidebar { display: none; }

@@ -210,7 +210,7 @@ const TutorTopbar = () => {
             >
               {[
                 { label: 'Hồ sơ cá nhân', onClick: () => { setDropdownOpen(false); navigate('/tutor/profile'); } },
-                { label: 'Đổi mật khẩu',  onClick: () => { setDropdownOpen(false); setShowPwdModal(true); } },
+                { label: 'Đổi mật khẩu', onClick: () => { setDropdownOpen(false); setShowPwdModal(true); } },
               ].map(item => (
                 <li key={item.label}>
                   <button
