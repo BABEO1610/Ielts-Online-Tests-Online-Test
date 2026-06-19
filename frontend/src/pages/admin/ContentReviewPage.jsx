@@ -4,6 +4,8 @@ import {
   reviewTest, reviewResource,
 } from '../../services/adminOps.service';
 import { formatDateTime, formatBytes } from '../../utils/adminFormat';
+import TestPreviewModal from '../../components/admin/TestPreviewModal';
+import ResourcePreviewModal from '../../components/admin/ResourcePreviewModal';
 
 const TABS = [
   { key: 'tests', label: 'Đề thi chờ duyệt' },
@@ -18,6 +20,9 @@ const ContentReviewPage = () => {
   const [schedule, setSchedule] = useState([]);
   const [isSample, setIsSample] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [actionError, setActionError] = useState(null);
+  const [previewTestId, setPreviewTestId] = useState(null);
+  const [previewResourceId, setPreviewResourceId] = useState(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -30,12 +35,22 @@ const ContentReviewPage = () => {
   useEffect(() => { load(); }, [load]);
 
   const onReviewTest = async (id, action) => {
-    await reviewTest(id, action);
-    setTests((prev) => prev.filter((x) => x.id !== id));
+    setActionError(null);
+    try {
+      await reviewTest(id, action);
+      setTests((prev) => prev.filter((x) => x.id !== id));
+    } catch (err) {
+      setActionError(err.message);
+    }
   };
   const onReviewResource = async (id, action) => {
-    await reviewResource(id, action);
-    setResources((prev) => prev.filter((x) => x.id !== id));
+    setActionError(null);
+    try {
+      await reviewResource(id, action);
+      setResources((prev) => prev.filter((x) => x.id !== id));
+    } catch (err) {
+      setActionError(err.message);
+    }
   };
 
   return (
@@ -47,6 +62,13 @@ const ContentReviewPage = () => {
         </div>
         {isSample && <span className="admin-data-note">● Dữ liệu mẫu (chưa nối API nội dung)</span>}
       </div>
+
+      {actionError && (
+        <div className="admin-error-banner" role="alert">
+          <span>⚠ {actionError}</span>
+          <button onClick={() => setActionError(null)} aria-label="Đóng">✕</button>
+        </div>
+      )}
 
       <div className="stat-grid mb-4">
         <div className="stat-card"><span className="stat-card__label">Đề thi chờ duyệt</span><span className="stat-card__value">{tests.length}</span></div>
@@ -73,15 +95,21 @@ const ContentReviewPage = () => {
                 {tests.length === 0 ? <tr><td colSpan={7} className="text-center py-4 text-secondary">Không có đề thi chờ duyệt.</td></tr> :
                   tests.map((t) => (
                     <tr key={t.id}>
-                      <td className="fw-semibold">{t.title}</td>
+                      <td className="fw-semibold">
+                        <button className="btn-link-table text-start" onClick={() => setPreviewTestId(t.id)}>
+                          {t.title}
+                        </button>
+                      </td>
                       <td><span className="pill pill--info text-capitalize">{t.skill}</span></td>
                       <td className="text-secondary text-capitalize">{t.difficulty}</td>
                       <td>{t.created_by}</td>
-                      <td className="text-secondary">{formatDateTime(t.submitted_at)}</td>
-                      <td className="text-secondary">{t.publish_at ? formatDateTime(t.publish_at) : 'Đăng ngay'}</td>
+                      <td className="text-secondary" style={{ whiteSpace: 'nowrap' }}>{formatDateTime(t.submitted_at)}</td>
+                      <td className="text-secondary" style={{ whiteSpace: 'nowrap' }}>{t.publish_at ? formatDateTime(t.publish_at) : 'Đăng ngay'}</td>
                       <td className="text-end">
-                        <button className="btn-pill btn-pill--dark me-2" onClick={() => onReviewTest(t.id, 'approve')}>Duyệt</button>
-                        <button className="btn-pill btn-pill--ghost" onClick={() => onReviewTest(t.id, 'reject')}>Từ chối</button>
+                        <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', flexWrap: 'nowrap' }}>
+                          <button className="btn-pill btn-pill--dark" onClick={() => onReviewTest(t.id, 'approve')}>Duyệt</button>
+                          <button className="btn-pill btn-pill--reject" onClick={() => onReviewTest(t.id, 'reject')}>Từ chối</button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -94,14 +122,20 @@ const ContentReviewPage = () => {
                 {resources.length === 0 ? <tr><td colSpan={6} className="text-center py-4 text-secondary">Không có tài liệu chờ duyệt.</td></tr> :
                   resources.map((r) => (
                     <tr key={r.id}>
-                      <td className="fw-semibold">{r.title}</td>
+                      <td className="fw-semibold">
+                        <button className="btn-link-table text-start" onClick={() => setPreviewResourceId(r.id)}>
+                          {r.title}
+                        </button>
+                      </td>
                       <td><span className="pill pill--neutral text-uppercase">{r.resource_type}</span></td>
                       <td className="text-secondary">{formatBytes(r.file_size_bytes)}</td>
                       <td>{r.uploaded_by}</td>
-                      <td className="text-secondary">{formatDateTime(r.created_at)}</td>
+                      <td className="text-secondary" style={{ whiteSpace: 'nowrap' }}>{formatDateTime(r.created_at)}</td>
                       <td className="text-end">
-                        <button className="btn-pill btn-pill--dark me-2" onClick={() => onReviewResource(r.id, 'approve')}>Duyệt</button>
-                        <button className="btn-pill btn-pill--ghost" onClick={() => onReviewResource(r.id, 'reject')}>Từ chối</button>
+                        <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', flexWrap: 'nowrap' }}>
+                          <button className="btn-pill btn-pill--dark" onClick={() => onReviewResource(r.id, 'approve')}>Duyệt</button>
+                          <button className="btn-pill btn-pill--reject" onClick={() => onReviewResource(r.id, 'reject')}>Từ chối</button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -126,6 +160,20 @@ const ContentReviewPage = () => {
           )}
         </div>
       </div>
+      
+      {/* Preview Modals */}
+      {previewTestId && (
+        <TestPreviewModal 
+          testId={previewTestId} 
+          onClose={() => setPreviewTestId(null)} 
+        />
+      )}
+      {previewResourceId && (
+        <ResourcePreviewModal 
+          resourceId={previewResourceId} 
+          onClose={() => setPreviewResourceId(null)} 
+        />
+      )}
     </div>
   );
 };

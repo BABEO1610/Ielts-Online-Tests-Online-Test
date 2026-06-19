@@ -341,7 +341,8 @@ const googleCallback = async (req, res, next) => {
     });
 
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-    // Redirect to role-specific dashboard after OAuth login
+
+    // Redirect based on user role
     if (user?.role === 'admin') {
       return res.redirect(`${frontendUrl}/admin`);
     } else if (user?.role === 'tutor') {

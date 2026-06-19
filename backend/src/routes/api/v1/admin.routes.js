@@ -29,6 +29,20 @@ router.delete('/sessions/:id', authenticate, authorize('admin'), adminController
 router.get('/contacts', authenticate, authorize('admin'), adminController.listContacts);
 router.put('/contacts/:id/resolve', authenticate, authorize('admin'), adminController.resolveContact);
 
+// -------------------------------------------------------------
+// T040: API duyệt nội dung (Content Review) dành cho Admin
+// -------------------------------------------------------------
+const adminContentController = require('../../../controllers/adminContent.controller');
+
+router.get('/content/tests', authenticate, authorize('admin'), adminContentController.getPendingTests);
+router.get('/content/tests/:id', authenticate, authorize('admin'), adminContentController.getTestDetail);
+router.put('/content/tests/:id/review', authenticate, authorize('admin'), adminContentController.reviewTest);
+
+router.get('/content/resources', authenticate, authorize('admin'), adminContentController.getPendingResources);
+router.get('/content/resources/:id', authenticate, authorize('admin'), adminContentController.getResourceDetail);
+router.put('/content/resources/:id/review', authenticate, authorize('admin'), adminContentController.reviewResource);
+
+router.get('/content/schedule', authenticate, authorize('admin'), adminContentController.getPublishSchedule);
 // API nhật ký duyệt & thay đổi
 router.get('/change-logs', authenticate, authorize('admin'), adminController.listChangeLogs);
 router.get('/change-logs/:id', authenticate, authorize('admin'), adminController.getChangeLogDetail);
