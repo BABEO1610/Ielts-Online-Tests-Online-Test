@@ -6,10 +6,12 @@ const BASE = '/library';
  * Lấy danh sách tài liệu (có thể filter category)
  * @param {string} [category] - 'All' hoặc tên category cụ thể
  */
-export async function fetchLibraryResources(category) {
-  const params = {};
-  if (category && category !== 'All') {
-    params.category = category;
+export async function fetchLibraryResources(paramsOrCategory) {
+  let params = {};
+  if (typeof paramsOrCategory === 'object' && paramsOrCategory !== null) {
+    params = { ...paramsOrCategory };
+  } else if (paramsOrCategory && paramsOrCategory !== 'All') {
+    params.category = paramsOrCategory;
   }
   const res = await api.get(BASE, { params });
   return res.data; // { success, data, error, meta }
