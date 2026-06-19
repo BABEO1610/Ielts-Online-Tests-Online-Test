@@ -200,14 +200,8 @@ const AnimatedBackground = () => {
 const LandingPage = () => {
     const { user, isAuthenticated } = useAuth();
     
-    // Auth guard for admin and tutor: prevent them from seeing the landing page
-    if (isAuthenticated && user) {
-        if (user.role === 'admin') {
-            return <Navigate to="/admin" replace />;
-        } else if (user.role === 'tutor') {
-            return <Navigate to="/tutor/dashboard" replace />;
-        }
-    }
+    // Allow all roles including admin/tutor to view the landing page 
+    // when they click "Xem website"
 
     const { scrollYProgress } = useScroll();
     

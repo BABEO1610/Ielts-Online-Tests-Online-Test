@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Toaster, toast } from 'react-hot-toast';
 import StudentNavbar from '../../components/layout/StudentNavbar';
+import html2pdf from 'html2pdf.js';
 import { fetchLibraryResources } from '../../services/library.service';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -267,10 +268,10 @@ const TestPreviewModal = ({ test, onClose, onDownload, downloadingId }) => {
     if (test.resource_type === 'pdf' && test.file_url) {
       return (
         <div style={{ height: '70vh' }}>
-          <iframe 
-            src={getFullUrl(test.file_url)} 
-            width="100%" 
-            height="100%" 
+          <iframe
+            src={getFullUrl(test.file_url)}
+            width="100%"
+            height="100%"
             title={test.title}
             style={{ border: 'none' }}
           />
@@ -420,7 +421,7 @@ const ContentLibraryPage = () => {
         setLoading(false);
       }
     };
-    
+
     const timeoutId = setTimeout(() => {
       fetchResources();
     }, 500);
@@ -449,7 +450,7 @@ const ContentLibraryPage = () => {
       const response = await fetch(getFullUrl(test.file_url));
       if (!response.ok) throw new Error('Không thể fetch file');
       const blob = await response.blob();
-      
+
       const ext = type === 'pdf' ? '.pdf' : '.mp3';
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
@@ -459,7 +460,7 @@ const ContentLibraryPage = () => {
       link.click();
       link.parentNode.removeChild(link);
       window.URL.revokeObjectURL(url);
-      
+
       toast.success(`Tải file thành công!`, { id: toastId });
     } catch (error) {
       console.error('Download error:', error);
@@ -579,12 +580,12 @@ const ContentLibraryPage = () => {
                           <button
                             className="btn btn-outline-danger flex-grow-1 d-flex align-items-center justify-content-center gap-1 fw-medium"
                             onClick={() => {
-                               const link = document.createElement('a');
-                               link.href = test.file_url;
-                               link.setAttribute('download', test.title);
-                               document.body.appendChild(link);
-                               link.click();
-                               link.parentNode.removeChild(link);
+                              const link = document.createElement('a');
+                              link.href = test.file_url;
+                              link.setAttribute('download', test.title);
+                              document.body.appendChild(link);
+                              link.click();
+                              link.parentNode.removeChild(link);
                             }}
                             data-testid={`btn-download-pdf-${test.id}`}
                           >
@@ -594,12 +595,12 @@ const ContentLibraryPage = () => {
                           <button
                             className="btn btn-outline-secondary flex-grow-1 d-flex align-items-center justify-content-center gap-1 fw-medium"
                             onClick={() => {
-                               const link = document.createElement('a');
-                               link.href = test.file_url;
-                               link.setAttribute('download', test.title);
-                               document.body.appendChild(link);
-                               link.click();
-                               link.parentNode.removeChild(link);
+                              const link = document.createElement('a');
+                              link.href = test.file_url;
+                              link.setAttribute('download', test.title);
+                              document.body.appendChild(link);
+                              link.click();
+                              link.parentNode.removeChild(link);
                             }}
                             data-testid={`btn-download-audio-${test.id}`}
                           >
@@ -609,7 +610,7 @@ const ContentLibraryPage = () => {
                           <button
                             className="btn btn-outline-info flex-grow-1 d-flex align-items-center justify-content-center gap-1 fw-medium"
                             onClick={() => {
-                               window.open(test.file_url, '_blank');
+                              window.open(test.file_url, '_blank');
                             }}
                           >
                             <i className="bi bi-download"></i> Tải file

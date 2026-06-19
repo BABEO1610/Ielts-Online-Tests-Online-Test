@@ -76,6 +76,15 @@ const StudentNavbar = () => {
           </ul>
 
           <div className="d-flex align-items-center gap-3 mt-3 mt-lg-0">
+            {(user?.role === 'admin' || user?.role === 'tutor') && (
+              <Link
+                to={user.role === 'admin' ? '/admin' : '/tutor/dashboard'}
+                className="btn btn-dark rounded-pill px-4 py-2 fw-medium border-0 shadow-sm"
+                style={{ fontSize: '15px', backgroundColor: '#000000', fontFamily: 'UberMoveText, system-ui, sans-serif' }}
+              >
+                Về bảng điều khiển
+              </Link>
+            )}
             {user ? (
               <div className="dropdown">
                 <button
