@@ -34,10 +34,13 @@ router.put('/contacts/:id/resolve', authenticate, authorize('admin'), adminContr
 const adminContentController = require('../../../controllers/adminContent.controller');
 
 router.get('/content/tests', authenticate, authorize('admin'), adminContentController.getPendingTests);
-router.get('/content/resources', authenticate, authorize('admin'), adminContentController.getPendingResources);
-router.get('/content/schedule', authenticate, authorize('admin'), adminContentController.getPublishSchedule);
-
+router.get('/content/tests/:id', authenticate, authorize('admin'), adminContentController.getTestDetail);
 router.put('/content/tests/:id/review', authenticate, authorize('admin'), adminContentController.reviewTest);
+
+router.get('/content/resources', authenticate, authorize('admin'), adminContentController.getPendingResources);
+router.get('/content/resources/:id', authenticate, authorize('admin'), adminContentController.getResourceDetail);
 router.put('/content/resources/:id/review', authenticate, authorize('admin'), adminContentController.reviewResource);
+
+router.get('/content/schedule', authenticate, authorize('admin'), adminContentController.getPublishSchedule);
 
 module.exports = router;

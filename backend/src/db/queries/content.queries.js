@@ -51,7 +51,7 @@ const getPublishSchedule = `
 const updateTestReviewStatus = `
   UPDATE mock_tests
   SET 
-    review_status = $2,
+    review_status = $2::review_status,
     is_published = CASE WHEN $2 = 'approved' THEN TRUE ELSE FALSE END,
     updated_at = NOW()
   WHERE id = $1
@@ -61,11 +61,47 @@ const updateTestReviewStatus = `
 const updateResourceReviewStatus = `
   UPDATE library_resources
   SET 
-    review_status = $2,
+    review_status = $2::review_status,
     is_published = CASE WHEN $2 = 'approved' THEN TRUE ELSE FALSE END,
     updated_at = NOW()
   WHERE id = $1
   RETURNING id, title, review_status
+`;
+
+const getTestDetailBase = `
+  SELECT 
+    t.*,
+    u.full_name AS created_by_name
+  FROM mock_tests t
+  LEFT JOIN users u ON t.created_by = u.id
+  WHERE t.id = $1
+`;
+
+const getTestPassages = `
+  SELECT *
+  FROM test_passages
+  WHERE test_id = $1
+  ORDER BY passage_number ASC
+`;
+
+const getTestQuestions = `
+  SELECT 
+    q.*,
+    qb.question_type,
+    qb.question_range
+  FROM questions q
+  LEFT JOIN question_blocks qb ON q.block_id = qb.id
+  WHERE q.test_id = $1
+  ORDER BY q.question_order ASC
+`;
+
+const getResourceDetail = `
+  SELECT 
+    r.*,
+    u.full_name AS uploaded_by_name
+  FROM library_resources r
+  LEFT JOIN users u ON r.uploaded_by = u.id
+  WHERE r.id = $1
 `;
 
 module.exports = {
@@ -73,5 +109,9 @@ module.exports = {
   getPendingResources,
   getPublishSchedule,
   updateTestReviewStatus,
-  updateResourceReviewStatus
+  updateResourceReviewStatus,
+  getTestDetailBase,
+  getTestPassages,
+  getTestQuestions,
+  getResourceDetail
 };

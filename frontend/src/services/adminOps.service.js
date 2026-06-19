@@ -92,12 +92,30 @@ export async function fetchPublishSchedule() {
   catch { return sample(SAMPLE_SCHEDULE); }
 }
 export async function reviewTest(id, action) {
-  try { await api.put(`/admin/content/tests/${id}/review`, { action }); return true; }
-  catch { return true; } // dev fallback: optimistic
+  try {
+    await api.put(`/admin/content/tests/${id}/review`, { action });
+    return true;
+  } catch (error) {
+    const msg = error?.response?.data?.error?.message || 'Không thể duyệt đề thi. Vui lòng thử lại.';
+    throw new Error(msg);
+  }
 }
 export async function reviewResource(id, action) {
-  try { await api.put(`/admin/content/resources/${id}/review`, { action }); return true; }
-  catch { return true; }
+  try {
+    await api.put(`/admin/content/resources/${id}/review`, { action });
+    return true;
+  } catch (error) {
+    const msg = error?.response?.data?.error?.message || 'Không thể duyệt tài liệu. Vui lòng thử lại.';
+    throw new Error(msg);
+  }
+}
+export async function fetchTestDetail(id) {
+  const res = await api.get(`/admin/content/tests/${id}`);
+  return ok(res.data.data);
+}
+export async function fetchResourceDetail(id) {
+  const res = await api.get(`/admin/content/resources/${id}`);
+  return ok(res.data.data);
 }
 
 // ── Grading oversight ─────────────────────────────────────────────────────────

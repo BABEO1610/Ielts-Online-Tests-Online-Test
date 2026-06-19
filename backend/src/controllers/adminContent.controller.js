@@ -68,6 +68,48 @@ const adminContentController = {
   },
 
   /**
+   * Handler for getting test details
+   * @param {import('express').Request} req
+   * @param {import('express').Response} res
+   * @param {import('express').NextFunction} next
+   */
+  getTestDetail: async (req, res, next) => {
+    try {
+      const testId = req.params.id;
+      const test = await contentService.getTestDetail(testId);
+      res.status(200).json({
+        success: true,
+        data: test,
+        error: null,
+        meta: null
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  /**
+   * Handler for getting resource details
+   * @param {import('express').Request} req
+   * @param {import('express').Response} res
+   * @param {import('express').NextFunction} next
+   */
+  getResourceDetail: async (req, res, next) => {
+    try {
+      const resourceId = req.params.id;
+      const resource = await contentService.getResourceDetail(resourceId);
+      res.status(200).json({
+        success: true,
+        data: resource,
+        error: null,
+        meta: null
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  /**
    * Handler for reviewing a test
    * @param {import('express').Request} req
    * @param {import('express').Response} res
