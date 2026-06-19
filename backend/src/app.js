@@ -31,6 +31,10 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 // Parse cookies
 app.use(cookieParser());
 
+// Serve uploaded files (ADR-004: local storage)
+// Chỉ serve path /uploads — không expose toàn bộ filesystem
+app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+
 // Mount API v1 routes
 app.use('/api/v1', apiV1Routes);
 
