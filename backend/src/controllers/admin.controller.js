@@ -9,9 +9,11 @@
  * @param {Object} usersService - Injected users service
  * @param {typeof import('../utils/AppError')} AppError - Injected AppError class
  * @param {Object} sessionsService - Injected sessions service
+ * @param {Object} contactsService - Injected contacts service
+ * @param {Object} auditService - Injected audit service
  * @returns {Object} Controller methods
  */
-const adminControllerFactory = (usersService, AppError, sessionsService, contactsService) => {
+const adminControllerFactory = (usersService, AppError, sessionsService, contactsService, auditService) => {
   return {
     /**
      * Handler for listing users with pagination and filters
@@ -207,6 +209,108 @@ const adminControllerFactory = (usersService, AppError, sessionsService, contact
         res.status(200).json({
           success: true,
           data: updated,
+          error: null,
+          meta: null
+        });
+      } catch (error) {
+        next(error);
+      }
+    },
+
+    /**
+     * Handler for listing admin change logs.
+     * EARS[Event]: WHEN Admin requests GET /admin/change-logs, THE system SHALL return paginated audit logs.
+     *
+     * @param {import('express').Request} req
+     * @param {import('express').Response} res
+     * @param {import('express').NextFunction} next
+     */
+    listChangeLogs: async (req, res, next) => {
+      try {
+        const {
+          page = 1,
+          limit = 20,
+          actor_id,
+          action,
+          target_table,
+          target_id,
+          status,
+          from,
+          to,
+          search
+        } = req.query;
+
+        const result = await auditService.listChangeLogs({
+          page,
+          limit,
+          actor_id,
+          action,
+          target_table,
+          target_id,
+          status,
+          from,
+          to,
+          search
+        });
+
+        res.status(200).json({
+          success: true,
+          data: result.logs,
+          error: null,
+          meta: {
+            page: result.page,
+            limit: result.limit,
+            total: result.total,
+            summary: result.summary
+          }
+        });
+      } catch (error) {
+        next(error);
+      }
+    },
+
+    /**
+     * Handler for viewing one admin change log.
+     * EARS[Event]: WHEN Admin requests GET /admin/change-logs/:id, THE system SHALL return the log detail.
+     *
+     * @param {import('express').Request} req
+     * @param {import('express').Response} res
+     * @param {import('express').NextFunction} next
+     */
+    getChangeLogDetail: async (req, res, next) => {
+      try {
+        const detail = await auditService.getChangeLogDetail(req.params.id);
+
+        res.status(200).json({
+          success: true,
+          data: detail,
+          error: null,
+          meta: null
+        });
+      } catch (error) {
+        next(error);
+      }
+    },
+
+    /**
+     * Handler for undoing a supported admin change log.
+     * EARS[Event]: WHEN Admin requests POST /admin/change-logs/:id/undo, THE system SHALL revert the supported change and log it.
+     *
+     * @param {import('express').Request} req
+     * @param {import('express').Response} res
+     * @param {import('express').NextFunction} next
+     */
+    undoChangeLog: async (req, res, next) => {
+      try {
+        const result = await auditService.undoChangeLog({
+          logId: req.params.id,
+          actorId: req.user.id,
+          ipAddress: req.ip
+        });
+
+        res.status(200).json({
+          success: true,
+          data: result,
           error: null,
           meta: null
         });

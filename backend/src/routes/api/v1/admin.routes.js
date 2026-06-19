@@ -5,12 +5,13 @@ const AppError = require('../../../utils/AppError');
 const usersService = require('../../../services/users.service');
 const sessionsService = require('../../../services/sessions.service');
 const contactsService = require('../../../services/contacts.service');
+const auditService = require('../../../services/audit.service');
 const adminControllerFactory = require('../../../controllers/admin.controller');
 const authorizeFactory = require('../../../middleware/authorize');
 const authenticate = require('../../../middleware/authenticate');
 
 // Inject dependencies (Dependency Injection pattern)
-const adminController = adminControllerFactory(usersService, AppError, sessionsService, contactsService);
+const adminController = adminControllerFactory(usersService, AppError, sessionsService, contactsService, auditService);
 const authorize = authorizeFactory(AppError);
 
 // T039: API quản lý user dành cho Admin
@@ -42,5 +43,9 @@ router.get('/content/resources/:id', authenticate, authorize('admin'), adminCont
 router.put('/content/resources/:id/review', authenticate, authorize('admin'), adminContentController.reviewResource);
 
 router.get('/content/schedule', authenticate, authorize('admin'), adminContentController.getPublishSchedule);
+// API nhật ký duyệt & thay đổi
+router.get('/change-logs', authenticate, authorize('admin'), adminController.listChangeLogs);
+router.get('/change-logs/:id', authenticate, authorize('admin'), adminController.getChangeLogDetail);
+router.post('/change-logs/:id/undo', authenticate, authorize('admin'), adminController.undoChangeLog);
 
 module.exports = router;
