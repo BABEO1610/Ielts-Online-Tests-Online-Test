@@ -49,8 +49,8 @@ function checkValidation(req, next) {
  */
 const listResources = async (req, res, next) => {
   try {
-    const { category } = req.query;
-    const resources = await libraryService.listResources(category);
+    const { category, search, resource_type } = req.query;
+    const resources = await libraryService.listResources({ category, search, resource_type });
 
     return res.status(200).json({
       success: true,
@@ -69,7 +69,7 @@ const listResources = async (req, res, next) => {
  */
 const getResource = async (req, res, next) => {
   try {
-    const resource = await libraryService.getResourceDetail(req.params.id, req.user.id);
+    const resource = await libraryService.getResourceDetail(req.params.id, req.user?.id || null);
 
     return res.status(200).json({
       success: true,
