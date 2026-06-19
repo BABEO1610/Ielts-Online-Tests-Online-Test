@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Toaster, toast } from 'react-hot-toast';
 import StudentNavbar from '../../components/layout/StudentNavbar';
-import { getLibraryResources } from '../../services/library.service';
+import { fetchLibraryResources } from '../../services/library.service';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 const SKILL_FILTERS = [
@@ -394,7 +394,7 @@ const ContentLibraryPage = () => {
     const fetchResources = async () => {
       setLoading(true);
       try {
-        const res = await getLibraryResources({ search: searchQuery, resource_type: activeSkill });
+        const res = await fetchLibraryResources({ search: searchQuery, resource_type: activeSkill });
         if (res.success) {
           const mapped = res.data.map(item => ({
             id: item.id,
