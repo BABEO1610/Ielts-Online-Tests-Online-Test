@@ -10,12 +10,12 @@ const libraryController = require('../../../controllers/library.controller');
 
 const authorize = authorizeFactory(AppError);
 
-// Tất cả routes yêu cầu authenticate + role tutor hoặc admin (SEC-07)
-router.use(authenticate);
-router.use(authorize(['tutor', 'admin']));
+// ── Public routes (student có thể xem danh sách + tải file) ─────────────────
 
-// Serve uploaded files (chỉ cho tutor/admin đã authenticated)
-// ADR-004: file lưu local trước
+// GET    /api/v1/library          — danh sách tài liệu (public, ai cũng xem được)
+router.get('/', libraryController.listResources);
+
+// GET    /api/v1/library/files/:filename — serve file (public download)
 router.get(
   '/files/:filename',
   (req, res, next) => {
@@ -27,15 +27,16 @@ router.get(
   }
 );
 
-// GET    /api/v1/library          — danh sách tài liệu (có filter category)
-router.get('/', libraryController.listResources);
-
-// GET    /api/v1/library/:id      — chi tiết tài liệu
+// GET    /api/v1/library/:id      — chi tiết tài liệu (public)
 router.get('/:id', libraryController.getResource);
+
+// ── Protected routes (tutor/admin mới được tạo/sửa/xóa) ────────────────────
 
 // POST   /api/v1/library          — tạo mới (multipart/form-data, 1 file)
 router.post(
   '/',
+  authenticate,
+  authorize(['tutor', 'admin']),
   upload.single('file'),
   libraryController.createResource
 );
@@ -43,11 +44,14 @@ router.post(
 // PUT    /api/v1/library/:id      — cập nhật metadata và file đính kèm
 router.put(
   '/:id',
+  authenticate,
+  authorize(['tutor', 'admin']),
   upload.single('file'),
   libraryController.updateResource
 );
 
 // DELETE /api/v1/library/:id      — xóa tài liệu
-router.delete('/:id', libraryController.deleteResource);
+router.delete('/:id', authenticate, authorize(['tutor', 'admin']), libraryController.deleteResource);
 
 module.exports = router;
+
