@@ -3,10 +3,7 @@ import axios from 'axios';
 // EARS[State-driven]: WHEN application starts THEN initialize api client with base URL and credentials
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1',
-  withCredentials: true,
-  headers: {
-    'Content-Type': 'application/json',
-  },
+  withCredentials: true
 });
 
 // Response Interceptor

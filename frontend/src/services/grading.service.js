@@ -5,7 +5,7 @@ const gradingService = {
   uploadAudio: async (audioBlob) => {
     const formData = new FormData();
     formData.append('audio_file', audioBlob);
-    
+
     const response = await api.post('/submissions/speaking/upload', formData, {
       headers: {
         'Content-Type': 'multipart/form-data',

@@ -77,6 +77,28 @@ describe('Grading Service', () => {
     });
   });
 
+  describe('createAttempt', () => {
+    it('should omit dummy numeric mock ids when creating a speaking attempt', async () => {
+      const mockResponse = { data: { success: true, data: { id: 'attempt-1' } } };
+      api.post.mockResolvedValueOnce(mockResponse);
+
+      const result = await gradingService.createAttempt('2');
+
+      expect(api.post).toHaveBeenCalledWith('/submissions/speaking/attempt', {});
+      expect(result).toEqual(mockResponse.data);
+    });
+
+    it('should send real UUID test ids when creating a speaking attempt', async () => {
+      const testId = '11111111-1111-4111-8111-111111111111';
+      const mockResponse = { data: { success: true, data: { id: 'attempt-1' } } };
+      api.post.mockResolvedValueOnce(mockResponse);
+
+      await gradingService.createAttempt(testId);
+
+      expect(api.post).toHaveBeenCalledWith('/submissions/speaking/attempt', { test_id: testId });
+    });
+  });
+
   describe('getFeedback', () => {
     it('should fetch feedback report correctly (FR-06)', async () => {
       // EARS[Event]: WHEN feedback is requested THEN it calls GET with type param
