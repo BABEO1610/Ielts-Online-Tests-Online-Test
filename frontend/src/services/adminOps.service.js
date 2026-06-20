@@ -80,24 +80,42 @@ const SAMPLE_ASSIGNMENTS = [
 
 // ── Content review ───────────────────────────────────────────────────────────
 export async function fetchPendingTests() {
-  try { return ok((await api.get('/admin/tests?status=pending')).data.data); }
+  try { return ok((await api.get('/admin/content/tests')).data.data); }
   catch { return sample(SAMPLE_PENDING_TESTS); }
 }
 export async function fetchPendingResources() {
-  try { return ok((await api.get('/admin/resources?status=pending')).data.data); }
+  try { return ok((await api.get('/admin/content/resources')).data.data); }
   catch { return sample(SAMPLE_PENDING_RESOURCES); }
 }
 export async function fetchPublishSchedule() {
-  try { return ok((await api.get('/admin/publish-schedule')).data.data); }
+  try { return ok((await api.get('/admin/content/schedule')).data.data); }
   catch { return sample(SAMPLE_SCHEDULE); }
 }
 export async function reviewTest(id, action) {
-  try { await api.put(`/admin/tests/${id}/review`, { action }); return true; }
-  catch { return true; } // dev fallback: optimistic
+  try {
+    await api.put(`/admin/content/tests/${id}/review`, { action });
+    return true;
+  } catch (error) {
+    const msg = error?.response?.data?.error?.message || 'Không thể duyệt đề thi. Vui lòng thử lại.';
+    throw new Error(msg);
+  }
 }
 export async function reviewResource(id, action) {
-  try { await api.put(`/admin/resources/${id}/review`, { action }); return true; }
-  catch { return true; }
+  try {
+    await api.put(`/admin/content/resources/${id}/review`, { action });
+    return true;
+  } catch (error) {
+    const msg = error?.response?.data?.error?.message || 'Không thể duyệt tài liệu. Vui lòng thử lại.';
+    throw new Error(msg);
+  }
+}
+export async function fetchTestDetail(id) {
+  const res = await api.get(`/admin/content/tests/${id}`);
+  return ok(res.data.data);
+}
+export async function fetchResourceDetail(id) {
+  const res = await api.get(`/admin/content/resources/${id}`);
+  return ok(res.data.data);
 }
 
 // ── Grading oversight ─────────────────────────────────────────────────────────

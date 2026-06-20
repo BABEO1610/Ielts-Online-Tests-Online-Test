@@ -87,6 +87,21 @@
 
 | Date | Agent | File Changed | Summary |
 |------|-------|-------------|---------|
+| 2026-06-09 | Antigravity | `frontend/src/layouts/StudentLayout.jsx` | **Student Sidebar Layout:** Tạo layout mới với sidebar theo thiết kế mới chứa các mục (Dashboard, Prep Services, Live Lessons, History, Wallet, Profile, Referral), topbar, và footer. |
+| 2026-06-09 | Antigravity | `frontend/src/pages/Dashboard.jsx` | **My Dashboard:** Xây dựng trang tổng quan điểm số 4 kỹ năng bằng `recharts` với giao diện hiển thị Target Score, Average Score, Accuracy, v.v... |
+| 2026-06-09 | Antigravity | `frontend/src/pages/UserProfilePage.jsx` | **Refactor Profile:** Chỉnh sửa giao diện và cấu trúc để tích hợp vào `StudentLayout`, bỏ `StudentNavbar` lồng bên trong. |
+| 2026-06-09 | Antigravity | `frontend/src/App.jsx` | **Routing:** Gắn `StudentLayout` cho các page của Student. |
+
+## 2026-06-15 (Fix giao diện Profile học viên)
+
+| Date | Agent | File Changed | Summary |
+|------|-------|-------------|---------|
+| 2026-06-15 | Antigravity | `frontend/index.html` | **Fix icon Profile (DESIGN.md):** Trang `/profile` và `StudentLayout` dùng rất nhiều Bootstrap Icons (`bi bi-*`) nhưng `index.html` chỉ nạp Bootstrap CSS/JS, THIẾU font Bootstrap Icons → toàn bộ icon hiển thị trống/lỗi. Thêm `<link>` CDN `bootstrap-icons@1.11.3` để icon render đúng. Không đổi logic, chỉ bổ sung stylesheet. |
+
+## 2026-06-15
+
+| Date | Agent | File Changed | Summary |
+|------|-------|-------------|---------|
 | 2026-06-14 | Antigravity | `frontend/src/pages/subjective-testing/WritingTestPage.jsx` | **Tạo mới trang thi Writing:** Tách màn hình làm bài và xem kết quả từ `WritingPage.jsx`, hỗ trợ route-driven thi theo ID: `/tests/:id/writing`. |
 | 2026-06-14 | Antigravity | `frontend/src/pages/subjective-testing/SpeakingTestPage.jsx` | **Tạo mới trang thi Speaking:** Tách màn hình làm bài và xem kết quả từ `SpeakingPage.jsx`, hỗ trợ route-driven thi theo ID: `/tests/:id/speaking`. |
 | 2026-06-14 | Antigravity | `frontend/src/pages/subjective-testing/WritingPage.jsx` | **Refactor WritingPage:** Xóa code màn hình làm bài, chuyển hướng `ModeSelector` sang trang thi route-driven mới. Sửa relative imports. |

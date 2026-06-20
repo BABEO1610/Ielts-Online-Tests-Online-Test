@@ -5,7 +5,7 @@ process.exit = function (code) {
   originalExit(code);
 };
 const path = require('path');
-require('dotenv').config({ path: path.resolve(__dirname, '../.env') });
+require('dotenv').config({ path: path.resolve(__dirname, '../../.env') });
 require('node:dns').setDefaultResultOrder('ipv4first'); // Fix lỗi UND_ERR_CONNECT_TIMEOUT do Node ưu tiên IPv6
 const express = require('express');
 const cors = require('cors');
@@ -30,6 +30,10 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Parse cookies
 app.use(cookieParser());
+
+// Serve uploaded files (ADR-004: local storage)
+// Chỉ serve path /uploads — không expose toàn bộ filesystem
+app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 // Mount API v1 routes
 app.use('/api/v1', apiV1Routes);

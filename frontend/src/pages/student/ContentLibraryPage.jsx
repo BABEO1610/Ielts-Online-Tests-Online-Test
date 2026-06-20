@@ -1,16 +1,16 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Toaster, toast } from 'react-hot-toast';
 import StudentNavbar from '../../components/layout/StudentNavbar';
-import { mockTests } from '../../data/libraryMockData';
 import html2pdf from 'html2pdf.js';
+import { fetchLibraryResources } from '../../services/library.service';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 const SKILL_FILTERS = [
   { value: '', label: 'Tất cả' },
-  { value: 'reading', label: 'Reading' },
-  { value: 'listening', label: 'Listening' },
-  { value: 'writing', label: 'Writing' },
-  { value: 'speaking', label: 'Speaking' },
+  { value: 'pdf', label: 'PDF / Sách' },
+  { value: 'audio', label: 'Audio' },
+  { value: 'video', label: 'Video' },
+  { value: 'other', label: 'Khác' },
 ];
 
 const SKILL_BADGE = {
@@ -257,9 +257,39 @@ const TestPreviewModal = ({ test, onClose, onDownload, downloadingId }) => {
 
   if (!test) return null;
 
+  const getFullUrl = (path) => {
+    if (!path) return '';
+    if (path.startsWith('http')) return path;
+    const baseUrl = import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL.replace('/api/v1', '') : 'http://localhost:3000';
+    return `${baseUrl}${path}`;
+  };
+
   const renderContent = () => {
+    if (test.resource_type === 'pdf' && test.file_url) {
+      return (
+        <div style={{ height: '70vh' }}>
+          <iframe 
+            src={getFullUrl(test.file_url)} 
+            width="100%" 
+            height="100%" 
+            title={test.title}
+            style={{ border: 'none' }}
+          />
+        </div>
+      );
+    }
+
+    if (test.resource_type === 'audio' && test.file_url) {
+      return (
+        <div className="text-center py-5">
+          <i className="bi bi-music-note-beamed text-muted mb-4 d-block" style={{ fontSize: '64px' }}></i>
+          <audio controls src={getFullUrl(test.file_url)} className="w-100" />
+        </div>
+      );
+    }
+
     const { content } = test;
-    if (!content) return <p className="text-muted">Nội dung đang được cập nhật.</p>;
+    if (!content) return <p className="text-muted text-center py-4">Nội dung đang được cập nhật.</p>;
     switch (content.type) {
       case 'reading': return <ReadingPreview content={content} />;
       case 'listening': return <ListeningPreview content={content} />;
@@ -355,86 +385,89 @@ const TestPreviewModal = ({ test, onClose, onDownload, downloadingId }) => {
 // ─── Main Page ────────────────────────────────────────────────────────────────
 const ContentLibraryPage = () => {
   const [downloadingId, setDownloadingId] = useState(null);
-  const [activeSkill, setActiveSkill] = useState('');
+  const [activeSkill, setActiveSkill] = useState(''); // Thực ra là activeResourceType
   const [searchQuery, setSearchQuery] = useState('');
   const [previewTest, setPreviewTest] = useState(null);
+  const [resources, setResources] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  const filteredTests = useMemo(() => {
-    return mockTests.filter((test) => {
-      const matchSkill = activeSkill === '' || test.skill === activeSkill;
-      const matchSearch =
-        test.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        test.description.toLowerCase().includes(searchQuery.toLowerCase());
-      return matchSkill && matchSearch;
-    });
-  }, [activeSkill, searchQuery]);
+  useEffect(() => {
+    const fetchResources = async () => {
+      setLoading(true);
+      try {
+        const res = await fetchLibraryResources({ search: searchQuery, resource_type: activeSkill });
+        if (res.success) {
+          const mapped = res.data.map(item => ({
+            id: item.id,
+            title: item.title,
+            description: item.description || '',
+            skill: item.resource_type === 'audio' ? 'listening' : 'reading', // fake skill for badge UI
+            level: 'Trung bình', // fake level for badge UI
+            parts: [item.resource_type === 'audio' ? 'Audio file' : 'Document'],
+            questions: 0,
+            duration: 'N/A',
+            pdfSize: item.resource_type === 'pdf' ? (item.file_size_bytes / 1024 / 1024).toFixed(1) + ' MB' : null,
+            audioSize: item.resource_type === 'audio' ? (item.file_size_bytes / 1024 / 1024).toFixed(1) + ' MB' : null,
+            content: null,
+            file_url: item.file_url,
+            resource_type: item.resource_type,
+            category: item.category
+          }));
+          setResources(mapped);
+        }
+      } catch (err) {
+        toast.error('Lỗi khi tải danh sách tài liệu');
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    const timeoutId = setTimeout(() => {
+      fetchResources();
+    }, 500);
+    return () => clearTimeout(timeoutId);
+  }, [searchQuery, activeSkill]);
 
-  const handleDownload = (id, type, title, sourceElement = null) => {
+  const handleDownload = async (id, type, title, sourceElement = null) => {
     if (downloadingId) return;
     setDownloadingId(`${id}-${type}`);
     const toastId = toast.loading(`Đang tải ${type.toUpperCase()}...`);
 
-    setTimeout(() => {
-      if (type === 'pdf') {
-        if (!sourceElement) {
-          toast.error('Vui lòng ấn "Xem đề" và tải xuống từ giao diện xem trước để tạo PDF!', { id: toastId });
-          setDownloadingId(null);
-          return;
-        }
-
-        const opt = {
-          margin: 10,
-          filename: `${title}.pdf`,
-          image: { type: 'jpeg', quality: 0.98 },
-          html2canvas: {
-            scale: 2,
-            useCORS: true,
-            onclone: (clonedDoc) => {
-              // Mở toàn bộ thẻ details (đáp án mẫu) để in ra PDF
-              const details = clonedDoc.querySelectorAll('details');
-              details.forEach(d => d.setAttribute('open', 'true'));
-
-              // Loại bỏ giới hạn chiều cao (max-height) và thanh cuộn để hiển thị đủ toàn bộ chữ
-              const divs = clonedDoc.querySelectorAll('div');
-              divs.forEach(el => {
-                if (el.style.maxHeight) {
-                  el.style.maxHeight = 'none';
-                  el.style.overflow = 'visible';
-                  el.style.overflowY = 'visible';
-                }
-              });
-            }
-          },
-          pagebreak: { mode: ['css', 'legacy'] },
-          jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-        };
-
-        toast.loading('Đang xử lý nội dung trang để xuất PDF...', { id: toastId });
-        html2pdf().set(opt).from(sourceElement).save().then(() => {
-          toast.success(`Xuất PDF thành công!`, { id: toastId });
-          setDownloadingId(null);
-        }).catch(err => {
-          toast.error(`Có lỗi khi tạo file PDF`, { id: toastId });
-          setDownloadingId(null);
-        });
-
-      } else {
-        try {
-          // Tạo URL cho Audio
-          const fileUrl = `/audios/test-${id}.mp3`;
-          const link = document.createElement('a');
-          link.href = fileUrl;
-          link.setAttribute('download', `${title}.mp3`);
-          document.body.appendChild(link);
-          link.click();
-          link.parentNode.removeChild(link);
-          toast.success(`Tải AUDIO thành công!`, { id: toastId });
-        } catch (error) {
-          toast.error(`Có lỗi khi tải file`, { id: toastId });
-        }
-        setDownloadingId(null);
+    try {
+      const test = resources.find(r => r.id === id);
+      if (!test || !test.file_url) {
+        throw new Error('Không tìm thấy đường dẫn file');
       }
-    }, 500);
+
+      const getFullUrl = (path) => {
+        if (!path) return '';
+        if (path.startsWith('http')) return path;
+        const baseUrl = import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL.replace('/api/v1', '') : 'http://localhost:3000';
+        return `${baseUrl}${path}`;
+      };
+
+      // Fetch blob để ép tải xuống với đúng định dạng (tránh tải nhầm file .htm do CORS)
+      const response = await fetch(getFullUrl(test.file_url));
+      if (!response.ok) throw new Error('Không thể fetch file');
+      const blob = await response.blob();
+      
+      const ext = type === 'pdf' ? '.pdf' : '.mp3';
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `${title}${ext}`);
+      document.body.appendChild(link);
+      link.click();
+      link.parentNode.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      
+      toast.success(`Tải file thành công!`, { id: toastId });
+    } catch (error) {
+      console.error('Download error:', error);
+      toast.error(`Có lỗi khi tải file, thử lại sau.`, { id: toastId });
+    } finally {
+      setDownloadingId(null);
+    }
   };
 
   return (
@@ -493,11 +526,18 @@ const ContentLibraryPage = () => {
             ))}
           </div>
 
-          <span className="text-muted small ms-md-auto text-nowrap">{filteredTests.length} tài liệu</span>
+          <span className="text-muted small ms-md-auto text-nowrap">{loading ? 'Đang tải...' : `${resources.length} tài liệu`}</span>
         </div>
 
         {/* Results */}
-        {filteredTests.length === 0 ? (
+        {loading ? (
+          <div className="text-center py-5">
+            <div className="spinner-border text-primary" role="status">
+              <span className="visually-hidden">Loading...</span>
+            </div>
+            <p className="mt-2 text-muted">Đang tải tài liệu...</p>
+          </div>
+        ) : resources.length === 0 ? (
           <div className="card border-0 shadow-sm rounded-4 p-5 text-center bg-white" data-testid="empty-state">
             <i className="bi bi-search text-muted mb-3" style={{ fontSize: '48px' }}></i>
             <h5 className="fw-bold text-dark">Không tìm thấy tài liệu</h5>
@@ -512,23 +552,19 @@ const ContentLibraryPage = () => {
           </div>
         ) : (
           <div className="row row-cols-1 row-cols-md-2 row-cols-xl-3 g-4" data-testid="test-list">
-            {filteredTests.map((test) => (
+            {resources.map((test) => (
               <div className="col" key={test.id} data-testid={`test-item-${test.id}`}>
                 <div className="card h-100 border-0 shadow-sm rounded-4">
                   <div className="card-body p-4 d-flex flex-column">
                     <div className="d-flex justify-content-between align-items-center mb-3">
                       <div className="d-flex gap-2">
-                        <span className={`badge rounded-pill ${SKILL_BADGE[test.skill]} text-capitalize`}>{test.skill}</span>
-                        <span className={`badge rounded-pill ${LEVEL_BADGE[test.level]}`}>{test.level}</span>
+                        <span className={`badge rounded-pill ${SKILL_BADGE[test.skill]} text-capitalize`}>{test.resource_type}</span>
+                        <span className={`badge rounded-pill text-bg-secondary`}>{test.category || 'Tài liệu'}</span>
                       </div>
-                      <span className="text-muted small">{test.parts.length} phần · {test.questions} câu</span>
+                      <span className="text-muted small">{test.resource_type === 'pdf' ? 'PDF' : 'Audio'}</span>
                     </div>
 
                     <h5 className="card-title fw-bold text-dark mb-2">{test.title}</h5>
-                    <p className="text-muted small mb-1">
-                      {test.parts.slice(0, 2).join(' · ')}
-                      {test.parts.length > 2 && ` · +${test.parts.length - 2} khác`}
-                    </p>
                     <p className="card-text text-muted small flex-grow-1 mb-4">{test.description}</p>
 
                     <div className="d-flex flex-column gap-2 mt-auto">
@@ -537,35 +573,47 @@ const ContentLibraryPage = () => {
                         onClick={() => setPreviewTest(test)}
                         data-testid={`btn-view-${test.id}`}
                       >
-                        Xem đề →
+                        Thông tin chi tiết →
                       </button>
                       <div className="d-flex gap-2">
-                        <button
-                          className="btn btn-outline-danger flex-grow-1 d-flex align-items-center justify-content-center gap-1 fw-medium"
-                          onClick={() => handleDownload(test.id, 'pdf', test.title)}
-                          disabled={!!downloadingId}
-                          data-testid={`btn-download-pdf-${test.id}`}
-                        >
-                          {downloadingId === `${test.id}-pdf`
-                            ? <span className="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
-                            : <i className="bi bi-file-earmark-pdf-fill"></i>}
-                          PDF
-                        </button>
-                        {test.audioSize ? (
+                        {test.resource_type === 'pdf' ? (
+                          <button
+                            className="btn btn-outline-danger flex-grow-1 d-flex align-items-center justify-content-center gap-1 fw-medium"
+                            onClick={() => {
+                               const link = document.createElement('a');
+                               link.href = test.file_url;
+                               link.setAttribute('download', test.title);
+                               document.body.appendChild(link);
+                               link.click();
+                               link.parentNode.removeChild(link);
+                            }}
+                            data-testid={`btn-download-pdf-${test.id}`}
+                          >
+                            <i className="bi bi-file-earmark-pdf-fill"></i> Tải PDF
+                          </button>
+                        ) : test.resource_type === 'audio' ? (
                           <button
                             className="btn btn-outline-secondary flex-grow-1 d-flex align-items-center justify-content-center gap-1 fw-medium"
-                            onClick={() => handleDownload(test.id, 'audio', test.title)}
-                            disabled={!!downloadingId}
+                            onClick={() => {
+                               const link = document.createElement('a');
+                               link.href = test.file_url;
+                               link.setAttribute('download', test.title);
+                               document.body.appendChild(link);
+                               link.click();
+                               link.parentNode.removeChild(link);
+                            }}
                             data-testid={`btn-download-audio-${test.id}`}
                           >
-                            {downloadingId === `${test.id}-audio`
-                              ? <span className="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
-                              : <i className="bi bi-music-note-beamed"></i>}
-                            Audio
+                            <i className="bi bi-music-note-beamed"></i> Tải Audio
                           </button>
                         ) : (
-                          <button className="btn btn-outline-light flex-grow-1 text-muted" disabled title="Đề này không có audio">
-                            <i className="bi bi-music-note-beamed"></i> N/A
+                          <button
+                            className="btn btn-outline-info flex-grow-1 d-flex align-items-center justify-content-center gap-1 fw-medium"
+                            onClick={() => {
+                               window.open(test.file_url, '_blank');
+                            }}
+                          >
+                            <i className="bi bi-download"></i> Tải file
                           </button>
                         )}
                       </div>
