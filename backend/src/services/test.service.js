@@ -116,7 +116,15 @@ class TestService {
             // 4. Insert Questions
             if (block.questions && Array.isArray(block.questions)) {
               for (const q of block.questions) {
-                const options = TestService.serializeJsonb(q.options || block.options);
+                // For matching questions, always store the full options pool with text
+                let options;
+                if (block.type && block.type.toLowerCase().includes('matching') && block.options) {
+                  // For matching, store the full pool of options with text
+                  options = TestService.serializeJsonb(block.options);
+                } else {
+                  // For other types, use question-specific options if available
+                  options = TestService.serializeJsonb(q.options || block.options);
+                }
                 const correctAnswers = TestService.serializeJsonb(q.correctAnswers);
                 await client.query(
                   `INSERT INTO questions (test_id, block_id, question_order, question_text, options, correct_answer, correct_answers, explanation)
@@ -420,7 +428,15 @@ class TestService {
 
             if (block.questions && Array.isArray(block.questions)) {
               for (const q of block.questions) {
-                const options = TestService.serializeJsonb(q.options || block.options);
+                // For matching questions, always store the full options pool with text
+                let options;
+                if (block.type && block.type.toLowerCase().includes('matching') && block.options) {
+                  // For matching, store the full pool of options with text
+                  options = TestService.serializeJsonb(block.options);
+                } else {
+                  // For other types, use question-specific options if available
+                  options = TestService.serializeJsonb(q.options || block.options);
+                }
                 const correctAnswers = TestService.serializeJsonb(q.correctAnswers);
                 await client.query(
                   `INSERT INTO questions (test_id, block_id, question_order, question_text, options, correct_answer, correct_answers, explanation)

@@ -155,13 +155,13 @@ class AttemptService {
       const mode = practiceMode ? 'untimed' : 'timed';
 
       // Insert attempt header
-      // Note: 'mode' column is original schema (enum test_mode); other columns added in migration 014
+      // Note: status='submitted' means pending tutor grading; band_score=NULL until graded
       const attemptRes = await client.query(
         `INSERT INTO test_attempts
            (test_id, user_id, mode, status, raw_score, total_questions, band_score, time_spent, practice_mode)
-         VALUES ($1, $2, $3, 'completed', $4, $5, $6, $7, $8)
+         VALUES ($1, $2, $3, 'submitted', $4, $5, NULL, $6, $7)
          RETURNING id`,
-        [testId, userId, mode, rawScore, totalQuestions, bandScore, timeSpent, practiceMode]
+        [testId, userId, mode, rawScore, totalQuestions, timeSpent, practiceMode]
       );
       const attemptId = attemptRes.rows[0].id;
 
@@ -179,13 +179,14 @@ class AttemptService {
 
       return {
         attemptId,
+        status: 'submitted',  // Pending tutor grading
         rawScore,
         totalQuestions,
-        bandScore,
         correctCount: rawScore,
         incorrectCount: totalQuestions - rawScore,
         timeSpent,
         practiceMode,
+        message: 'Bài làm của bạn đã được nộp. Vui lòng chờ giáo viên chấm điểm.'
       };
     } catch (error) {
       await client.query('ROLLBACK');

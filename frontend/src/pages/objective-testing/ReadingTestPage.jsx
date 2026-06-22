@@ -44,9 +44,30 @@ function flattenTestData(testData, allowedPassageNumbers) {
 
   passages.forEach((passage) => {
     (passage.blocks || []).forEach((block) => {
-      // question_type from backend: 'multiple_choice', 'true_false', 'fill_blank',
-      // 'matching_headings', 'sentence_completion', etc.
-      const isMcq = ['multiple_choice', 'true_false', 'multiple_choice_multiple'].includes(block.type);
+      // question_type from backend may be stored in different formats (canonical or human-readable).
+      // Normalize to machine-friendly form then map to our UI-level types.
+      const rawType = (block.type || '').toString();
+      const normType = rawType.toLowerCase().replace(/\s+/g, '_').replace(/\//g, '_').replace(/[^a-z_]/g, '');
+
+      const mapToQType = (t) => {
+        if (!t) return 'fill';
+        if (['multiple_choice', 'multiplechoice', 'mcq', 'single_choice', 'singlechoice'].includes(t)) return 'mcq';
+        if (['multiple_choice_multiple', 'multiple_choice_multipleanswer', 'multiple_choice_multiplechoice', 'multiplechoice_multiple'].includes(t)) return 'mcq_multi';
+        if (['true_false', 'truefalse', 'true_false_ng', 'true_false_not_given'].includes(t)) return 'true_false';
+        if (['fill_blank', 'fill_in_blank', 'fillblank', 'sentence_completion'].includes(t)) return 'fill';
+        if (['matching_headings', 'matching_information', 'matching', 'match_the_following'].includes(t)) return 'matching';
+        if (['short_answer', 'shortanswer', 'short'].includes(t)) return 'short';
+        return 'fill';
+      };
+
+      const blockQType = mapToQType(normType);
+      // Debug: help diagnose mapping issues in browser console
+      try {
+        // eslint-disable-next-line no-console
+        console.debug(`[ReadingTestPage] passage=${passage.passageNumber} rawType="${rawType}" normType="${normType}" mapped="${blockQType}"`);
+      } catch (err) {
+        // ignore
+      }
 
       (block.questions || []).forEach((q) => {
         // Normalise options: backend stores as JSONB (array of {label,text} or plain strings)
@@ -59,9 +80,9 @@ function flattenTestData(testData, allowedPassageNumbers) {
 
         questions.push({
           id: q.id,
-          order: q.questionOrder,  // matches backend field name
+          order: q.questionOrder, // matches backend field name
           passageNumber: passage.passageNumber,
-          type: isMcq ? 'mcq' : 'fill',
+          type: blockQType,
           text: q.text || '',
           options,
         });
@@ -172,6 +193,15 @@ function ReadingTestPage() {
   // ── Handlers ────────────────────────────────────────────────────────────────
   const handleAnswer = useCallback((qOrder, value) => {
     setAnswers((prev) => ({ ...prev, [qOrder]: value }));
+  }, []);
+
+  const handleToggleMulti = useCallback((qOrder, optionValue) => {
+    setAnswers((prev) => {
+      const existing = Array.isArray(prev[qOrder]) ? [...prev[qOrder]] : [];
+      const idx = existing.indexOf(optionValue);
+      if (idx === -1) existing.push(optionValue); else existing.splice(idx, 1);
+      return { ...prev, [qOrder]: existing };
+    });
   }, []);
 
   const doSubmit = useCallback(async () => {
@@ -297,7 +327,17 @@ function ReadingTestPage() {
                       {q.order}
                     </span>
                     <span className="badge-difficulty" style={{ fontSize: 11 }}>
-                      {q.type === 'mcq' ? 'Multiple Choice' : 'Fill in the blank'}
+                      {(() => {
+                        const typeLabels = {
+                          'mcq': 'Multiple Choice',
+                          'mcq_multi': 'Multiple Answer',
+                          'true_false': 'True/False/Not Given',
+                          'matching': 'Matching',
+                          'short': 'Short Answer',
+                          'fill': 'Fill in the blank'
+                        };
+                        return typeLabels[q.type] || 'Fill in the blank';
+                      })()}
                     </span>
                   </div>
 
@@ -305,12 +345,12 @@ function ReadingTestPage() {
                   {q.text && <p className="body-md-strong mb-3">{q.text}</p>}
 
                   {/* Answer input */}
-                  {q.type === 'mcq' ? (
+                  {q.type === 'mcq' && (
                     <div className="d-flex flex-column gap-2">
-                      {q.options.map((opt) => {
+                      {q.options.map((opt, i) => {
                         // Options stored as {label, text} or plain string
-                        const label = typeof opt === 'object' ? (opt.label ?? opt.value ?? '') : String(opt);
-                        const text  = typeof opt === 'object' ? (opt.text  ?? opt.label ?? '') : String(opt);
+                        const label = typeof opt === 'object' ? (opt.label ?? String.fromCharCode(65 + i)) : String.fromCharCode(65 + i);
+                        const text  = typeof opt === 'object' ? (opt.text  ?? opt.label ?? String(opt)) : String(opt);
                         const selected = answers[q.order] === label;
                         return (
                           <label
@@ -333,7 +373,91 @@ function ReadingTestPage() {
                         );
                       })}
                     </div>
-                  ) : (
+                  )}
+
+                  {q.type === 'mcq_multi' && (
+                    <div className="d-flex flex-column gap-2">
+                      {q.options.map((opt, i) => {
+                        const label = typeof opt === 'object' ? (opt.label ?? String.fromCharCode(65 + i)) : String.fromCharCode(65 + i);
+                        const text  = typeof opt === 'object' ? (opt.text  ?? opt.label ?? String(opt)) : String(opt);
+                        const selected = Array.isArray(answers[q.order]) && answers[q.order].includes(label);
+                        return (
+                          <label key={label} className={`option-card ${selected ? 'selected' : ''}`} style={{ margin: 0, padding: '12px 16px', alignItems: 'flex-start' }}>
+                            <input type="checkbox" className="form-check-input flex-shrink-0 mt-1" value={label} checked={selected} onChange={() => handleToggleMulti(q.order, label)} />
+                            <span className="body-md-strong flex-shrink-0 mt-1 mx-2">{label}.</span>
+                            <span className="body-md mt-1">{text}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {q.type === 'true_false' && (
+                    <div className="d-flex flex-column gap-2">
+                      {(() => {
+                        // True/False/Not Given always has 3 options, even if backend doesn't send them
+                        const opts = ['True', 'False', 'Not Given'];
+                        return opts.map((text, i) => {
+                          const label = String.fromCharCode(65 + i); // A, B, C
+                          const selected = answers[q.order] === label;
+                          return (
+                            <label key={label} className={`option-card ${selected ? 'selected' : ''}`} style={{ margin: 0, padding: '12px 16px', alignItems: 'flex-start' }}>
+                              <input type="radio" name={`q-${q.order}`} className="form-check-input flex-shrink-0 mt-1" value={label} checked={selected} onChange={() => handleAnswer(q.order, label)} />
+                              <span className="body-md-strong flex-shrink-0 mt-1 mx-2">{label}.</span>
+                              <span className="body-md mt-1">{text}</span>
+                            </label>
+                          );
+                        });
+                      })()}
+                    </div>
+                  )}
+
+                  {q.type === 'matching' && (
+                    <div className="d-flex flex-column gap-2">
+                      {/* If options don't have left/right structure, render as simple dropdown selector */}
+                      {!(Array.isArray(q.options) && q.options.length > 0 && typeof q.options[0] === 'object' && (q.options[0].left || q.options[0].right)) && (
+                        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                          <select 
+                            value={answers[q.order] || ''} 
+                            onChange={(e) => handleAnswer(q.order, e.target.value)}
+                            style={{ minWidth: 150 }}
+                          >
+                            <option value="">Chọn...</option>
+                            {Array.isArray(q.options) && q.options.map((opt, i) => {
+                              const text = typeof opt === 'object' ? (opt.text || opt.label || `Option ${i + 1}`) : String(opt);
+                              return <option key={i} value={text}>{text}</option>;
+                            })}
+                          </select>
+                        </div>
+                      )}
+                      {/* If options have left/right structure, render as pair matching */}
+                      {(Array.isArray(q.options) && q.options.length > 0 && typeof q.options[0] === 'object' && (q.options[0].left || q.options[0].right)) && (
+                        <div className="d-flex flex-column gap-2">
+                          {q.options.map((pair, idx) => {
+                            const left = pair.left || pair.a || `Item ${idx+1}`;
+                            const rightOptions = q.options.map((p) => p.right || p.b || '');
+                            const selected = answers[`${q.order}-${idx}`] || '';
+                            return (
+                              <div key={idx} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                                <div style={{ flex: 1 }}>{left}</div>
+                                <select value={selected} onChange={(e) => handleAnswer(`${q.order}-${idx}`, e.target.value)}>
+                                  <option value="">Chọn...</option>
+                                  {rightOptions.map((ro, i) => <option key={i} value={ro}>{ro}</option>)}
+                                </select>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {q.type === 'short' && (
+                    <input type="text" className="text-input" placeholder="Short answer..." value={answers[q.order] || ''} onChange={(e) => handleAnswer(q.order, e.target.value)} />
+                  )}
+
+                  {/* Fallback to free text for any other types */}
+                  {['fill'].includes(q.type) && (
                     <input
                       type="text"
                       className="text-input"

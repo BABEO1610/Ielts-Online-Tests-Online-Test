@@ -70,66 +70,37 @@ function TestResultPage() {
   }
 
   const r = result;
-  const bandDisplay = typeof r.bandScore === 'number' ? r.bandScore.toFixed(1) : '—';
+  const isGraded = r.status === 'graded' || (r.bandScore !== null && r.bandScore !== undefined);
+  const isSubmitted = r.status === 'submitted';
 
   return (
-    <div className="container py-4" style={{ maxWidth: 800 }}>
-      {/* Success banner */}
-      <div className="api-success-message d-flex align-items-center gap-2 justify-content-center mb-4" id="submit-success-alert">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1e4620" strokeWidth="2">
-          <path d="M22 11.08V12a10 10 0 11-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" />
-        </svg>
-        <span>Nộp bài thành công!</span>
-      </div>
-
-      {/* Band Score card */}
-      <div className="card-content text-center mb-4" id="band-score-card" style={{ padding: '48px 24px' }}>
-        <div className="caption mb-1" style={{ color: 'var(--mute)', textTransform: 'uppercase', letterSpacing: 2 }}>
-          Band Score của bạn
-        </div>
-        <div className="band-score-display" id="band-score-value">{bandDisplay}</div>
-        <div className="body-md mt-2" style={{ color: 'var(--body)' }}>{r.testTitle}</div>
-        {r.practiceMode && (
-          <span className="badge-difficulty mt-2" style={{ display: 'inline-block', fontSize: 12 }}>
-            Practice Mode
-          </span>
-        )}
-      </div>
-
-      {/* Stats row */}
-      <div className="row g-3 mb-4">
-        {[
-          { id: 'stat-raw',       label: 'Raw score',    val: `${r.rawScore}/${r.totalQuestions}` },
-          { id: 'stat-correct',   label: 'Đúng',         val: r.correctCount,   color: '#1e4620' },
-          { id: 'stat-incorrect', label: 'Sai',          val: r.incorrectCount, color: '#e02424' },
-          { id: 'stat-time',      label: 'Thời gian',    val: formatTime(r.timeSpent) },
-        ].map((s) => (
-          <div className="col-md-3 col-6" key={s.id}>
-            <div className="card-content text-center" id={s.id}>
-              <div className="display-md" style={s.color ? { color: s.color } : {}}>{s.val}</div>
-              <div className="caption" style={{ color: 'var(--body)' }}>{s.label}</div>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* Actions */}
-      <div className="d-flex gap-3">
-        <button
-          className="button-primary flex-fill"
-          id="btn-view-detail"
-          style={{ textAlign: 'center', padding: '14px 0', border: 'none', cursor: 'pointer' }}
-          onClick={() => navigate(`/results/${attemptId}/detail`)}
+    <div className="bg-white min-vh-100 d-flex align-items-center justify-content-center">
+      <div className="text-center px-4" style={{ maxWidth: '560px', width: '100%' }}>
+        <div
+          className="mx-auto mb-5 d-flex align-items-center justify-content-center rounded-circle"
+          style={{ width: '88px', height: '88px', backgroundColor: '#000', flexShrink: 0 }}
         >
-          Xem chi tiết đáp án
-        </button>
+          <i className="bi bi-check-lg text-white" style={{ fontSize: '40px', lineHeight: 1 }}></i>
+        </div>
+
+        <h2 className="fw-bold mb-3" style={{ fontFamily: 'UberMove, system-ui, sans-serif', fontSize: '36px', letterSpacing: '-0.5px' }}>
+          Bài đã được nộp
+        </h2>
+        <p className="mb-2" style={{ fontSize: '17px', fontFamily: 'UberMoveText, system-ui, sans-serif', color: '#3d3d3d' }}>
+          Bài Reading của bạn đã được gửi thành công.
+        </p>
+        <p className="mb-5" style={{ fontSize: '15px', fontFamily: 'UberMoveText, system-ui, sans-serif', color: '#767676' }}>
+          Kết quả sẽ hiển thị trong lịch sử bài làm sau khi giáo viên hoặc AI hoàn tất chấm điểm.
+        </p>
+
+        <div style={{ width: '100%', height: '1px', backgroundColor: '#e2e2e2', marginBottom: '28px' }}></div>
+
         <button
-          className="button-secondary flex-fill"
-          id="btn-back-to-tests"
-          style={{ textAlign: 'center', padding: '14px 0', border: '1px solid var(--surface-pressed)', cursor: 'pointer' }}
+          className="btn btn-dark rounded-pill px-5 py-3 fw-semibold"
+          style={{ fontSize: '15px', fontFamily: 'UberMoveText, system-ui, sans-serif', letterSpacing: '0.1px' }}
           onClick={() => navigate('/reading')}
         >
-          Về danh sách đề thi
+          Trở về danh sách đề
         </button>
       </div>
     </div>
