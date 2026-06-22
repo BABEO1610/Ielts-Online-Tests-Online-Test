@@ -18,6 +18,20 @@ export async function fetchLibraryResources(paramsOrCategory) {
 }
 
 /**
+ * Lấy danh sách tài liệu với nhiều tham số (search, resource_type, category)
+ * Phục vụ cho giao diện học viên (ContentLibraryPage)
+ */
+export async function getLibraryResources(params = {}) {
+  const query = {};
+  if (params.category && params.category !== 'All') query.category = params.category;
+  if (params.search) query.search = params.search;
+  if (params.resource_type) query.resource_type = params.resource_type;
+  
+  const res = await api.get(BASE, { params: query });
+  return res.data;
+}
+
+/**
  * Lấy chi tiết một tài liệu
  * @param {string} id - UUID
  */

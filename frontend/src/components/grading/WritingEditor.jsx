@@ -13,7 +13,8 @@ const WritingEditor = forwardRef(({
   taskNumber, 
   promptText, 
   status = 'new', 
-  onSubmitSuccess 
+  onSubmitSuccess,
+  onSubmitError
 }, ref) => {
   const { user } = useAuth();
   const aiQuotaRemaining = user?.ai_grading_quota_remaining ?? 0;
@@ -39,12 +40,14 @@ const WritingEditor = forwardRef(({
     if (e && e.preventDefault) e.preventDefault();
     
     if (charCount === 0) {
-      setToast({ message: 'Vui lòng nhập bài làm của bạn.', type: 'warning' });
+      window.alert(`Vui lòng viết câu trả lời cho Writing Task ${taskNumber} trước khi nộp!`);
+      if (onSubmitError) onSubmitError(new Error('Empty response'));
       return;
     }
 
     if (grader === 'ai' && aiQuotaRemaining <= 0) {
       setToast({ message: 'Bạn đã hết lượt chấm bài bằng AI.', type: 'error' });
+      if (onSubmitError) onSubmitError(new Error('No AI quota'));
       return;
     }
 
@@ -69,6 +72,9 @@ const WritingEditor = forwardRef(({
     } catch (error) {
       const errMsg = error.response?.data?.error?.message || 'Đã xảy ra lỗi khi nộp bài.';
       setToast({ message: errMsg, type: 'error' });
+      if (onSubmitError) {
+        onSubmitError(error);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -168,7 +174,8 @@ WritingEditor.propTypes = {
   taskNumber: PropTypes.number,
   promptText: PropTypes.string,
   status: PropTypes.oneOf(['new', 'pending', 'ai_graded', 'tutor_graded', 'reviewed', 'failed']),
-  onSubmitSuccess: PropTypes.func
+  onSubmitSuccess: PropTypes.func,
+  onSubmitError: PropTypes.func
 };
 
 export default WritingEditor;
