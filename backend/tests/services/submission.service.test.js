@@ -1,7 +1,5 @@
 const SubmissionService = require('../../src/services/submission.service');
 const { pool } = require('../../src/db/pool');
-const fs = require('fs');
-const AppError = require('../../src/utils/AppError');
 
 jest.mock('../../src/db/pool', () => ({
   pool: {
@@ -10,17 +8,15 @@ jest.mock('../../src/db/pool', () => ({
   }
 }));
 
-jest.mock('fs', () => {
-  return {
-    promises: {
-      access: jest.fn(),
-      rename: jest.fn()
-    },
-    existsSync: jest.fn(),
-    mkdirSync: jest.fn(),
-    constants: { F_OK: 0 }
-  };
-});
+jest.mock('../../src/config/supabase', () => ({
+  storage: {
+    from: jest.fn(() => ({
+      getPublicUrl: jest.fn((path) => ({
+        data: { publicUrl: `https://supabase.test/storage/v1/object/public/speaking-audio/${path}` }
+      }))
+    }))
+  }
+}));
 
 describe('SubmissionService', () => {
   beforeEach(() => {
@@ -37,96 +33,95 @@ describe('SubmissionService', () => {
       pool.connect.mockResolvedValue(mockClient);
     });
 
-    it('should submit successfully and move file', async () => {
+    it('should submit successfully with uploaded Supabase audio path', async () => {
       pool.query.mockResolvedValueOnce({ rows: [{ id: 'test-id' }] }); // Test exists
-      fs.promises.access.mockResolvedValueOnce(); // File exists
-      fs.existsSync.mockReturnValueOnce(true);
       
       mockClient.query
         .mockResolvedValueOnce() // BEGIN
-        .mockResolvedValueOnce({ rows: [{ id: 'sub-1', audio_url: '/uploads/speaking/1/uuid.webm' }] }) // INSERT
+        .mockResolvedValueOnce({
+          rows: [{
+            id: 'sub-1',
+            audio_url: 'https://supabase.test/storage/v1/object/public/speaking-audio/speaking/1/uuid.webm'
+          }]
+        }) // INSERT
         .mockResolvedValueOnce(); // COMMIT
 
-      const result = await SubmissionService.submitSpeaking('1', 'test-id', 1, 'uuid.webm', 'ai');
+      const result = await SubmissionService.submitSpeaking('1', 'test-id', 1, 'speaking/1/uuid.webm', 'ai');
 
       expect(result.id).toBe('sub-1');
-      expect(fs.promises.rename).toHaveBeenCalled();
-      expect(mockClient.query).toHaveBeenCalledWith('COMMIT');
-    });
-
-    it('should rollback if move file fails', async () => {
-      pool.query.mockResolvedValueOnce({ rows: [{ id: 'test-id' }] });
-      fs.promises.access.mockResolvedValueOnce();
-      fs.existsSync.mockReturnValueOnce(true);
-      
-      mockClient.query
-        .mockResolvedValueOnce() // BEGIN
-        .mockResolvedValueOnce({ rows: [{ id: 'sub-1' }] }); // INSERT
-        
-      fs.promises.rename.mockRejectedValueOnce(new Error('Move failed'));
-
-      await expect(SubmissionService.submitSpeaking('1', 'test-id', 1, 'uuid.webm', 'ai'))
-        .rejects.toThrow('Move failed');
-
-      expect(mockClient.query).toHaveBeenCalledWith('ROLLBACK');
-    });
-  });
-
-  describe('createAttempt', () => {
-    const mockClient = {
-      query: jest.fn(),
-      release: jest.fn()
-    };
-
-    beforeEach(() => {
-      pool.connect.mockResolvedValue(mockClient);
-      mockClient.query.mockReset();
-    });
-
-    it('should create a mock speaking attempt with null test_id for numeric mock ids', async () => {
-      mockClient.query
-        .mockResolvedValueOnce() // BEGIN
-        .mockResolvedValueOnce({ rows: [{ id: 'attempt-1', status: 'in_progress' }] })
-        .mockResolvedValueOnce(); // COMMIT
-
-      const result = await SubmissionService.createAttempt('user-1', '2');
-
-      expect(result.id).toBe('attempt-1');
-      expect(pool.query).not.toHaveBeenCalled();
       expect(mockClient.query).toHaveBeenCalledWith(
-        expect.stringContaining('INSERT INTO speaking_attempts'),
-        ['user-1', null]
+        expect.stringContaining('INSERT INTO speaking_submissions'),
+        [
+          '1',
+          'test-id',
+          1,
+          'https://supabase.test/storage/v1/object/public/speaking-audio/speaking/1/uuid.webm',
+          'ai'
+        ]
       );
       expect(mockClient.query).toHaveBeenCalledWith('COMMIT');
     });
 
-    it('should return a clear error when speaking attempt tables are missing', async () => {
-      mockClient.query
-        .mockResolvedValueOnce() // BEGIN
-        .mockRejectedValueOnce(Object.assign(new Error('relation does not exist'), { code: '42P01' }));
+    it('should reject audio paths outside the current user folder', async () => {
+      pool.query.mockResolvedValueOnce({ rows: [{ id: 'test-id' }] });
 
-      await expect(SubmissionService.createAttempt('user-1', null))
+      await expect(SubmissionService.submitSpeaking('1', 'test-id', 1, 'speaking/2/uuid.webm', 'ai'))
         .rejects.toMatchObject({
-          message: 'Speaking tables are missing. Run backend migrations, then restart the server.',
-          statusCode: 500,
-          errorCode: 'SPEAKING_SCHEMA_MISSING'
-        });
-
-      expect(mockClient.query).toHaveBeenCalledWith('ROLLBACK');
-    });
-
-    it('should reject an unknown real speaking test id before inserting', async () => {
-      const testId = '11111111-1111-4111-8111-111111111111';
-      pool.query.mockResolvedValueOnce({ rows: [] });
-
-      await expect(SubmissionService.createAttempt('user-1', testId))
-        .rejects.toMatchObject({
-          message: 'Speaking test not found',
-          statusCode: 404,
-          errorCode: 'TEST_NOT_FOUND'
+          message: 'Invalid speaking audio path',
+          statusCode: 400,
+          errorCode: 'INVALID_AUDIO_PATH'
         });
 
       expect(pool.connect).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('getSpeakingAudioUrl', () => {
+    it('should return the stored public URL for tutors', async () => {
+      const url = 'https://supabase.test/storage/v1/object/public/speaking-audio/speaking/user-1/uuid.webm';
+      pool.query.mockResolvedValueOnce({
+        rows: [{ id: 'sub-1', user_id: 'user-1', audio_url: url }]
+      });
+
+      const result = await SubmissionService.getSpeakingAudioUrl('sub-1', {
+        id: 'tutor-1',
+        role: 'tutor'
+      });
+
+      expect(result).toBe(url);
+      expect(pool.query).toHaveBeenCalledWith(
+        'SELECT id, user_id, audio_url FROM speaking_submissions WHERE id = $1',
+        ['sub-1']
+      );
+    });
+
+    it('should scope student audio lookup to the current student', async () => {
+      pool.query.mockResolvedValueOnce({
+        rows: [{ id: 'sub-1', user_id: 'user-1', audio_url: 'speaking/user-1/uuid.webm' }]
+      });
+
+      const result = await SubmissionService.getSpeakingAudioUrl('sub-1', {
+        id: 'user-1',
+        role: 'student'
+      });
+
+      expect(result).toBe('https://supabase.test/storage/v1/object/public/speaking-audio/speaking/user-1/uuid.webm');
+      expect(pool.query).toHaveBeenCalledWith(
+        'SELECT id, user_id, audio_url FROM speaking_submissions WHERE id = $1 AND user_id = $2',
+        ['sub-1', 'user-1']
+      );
+    });
+
+    it('should reject unsupported roles', async () => {
+      await expect(SubmissionService.getSpeakingAudioUrl('sub-1', {
+        id: 'user-1',
+        role: 'guest'
+      })).rejects.toMatchObject({
+        statusCode: 403,
+        errorCode: 'AUTH_PERM_001'
+      });
+
+      expect(pool.query).not.toHaveBeenCalled();
     });
   });
 });

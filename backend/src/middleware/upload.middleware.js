@@ -1,49 +1,14 @@
 const multer = require('multer');
-const path = require('path');
-const fs = require('fs');
-const { v4: uuidv4 } = require('uuid');
 const AppError = require('../utils/AppError');
 
-// Ensure directory exists
-const ensureDir = (dir) => {
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
-  }
-};
-
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    // userId is required to separate temp files
-    const userId = req.user?.id;
-    if (!userId) {
-      return cb(new AppError('Unauthorized access to upload', 401, 'UNAUTHORIZED'));
-    }
-
-    const tempDir = path.join(__dirname, '../../uploads/temp_audio', userId);
-    ensureDir(tempDir);
-    cb(null, tempDir);
-  },
-  filename: (req, file, cb) => {
-    let ext = path.extname(file.originalname);
-    if (!ext) {
-      // Guess extension from mimetype if missing
-      const mime = file.mimetype.split(';')[0].trim();
-      if (mime === 'audio/webm') ext = '.webm';
-      else if (mime === 'audio/mpeg') ext = '.mp3';
-      else if (mime === 'audio/wav' || mime === 'audio/x-wav') ext = '.wav';
-      else if (mime === 'audio/ogg') ext = '.ogg';
-      else if (mime === 'audio/mp4' || mime === 'audio/m4a') ext = '.m4a';
-      else ext = '.audio';
-    }
-    const filename = `${uuidv4()}${ext}`;
-    cb(null, filename);
-  }
-});
+// Dùng memoryStorage — file sẽ được upload lên Supabase Storage
+// thay vì lưu xuống disk local.
+const storage = multer.memoryStorage();
 
 const fileFilter = (req, file, cb) => {
   // Extract base MIME type (ignore codecs like audio/webm;codecs=opus)
   const mimeType = file.mimetype.split(';')[0].trim();
-  
+
   const allowedMimeTypes = [
     'audio/mpeg',
     'audio/wav',
@@ -86,3 +51,4 @@ const uploadMiddleware = (req, res, next) => {
 };
 
 module.exports = uploadMiddleware;
+

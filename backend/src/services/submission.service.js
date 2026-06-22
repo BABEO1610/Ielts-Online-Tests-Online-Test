@@ -1,7 +1,8 @@
 const { pool } = require('../db/pool');
 const AppError = require('../utils/AppError');
-const fs = require('fs');
-const path = require('path');
+const supabase = require('../config/supabase');
+
+const SUPABASE_BUCKET = process.env.SUPABASE_SPEAKING_BUCKET || 'speaking-audio';
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -25,10 +26,24 @@ const mapSpeakingDbError = (err) => {
   return err;
 };
 
+const toPublicSpeakingAudioUrl = (audioUrlOrPath) => {
+  if (!audioUrlOrPath) return null;
+  if (/^https?:\/\//i.test(audioUrlOrPath)) return audioUrlOrPath;
+
+  const storagePath = String(audioUrlOrPath).replace(/^\/+/, '');
+  const { data: publicUrlData } = supabase
+    .storage
+    .from(SUPABASE_BUCKET)
+    .getPublicUrl(storagePath);
+
+  return publicUrlData?.publicUrl || storagePath;
+};
+
 class SubmissionService {
   /**
    * Submit speaking record.
-   * We insert DB first, then move the file. If move fails, we rollback the DB.
+   * The audio is already uploaded to Supabase by /speaking/upload; this method
+   * records the Supabase object path/public URL against the submission.
    */
   static async submitSpeaking(userId, testId, partNumber, tempS3Key, grader) {
     // 1. Validate mock test exists ONLY IF testId is provided (not null)
@@ -44,51 +59,58 @@ class SubmissionService {
       }
     }
 
-    // 2. Validate temp file exists
-    // Use basename to prevent path traversal
-    const filename = path.basename(tempS3Key);
-    const tempPath = path.join(__dirname, '../../uploads/temp_audio', userId, filename);
-    
-    try {
-      await fs.promises.access(tempPath, fs.constants.F_OK);
-    } catch (e) {
-      throw new AppError('Temp audio file not found or you do not have permission', 404, 'TEMP_AUDIO_NOT_FOUND');
+    // 2. Validate the uploaded Supabase object belongs to this user.
+    const storagePath = String(tempS3Key || '').replace(/^\/+/, '');
+    const expectedPrefix = `speaking/${userId}/`;
+    if (!storagePath.startsWith(expectedPrefix) || storagePath.includes('..')) {
+      throw new AppError('Invalid speaking audio path', 400, 'INVALID_AUDIO_PATH');
     }
 
-    // 3. Prepare final destination
-    const finalDir = path.join(__dirname, '../../uploads/speaking', userId);
-    if (!fs.existsSync(finalDir)) {
-      fs.mkdirSync(finalDir, { recursive: true });
-    }
-    const finalPath = path.join(finalDir, filename);
-    
-    // Using relative path for frontend to consume (served statically)
-    const relativeFinalPath = `/uploads/speaking/${userId}/${filename}`;
+    const audioUrl = toPublicSpeakingAudioUrl(storagePath);
 
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
 
-      // 4. Insert into speaking_submissions
+      // 3. Insert into speaking_submissions
       const insertRes = await client.query(
         `INSERT INTO speaking_submissions (user_id, test_id, part_number, audio_url, grader, status)
          VALUES ($1, $2, $3, $4, $5, 'pending') RETURNING *`,
-        [userId, testId, partNumber, relativeFinalPath, grader]
+        [userId, testId, partNumber, audioUrl, grader]
       );
-      
-      const submission = insertRes.rows[0];
-
-      // 5. Move file
-      await fs.promises.rename(tempPath, finalPath);
 
       await client.query('COMMIT');
-      return submission;
+      return insertRes.rows[0];
     } catch (error) {
       await client.query('ROLLBACK');
-      throw error;
+      throw mapSpeakingDbError(error);
     } finally {
       client.release();
     }
+  }
+
+  static async getSpeakingAudioUrl(submissionId, user) {
+    const params = [submissionId];
+    let query = 'SELECT id, user_id, audio_url FROM speaking_submissions WHERE id = $1';
+
+    if (user.role === 'student') {
+      params.push(user.id);
+      query += ' AND user_id = $2';
+    } else if (!['tutor', 'admin'].includes(user.role)) {
+      throw new AppError('You do not have permission to access this audio', 403, 'AUTH_PERM_001');
+    }
+
+    const result = await pool.query(query, params);
+    if (result.rows.length === 0) {
+      throw new AppError('Speaking submission audio not found', 404, 'AUDIO_NOT_FOUND');
+    }
+
+    const audioUrl = toPublicSpeakingAudioUrl(result.rows[0].audio_url);
+    if (!audioUrl) {
+      throw new AppError('Speaking submission has no audio', 404, 'AUDIO_NOT_FOUND');
+    }
+
+    return audioUrl;
   }
 
 

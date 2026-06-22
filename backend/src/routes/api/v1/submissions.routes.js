@@ -19,7 +19,12 @@ router.post(
   SubmissionController.submitSpeaking
 );
 
-
+// Get playable audio URL for speaking submission
+router.get(
+  '/:id/audio-url',
+  authenticateToken,
+  SubmissionController.getAudioUrl
+);
 
 // Get feedback for a submission
 router.get(

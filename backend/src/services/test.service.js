@@ -151,9 +151,12 @@ class TestService {
       SELECT 
         mt.id, 
         mt.title, 
+        mt.description,
         mt.skill, 
         mt.difficulty,
+        mt.duration_minutes,
         mt.is_published,
+        mt.review_status,
         mt.created_at,
         COUNT(q.id) as questions
       FROM mock_tests mt
@@ -167,8 +170,11 @@ class TestService {
     return result.rows.map(row => ({
       id: row.id,
       title: row.title,
+      description: row.description,
       skill: row.skill,
       difficulty: row.difficulty,
+      duration: row.duration_minutes,
+      reviewStatus: row.review_status,
       status: row.is_published ? 'published' : 'draft',
       questions: parseInt(row.questions, 10),
       createdAt: new Date(row.created_at).toISOString().split('T')[0] // formatted as YYYY-MM-DD for now

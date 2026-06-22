@@ -1,39 +1,58 @@
 /**
  * TestListPage.jsx — Task 4.1.1
  * Trang danh sách đề thi (Student View)
- * 
+ *
+ * Load dữ liệu thật từ GET /api/v1/tests.
  * Giao diện dạng lưới (grid) hiển thị card các bài test (Title, Skill, Difficulty).
  * Có form lọc bên trên. Phân trang bên dưới.
- * 
- * Bootstrap 5 classes: row, col-md-4, card, badge, form inputs.
- * Design: Uber-inspired từ DESIGN.md — black/white duet, pill shapes, Inter font.
  */
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { testService } from '../../services/test.service';
 import '../../styles/objective-testing.css';
-
-/* Mock data — sẽ thay bằng API call khi tích hợp backend */
-const MOCK_TESTS = [
-  { id: '1', title: 'Cambridge IELTS 18 — Reading Test 1', skill: 'reading', difficulty: 'intermediate', questionCount: 40, duration: 60, description: 'Practice with authentic IELTS reading passages from Cambridge 18.' },
-  { id: '2', title: 'Cambridge IELTS 18 — Listening Test 1', skill: 'listening', difficulty: 'intermediate', questionCount: 40, duration: 30, description: 'Full listening test with 4 sections from Cambridge 18.' },
-  { id: '3', title: 'Academic Reading — Coral Reefs', skill: 'reading', difficulty: 'advanced', questionCount: 40, duration: 60, description: 'Advanced reading passages about marine ecosystems.' },
-  { id: '4', title: 'Listening Practice — Campus Life', skill: 'listening', difficulty: 'beginner', questionCount: 40, duration: 30, description: 'Beginner-friendly listening about university campus scenarios.' },
-  { id: '5', title: 'Reading Mini Test — Technology', skill: 'reading', difficulty: 'beginner', questionCount: 40, duration: 60, description: 'Technology-focused reading passages for beginners.' },
-  { id: '6', title: 'IELTS 17 — Listening Test 3', skill: 'listening', difficulty: 'advanced', questionCount: 40, duration: 30, description: 'Challenging listening test from Cambridge 17.' },
-];
 
 const ITEMS_PER_PAGE = 6;
 
 function TestListPage() {
+  const [tests, setTests] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
   const [skillFilter, setSkillFilter] = useState('');
   const [difficultyFilter, setDifficultyFilter] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
 
+  // EARS[Event]: WHEN page mounts THEN fetch tests from API
+  useEffect(() => {
+    let active = true;
+    const fetchTests = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const res = await testService.getTests();
+        if (!active) return;
+        if (res.success) {
+          setTests(res.data || []);
+        } else {
+          setError(res.error?.message || 'Không thể tải danh sách đề thi.');
+        }
+      } catch (err) {
+        if (active) setError(err.message || 'Lỗi kết nối đến server.');
+      } finally {
+        if (active) setLoading(false);
+      }
+    };
+    fetchTests();
+    return () => { active = false; };
+  }, []);
+
   /* Lọc danh sách */
-  const filtered = MOCK_TESTS.filter((t) => {
+  const filtered = tests.filter((t) => {
     if (skillFilter && t.skill !== skillFilter) return false;
     if (difficultyFilter && t.difficulty !== difficultyFilter) return false;
     if (searchQuery && !t.title.toLowerCase().includes(searchQuery.toLowerCase())) return false;
+    // Chỉ hiển thị bài test đã published cho student
+    if (t.status && t.status !== 'published') return false;
     return true;
   });
 
@@ -66,6 +85,8 @@ function TestListPage() {
           <option value="">All Skills</option>
           <option value="reading">Reading</option>
           <option value="listening">Listening</option>
+          <option value="writing">Writing</option>
+          <option value="speaking">Speaking</option>
         </select>
         <select
           id="filter-difficulty"
@@ -79,42 +100,67 @@ function TestListPage() {
         </select>
       </div>
 
+      {/* Loading State */}
+      {loading && (
+        <div className="d-flex justify-content-center align-items-center py-5">
+          <div className="spinner-border text-dark me-3" role="status" aria-hidden="true" />
+          <span className="body-md" style={{ color: 'var(--body)' }}>Đang tải đề thi...</span>
+        </div>
+      )}
+
+      {/* Error State */}
+      {!loading && error && (
+        <div className="alert alert-danger d-flex align-items-center rounded-3 my-4" role="alert">
+          <i className="bi bi-exclamation-triangle-fill me-2" />
+          {error}
+        </div>
+      )}
+
       {/* Test Cards Grid */}
-      <div className="row g-3">
-        {paged.length === 0 && (
-          <div className="col-12 text-center py-5">
-            <p className="body-md" style={{ color: 'var(--body)' }}>No tests match your filters.</p>
-          </div>
-        )}
-        {paged.map((test) => (
-          <div className="col-md-4" key={test.id}>
-            <div className="test-card" id={`test-card-${test.id}`}>
-              <div className="card-meta">
-                <span className="badge-skill">{test.skill}</span>
-                <span className="badge-difficulty">{test.difficulty}</span>
-              </div>
-              <div className="card-title">{test.title}</div>
-              <p className="body-sm" style={{ color: 'var(--body)', flex: 1 }}>{test.description}</p>
-              <div className="d-flex justify-content-between align-items-center mt-auto pt-3" style={{ borderTop: '1px solid var(--surface-pressed)' }}>
-                <span className="body-sm" style={{ color: 'var(--mute)' }}>
-                  {test.questionCount} questions · {test.duration} min
-                </span>
-                <a
-                  href={`/tests/${test.id}`}
-                  className="button-primary"
-                  id={`btn-view-${test.id}`}
-                  style={{ width: 'auto', padding: '8px 20px', textDecoration: 'none' }}
-                >
-                  View
-                </a>
+      {!loading && !error && (
+        <div className="row g-3">
+          {paged.length === 0 && (
+            <div className="col-12 text-center py-5">
+              <i className="bi bi-journal-x fs-1 text-secondary mb-3 d-block" />
+              <p className="body-md" style={{ color: 'var(--body)' }}>
+                {tests.length === 0
+                  ? 'Chưa có đề thi nào được đăng tải.'
+                  : 'Không có đề thi nào phù hợp với bộ lọc.'}
+              </p>
+            </div>
+          )}
+          {paged.map((test) => (
+            <div className="col-md-4" key={test.id}>
+              <div className="test-card" id={`test-card-${test.id}`}>
+                <div className="card-meta">
+                  <span className="badge-skill">{test.skill}</span>
+                  {test.difficulty && <span className="badge-difficulty">{test.difficulty}</span>}
+                </div>
+                <div className="card-title">{test.title}</div>
+                <p className="body-sm" style={{ color: 'var(--body)', flex: 1 }}>
+                  {test.description || `Bài thi ${test.skill} — ${test.questions ?? 0} câu hỏi`}
+                </p>
+                <div className="d-flex justify-content-between align-items-center mt-auto pt-3" style={{ borderTop: '1px solid var(--surface-pressed)' }}>
+                  <span className="body-sm" style={{ color: 'var(--mute)' }}>
+                    {test.questions ?? 0} câu · {test.duration ? `${test.duration} phút` : '—'}
+                  </span>
+                  <a
+                    href={`/tests/${test.id}`}
+                    className="button-primary"
+                    id={`btn-view-${test.id}`}
+                    style={{ width: 'auto', padding: '8px 20px', textDecoration: 'none' }}
+                  >
+                    Xem
+                  </a>
+                </div>
               </div>
             </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
 
       {/* Pagination */}
-      {totalPages > 1 && (
+      {!loading && !error && totalPages > 1 && (
         <nav className="d-flex justify-content-center mt-4" aria-label="Test list pagination">
           <ul className="pagination" style={{ gap: 4 }}>
             <li className={`page-item ${currentPage === 1 ? 'disabled' : ''}`}>
@@ -162,3 +208,4 @@ function TestListPage() {
 }
 
 export default TestListPage;
+

@@ -16,6 +16,7 @@ import OnboardingPage from './pages/auth/OnboardingPage';
 import VerifyEmailPage from './pages/auth/VerifyEmailPage';
 
 // ── Student Pages ──────────────────────────────────────────────────────────────
+import Dashboard from './pages/student/Dashboard';
 import ContentLibraryPage from './pages/student/ContentLibraryPage';
 
 // ── Core Protected Pages ───────────────────────────────────────────────────────
@@ -129,8 +130,8 @@ function App() {
 
         {/* ── Protected Core (Student) ────────────────────────────────────────── */}
 
-
         <Route element={<ProfileLayout />}>
+          <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
           <Route path="/profile" element={<ProtectedRoute><UserProfilePage /></ProtectedRoute>} />
           <Route path="/practice-history" element={<ProtectedRoute><UserProfilePage /></ProtectedRoute>} />
           <Route path="/study-plan" element={<ProtectedRoute><UserProfilePage /></ProtectedRoute>} />

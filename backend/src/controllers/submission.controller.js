@@ -1,5 +1,10 @@
 const SubmissionService = require('../services/submission.service');
 const AppError = require('../utils/AppError');
+const supabase = require('../config/supabase');
+const { v4: uuidv4 } = require('uuid');
+const path = require('path');
+
+const SUPABASE_BUCKET = process.env.SUPABASE_SPEAKING_BUCKET || 'speaking-audio';
 
 class SubmissionController {
   static async uploadSpeakingAudio(req, res, next) {
@@ -8,14 +13,46 @@ class SubmissionController {
         throw new AppError('No audio file uploaded', 400, 'NO_FILE');
       }
 
-      // We only return the relative path
-      // file.filename contains the UUID.ext
-      const tempS3Key = `uploads/temp_audio/${req.user.id}/${req.file.filename}`;
+      const userId = req.user.id;
+
+      // Đoán extension từ mimetype
+      const mimeType = req.file.mimetype.split(';')[0].trim();
+      const extMap = {
+        'audio/webm': '.webm',
+        'audio/mpeg': '.mp3',
+        'audio/wav': '.wav',
+        'audio/x-wav': '.wav',
+        'audio/ogg': '.ogg',
+        'audio/mp4': '.m4a',
+        'audio/m4a': '.m4a',
+      };
+      const ext = extMap[mimeType] || path.extname(req.file.originalname) || '.audio';
+      const filename = `${uuidv4()}${ext}`;
+
+      // Path trong Supabase bucket: speaking/{userId}/{uuid}.ext
+      const storagePath = `speaking/${userId}/${filename}`;
+
+      // Upload buffer lên Supabase Storage
+      const { error: uploadError } = await supabase.storage
+        .from(SUPABASE_BUCKET)
+        .upload(storagePath, req.file.buffer, {
+          contentType: mimeType,
+          upsert: false,
+        });
+
+      if (uploadError) {
+        throw new AppError(`Supabase upload failed: ${uploadError.message}`, 500, 'STORAGE_UPLOAD_ERROR');
+      }
+
+      const { data: publicUrlData } = supabase.storage
+        .from(SUPABASE_BUCKET)
+        .getPublicUrl(storagePath);
 
       res.status(200).json({
         success: true,
         data: {
-          temp_s3_key: tempS3Key
+          temp_s3_key: storagePath,
+          audio_url: publicUrlData?.publicUrl || null
         },
         error: null,
         meta: null
@@ -57,6 +94,32 @@ class SubmissionController {
       next(error);
     }
   }
+
+  static async getAudioUrl(req, res, next) {
+    try {
+      const { id } = req.params;
+      const { type = 'speaking' } = req.query;
+
+      if (type !== 'speaking') {
+        throw new AppError('type must be speaking', 400, 'INVALID_FIELD');
+      }
+
+      const audioUrl = await SubmissionService.getSpeakingAudioUrl(id, req.user);
+
+      res.status(200).json({
+        success: true,
+        data: {
+          presigned_url: audioUrl,
+          audio_url: audioUrl
+        },
+        error: null,
+        meta: null
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   static async getFeedback(req, res, next) {
     try {
       const { id } = req.params;
