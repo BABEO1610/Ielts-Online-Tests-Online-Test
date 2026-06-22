@@ -9,6 +9,8 @@ router.post('/', TestController.createTest);
 router.get('/', TestController.getTests);
 
 // Define route for fetching a single test by ID
+// Must put /writing before /:id so it doesn't match as an ID
+router.get('/writing', TestController.getWritingTests);
 router.get('/:id', TestController.getTestById);
 
 // Define route for updating a test

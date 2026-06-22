@@ -6,6 +6,7 @@ const usersRoutes = require('./users.routes');
 const adminRoutes = require('./admin.routes');
 const testRoutes = require('./tests');
 const libraryRoutes = require('./library.routes');
+const submissionRoutes = require('./submissions.routes');
 
 // Health check endpoint for API v1
 router.get('/health', (req, res) => {
@@ -25,5 +26,6 @@ router.use('/users', usersRoutes);
 router.use('/admin', adminRoutes);
 router.use('/tests', testRoutes);
 router.use('/library', libraryRoutes);
+router.use('/submissions', submissionRoutes);
 
 module.exports = router;

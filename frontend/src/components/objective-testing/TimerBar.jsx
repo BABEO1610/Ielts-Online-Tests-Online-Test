@@ -6,9 +6,10 @@
  * Thanh trạng thái hiển thị thời gian làm bài ở trên cùng màn hình.
  */
 import React, { useState, useEffect, useCallback } from 'react';
+import { Link } from 'react-router-dom';
 import '../../styles/objective-testing.css';
 
-const TimerBar = ({ durationMinutes = 60, onTimeUp, onSubmitEarly, practiceMode = false, customTimeLimit = null }) => {
+const TimerBar = ({ durationMinutes = 60, onTimeUp, onSubmitEarly, practiceMode = false, customTimeLimit = null, hideReviewButton = false }) => {
   const isCountDown = !practiceMode || customTimeLimit !== null;
   const initialTime = isCountDown ? (practiceMode ? customTimeLimit * 60 : durationMinutes * 60) : 0;
   
@@ -45,7 +46,9 @@ const TimerBar = ({ durationMinutes = 60, onTimeUp, onSubmitEarly, practiceMode 
     <div className="timer-bar" id="timer-bar" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', zIndex: 1040 }}>
       {/* Left side */}
       <div className="d-flex align-items-center gap-3" style={{ flex: 1 }}>
-        <span className="fw-bold fs-5 text-white" style={{ fontFamily: 'UberMove, system-ui, sans-serif' }}>IELTSZone</span>
+        <Link to="/" className="text-decoration-none">
+          <span className="fw-bold fs-5 text-white" style={{ fontFamily: 'UberMove, system-ui, sans-serif' }}>IELTSZone</span>
+        </Link>
         <span className="fw-medium text-white px-2 py-1 rounded d-none d-sm-inline" style={{ fontSize: '13px', backgroundColor: 'rgba(255,255,255,0.2)' }}>
           {practiceMode ? `Practice Mode${customTimeLimit ? ' (Custom)' : ''}` : 'Real Test Mode'}
         </span>
@@ -71,19 +74,21 @@ const TimerBar = ({ durationMinutes = 60, onTimeUp, onSubmitEarly, practiceMode 
 
       {/* Right side */}
       <div className="d-flex align-items-center gap-3 justify-content-end" style={{ flex: 1 }}>
-        <button
-          className="btn btn-outline-light d-none d-md-flex align-items-center gap-2 rounded-pill px-3 py-1"
-          style={{ fontSize: '14px', border: '1px solid rgba(255,255,255,0.3)', color: '#fff' }}
-        >
-           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-             <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-             <polyline points="14 2 14 8 20 8"></polyline>
-             <line x1="16" y1="13" x2="8" y2="13"></line>
-             <line x1="16" y1="17" x2="8" y2="17"></line>
-             <polyline points="10 9 9 9 8 9"></polyline>
-           </svg>
-           Review
-        </button>
+        {!hideReviewButton && (
+          <button
+            className="btn btn-outline-light d-none d-md-flex align-items-center gap-2 rounded-pill px-3 py-1"
+            style={{ fontSize: '14px', border: '1px solid rgba(255,255,255,0.3)', color: '#fff' }}
+          >
+             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+               <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+               <polyline points="14 2 14 8 20 8"></polyline>
+               <line x1="16" y1="13" x2="8" y2="13"></line>
+               <line x1="16" y1="17" x2="8" y2="17"></line>
+               <polyline points="10 9 9 9 8 9"></polyline>
+             </svg>
+             Review
+          </button>
+        )}
         <button
           className="button-primary d-flex align-items-center gap-2"
           id="btn-submit-early"
@@ -117,7 +122,8 @@ TimerBar.propTypes = {
   onTimeUp: PropTypes.func,
   onSubmitEarly: PropTypes.func,
   practiceMode: PropTypes.bool,
-  customTimeLimit: PropTypes.number
+  customTimeLimit: PropTypes.number,
+  hideReviewButton: PropTypes.bool
 };
 
 export default TimerBar;
