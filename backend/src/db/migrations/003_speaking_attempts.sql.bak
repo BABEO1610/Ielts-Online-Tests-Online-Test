@@ -1,0 +1,54 @@
+-- ============================================================
+-- Migration 003: Speaking Attempts & Answers
+-- Thay thế luồng speaking_submissions đơn lẻ bằng:
+--   speaking_attempts  : một lần thi gồm cả 3 Part
+--   speaking_attempt_answers : từng câu hỏi riêng biệt
+-- ============================================================
+
+-- ─────────────────────────────────────────────
+-- speaking_attempts: một lần thi Speaking
+-- ─────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS speaking_attempts (
+    id           UUID              PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id      UUID              NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    test_id      UUID              REFERENCES mock_tests(id) ON DELETE SET NULL,
+    status       VARCHAR(30)       NOT NULL DEFAULT 'in_progress',
+    -- 'in_progress' | 'submitted' | 'ai_graded' | 'tutor_graded' | 'reviewed'
+    grader       grader_type,      -- chọn khi nộp bài
+    submitted_at TIMESTAMPTZ,
+    created_at   TIMESTAMPTZ       NOT NULL DEFAULT NOW(),
+    updated_at   TIMESTAMPTZ       NOT NULL DEFAULT NOW()
+);
+
+-- ─────────────────────────────────────────────
+-- speaking_attempt_answers: từng câu hỏi
+-- ─────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS speaking_attempt_answers (
+    id               UUID          PRIMARY KEY DEFAULT gen_random_uuid(),
+    attempt_id       UUID          NOT NULL REFERENCES speaking_attempts(id) ON DELETE CASCADE,
+    part_number      SMALLINT      NOT NULL CHECK (part_number IN (1, 2, 3)),
+    question_index   SMALLINT      NOT NULL,   -- 0-indexed trong part
+    audio_url        TEXT          NOT NULL,   -- đường dẫn file đã lưu (final)
+    temp_s3_key      TEXT,                     -- key tạm trước khi move
+    duration_seconds SMALLINT,                 -- thời lượng ghi âm (giây)
+    status           VARCHAR(20)   NOT NULL DEFAULT 'uploaded',
+    -- 'uploading' | 'uploaded' | 'failed'
+    created_at       TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
+    UNIQUE (attempt_id, part_number, question_index)
+);
+
+-- ─────────────────────────────────────────────
+-- Indexes
+-- ─────────────────────────────────────────────
+CREATE INDEX IF NOT EXISTS idx_attempts_user_status
+    ON speaking_attempts(user_id, status);
+
+CREATE INDEX IF NOT EXISTS idx_attempt_answers_attempt
+    ON speaking_attempt_answers(attempt_id, part_number, question_index);
+
+-- ─────────────────────────────────────────────
+-- Auto-update updated_at
+-- ─────────────────────────────────────────────
+CREATE TRIGGER trg_speaking_attempts_updated_at
+    BEFORE UPDATE ON speaking_attempts
+    FOR EACH ROW EXECUTE FUNCTION set_updated_at();

@@ -5,6 +5,7 @@ const authRoutes = require('./auth.routes');
 const usersRoutes = require('./users.routes');
 const adminRoutes = require('./admin.routes');
 const testRoutes = require('./tests');
+const submissionsRoutes = require('./submissions.routes');
 const libraryRoutes = require('./library.routes');
 const submissionRoutes = require('./submissions.routes');
 
@@ -25,6 +26,7 @@ router.use('/auth', authRoutes);
 router.use('/users', usersRoutes);
 router.use('/admin', adminRoutes);
 router.use('/tests', testRoutes);
+router.use('/submissions', submissionsRoutes);
 router.use('/library', libraryRoutes);
 router.use('/submissions', submissionRoutes);
 
