@@ -1,93 +1,79 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import StudentNavbar from '../../components/layout/StudentNavbar';
 import ModeSelector from '../../components/objective-testing/ModeSelector';
-
-export const MOCK_EXAMS = [
-  {
-    id: 1,
-    title: 'Cambridge IELTS 18 - Speaking Test 1',
-    topic: 'Daily Life, Travel, Reading',
-    description: 'Đề thi chuẩn Cambridge với các câu hỏi bám sát format bài thi Speaking thực tế.',
-    questions: 15,
-    difficulty: 'Khó',
-    duration: 15,
-    parts: [
-      {
-        partName: 'Part 1: Introduction and Interview',
-        description: 'You will answer questions about yourself and familiar topics.',
-        questions: [
-          { id: 'q1', text: 'Where are you from?' },
-          { id: 'q2', text: 'What do you like about your hometown?' },
-          { id: 'q3', text: 'Do you prefer living in a city or the countryside?' }
-        ],
-        duration: '4-5 phút'
-      },
-      {
-        partName: 'Part 2: Long Turn',
-        description: 'You will have 1 minute to prepare and 1-2 minutes to speak on a specific topic.',
-        prompt: 'Describe a memorable journey you have made.\nYou should say:\n- where you went\n- how you traveled\n- why you went on this journey\n- and explain why it was memorable.',
-        preparationTime: 60,
-        speakingTime: 120,
-        duration: '3-4 phút'
-      },
-      {
-        partName: 'Part 3: Discussion',
-        description: 'You will answer more abstract questions related to the topic in Part 2.',
-        questions: [
-          { id: 'q4', text: 'How have travel habits changed in your country over the last few decades?' },
-          { id: 'q5', text: 'What impact does tourism have on local cultures?' },
-          { id: 'q6', text: 'Do you think international travel will become more or less common in the future?' }
-        ],
-        duration: '4-5 phút'
-      }
-    ]
-  },
-  {
-    id: 2,
-    title: 'Recent Actual Test - Speaking Practice 2',
-    topic: 'Hobbies, Books, Literature',
-    description: 'Đề thi thật được thu thập gần đây, giúp bạn quen với các chủ đề đang phổ biến.',
-    questions: 14,
-    difficulty: 'Trung bình',
-    duration: 14,
-    parts: [
-      {
-        partName: 'Part 1: Introduction and Interview',
-        description: 'Questions about hobbies, work, and daily life.',
-        questions: [
-          { id: 'q1', text: 'Do you have any hobbies?' },
-          { id: 'q2', text: 'What do you usually do in your free time?' }
-        ],
-        duration: '4-5 phút'
-      },
-      {
-        partName: 'Part 2: Long Turn',
-        description: 'Describe a book you read recently.',
-        prompt: 'Describe a book that you enjoyed reading.\nYou should say:\n- what the book is\n- what it is about\n- why you decided to read it\n- and explain why you enjoyed it.',
-        preparationTime: 60,
-        speakingTime: 120,
-        duration: '3-4 phút'
-      },
-      {
-        partName: 'Part 3: Discussion',
-        description: 'Abstract questions about reading and literature.',
-        questions: [
-          { id: 'q3', text: 'Is reading still popular in your country?' },
-          { id: 'q4', text: 'Do you think e-books will replace printed books?' }
-        ],
-        duration: '4-5 phút'
-      }
-    ]
-  }
-];
+import { testService } from '../../services/test.service';
 
 const DIFFICULTY_STYLE = {
   'Dễ': { bg: '#efefef', color: '#5e5e5e' },
   'Trung bình': { bg: '#000', color: '#fff' },
-  'Khó': { bg: '#282828', color: '#afafaf' }
+  'Khó': { bg: '#282828', color: '#afafaf' },
+  easy: { bg: '#efefef', color: '#5e5e5e' },
+  intermediate: { bg: '#000', color: '#fff' },
+  advanced: { bg: '#282828', color: '#afafaf' }
 };
+
+const DIFFICULTY_LABEL = {
+  'Dễ': 'Dễ',
+  'Trung bình': 'Trung bình',
+  'Khó': 'Khó',
+  easy: 'Dễ',
+  intermediate: 'Trung bình',
+  advanced: 'Khó'
+};
+
+const formatDuration = (exam) => exam.duration || exam.duration_minutes || '–';
+
+const parseSpeakingQuestions = (content) => {
+  if (!content) return [];
+  if (Array.isArray(content)) {
+    return content.map((item, idx) => (
+      typeof item === 'string' ? { id: `q${idx + 1}`, text: item } : item
+    ));
+  }
+  return content
+    .split('\n')
+    .map(line => line.trim())
+    .filter(Boolean)
+    .map((text, idx) => ({ id: `q${idx + 1}`, text }));
+};
+
+const buildSpeakingParts = (passages = []) => passages.map((passage, idx) => {
+  if (idx === 0) {
+    return {
+      partName: passage.title || 'Part 1: Introduction and Interview',
+      description: passage.instruction || 'Answer questions about yourself and familiar topics.',
+      questions: parseSpeakingQuestions(passage.content),
+      duration: '4-5 phút'
+    };
+  }
+  if (idx === 1) {
+    return {
+      partName: passage.title || 'Part 2: Long Turn',
+      description: passage.instruction || 'Cue card bullet points',
+      prompt: passage.title && passage.title !== 'Speaking Part 2' ? passage.title : passage.content || '',
+      preparationTime: 60,
+      speakingTime: 120,
+      duration: '3-4 phút'
+    };
+  }
+  if (idx === 2) {
+    return {
+      partName: passage.title || 'Part 3: Discussion',
+      description: passage.instruction || 'Follow-up discussion',
+      questions: parseSpeakingQuestions(passage.content),
+      duration: '4-5 phút'
+    };
+  }
+  return {
+    partName: passage.title || `Part ${idx + 1}`,
+    description: passage.instruction || '',
+    prompt: passage.content || '',
+    questions: parseSpeakingQuestions(passage.content),
+    duration: '4-5 phút'
+  };
+});
 
 const SpeakingPartList = ({ exam, onStartExam, onBack }) => {
   const { isAuthenticated } = useAuth();
@@ -178,15 +164,60 @@ const SpeakingPartList = ({ exam, onStartExam, onBack }) => {
 
 const SpeakingPage = () => {
   const [selectedExam, setSelectedExam] = useState(null);
+  const [exams, setExams] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
 
-  const handleViewExam = (exam) => {
+  useEffect(() => {
+    const fetchExams = async () => {
+      try {
+        setLoading(true);
+        const res = await testService.getTests('speaking');
+        if (res.success && Array.isArray(res.data)) {
+          setExams(res.data);
+        } else {
+          setError(res.error?.message || 'Không thể tải danh sách đề thi.');
+        }
+      } catch (err) {
+        setError('Lỗi kết nối đến server.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchExams();
+  }, []);
+
+  const handleViewExam = async (exam) => {
     if (!isAuthenticated) {
       navigate('/login', { state: { message: 'Vui lòng đăng nhập để xem chi tiết đề thi' } });
       return;
     }
-    setSelectedExam(exam);
+
+    setError(null);
+    try {
+      setLoading(true);
+      const res = await testService.getTestById(exam.id);
+      if (res.success && res.data) {
+        const fullExam = res.data;
+        const parts = buildSpeakingParts(fullExam.passages || []);
+        setSelectedExam({
+          ...exam,
+          ...fullExam,
+          parts,
+          topic: fullExam.topic || exam.topic || 'Tổng hợp',
+          questions: parts.reduce((sum, part) => sum + (part.questions?.length || 0), 0)
+        });
+      } else {
+        setError(res.error?.message || 'Không thể tải chi tiết đề thi.');
+      }
+    } catch (err) {
+      setError('Không thể tải chi tiết đề thi.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleStartExam = (modeConfig) => {
@@ -218,8 +249,29 @@ const SpeakingPage = () => {
         </div>
 
         <div className="row g-4">
-          {MOCK_EXAMS.map((exam) => {
-            const diff = DIFFICULTY_STYLE[exam.difficulty] || DIFFICULTY_STYLE['Trung bình'];
+          {loading && Array.from({ length: 4 }).map((_, index) => (
+            <div key={index} className="col-md-6">
+              <div className="p-4 rounded-4 h-100" style={{ border: '1px solid #e2e2e2', minHeight: '260px', backgroundColor: '#f8f8f8' }} />
+            </div>
+          ))}
+          {!loading && error && (
+            <div className="col-12">
+              <div className="alert rounded-4" style={{ backgroundColor: '#fdf2f2', color: '#c0392b', border: 'none' }}>
+                {error}
+              </div>
+            </div>
+          )}
+          {!loading && !error && exams.length === 0 && (
+            <div className="col-12 text-center py-5">
+              <p style={{ fontFamily: 'UberMoveText, system-ui, sans-serif', fontSize: '18px', color: '#5e5e5e' }}>
+                Chưa có đề Speaking nào. Vui lòng quay lại sau.
+              </p>
+            </div>
+          )}
+          {!loading && !error && exams.map((exam) => {
+            const diff = DIFFICULTY_STYLE[exam.difficulty] || DIFFICULTY_STYLE['intermediate'];
+            const label = DIFFICULTY_LABEL[exam.difficulty] || exam.difficulty || 'Trung bình';
+            const metaLabel = exam.parts ? `${exam.parts.length} phần` : `${exam.questions || 0} câu`;
             return (
               <div key={exam.id} className="col-md-6">
                 <div
@@ -235,10 +287,10 @@ const SpeakingPage = () => {
                         className="rounded-pill px-3 py-1 fw-medium"
                         style={{ backgroundColor: diff.bg, color: diff.color, fontSize: '13px', fontFamily: 'UberMoveText, system-ui, sans-serif' }}
                       >
-                        {exam.difficulty}
+                        {label}
                       </span>
                       <span className="text-muted fw-medium" style={{ fontSize: '13px' }}>
-                        {exam.parts.length} phần · {exam.duration} phút
+                        {metaLabel} · {formatDuration(exam)} phút
                       </span>
                     </div>
                     <h3 className="fw-bold mb-1 text-dark" style={{ fontFamily: 'UberMove, system-ui, sans-serif', fontSize: '24px' }}>

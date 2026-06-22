@@ -41,6 +41,22 @@ class TestController {
       next(error);
     }
   }
+
+  static async getWritingTests(req, res, next) {
+    try {
+      const tests = await TestService.getWritingTests();
+      
+      res.status(200).json({
+        success: true,
+        data: tests,
+        meta: null,
+        error: null
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   static async getTestById(req, res, next) {
     try {
       const test = await TestService.getTestById(req.params.id);

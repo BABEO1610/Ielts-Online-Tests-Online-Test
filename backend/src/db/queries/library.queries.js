@@ -11,25 +11,44 @@ const { pool } = require('../pool');
  * Lấy TẤT CẢ tài liệu đã published — dùng chung cho cả team tutor
  * @param {string|null} category - filter category (hoặc null = tất cả)
  */
-async function getAllResources(category = null) {
+async function getAllResources(filters = {}) {
+  const { category, search, resource_type } = typeof filters === 'string'
+    ? { category: filters }
+    : (filters || {});
+
+  const conditions = [];
+  const values = [];
+  let idx = 1;
+
   if (category) {
-    const result = await pool.query(
-      `SELECT id, title, description, resource_type, file_url, file_size_bytes,
-              category, is_published, review_status, uploaded_by, created_at, updated_at
-       FROM library_resources
-       WHERE is_published = TRUE AND category = $1
-       ORDER BY updated_at DESC`,
-      [category]
-    );
-    return result.rows;
+    conditions.push(`category = $${idx++}`);
+    values.push(category);
   }
+  if (resource_type) {
+    conditions.push(`resource_type = $${idx++}`);
+    values.push(resource_type);
+  }
+  if (search) {
+    conditions.push(`(title ILIKE $${idx} OR description ILIKE $${idx})`);
+    values.push(`%${search}%`);
+    idx++;
+  }
+
+  // Filter out unpublished or pending/rejected resources from the public library
+  conditions.push(`is_published = TRUE`);
+  conditions.push(`review_status = 'approved'`);
+
+  const whereClause = conditions.length > 0
+    ? 'WHERE ' + conditions.join(' AND ')
+    : '';
 
   const result = await pool.query(
     `SELECT id, title, description, resource_type, file_url, file_size_bytes,
             category, is_published, review_status, uploaded_by, created_at, updated_at
      FROM library_resources
-     WHERE is_published = TRUE
-     ORDER BY updated_at DESC`
+     ${whereClause}
+     ORDER BY updated_at DESC`,
+    values
   );
   return result.rows;
 }
@@ -69,6 +88,18 @@ async function getResourcesByUploader(uploadedBy, category = null) {
  * @param {string} uploadedBy - UUID của tutor (để kiểm tra ownership)
  */
 async function getResourceById(id, uploadedBy) {
+  // Public access: nếu không truyền uploadedBy, chỉ cần tìm theo id
+  if (!uploadedBy) {
+    const result = await pool.query(
+      `SELECT id, title, description, resource_type, file_url, file_size_bytes,
+              category, is_published, review_status, created_at, updated_at
+       FROM library_resources
+       WHERE id = $1 AND is_published = TRUE AND review_status = 'approved'`,
+      [id]
+    );
+    return result.rows[0] || null;
+  }
+
   const result = await pool.query(
     `SELECT id, title, description, resource_type, file_url, file_size_bytes,
             category, is_published, review_status, created_at, updated_at
