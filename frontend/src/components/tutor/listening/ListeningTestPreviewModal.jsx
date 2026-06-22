@@ -67,6 +67,15 @@ function renderQuestion(block, question, qNum, answers, onAnswer) {
   );
 }
 
+function renderBlockContent(content) {
+  if (!content) return null;
+  const isImageUrl = /^https?:\/\/.+\.(jpg|jpeg|png|gif|webp|svg)(\?.*)?$/i.test(content.trim());
+  if (isImageUrl) {
+    return <img src={content.trim()} alt="Diagram / Map" className="img-fluid rounded border mb-2" style={{ maxHeight: '400px', display: 'block', margin: '10px auto' }} />;
+  }
+  return <div dangerouslySetInnerHTML={{ __html: content }} />;
+}
+
 function ListeningTestPreviewModal({ formData, sections, onClose }) {
   const [activeSectionIdx, setActiveSectionIdx] = useState(0);
   const [answers, setAnswers] = useState({});
@@ -158,7 +167,9 @@ function ListeningTestPreviewModal({ formData, sections, onClose }) {
                   <p className="mb-0 fw-semibold" style={{ fontSize: '0.85rem' }}>{block.type || 'Question Block'} - Questions {block.range || '?'}</p>
                 </div>
                 {block.content && (
-                  <div className="mb-3 p-3 rounded bg-white border" style={{ whiteSpace: 'pre-wrap' }}>{block.content}</div>
+                  <div className="mb-3 p-3 rounded bg-white border">
+                    {renderBlockContent(block.content)}
+                  </div>
                 )}
                 {(block.questions || []).map((question, qIdx) => (
                   renderQuestion(block, question, startNums[activeSectionIdx][blockIdx] + qIdx, answers, handleAnswer)

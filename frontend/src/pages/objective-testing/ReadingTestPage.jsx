@@ -12,6 +12,7 @@ import React, { useState, useCallback } from 'react';
 import { useLocation } from 'react-router-dom';
 import TimerBar from '../../components/objective-testing/TimerBar';
 import AutoSubmitModal from '../../components/objective-testing/AutoSubmitModal';
+import ReviewModal from '../../components/objective-testing/ReviewModal';
 import '../../styles/objective-testing.css';
 
 /* Mock passages */
@@ -65,6 +66,7 @@ function ReadingTestPage() {
   const [currentQuestion, setCurrentQuestion] = useState(1);
   const [activeSection, setActiveSection] = useState(allowedPassages[0]);
   const [showAutoSubmit, setShowAutoSubmit] = useState(false);
+  const [isReviewOpen, setIsReviewOpen] = useState(false);
 
   const handleAnswer = useCallback((qOrder, value) => {
     setAnswers((prev) => ({ ...prev, [qOrder]: value }));
@@ -85,15 +87,24 @@ function ReadingTestPage() {
   }, []);
 
   const scrollToQuestion = useCallback((qNum) => {
-    setCurrentQuestion(qNum);
-    const el = document.getElementById(`question-${qNum}`);
-    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  }, []);
+    // Find which passage this question belongs to
+    const q = filteredQuestions.find(item => item.order === qNum);
+    if (q) {
+      setActiveSection(q.passage);
+      setCurrentQuestion(qNum);
+      
+      // Delay slightly to let React render the passage panel and questions list
+      setTimeout(() => {
+        const el = document.getElementById(`question-${qNum}`);
+        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 50);
+    }
+  }, [filteredQuestions]);
 
   return (
     <div id="reading-test-page" style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
       {/* Timer */}
-      <TimerBar durationMinutes={60} customTimeLimit={customTimeLimit} onTimeUp={handleTimeUp} onSubmitEarly={handleSubmitEarly} practiceMode={practiceMode} />
+      <TimerBar durationMinutes={60} customTimeLimit={customTimeLimit} onTimeUp={handleTimeUp} onSubmitEarly={handleSubmitEarly} practiceMode={practiceMode} onReview={() => setIsReviewOpen(true)} />
 
       {/* Split View */}
       <div className="split-view" style={{ paddingBottom: '80px' }}>
@@ -229,6 +240,16 @@ function ReadingTestPage() {
 
       {/* Auto Submit Modal */}
       <AutoSubmitModal isOpen={showAutoSubmit} />
+
+      {/* Review Modal */}
+      <ReviewModal 
+        isOpen={isReviewOpen}
+        onClose={() => setIsReviewOpen(false)}
+        questions={filteredQuestions}
+        answers={answers}
+        currentQuestion={currentQuestion}
+        onNavigate={scrollToQuestion}
+      />
     </div>
   );
 }

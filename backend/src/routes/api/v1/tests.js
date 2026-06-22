@@ -13,6 +13,9 @@ router.get('/', TestController.getTests);
 router.get('/writing', TestController.getWritingTests);
 router.get('/:id', TestController.getTestById);
 
+// Define route for a student to take a test (fetches test without answers)
+router.get('/:id/take', TestController.getTestForStudent);
+
 // Define route for updating a test
 router.put('/:id', TestController.updateTest);
 
