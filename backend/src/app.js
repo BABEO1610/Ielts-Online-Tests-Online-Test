@@ -44,6 +44,8 @@ app.use('/api/assistant', assistantRoutes);
 
 // Phục vụ các file tĩnh trong thư mục uploads
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+// Serve static files for official speaking uploads (Sprint 1)
+app.use('/uploads/speaking', express.static(path.join(__dirname, '../uploads/speaking')));
 
 // Handle 404
 app.use((req, res, next) => {
@@ -76,3 +78,4 @@ if (require.main === module) {
 }
 
 module.exports = app;
+// Trigger restart

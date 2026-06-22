@@ -32,6 +32,7 @@
     "nodemailer": "^8.0.10",
     "nodemon": "^3.1.14",
     "pg": "^8.21.0",
+    "uuid": "^14.0.1",
     "winston": "^3.11.0"
   },
   "devDependencies": {
