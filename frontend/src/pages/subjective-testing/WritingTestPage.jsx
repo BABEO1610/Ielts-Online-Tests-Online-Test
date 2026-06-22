@@ -5,7 +5,6 @@ import WritingEditor from '../../components/grading/WritingEditor';
 import FeedbackReport from '../../components/grading/FeedbackReport';
 import TimerBar from '../../components/objective-testing/TimerBar';
 import AutoSubmitModal from '../../components/objective-testing/AutoSubmitModal';
-import { MOCK_EXAMS } from './WritingPage';
 
 /**
  * WritingTestScreen — Component màn hình làm bài
@@ -26,12 +25,10 @@ const WritingTestScreen = ({ exam, onBack, onSubmitSuccess, practiceMode, custom
   }, []);
 
   const handleSubmitEarly = useCallback(() => {
-    if (window.confirm('Bạn có chắc chắn muốn nộp toàn bộ bài thi? (Cả Task 1 và Task 2)')) {
-      setShowAutoSubmit(true);
-      editorRefs.current.forEach(ref => {
-        if (ref && ref.submit) ref.submit();
-      });
-    }
+    setShowAutoSubmit(true);
+    editorRefs.current.forEach(ref => {
+      if (ref && ref.submit) ref.submit();
+    });
   }, []);
 
   const handleSuccess = (res) => {
@@ -39,11 +36,22 @@ const WritingTestScreen = ({ exam, onBack, onSubmitSuccess, practiceMode, custom
     if (onSubmitSuccess) onSubmitSuccess(res);
   };
 
+  const handleError = (error) => {
+    setShowAutoSubmit(false);
+  };
+
   const activeTask = exam.tasks[activeTaskIndex];
 
   return (
     <div className="bg-white" style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' }}>
-      <TimerBar durationMinutes={durationMinutes} customTimeLimit={customTimeLimit} onTimeUp={handleTimeUp} onSubmitEarly={handleSubmitEarly} practiceMode={practiceMode} />
+      <TimerBar 
+        durationMinutes={durationMinutes} 
+        customTimeLimit={customTimeLimit} 
+        onTimeUp={handleTimeUp} 
+        onSubmitEarly={handleSubmitEarly} 
+        practiceMode={practiceMode} 
+        hideReviewButton={true} 
+      />
       
       <div className="split-view" style={{ flex: 1, height: 'calc(100vh - 60px)', paddingBottom: '70px' }}>
         {/* Left Panel: Prompt */}
@@ -89,11 +97,12 @@ const WritingTestScreen = ({ exam, onBack, onSubmitSuccess, practiceMode, custom
             <div key={task.id} style={{ display: idx === activeTaskIndex ? 'flex' : 'none', flex: 1, flexDirection: 'column', height: '100%' }}>
               <WritingEditor
                 ref={el => editorRefs.current[idx] = el}
-                testId={task.id}
+                testId={exam.id}
                 taskNumber={task.task_number}
                 promptText={task.prompt_text}
                 status="new"
                 onSubmitSuccess={handleSuccess}
+                onSubmitError={handleError}
               />
             </div>
           ))}
@@ -134,7 +143,7 @@ function WritingTestPage() {
   const practiceMode = location.state?.practiceMode || false;
   const customTimeLimit = location.state?.customTimeLimit || null;
 
-  const exam = MOCK_EXAMS.find(e => e.id === id);
+  const exam = location.state?.exam || null;
   const [submittedId, setSubmittedId] = useState(null);
 
   const handleSubmitSuccess = (response) => {

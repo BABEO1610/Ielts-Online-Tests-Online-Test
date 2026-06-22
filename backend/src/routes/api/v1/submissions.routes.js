@@ -1,13 +1,18 @@
 const express = require('express');
 const router = express.Router();
-const authenticateToken = require('../../../middleware/authenticate');
-const uploadMiddleware = require('../../../middleware/upload.middleware');
 const SubmissionController = require('../../../controllers/submission.controller');
+const authenticate = require('../../../middleware/authenticate');
+const uploadMiddleware = require('../../../middleware/upload.middleware');
 
-// Upload audio temp
+// Apply auth middleware to all submission routes
+router.use(authenticate);
+
+// Submit a writing task response
+router.post('/writing', SubmissionController.submitWriting);
+
+// Upload audio temp (speaking)
 router.post(
   '/speaking/upload',
-  authenticateToken,
   uploadMiddleware,
   SubmissionController.uploadSpeakingAudio
 );
@@ -19,18 +24,9 @@ router.post(
   SubmissionController.submitSpeaking
 );
 
-// Get playable audio URL for speaking submission
-router.get(
-  '/:id/audio-url',
-  authenticateToken,
-  SubmissionController.getAudioUrl
-);
+
 
 // Get feedback for a submission
-router.get(
-  '/:id/feedback',
-  authenticateToken,
-  SubmissionController.getFeedback
-);
+router.get('/:id/feedback', SubmissionController.getFeedback);
 
 module.exports = router;

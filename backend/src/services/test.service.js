@@ -182,6 +182,78 @@ class TestService {
   }
 
   /**
+   * Fetch all published writing tests with their tasks (passages).
+   */
+  static async getWritingTests() {
+    const testRes = await pool.query(`
+      SELECT 
+        id, 
+        title, 
+        description,
+        difficulty,
+        duration_minutes,
+        created_at
+      FROM mock_tests
+      WHERE skill = 'writing' AND is_published = true
+      ORDER BY created_at DESC
+    `);
+
+    const tests = testRes.rows;
+    if (tests.length === 0) return [];
+
+    const testIds = tests.map(t => t.id);
+    const passagesRes = await pool.query(
+      `SELECT * FROM test_passages WHERE test_id = ANY($1) ORDER BY test_id, passage_number ASC`,
+      [testIds]
+    );
+
+    const passages = passagesRes.rows;
+
+    return tests.map(test => {
+      const testPassages = passages.filter(p => p.test_id === test.id);
+      
+      const tasks = testPassages.map(p => {
+        let instructionData = {};
+        try {
+          if (p.instruction) {
+            instructionData = JSON.parse(p.instruction);
+          }
+        } catch (e) {
+          // ignore parsing error
+        }
+        
+        return {
+          id: p.id,
+          task_number: p.passage_number,
+          title: p.title,
+          prompt_text: p.content,
+          duration: instructionData.type === 'task1' ? '20 phút' : '40 phút',
+          min_words: instructionData.type === 'task1' ? 150 : 250,
+          illustration: instructionData.imageUrl || null,
+          hint: instructionData.hint || null
+        };
+      });
+
+      // format date e.g. "Tháng 6, 2026"
+      const dateObj = new Date(test.created_at);
+      const dateStr = `Tháng ${dateObj.getMonth() + 1}, ${dateObj.getFullYear()}`;
+      
+      let difficultyVi = 'Trung bình';
+      if (test.difficulty === 'beginner') difficultyVi = 'Dễ';
+      if (test.difficulty === 'advanced') difficultyVi = 'Khó';
+
+      return {
+        id: test.id,
+        title: test.title,
+        date: dateStr,
+        difficulty: difficultyVi,
+        duration_minutes: test.duration_minutes,
+        tasks
+      };
+    });
+  }
+
+  /**
    * Fetch full test details by ID
    */
   static async getTestById(id) {
