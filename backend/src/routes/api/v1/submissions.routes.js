@@ -1,7 +1,8 @@
 const express = require('express');
 const router = express.Router();
-const SubmissionController = require('../../../controllers/submissionController');
+const SubmissionController = require('../../../controllers/submission.controller');
 const authenticate = require('../../../middleware/authenticate');
+const uploadMiddleware = require('../../../middleware/upload.middleware');
 
 // Apply auth middleware to all submission routes
 router.use(authenticate);
@@ -9,34 +10,17 @@ router.use(authenticate);
 // Submit a writing task response
 router.post('/writing', SubmissionController.submitWriting);
 
-// Get feedback for a submission (placeholder for pending)
-router.get('/:id/feedback', SubmissionController.getFeedback);
-const authenticateToken = require('../../../middleware/authenticate');
-const uploadMiddleware = require('../../../middleware/upload.middleware');
-const SubmissionController = require('../../../controllers/submission.controller');
-
-// Upload audio temp
+// Upload audio temp (speaking)
 router.post(
   '/speaking/upload',
-  authenticateToken,
   uploadMiddleware,
   SubmissionController.uploadSpeakingAudio
 );
 
 // Submit speaking (legacy - per part)
-router.post(
-  '/speaking',
-  authenticateToken,
-  SubmissionController.submitSpeaking
-);
-
-
+router.post('/speaking', SubmissionController.submitSpeaking);
 
 // Get feedback for a submission
-router.get(
-  '/:id/feedback',
-  authenticateToken,
-  SubmissionController.getFeedback
-);
+router.get('/:id/feedback', SubmissionController.getFeedback);
 
 module.exports = router;

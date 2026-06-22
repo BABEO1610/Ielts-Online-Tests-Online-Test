@@ -2,6 +2,27 @@ const SubmissionService = require('../services/submission.service');
 const AppError = require('../utils/AppError');
 
 class SubmissionController {
+  static async submitWriting(req, res, next) {
+    try {
+      const userId = req.user.id;
+
+      const submission = await SubmissionService.submitWriting(userId, req.body);
+      
+      res.status(201).json({
+        success: true,
+        data: {
+          submission_id: submission.id,
+          status: submission.status,
+          submitted_at: submission.submitted_at
+        },
+        meta: null,
+        error: null
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   static async uploadSpeakingAudio(req, res, next) {
     try {
       if (!req.file) {
