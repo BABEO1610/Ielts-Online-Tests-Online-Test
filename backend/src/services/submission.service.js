@@ -1,56 +1,65 @@
-const { pool } = require('../db/pool');
+﻿const { pool } = require('../db/pool');
 const { getBandScore } = require('../utils/scoring');
 const TestService = require('./test.service');
+const AppError = require('../utils/AppError');
+const fs = require('fs');
+const path = require('path');
+
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+const normalizeOptionalUuid = (value) => {
+  if (!value) return null;
+  const text = String(value);
+  return UUID_REGEX.test(text) ? text : null;
+};
+
+const mapSpeakingDbError = (err) => {
+  if (err.code === '42P01') {
+    return new AppError(
+      'Speaking tables are missing. Run backend migrations, then restart the server.',
+      500,
+      'SPEAKING_SCHEMA_MISSING'
+    );
+  }
+  if (err.code === '23503') {
+    return new AppError('Referenced speaking test or user was not found', 400, 'SPEAKING_REFERENCE_INVALID');
+  }
+  return err;
+};
 
 class SubmissionService {
-  /**
-   * Submit an objective test (Listening / Reading)
-   * @param {string} userId
-   * @param {string} testId
-   * @param {Object} answers - Key-value pair of { "questionOrder": "student Answer" }
-   * @param {number} timeSpentSeconds
-   */
   static async submitObjectiveTest(userId, testId, answers, timeSpentSeconds = 0) {
-    // 1. Fetch test details to get correct answers
     const test = await TestService.getTestById(testId);
     if (!test) {
-      throw new Error('Test not found');
+      throw new AppError('Test not found', 404, 'TEST_NOT_FOUND');
     }
-
     if (test.skill !== 'listening' && test.skill !== 'reading') {
-      throw new Error('This endpoint only supports listening and reading tests');
+      throw new AppError('This endpoint only supports listening and reading tests', 400, 'INVALID_TEST_SKILL');
     }
 
-    // 2. Extract all questions in a flat array
     const allQuestions = [];
     if (test.passages) {
       test.passages.forEach(p => {
         (p.blocks || []).forEach(b => {
-          (b.questions || []).forEach(q => {
-            allQuestions.push(q);
-          });
+          (b.questions || []).forEach(q => { allQuestions.push(q); });
         });
       });
     }
 
-    // 3. Compare user answers with correct answers
     let rawScore = 0;
     const gradedAnswers = allQuestions.map(q => {
       const qOrder = String(q.questionOrder);
       const studentAnswer = answers[qOrder] || '';
       let isCorrect = false;
 
-      // Handle correct_answers array (e.g., Multiple Choice / Checkbox)
       if (q.correctAnswers && Array.isArray(q.correctAnswers) && q.correctAnswers.length > 0) {
-        // Find if studentAnswer matches any of the correct option texts or labels
         const correctOptMatch = q.correctAnswers.some(ansId => {
           if (q.options && Array.isArray(q.options)) {
             const optIdx = q.options.findIndex(o => String(o.id) === String(ansId) || (o.label && String(o.label) === String(ansId)));
             if (optIdx !== -1) {
               const opt = q.options[optIdx];
-              const autoLabel = String.fromCharCode(65 + optIdx); // e.g., 'A', 'B', 'C'
+              const autoLabel = String.fromCharCode(65 + optIdx);
               const studentAnsLower = studentAnswer.trim().toLowerCase();
-
               return (
                 (opt.label && String(opt.label).toLowerCase() === studentAnsLower) ||
                 (opt.text && String(opt.text).trim().toLowerCase() === studentAnsLower) ||
@@ -60,18 +69,13 @@ class SubmissionService {
           }
           return false;
         });
-        
         if (correctOptMatch) isCorrect = true;
-      } 
-      // Handle text correct_answer (e.g., Fill in the blank)
-      else if (q.correctAnswer) {
+      } else if (q.correctAnswer) {
         const studentAnsLower = studentAnswer.trim().toLowerCase();
         const correctAnsLower = q.correctAnswer.trim().toLowerCase();
-
         if (studentAnsLower === correctAnsLower) {
           isCorrect = true;
         } else if (q.options && Array.isArray(q.options)) {
-          // If the correct answer is an ID (e.g. Matching), try to resolve it to A, B, C
           const optIdx = q.options.findIndex(o => String(o.id) === String(q.correctAnswer) || (o.label && String(o.label) === String(q.correctAnswer)));
           if (optIdx !== -1) {
             const autoLabel = String.fromCharCode(65 + optIdx).toLowerCase();
@@ -88,47 +92,29 @@ class SubmissionService {
       }
 
       if (isCorrect) rawScore++;
-
-      return {
-        questionId: q.id,
-        questionOrder: q.questionOrder,
-        givenAnswer: studentAnswer,
-        isCorrect: isCorrect
-      };
+      return { questionId: q.id, questionOrder: q.questionOrder, givenAnswer: studentAnswer, isCorrect };
     });
 
-    const totalQuestions = allQuestions.length || 40; // Default to 40 if no questions (safety fallback)
-    const normalizedRawScore = Math.min(rawScore, 40); // Cap at 40
-    
-    // Scale up raw score if the test has fewer than 40 questions (for demo purposes)
+    const totalQuestions = allQuestions.length || 40;
+    const normalizedRawScore = Math.min(rawScore, 40);
     const scaledRawScore = totalQuestions > 0 ? Math.round((normalizedRawScore / totalQuestions) * 40) : 0;
-    
     const bandScore = getBandScore(test.skill, scaledRawScore);
 
-    // 4. Save to Database
     const client = await pool.connect();
     let attemptId;
-    
     try {
       await client.query('BEGIN');
-
-      // Insert into test_attempts
       const attemptRes = await client.query(
-        `INSERT INTO test_attempts (user_id, test_id, mode, submitted_at, band_score)
-         VALUES ($1, $2, 'timed', NOW(), $3) RETURNING id`,
+        `INSERT INTO test_attempts (user_id, test_id, mode, submitted_at, band_score) VALUES ($1, $2, 'timed', NOW(), $3) RETURNING id`,
         [userId, testId, bandScore]
       );
       attemptId = attemptRes.rows[0].id;
-
-      // Insert into question_answers
       for (const ga of gradedAnswers) {
         await client.query(
-          `INSERT INTO question_answers (attempt_id, question_id, given_answer, is_correct)
-           VALUES ($1, $2, $3, $4)`,
+          `INSERT INTO question_answers (attempt_id, question_id, given_answer, is_correct) VALUES ($1, $2, $3, $4)`,
           [attemptId, ga.questionId, ga.givenAnswer, ga.isCorrect]
         );
       }
-
       await client.query('COMMIT');
     } catch (err) {
       await client.query('ROLLBACK');
@@ -137,38 +123,23 @@ class SubmissionService {
       client.release();
     }
 
-    return {
-      attemptId,
-      bandScore,
-      rawScore: normalizedRawScore,
-      totalQuestions
-    };
+    return { attemptId, bandScore, rawScore: normalizedRawScore, totalQuestions };
   }
 
-  /**
-   * Fetch the details of a submission result
-   */
   static async getSubmissionResult(attemptId, userId) {
-    // 1. Fetch attempt and verify ownership
     const attemptRes = await pool.query(
       `SELECT ta.*, mt.title as test_title, mt.skill
        FROM test_attempts ta
        JOIN mock_tests mt ON mt.id = ta.test_id
-       WHERE ta.id = $1`,
-      [attemptId]
+       WHERE ta.id = $1 AND ta.user_id = $2`,
+      [attemptId, userId]
     );
-
     if (attemptRes.rows.length === 0) return null;
     const attempt = attemptRes.rows[0];
 
-    // Check if the user is authorized to view this result (must be the owner, skipping admin check for now)
-    if (String(attempt.user_id) !== String(userId)) {
-      throw new Error('Unauthorized access to this result');
-    }
-
-    // 2. Fetch all answers
     const answersRes = await pool.query(
-      `SELECT qa.given_answer, qa.is_correct, q.question_order, q.question_text, q.correct_answer, q.correct_answers, q.explanation, q.options
+      `SELECT qa.given_answer, qa.is_correct, q.question_order, q.question_text,
+              q.correct_answer, q.correct_answers, q.explanation, q.options
        FROM question_answers qa
        JOIN questions q ON q.id = qa.question_id
        WHERE qa.attempt_id = $1
@@ -179,8 +150,6 @@ class SubmissionService {
     let rawScore = 0;
     const mappedAnswers = answersRes.rows.map(row => {
       if (row.is_correct) rawScore++;
-      
-      // Formatting correct answer for display
       let displayCorrectAnswer = row.correct_answer;
       if (row.correct_answers && Array.isArray(row.correct_answers) && row.correct_answers.length > 0) {
         if (Array.isArray(row.options)) {
@@ -201,7 +170,6 @@ class SubmissionService {
           }
         }
       }
-
       return {
         order: row.question_order,
         text: row.question_text,
@@ -213,9 +181,11 @@ class SubmissionService {
     });
 
     const totalQuestions = mappedAnswers.length;
-    const timeSpentObj = attempt.submitted_at - attempt.created_at; // milliseconds
-    const timeSpentMins = Math.floor(timeSpentObj / 60000);
-    const timeSpentSecs = Math.floor((timeSpentObj % 60000) / 1000);
+    const submittedAt = new Date(attempt.submitted_at);
+    const createdAt = new Date(attempt.created_at);
+    const timeSpentMs = submittedAt.getTime() - createdAt.getTime();
+    const timeSpentMins = Math.floor(timeSpentMs / 60000);
+    const timeSpentSecs = Math.floor((timeSpentMs % 60000) / 1000);
 
     return {
       testTitle: attempt.test_title,
@@ -229,6 +199,125 @@ class SubmissionService {
       incorrectCount: totalQuestions - rawScore,
       answers: mappedAnswers
     };
+  }
+
+  static async submitSpeaking(userId, testId, partNumber, tempS3Key, grader) {
+    if (testId) {
+      try {
+        const testRes = await pool.query('SELECT id FROM mock_tests WHERE id = $1', [testId]);
+        if (testRes.rows.length === 0) {
+          throw new AppError('Test not found', 404, 'TEST_NOT_FOUND');
+        }
+      } catch (err) {
+        if (err instanceof AppError) throw err;
+        throw new AppError('Invalid test ID format', 400, 'INVALID_TEST_ID');
+      }
+    }
+
+    const filename = path.basename(tempS3Key);
+    const tempPath = path.join(__dirname, '../../uploads/temp_audio', userId, filename);
+    try {
+      await fs.promises.access(tempPath, fs.constants.F_OK);
+    } catch (e) {
+      throw new AppError('Temp audio file not found or you do not have permission', 404, 'TEMP_AUDIO_NOT_FOUND');
+    }
+
+    const finalDir = path.join(__dirname, '../../uploads/speaking', userId);
+    if (!fs.existsSync(finalDir)) {
+      fs.mkdirSync(finalDir, { recursive: true });
+    }
+    const finalPath = path.join(finalDir, filename);
+    const relativeFinalPath = `/uploads/speaking/${userId}/${filename}`;
+
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      const insertRes = await client.query(
+        `INSERT INTO speaking_submissions (user_id, test_id, part_number, audio_url, grader, status) VALUES ($1, $2, $3, $4, $5, 'pending') RETURNING *`,
+        [userId, testId, partNumber, relativeFinalPath, grader]
+      );
+      const submission = insertRes.rows[0];
+      await fs.promises.rename(tempPath, finalPath);
+      await client.query('COMMIT');
+      return submission;
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  static async submitWriting(userId, data) {
+    const { test_id, task_number, prompt_text, response_text, grader } = data;
+    const query = `
+      INSERT INTO writing_submissions (user_id, test_id, task_number, prompt_text, response_text, grader, status)
+      VALUES ($1, $2, $3, $4, $5, $6, 'pending')
+      RETURNING id, status, submitted_at
+    `;
+    const result = await pool.query(query, [userId, test_id, task_number, prompt_text, response_text, grader]);
+    return result.rows[0];
+  }
+
+  static async createAttempt(userId, testId) {
+    const normalizedTestId = normalizeOptionalUuid(testId);
+    if (normalizedTestId) {
+      try {
+        const testRes = await pool.query('SELECT id FROM mock_tests WHERE id = $1', [normalizedTestId]);
+        if (testRes.rows.length === 0) {
+          throw new AppError('Speaking test not found', 404, 'TEST_NOT_FOUND');
+        }
+      } catch (err) {
+        if (err instanceof AppError) throw err;
+        throw new AppError('Invalid test ID format', 400, 'INVALID_TEST_ID');
+      }
+    }
+
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      const insertRes = await client.query(
+        `INSERT INTO speaking_attempts (user_id, test_id, status) VALUES ($1, $2, 'in_progress') RETURNING id, status`,
+        [userId, normalizedTestId]
+      );
+      await client.query('COMMIT');
+      return insertRes.rows[0];
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw mapSpeakingDbError(err);
+    } finally {
+      client.release();
+    }
+  }
+
+  static async getFeedback(id, userId, type) {
+    if (type !== 'speaking' && type !== 'writing') {
+      throw new AppError('type must be speaking or writing', 400, 'INVALID_FIELD');
+    }
+    const submissionTable = type === 'speaking' ? 'speaking_submissions' : 'writing_submissions';
+    const subRes = await pool.query(
+      `SELECT * FROM ${submissionTable} WHERE id = $1 AND user_id = $2`,
+      [id, userId]
+    );
+    if (subRes.rows.length === 0) {
+      throw new AppError('Submission not found', 404, 'NOT_FOUND');
+    }
+    const submission = subRes.rows[0];
+    if (submission.status === 'pending') {
+      return { status: 'pending', message: 'Bai dang duoc cham, vui long cho...' };
+    }
+    let report = {};
+    const aiRes = await pool.query(
+      'SELECT * FROM ai_grading_reports WHERE submission_id = $1 AND submission_type = $2',
+      [id, type]
+    );
+    if (aiRes.rows.length > 0) report.ai_report = aiRes.rows[0];
+    const tutorRes = await pool.query(
+      'SELECT * FROM tutor_grading_reports WHERE submission_id = $1 AND submission_type = $2',
+      [id, type]
+    );
+    if (tutorRes.rows.length > 0) report.tutor_report = tutorRes.rows[0];
+    return report;
   }
 }
 

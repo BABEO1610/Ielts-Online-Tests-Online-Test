@@ -3,7 +3,7 @@ import api from '../../services/api';
 import gradingService from '../../services/grading.service';
 import { useAuth } from '../../context/AuthContext';
 
-const AudioRecorder = forwardRef(({ testId, partNumber, onUploadComplete, onSubmitSuccess, maxDuration = 300, practiceMode = false }, ref) => {
+const AudioRecorder = forwardRef(({ testId, partNumber, onUploadComplete, onSubmitSuccess, maxDuration = 300, practiceMode = false, examMode = false }, ref) => {
   const { user } = useAuth();
   const aiQuotaRemaining = user?.ai_grading_quota_remaining ?? 0;
 
@@ -126,11 +126,7 @@ const AudioRecorder = forwardRef(({ testId, partNumber, onUploadComplete, onSubm
       // EARS[Event]: WHEN user submits audio, THE system SHALL upload the file
       formData.append('audio_file', blob, 'recording.m4a'); 
 
-      const response = await api.post('/submissions/speaking/upload', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      });
+      const response = await api.post('/submissions/speaking/upload', formData);
 
       if (response.data?.success && response.data?.data?.temp_s3_key) {
         setStatus('done');
@@ -252,8 +248,8 @@ const AudioRecorder = forwardRef(({ testId, partNumber, onUploadComplete, onSubm
           </button>
         </div>
       )}
-      {/* Conditional Rendering: Submit Form appears only after successful upload */}
-      {status === 'done' && (
+      {/* Conditional Rendering: Submit Form or Exam-mode ready indicator */}
+      {status === 'done' && !examMode && (
         <div className="submit-section fade-in mt-4 text-start">
           <hr className="my-4" />
           <form onSubmit={handleSubmit}>
@@ -323,6 +319,15 @@ const AudioRecorder = forwardRef(({ testId, partNumber, onUploadComplete, onSubm
               </button>
             </div>
           </form>
+        </div>
+      )}
+
+      {/* Exam mode: just show a ready badge, no submit button */}
+      {status === 'done' && examMode && (
+        <div className="mt-3 fade-in">
+          <span className="badge bg-success px-3 py-2 fs-6">
+            ✓ Phần này đã được ghi âm. Chuyển sang phần tiếp theo hoặc nhấn Submit để nộp toàn bộ.
+          </span>
         </div>
       )}
     </div>

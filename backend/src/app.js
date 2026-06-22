@@ -34,6 +34,9 @@ app.use(cookieParser());
 // Mount API v1 routes
 app.use('/api/v1', apiV1Routes);
 
+// Serve static files for official speaking uploads (Sprint 1)
+app.use('/uploads/speaking', express.static(path.join(__dirname, '../uploads/speaking')));
+
 // Handle 404
 app.use((req, res, next) => {
   const error = new Error(`Not Found - ${req.originalUrl}`);
@@ -65,3 +68,4 @@ if (require.main === module) {
 }
 
 module.exports = app;
+// Trigger restart

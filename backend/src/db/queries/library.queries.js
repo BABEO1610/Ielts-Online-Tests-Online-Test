@@ -34,6 +34,10 @@ async function getAllResources(filters = {}) {
     idx++;
   }
 
+  // Filter out unpublished or pending/rejected resources from the public library
+  conditions.push(`is_published = TRUE`);
+  conditions.push(`review_status = 'approved'`);
+
   const whereClause = conditions.length > 0
     ? 'WHERE ' + conditions.join(' AND ')
     : '';
@@ -90,7 +94,7 @@ async function getResourceById(id, uploadedBy) {
       `SELECT id, title, description, resource_type, file_url, file_size_bytes,
               category, is_published, review_status, created_at, updated_at
        FROM library_resources
-       WHERE id = $1`,
+       WHERE id = $1 AND is_published = TRUE AND review_status = 'approved'`,
       [id]
     );
     return result.rows[0] || null;
