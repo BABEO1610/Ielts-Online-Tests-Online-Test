@@ -11,6 +11,7 @@ const express = require('express');
 const cors = require('cors');
 const cookieParser = require('cookie-parser');
 const apiV1Routes = require('./routes/api/v1');
+const assistantRoutes = require('./api/assistant/assistant.routes');
 const errorHandler = require('./middleware/errorHandler');
 
 // Initialize express app
@@ -38,6 +39,11 @@ app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 // Mount API v1 routes
 app.use('/api/v1', apiV1Routes);
 
+// Mount spec-compatible assistant routes alongside the existing v1 API convention.
+app.use('/api/assistant', assistantRoutes);
+
+// Phục vụ các file tĩnh trong thư mục uploads
+app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 // Serve static files for official speaking uploads (Sprint 1)
 app.use('/uploads/speaking', express.static(path.join(__dirname, '../uploads/speaking')));
 
