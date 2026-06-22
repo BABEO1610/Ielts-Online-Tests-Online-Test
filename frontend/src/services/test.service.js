@@ -27,10 +27,13 @@ export const testService = {
 
   /**
    * Fetch list of tests
+   * @param {Object} params - Query params like skill, isPublished
    * @returns {Promise<Object>}
    */
-  getTests: async () => {
-    const response = await api.get('/tests');
+  getTests: async (params = {}) => {
+    const query = new URLSearchParams(params).toString();
+    const url = query ? `/tests?${query}` : '/tests';
+    const response = await api.get(url);
     return response.data;
   },
 
@@ -67,5 +70,48 @@ export const testService = {
   deleteTest: async (id) => {
     const response = await api.delete(`/tests/${id}`);
     return response.data;
+  },
+
+  /**
+   * Fetch a test for a student (without answers)
+   * @param {string} id
+   * @returns {Promise<Object>}
+   */
+  getTestForStudent: async (id) => {
+    try {
+      const response = await api.get(`/tests/${id}/take`);
+      return response.data;
+    } catch (error) {
+      return getApiError(error);
+    }
+  },
+
+  /**
+   * Submit an objective test
+   * @param {string} testId
+   * @param {Object} payload - { answers: {}, timeSpentSeconds: number }
+   * @returns {Promise<Object>}
+   */
+  submitObjectiveTest: async (testId, payload) => {
+    try {
+      const response = await api.post(`/submissions/${testId}`, payload);
+      return response.data;
+    } catch (error) {
+      return getApiError(error);
+    }
+  },
+
+  /**
+   * Fetch the result of a submitted test
+   * @param {string} attemptId
+   * @returns {Promise<Object>}
+   */
+  getSubmissionResult: async (attemptId) => {
+    try {
+      const response = await api.get(`/submissions/${attemptId}`);
+      return response.data;
+    } catch (error) {
+      return getApiError(error);
+    }
   }
 };

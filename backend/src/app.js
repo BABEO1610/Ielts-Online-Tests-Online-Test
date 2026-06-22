@@ -22,11 +22,11 @@ app.use(cors({
   credentials: true
 }));
 
-// Parse JSON bodies
-app.use(express.json());
+// Parse JSON bodies (increased limit for audio base64 uploads)
+app.use(express.json({ limit: '50mb' }));
 
 // Parse URL-encoded bodies
-app.use(express.urlencoded({ extended: true }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // Parse cookies
 app.use(cookieParser());

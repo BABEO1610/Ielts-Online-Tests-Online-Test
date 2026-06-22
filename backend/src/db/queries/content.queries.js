@@ -88,7 +88,8 @@ const getTestQuestions = `
   SELECT 
     q.*,
     qb.question_type,
-    qb.question_range
+    qb.question_range,
+    qb.content AS block_content
   FROM questions q
   LEFT JOIN question_blocks qb ON q.block_id = qb.id
   WHERE q.test_id = $1

@@ -3,18 +3,39 @@
  * Trang Kết quả thi (Tổng quan)
  * Band Score lớn, điểm thô /40, thời gian hoàn thành.
  */
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import { useParams, Link } from 'react-router-dom';
+import { testService } from '../../services/test.service';
 import '../../styles/objective-testing.css';
 
-const MOCK_RESULT = {
-  testTitle: 'Cambridge IELTS 18 — Reading Test 1',
-  bandScore: 7.0, rawScore: 30, totalQuestions: 40,
-  timeSpent: '54:32', submittedAt: '2026-06-03 14:32',
-  correctCount: 30, incorrectCount: 10,
-};
-
 function TestResultPage() {
-  const r = MOCK_RESULT;
+  const { attemptId: id } = useParams();
+  const [result, setResult] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    const fetchResult = async () => {
+      try {
+        const response = await testService.getSubmissionResult(id);
+        if (response && response.success && response.data) {
+          setResult(response.data);
+        } else {
+          setError('Không tìm thấy kết quả bài thi');
+        }
+      } catch (err) {
+        setError('Đã có lỗi xảy ra khi tải kết quả');
+      } finally {
+        setLoading(false);
+      }
+    };
+    if (id) fetchResult();
+  }, [id]);
+
+  if (loading) return <div className="text-center py-5">Đang tải kết quả...</div>;
+  if (error || !result) return <div className="text-center py-5 text-danger">{error || 'Không tìm thấy kết quả'}</div>;
+
+  const r = result;
   return (
     <div className="container py-4" style={{ maxWidth: 800 }}>
       <div className="api-success-message d-flex align-items-center gap-2 justify-content-center mb-4" id="submit-success-alert">
@@ -44,8 +65,8 @@ function TestResultPage() {
         ))}
       </div>
       <div className="d-flex gap-3">
-        <a href="/results/a1/detail" className="button-primary flex-fill" id="btn-view-detail" style={{ textDecoration: 'none', textAlign: 'center', padding: '14px 0' }}>View detailed answers</a>
-        <a href="/tests" className="button-secondary flex-fill" id="btn-back-to-tests" style={{ textDecoration: 'none', textAlign: 'center', padding: '14px 0', border: '1px solid var(--surface-pressed)' }}>Back to tests</a>
+        <Link to={`/results/${id}/detail`} className="button-primary flex-fill" id="btn-view-detail" style={{ textDecoration: 'none', textAlign: 'center', padding: '14px 0' }}>Xem chi tiết đáp án</Link>
+        <Link to={r.skill === 'listening' ? "/listening" : "/reading"} className="button-secondary flex-fill" id="btn-back-to-tests" style={{ textDecoration: 'none', textAlign: 'center', padding: '14px 0', border: '1px solid var(--surface-pressed)' }}>Quay lại danh sách đề thi</Link>
       </div>
     </div>
   );

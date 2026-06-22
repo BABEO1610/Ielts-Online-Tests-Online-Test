@@ -6,41 +6,63 @@
  * Mở rộng (Accordion) để xem giải thích.
  * Bootstrap Accordion, text-success (đúng), text-danger (sai).
  */
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import { useParams, Link } from 'react-router-dom';
+import { testService } from '../../services/test.service';
 import '../../styles/objective-testing.css';
 
-const MOCK_ANSWERS = [
-  { order: 1, text: 'The earliest known glass objects were:', yourAnswer: 'B', correctAnswer: 'B', isCorrect: true, explanation: 'The passage states that "the earliest known man-made glass objects are beads" — option B.' },
-  { order: 2, text: 'Glassblowing was invented around:', yourAnswer: 'A', correctAnswer: 'C', isCorrect: false, explanation: 'The 1st century BC is mentioned as the time of invention.' },
-  { order: 3, text: 'The Venetians established their glass industry on the island of ________.', yourAnswer: 'Murano', correctAnswer: 'Murano', isCorrect: true, explanation: 'Paragraph 4 mentions the island of Murano.' },
-  { order: 4, text: 'George Ravenscroft added ________ to the glass formula.', yourAnswer: 'B', correctAnswer: 'B', isCorrect: true, explanation: 'Lead oxide was added to create lead crystal glass.' },
-  { order: 5, text: 'Float glass was invented by Sir Alastair ________.', yourAnswer: 'Pilkington', correctAnswer: 'Pilkington', isCorrect: true, explanation: 'Sir Alastair Pilkington invented float glass in the 1950s.' },
-  { order: 6, text: 'Early glass-making techniques were:', yourAnswer: 'A', correctAnswer: 'C', isCorrect: false, explanation: 'The passage says they were "closely guarded secrets".' },
-  { order: 7, text: 'Molten glass is poured onto ________.', yourAnswer: '', correctAnswer: 'molten tin', isCorrect: false, explanation: 'The float glass process uses a bath of molten tin.' },
-  { order: 8, text: 'Lead crystal glass is ideal for:', yourAnswer: 'B', correctAnswer: 'B', isCorrect: true, explanation: 'It was ideal for cutting and engraving.' },
-];
-
 function TestResultDetailPage() {
+  const { attemptId: id } = useParams();
+  const [result, setResult] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    const fetchResult = async () => {
+      try {
+        const response = await testService.getSubmissionResult(id);
+        if (response && response.success && response.data) {
+          setResult(response.data);
+        } else {
+          setError('Không tìm thấy kết quả bài thi');
+        }
+      } catch (err) {
+        setError('Đã có lỗi xảy ra khi tải kết quả');
+      } finally {
+        setLoading(false);
+      }
+    };
+    if (id) fetchResult();
+  }, [id]);
+
+  if (loading) return <div className="text-center py-5">Đang tải đáp án...</div>;
+  if (error || !result) return <div className="text-center py-5 text-danger">{error || 'Không tìm thấy kết quả'}</div>;
+
   return (
     <div className="container py-4" style={{ maxWidth: 900 }}>
+      <div className="mb-3">
+        <Link to={`/results/${id}`} className="text-decoration-none text-muted">
+          ← Quay lại tổng quan
+        </Link>
+      </div>
       <div className="page-heading">
-        <h1>Answer review</h1>
-        <p>Cambridge IELTS 18 — Reading Test 1 · Band 7.0 · 30/40 correct</p>
+        <h1>Chi tiết đáp án</h1>
+        <p>{result.testTitle} · Band {parseFloat(result.bandScore).toFixed(1)} · {result.correctCount}/{result.totalQuestions} câu đúng</p>
       </div>
 
       {/* Summary Bar */}
       <div className="d-flex gap-3 mb-4 flex-wrap">
         <div className="badge-status published" style={{ fontSize: 14, padding: '6px 16px' }}>
-          ✓ {MOCK_ANSWERS.filter(a => a.isCorrect).length} Correct
+          ✓ {result.correctCount} Correct
         </div>
         <div className="badge-status draft" style={{ fontSize: 14, padding: '6px 16px', background: '#fdf2f2', color: '#e02424' }}>
-          ✗ {MOCK_ANSWERS.filter(a => !a.isCorrect).length} Incorrect
+          ✗ {result.incorrectCount} Incorrect
         </div>
       </div>
 
       {/* Accordion */}
       <div className="accordion" id="resultsAccordion">
-        {MOCK_ANSWERS.map((item) => (
+        {result.answers && result.answers.map((item) => (
           <div className="accordion-item" key={item.order} id={`result-q-${item.order}`} style={{ border: 'none', borderBottom: '1px solid var(--surface-pressed)', borderRadius: 0 }}>
             <h2 className="accordion-header">
               <button
@@ -76,7 +98,9 @@ function TestResultDetailPage() {
             </h2>
             <div id={`collapse-${item.order}`} className="accordion-collapse collapse" data-bs-parent="#resultsAccordion">
               <div className="accordion-body" style={{ background: 'var(--canvas-soft)', padding: 'var(--spacing-2xl)' }}>
-                <p className="body-md mb-0" style={{ color: 'var(--body)' }}>{item.explanation}</p>
+                <p className="body-md mb-0" style={{ color: 'var(--body)' }}>
+                  {item.explanation || 'Không có giải thích cho câu hỏi này.'}
+                </p>
               </div>
             </div>
           </div>
