@@ -1,0 +1,348 @@
+.assistant-root {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 1200;
+  font-family: var(--font-text, Inter, system-ui, sans-serif);
+}
+
+.assistant-fab {
+  width: 56px;
+  height: 56px;
+  border: 0;
+  border-radius: 50%;
+  background: #111111;
+  color: #ffffff;
+  box-shadow: 0 14px 32px rgba(0, 0, 0, 0.24);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: transform 0.16s ease, background 0.16s ease;
+}
+
+.assistant-fab:hover {
+  background: #e11d48;
+  transform: translateY(-2px);
+}
+
+.assistant-panel {
+  position: absolute;
+  right: 0;
+  bottom: 72px;
+  width: min(380px, calc(100vw - 32px));
+  height: min(620px, calc(100vh - 112px));
+  background: #ffffff;
+  color: #111111;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.22);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.assistant-panel__header {
+  min-height: 64px;
+  padding: 14px 16px;
+  background: #111111;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.assistant-panel__header span,
+.assistant-panel__header strong {
+  display: block;
+}
+
+.assistant-panel__header span {
+  color: #d1d5db;
+  font-size: 12px;
+  line-height: 16px;
+}
+
+.assistant-panel__header strong {
+  font-size: 16px;
+  line-height: 22px;
+}
+
+.assistant-panel__header button {
+  width: 36px;
+  height: 36px;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.12);
+  color: #ffffff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.assistant-login-prompt,
+.assistant-empty-state {
+  flex: 1;
+  padding: 28px 20px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 16px;
+  text-align: center;
+}
+
+.assistant-login-prompt__icon,
+.assistant-empty-state svg {
+  width: 48px;
+  height: 48px;
+  margin: 0 auto;
+  border-radius: 50%;
+  background: #fff1f2;
+  color: #e11d48;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+}
+
+.assistant-login-prompt h2,
+.assistant-empty-state h2 {
+  margin: 0;
+  font-size: 18px;
+  line-height: 24px;
+}
+
+.assistant-login-prompt p,
+.assistant-empty-state p {
+  margin: 0;
+  color: #5f6368;
+  font-size: 14px;
+  line-height: 21px;
+}
+
+.assistant-login-prompt__actions {
+  display: grid;
+  gap: 10px;
+}
+
+.assistant-primary-link,
+.assistant-secondary-link {
+  min-height: 42px;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  font-weight: 700;
+}
+
+.assistant-primary-link {
+  background: #111111;
+  color: #ffffff;
+}
+
+.assistant-secondary-link {
+  background: #f3f4f6;
+  color: #111111;
+}
+
+.assistant-message-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: #f8fafc;
+}
+
+.assistant-message {
+  display: flex;
+  width: 100%;
+}
+
+.assistant-message--user {
+  justify-content: flex-end;
+}
+
+.assistant-message--assistant {
+  justify-content: flex-start;
+}
+
+.assistant-message__bubble {
+  max-width: 82%;
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 14px;
+  line-height: 20px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.assistant-message--user .assistant-message__bubble {
+  background: #111111;
+  color: #ffffff;
+}
+
+.assistant-message--assistant .assistant-message__bubble {
+  background: #ffffff;
+  color: #111111;
+  border: 1px solid #e5e7eb;
+}
+
+.assistant-message__rating {
+  margin-top: 8px;
+  display: flex;
+  gap: 6px;
+}
+
+.assistant-message__rating button {
+  width: 28px;
+  height: 28px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #4b5563;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.assistant-message__rating button:hover:not(:disabled),
+.assistant-message__rating button.is-selected {
+  border-color: #111111;
+  color: #111111;
+  background: #f3f4f6;
+}
+
+.assistant-message__rating button:disabled {
+  cursor: default;
+  opacity: 0.78;
+}
+
+.assistant-message__bubble--loading {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.assistant-message__bubble--loading svg {
+  animation: assistant-spin 0.8s linear infinite;
+}
+
+.assistant-input {
+  border-top: 1px solid #e5e7eb;
+  padding: 12px;
+  display: grid;
+  grid-template-columns: 1fr 44px;
+  gap: 10px;
+  background: #ffffff;
+}
+
+.assistant-input textarea {
+  min-height: 44px;
+  max-height: 96px;
+  resize: vertical;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  padding: 10px 12px;
+  font: inherit;
+  line-height: 20px;
+  outline: none;
+}
+
+.assistant-input textarea:focus {
+  border-color: #111111;
+  box-shadow: 0 0 0 2px rgba(17, 17, 17, 0.12);
+}
+
+.assistant-input button {
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: 8px;
+  background: #e11d48;
+  color: #ffffff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.assistant-input button:disabled,
+.assistant-input textarea:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.assistant-error,
+.assistant-disabled-notice {
+  margin: 12px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  line-height: 18px;
+}
+
+.assistant-error {
+  margin-bottom: 0;
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
+.assistant-disabled-notice {
+  position: absolute;
+  right: 0;
+  bottom: 72px;
+  width: 280px;
+  background: #fffbeb;
+  color: #92400e;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.18);
+}
+
+.assistant-links {
+  border-top: 1px solid #e5e7eb;
+  padding: 10px 12px;
+  display: grid;
+  gap: 8px;
+  background: #ffffff;
+}
+
+.assistant-links a {
+  color: #111111;
+  text-decoration: none;
+  font-size: 13px;
+  line-height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: #f3f4f6;
+}
+
+@keyframes assistant-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 640px) {
+  .assistant-root {
+    right: 16px;
+    bottom: 16px;
+  }
+
+  .assistant-panel {
+    right: -8px;
+    bottom: 68px;
+    height: min(560px, calc(100vh - 96px));
+  }
+}
