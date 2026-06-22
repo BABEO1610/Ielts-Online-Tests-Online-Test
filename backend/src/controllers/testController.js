@@ -22,7 +22,14 @@ class TestController {
 
   static async getTests(req, res, next) {
     try {
-      const tests = await TestService.getTests();
+      const { skill, all, tutor } = req.query;
+      const showAll = all === 'true' || tutor === 'true';
+      // If tutor=true, we should ideally pass req.user.id if authenticated.
+      // Since it might not be authenticated strictly in the GET endpoint yet, 
+      // we'll just allow showAll for tutor view.
+      const tutorId = tutor === 'true' && req.user ? req.user.id : null;
+      
+      const tests = await TestService.getTests(skill || null, showAll, tutorId);
       
       res.status(200).json({
         success: true,

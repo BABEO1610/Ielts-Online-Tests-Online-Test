@@ -1,233 +1,401 @@
 /**
- * ReadingTestPage.jsx — Task 4.2.2 + Task 4.2.4
- * Trang thi Reading (Split View) + Bộ 40 câu hỏi & Đáp án
- * 
- * Chia màn hình 50-50: Trái đọc bài văn, phải làm câu hỏi.
- * Cuộn độc lập. Render Multiple Choice (Radio) + Fill-in-blank (Text input).
- * 
- * Bootstrap 5: row với 2 cột col-md-6, class vh-100 overflow-auto.
- * Design: Uber-inspired split view, form-check, form-control.
+ * ReadingTestPage.jsx — /tests/:id/reading
+ *
+ * Split view: trái = passage content, phải = câu hỏi.
+ * Dữ liệu lấy từ GET /api/v1/tests/:id (testService.getTestById).
+ * Nộp bài: POST /api/v1/tests/:id/attempts (attemptService.submitAttempt).
+ *
+ * Response shape từ backend (test.service.js getTestById):
+ *   test.passages[]
+ *     .passageNumber (int)
+ *     .title (string)
+ *     .content (text/html)
+ *     .blocks[]
+ *       .type  (question_type: 'multiple_choice' | 'fill_blank' | ...)
+ *       .range (string e.g. "1-13")
+ *       .questions[]
+ *         .id
+ *         .questionOrder (int)
+ *         .text (question_text)
+ *         .options (JSONB — array of { label, text } or string[])
+ *         .correctAnswer
+ *         .correctAnswers
  */
-import React, { useState, useCallback } from 'react';
-import { useLocation } from 'react-router-dom';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useLocation, useParams, useNavigate } from 'react-router-dom';
 import TimerBar from '../../components/objective-testing/TimerBar';
 import AutoSubmitModal from '../../components/objective-testing/AutoSubmitModal';
+import { testService } from '../../services/test.service';
+import { attemptService } from '../../services/attempt.service';
 import '../../styles/objective-testing.css';
 
-/* Mock passages */
-const MOCK_PASSAGES = {
-  'Passage 1': `
-    <h3 style="margin-bottom: 16px">The History of Glass</h3>
-    <p>When people think of glass, they usually think of a transparent substance used primarily for windows. Glass, however, has a history stretching back thousands of years and has been utilised in a remarkable variety of ways.</p>
-    <p>The earliest known man-made glass objects are beads dating from around 3500 BC, found in Egypt and Eastern Mesopotamia. These first glass-making techniques were closely guarded secrets. Glass production flourished in Egypt and Mesopotamia and later spread to the Levant and the Mediterranean coast.</p>
-    <p>The invention of glassblowing around the 1st century BC was a major breakthrough in glass technology. This technique made glass production faster, easier, and cheaper than older methods. Glass could now be shaped into a wider variety of forms and began to be used as a household item.</p>
-    <p>During the Middle Ages, glass-making centres developed throughout Europe. The Venetians, in particular, became famous for their high-quality glass and by the 13th century had established a flourishing glass industry on the island of Murano. Venetian glass was renowned for its exceptional clarity and the artistry of its designs.</p>
-    <p>In the 17th century, an Englishman named George Ravenscroft discovered that adding lead oxide to the glass formula produced a type of glass with a particularly brilliant lustre and a slightly softer quality that made it ideal for cutting and engraving.</p>
-    <p>The Industrial Revolution brought mechanised production methods that greatly reduced the cost of glass and made it widely available. Float glass, invented in the 1950s by Sir Alastair Pilkington, revolutionised the manufacture of flat glass.</p>
-  `,
-  'Passage 2': `
-    <h3 style="margin-bottom: 16px">Money Transfers by Mobile</h3>
-    <p>The ping of a text message has never sounded so sweet. In what is being touted as a world first, Kenya's biggest mobile operator is allowing subscribers to send cash to other phone users by SMS. Known as M-Pesa, or mobile money, the service is expected to revolutionise banking in a country where more than 80% of people are excluded from the formal financial sector.</p>
-    <p>Developed by Vodafone, which holds a 35% share in Safaricom, M-Pesa was formally launched in Kenya two weeks ago. More than 10,000 people have signed up for the service, with around 8 million shillings transferred so far, mostly in tiny denominations.</p>
-    <p>M-Pesa is simple. There is no need for a new handset or SIM card. To send money, you hand over the cash to a registered agent - typically a retailer - who credits your virtual account.</p>
-  `,
-  'Passage 3': `
-    <h3 style="margin-bottom: 16px">The Future of Urban Transport</h3>
-    <p>As cities continue to grow, the demand for efficient and sustainable urban transport has never been greater. Innovations such as autonomous vehicles, electric scooters, and integrated public transit systems are transforming the way we move through urban landscapes.</p>
-    <p>Urban planners are focusing on reducing congestion and emissions by promoting active transport and investing in smart infrastructure. The ultimate goal is to create livable cities where mobility is seamless and environmentally friendly.</p>
-  `
-};
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+/**
+ * Flatten passages + questions from the actual API response shape.
+ * Returns { passages (filtered), questions (flat, sorted by questionOrder) }
+ */
+function flattenTestData(testData, allowedPassageNumbers) {
+  const allPassages = testData.passages || [];
+  const passages = allPassages.filter((p) =>
+    allowedPassageNumbers.includes(p.passageNumber)
+  );
 
-/* Mock questions — mix of MCQ and Fill-in-blank */
-const MOCK_QUESTIONS = [
-  { id: 1, order: 1, passage: 'Passage 1', type: 'mcq', text: 'The earliest known glass objects were:', options: [{ label: 'A', text: 'Windows' }, { label: 'B', text: 'Beads' }, { label: 'C', text: 'Bottles' }, { label: 'D', text: 'Mirrors' }], correctAnswer: 'B' },
-  { id: 2, order: 2, passage: 'Passage 1', type: 'mcq', text: 'Glassblowing was invented around:', options: [{ label: 'A', text: '3500 BC' }, { label: 'B', text: '13th century' }, { label: 'C', text: '1st century BC' }, { label: 'D', text: '17th century' }], correctAnswer: 'C' },
-  { id: 3, order: 3, passage: 'Passage 1', type: 'fill', text: 'The Venetians established their glass industry on the island of ________.', correctAnswer: 'Murano' },
-  { id: 4, order: 4, passage: 'Passage 1', type: 'mcq', text: 'George Ravenscroft added ________ to the glass formula.', options: [{ label: 'A', text: 'Silver oxide' }, { label: 'B', text: 'Lead oxide' }, { label: 'C', text: 'Iron oxide' }, { label: 'D', text: 'Copper oxide' }], correctAnswer: 'B' },
-  { id: 5, order: 5, passage: 'Passage 2', type: 'fill', text: 'Float glass was invented by Sir Alastair ________.', correctAnswer: 'Pilkington' },
-  { id: 6, order: 6, passage: 'Passage 2', type: 'mcq', text: 'Early glass-making techniques were:', options: [{ label: 'A', text: 'Widely shared' }, { label: 'B', text: 'Well documented' }, { label: 'C', text: 'Closely guarded' }, { label: 'D', text: 'Easily learned' }], correctAnswer: 'C' },
-  { id: 7, order: 7, passage: 'Passage 2', type: 'fill', text: 'In the float glass process, molten glass is poured onto ________.', correctAnswer: 'molten tin' },
-  { id: 8, order: 8, passage: 'Passage 2', type: 'mcq', text: 'Lead crystal glass is ideal for:', options: [{ label: 'A', text: 'Windows only' }, { label: 'B', text: 'Cutting and engraving' }, { label: 'C', text: 'Industrial use' }, { label: 'D', text: 'Scientific instruments' }], correctAnswer: 'B' },
-  { id: 9, order: 9, passage: 'Passage 3', type: 'fill', text: 'Urban planners promote ________ transport.', correctAnswer: 'active' },
-  { id: 10, order: 10, passage: 'Passage 3', type: 'mcq', text: 'The ultimate goal is to create:', options: [{ label: 'A', text: 'Larger cities' }, { label: 'B', text: 'Livable cities' }, { label: 'C', text: 'More highways' }, { label: 'D', text: 'Industrial zones' }], correctAnswer: 'B' },
-];
+  const questions = [];
 
+  passages.forEach((passage) => {
+    (passage.blocks || []).forEach((block) => {
+      // question_type from backend: 'multiple_choice', 'true_false', 'fill_blank',
+      // 'matching_headings', 'sentence_completion', etc.
+      const isMcq = ['multiple_choice', 'true_false', 'multiple_choice_multiple'].includes(block.type);
+
+      (block.questions || []).forEach((q) => {
+        // Normalise options: backend stores as JSONB (array of {label,text} or plain strings)
+        let options = [];
+        if (Array.isArray(q.options)) {
+          options = q.options;
+        } else if (q.options && typeof q.options === 'string') {
+          try { options = JSON.parse(q.options); } catch { options = []; }
+        }
+
+        questions.push({
+          id: q.id,
+          order: q.questionOrder,  // matches backend field name
+          passageNumber: passage.passageNumber,
+          type: isMcq ? 'mcq' : 'fill',
+          text: q.text || '',
+          options,
+        });
+      });
+    });
+  });
+
+  questions.sort((a, b) => a.order - b.order);
+  return { passages, questions };
+}
+
+// ─── Loading Skeleton ─────────────────────────────────────────────────────────
+function LoadingSkeleton() {
+  return (
+    <div id="reading-test-page" style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
+      <div style={{ height: 56, backgroundColor: '#000' }} />
+      <div className="split-view">
+        <div className="split-left">
+          {[1, 2, 3, 4, 5, 6].map((i) => (
+            <div key={i} style={{ height: 16, backgroundColor: '#efefef', borderRadius: 4, marginBottom: 12, width: `${55 + (i % 4) * 12}%` }} />
+          ))}
+        </div>
+        <div className="split-right">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="card-content mb-3" style={{ padding: 20 }}>
+              <div style={{ height: 14, backgroundColor: '#efefef', borderRadius: 4, marginBottom: 12, width: '70%' }} />
+              <div style={{ height: 14, backgroundColor: '#f5f5f5', borderRadius: 4, width: '50%' }} />
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Main Component ───────────────────────────────────────────────────────────
 function ReadingTestPage() {
+  const { id: testId } = useParams();
   const location = useLocation();
-  const practiceMode = location.state?.practiceMode || false;
-  const customTimeLimit = location.state?.customTimeLimit || null;
-  const selectedPartIds = location.state?.selectedPartIds || ['p1', 'p2', 'p3'];
+  const navigate = useNavigate();
 
-  const allowedPassages = practiceMode ? selectedPartIds.map(id => `Passage ${id.replace('p', '')}`) : ['Passage 1', 'Passage 2', 'Passage 3'];
-  const filteredQuestions = MOCK_QUESTIONS.filter(q => allowedPassages.includes(q.passage));
+  // State passed from ReadingPage via navigate()
+  const practiceMode      = location.state?.practiceMode      || false;
+  const customTimeLimit   = location.state?.customTimeLimit   || null;
+  const selectedPartIds   = location.state?.selectedPartIds   || null; // e.g. ['p1','p2','p3']
 
-  const [answers, setAnswers] = useState({});
-  const [currentQuestion, setCurrentQuestion] = useState(1);
-  const [activeSection, setActiveSection] = useState(allowedPassages[0]);
-  const [showAutoSubmit, setShowAutoSubmit] = useState(false);
+  // Which passage numbers to show (selectedPartIds = ['p1','p2'] → [1,2])
+  const allowedPassageNumbers = selectedPartIds
+    ? selectedPartIds.map((pid) => parseInt(pid.replace('p', ''), 10))
+    : [1, 2, 3];
 
+  // ── State ───────────────────────────────────────────────────────────────────
+  const [testData,    setTestData]    = useState(null);
+  const [loading,     setLoading]     = useState(true);
+  const [error,       setError]       = useState(null);
+  const [submitting,  setSubmitting]  = useState(false);
+
+  const [answers,          setAnswers]          = useState({});         // { [questionOrder]: string }
+  const [currentQuestion,  setCurrentQuestion]  = useState(null);       // highlighted question order
+  const [activePassageNum, setActivePassageNum] = useState(allowedPassageNumbers[0]);
+  const [showAutoSubmit,   setShowAutoSubmit]   = useState(false);
+  const [startTime]                             = useState(Date.now());
+
+  // ── Fetch test data ─────────────────────────────────────────────────────────
+  useEffect(() => {
+    let cancelled = false;
+    const fetchTest = async () => {
+      try {
+        setLoading(true);
+        const res = await testService.getTestById(testId);
+        if (!cancelled) {
+          if (res.success && res.data) {
+            setTestData(res.data);
+            // Set initial question to first question order
+            const firstPassage = (res.data.passages || []).find(
+              (p) => allowedPassageNumbers.includes(p.passageNumber)
+            );
+            const firstBlock = firstPassage?.blocks?.[0];
+            const firstQ = firstBlock?.questions?.[0];
+            if (firstQ) setCurrentQuestion(firstQ.questionOrder);
+          } else {
+            setError('Không tìm thấy đề thi.');
+          }
+        }
+      } catch {
+        if (!cancelled) setError('Lỗi kết nối đến server.');
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+    fetchTest();
+    return () => { cancelled = true; };
+  }, [testId]);
+
+  // ── Flatten data ────────────────────────────────────────────────────────────
+  const { passages, questions } = testData
+    ? flattenTestData(testData, allowedPassageNumbers)
+    : { passages: [], questions: [] };
+
+  const activePassageContent = passages.find((p) => p.passageNumber === activePassageNum)?.content || '';
+  const activeQuestions = questions.filter((q) => q.passageNumber === activePassageNum);
+  const answeredOrders = Object.entries(answers)
+    .filter(([, v]) => v !== '' && v !== null && v !== undefined)
+    .map(([k]) => Number(k));
+
+  const durationMinutes = testData?.duration || 60;
+
+  // ── Handlers ────────────────────────────────────────────────────────────────
   const handleAnswer = useCallback((qOrder, value) => {
     setAnswers((prev) => ({ ...prev, [qOrder]: value }));
   }, []);
 
-  const answeredQuestions = Object.keys(answers)
-    .filter((k) => answers[k] !== '')
-    .map(Number);
+  const doSubmit = useCallback(async () => {
+    if (submitting) return;
+    setSubmitting(true);
+    try {
+      const timeSpent = Math.floor((Date.now() - startTime) / 1000);
+      const res = await attemptService.submitAttempt(testId, {
+        answers,
+        timeSpent,
+        practiceMode,
+      });
+      if (res.success && res.data?.attemptId) {
+        navigate(`/results/${res.data.attemptId}`, { replace: true });
+      } else {
+        alert('Có lỗi khi nộp bài. Vui lòng thử lại.');
+        setSubmitting(false);
+        setShowAutoSubmit(false);
+      }
+    } catch {
+      alert('Có lỗi khi nộp bài. Vui lòng thử lại.');
+      setSubmitting(false);
+      setShowAutoSubmit(false);
+    }
+  }, [answers, testId, practiceMode, startTime, submitting, navigate]);
 
   const handleTimeUp = useCallback(() => {
     setShowAutoSubmit(true);
-  }, []);
+    doSubmit();
+  }, [doSubmit]);
 
   const handleSubmitEarly = useCallback(() => {
-    if (window.confirm('Are you sure you want to submit? You cannot undo this action.')) {
+    const unanswered = questions.length - answeredOrders.length;
+    const msg = unanswered > 0
+      ? `Bạn còn ${unanswered} câu chưa trả lời. Bạn có chắc muốn nộp bài?`
+      : 'Bạn có chắc muốn nộp bài? Hành động này không thể hoàn tác.';
+    if (window.confirm(msg)) {
       setShowAutoSubmit(true);
+      doSubmit();
     }
-  }, []);
+  }, [doSubmit, questions.length, answeredOrders.length]);
 
-  const scrollToQuestion = useCallback((qNum) => {
-    setCurrentQuestion(qNum);
-    const el = document.getElementById(`question-${qNum}`);
+  const scrollToQuestion = useCallback((qOrder) => {
+    setCurrentQuestion(qOrder);
+    const el = document.getElementById(`question-${qOrder}`);
     if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }, []);
 
+  // ── Render states ───────────────────────────────────────────────────────────
+  if (loading) return <LoadingSkeleton />;
+
+  if (error) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', flexDirection: 'column', gap: 16 }}>
+        <p style={{ fontSize: 18, color: '#c0392b' }}>{error}</p>
+        <button className="btn btn-dark rounded-pill px-4" onClick={() => navigate(-1)}>← Quay lại</button>
+      </div>
+    );
+  }
+
   return (
     <div id="reading-test-page" style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
-      {/* Timer */}
-      <TimerBar durationMinutes={60} customTimeLimit={customTimeLimit} onTimeUp={handleTimeUp} onSubmitEarly={handleSubmitEarly} practiceMode={practiceMode} />
+      {/* Timer Bar */}
+      <TimerBar
+        durationMinutes={durationMinutes}
+        customTimeLimit={customTimeLimit}
+        onTimeUp={handleTimeUp}
+        onSubmitEarly={handleSubmitEarly}
+        practiceMode={practiceMode}
+      />
 
       {/* Split View */}
       <div className="split-view" style={{ paddingBottom: '80px' }}>
         {/* Left — Passage */}
         <div className="split-left" id="reading-passage-panel">
-          <div className="body-sm-strong mb-2" style={{ color: 'var(--mute)', textTransform: 'uppercase', letterSpacing: 1 }}>
-            Reading Passage
-          </div>
-          <div
-            className="body-md"
-            style={{ lineHeight: '28px' }}
-            dangerouslySetInnerHTML={{ __html: MOCK_PASSAGES[activeSection] }}
-          />
+          <p className="body-sm-strong mb-2" style={{ color: 'var(--mute)', textTransform: 'uppercase', letterSpacing: 1 }}>
+            Passage {activePassageNum}
+            {passages.find((p) => p.passageNumber === activePassageNum)?.title
+              ? ` — ${passages.find((p) => p.passageNumber === activePassageNum).title}` : ''}
+          </p>
+          {activePassageContent ? (
+            <div
+              className="body-md"
+              style={{ lineHeight: '28px' }}
+              dangerouslySetInnerHTML={{ __html: activePassageContent }}
+            />
+          ) : (
+            <p style={{ color: 'var(--mute)', fontStyle: 'italic' }}>Passage chưa có nội dung.</p>
+          )}
         </div>
 
-        {/* Right — Questions + Nav */}
+        {/* Right — Questions */}
         <div className="split-right" id="reading-questions-panel" style={{ paddingBottom: '80px' }}>
+          {activeQuestions.length === 0 ? (
+            <p style={{ color: 'var(--mute)', fontStyle: 'italic' }}>Không có câu hỏi cho passage này.</p>
+          ) : (
+            activeQuestions.map((q) => {
+              const isAnswered = answeredOrders.includes(q.order);
+              const isActive = currentQuestion === q.order;
 
-          {/* Questions List */}
-          <div>
-            {filteredQuestions.filter(q => q.passage === activeSection).map((q) => (
-              <div
-                key={q.id}
-                id={`question-${q.order}`}
-                className="card-content mb-3"
-                style={{
-                  border: currentQuestion === q.order ? '2px solid var(--ink)' : '2px solid transparent',
-                }}
-                onClick={() => setCurrentQuestion(q.order)}
-              >
-                <div className="d-flex align-items-center gap-2 mb-3">
-                  <span
-                    className="body-sm-strong"
-                    style={{
-                      width: 28,
-                      height: 28,
-                      borderRadius: 'var(--rounded-md)',
-                      background: answeredQuestions.includes(q.order) ? 'var(--ink)' : 'var(--canvas-soft)',
-                      color: answeredQuestions.includes(q.order) ? '#fff' : 'var(--ink)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontSize: 12,
-                    }}
-                  >
-                    {q.order}
-                  </span>
-                  <span className="badge-difficulty" style={{ fontSize: 11 }}>
-                    {q.type === 'mcq' ? 'Multiple Choice' : 'Fill in the blank'}
-                  </span>
-                </div>
-                <p className="body-md-strong mb-3">{q.text}</p>
-
-                {q.type === 'mcq' ? (
-                  /* MCQ Options */
-                  <div className="d-flex flex-column gap-2">
-                    {q.options.map((opt) => (
-                      <label
-                        key={opt.label}
-                        className={`option-card ${answers[q.order] === opt.label ? 'selected' : ''}`}
-                        id={`option-${q.order}-${opt.label}`}
-                        style={{ margin: 0, padding: '12px 16px', alignItems: 'flex-start' }}
-                      >
-                        <input
-                          type="radio"
-                          name={`q-${q.order}`}
-                          className="form-check-input flex-shrink-0 mt-1"
-                          value={opt.label}
-                          checked={answers[q.order] === opt.label}
-                          onChange={() => handleAnswer(q.order, opt.label)}
-                          style={{ margin: 0 }}
-                        />
-                        <span className="body-md-strong flex-shrink-0 mt-1" style={{ minWidth: 24 }}>{opt.label}.</span>
-                        <span className="body-md mt-1">{opt.text}</span>
-                      </label>
-                    ))}
+              return (
+                <div
+                  key={q.id}
+                  id={`question-${q.order}`}
+                  className="card-content mb-3"
+                  style={{
+                    border: isActive ? '2px solid var(--ink)' : '2px solid transparent',
+                    cursor: 'default',
+                  }}
+                  onClick={() => setCurrentQuestion(q.order)}
+                >
+                  {/* Question header */}
+                  <div className="d-flex align-items-center gap-2 mb-3">
+                    <span
+                      className="body-sm-strong d-flex align-items-center justify-content-center flex-shrink-0"
+                      style={{
+                        width: 28, height: 28, borderRadius: 'var(--rounded-md)',
+                        background: isAnswered ? 'var(--ink)' : 'var(--canvas-soft)',
+                        color: isAnswered ? '#fff' : 'var(--ink)',
+                        fontSize: 12,
+                      }}
+                    >
+                      {q.order}
+                    </span>
+                    <span className="badge-difficulty" style={{ fontSize: 11 }}>
+                      {q.type === 'mcq' ? 'Multiple Choice' : 'Fill in the blank'}
+                    </span>
                   </div>
-                ) : (
-                  /* Fill-in-blank */
-                  <input
-                    type="text"
-                    className="text-input"
-                    id={`input-fill-${q.order}`}
-                    placeholder="Type your answer..."
-                    value={answers[q.order] || ''}
-                    onChange={(e) => handleAnswer(q.order, e.target.value)}
-                  />
-                )}
-              </div>
-            ))}
-          </div>
+
+                  {/* Question text */}
+                  {q.text && <p className="body-md-strong mb-3">{q.text}</p>}
+
+                  {/* Answer input */}
+                  {q.type === 'mcq' ? (
+                    <div className="d-flex flex-column gap-2">
+                      {q.options.map((opt) => {
+                        // Options stored as {label, text} or plain string
+                        const label = typeof opt === 'object' ? (opt.label ?? opt.value ?? '') : String(opt);
+                        const text  = typeof opt === 'object' ? (opt.text  ?? opt.label ?? '') : String(opt);
+                        const selected = answers[q.order] === label;
+                        return (
+                          <label
+                            key={label}
+                            id={`option-${q.order}-${label}`}
+                            className={`option-card ${selected ? 'selected' : ''}`}
+                            style={{ margin: 0, padding: '12px 16px', alignItems: 'flex-start' }}
+                          >
+                            <input
+                              type="radio"
+                              name={`q-${q.order}`}
+                              className="form-check-input flex-shrink-0 mt-1"
+                              value={label}
+                              checked={selected}
+                              onChange={() => handleAnswer(q.order, label)}
+                            />
+                            <span className="body-md-strong flex-shrink-0 mt-1 mx-2">{label}.</span>
+                            <span className="body-md mt-1">{text}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <input
+                      type="text"
+                      className="text-input"
+                      id={`input-fill-${q.order}`}
+                      placeholder="Nhập đáp án..."
+                      value={answers[q.order] || ''}
+                      onChange={(e) => handleAnswer(q.order, e.target.value)}
+                    />
+                  )}
+                </div>
+              );
+            })
+          )}
         </div>
       </div>
 
-      {/* Bottom Navigation */}
+      {/* Bottom Navigation Bar */}
       <div className="bottom-nav-bar">
         <div className="bottom-nav-tabs">
-          {allowedPassages.map((passageName, index) => {
-            const partNum = index + 1;
-            const isActive = activeSection === passageName;
-            const partQuestions = filteredQuestions.filter(q => q.passage === passageName);
-            
+          {passages.map((passage) => {
+            const passNum = passage.passageNumber;
+            const isActive = activePassageNum === passNum;
+            const partQuestions = questions.filter((q) => q.passageNumber === passNum);
+            const answeredInPart = partQuestions.filter((q) => answeredOrders.includes(q.order));
+
             return (
-              <div 
-                key={passageName} 
+              <div
+                key={passNum}
                 className={`bottom-nav-tab ${isActive ? 'active' : ''}`}
-                onClick={() => setActiveSection(passageName)}
+                onClick={() => setActivePassageNum(passNum)}
               >
-                <span className="fw-bold">Part {partNum}</span>
+                <span className="fw-bold">Passage {passNum}</span>
                 {isActive ? (
-                  <div className="d-flex gap-2 ms-2">
-                    {partQuestions.map(q => (
-                      <div 
+                  <div className="d-flex flex-wrap gap-1 ms-2">
+                    {partQuestions.map((q) => (
+                      <div
                         key={q.id}
-                        className={`q-circle ${answeredQuestions.includes(q.order) ? 'answered' : ''} ${currentQuestion === q.order ? 'current' : ''}`}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          scrollToQuestion(q.order);
-                        }}
+                        className={`q-circle ${answeredOrders.includes(q.order) ? 'answered' : ''} ${currentQuestion === q.order ? 'current' : ''}`}
+                        title={`Câu ${q.order}`}
+                        onClick={(e) => { e.stopPropagation(); scrollToQuestion(q.order); }}
                       >
                         {q.order}
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <span style={{ color: 'var(--body)' }}>: {partQuestions.filter(q => answeredQuestions.includes(q.order)).length} of {partQuestions.length} questions</span>
+                  <span style={{ color: 'var(--body)', marginLeft: 4, fontSize: 13 }}>
+                    : {answeredInPart.length}/{partQuestions.length}
+                  </span>
                 )}
               </div>
-            )
+            );
           })}
+
+          {/* Global question count */}
+          <div className="ms-auto d-flex align-items-center" style={{ color: 'var(--body)', fontSize: 13, paddingRight: 8 }}>
+            {answeredOrders.length}/{questions.length} câu
+          </div>
         </div>
       </div>
 
-      {/* Auto Submit Modal */}
+      {/* Auto Submit Modal (shows during submit) */}
       <AutoSubmitModal isOpen={showAutoSubmit} />
     </div>
   );

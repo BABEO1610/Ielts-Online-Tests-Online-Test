@@ -1,0 +1,346 @@
+const { pool } = require('../db/pool');
+
+/**
+ * IELTS Academic Reading — Band Score Lookup Table (Cambridge official)
+ */
+const READING_BAND_TABLE = [
+  { min: 39, max: 40, band: 9.0 },
+  { min: 37, max: 38, band: 8.5 },
+  { min: 35, max: 36, band: 8.0 },
+  { min: 33, max: 34, band: 7.5 },
+  { min: 30, max: 32, band: 7.0 },
+  { min: 27, max: 29, band: 6.5 },
+  { min: 23, max: 26, band: 6.0 },
+  { min: 19, max: 22, band: 5.5 },
+  { min: 15, max: 18, band: 5.0 },
+  { min: 13, max: 14, band: 4.5 },
+  { min: 10, max: 12, band: 4.0 },
+  { min: 8,  max: 9,  band: 3.5 },
+  { min: 6,  max: 7,  band: 3.0 },
+  { min: 4,  max: 5,  band: 2.5 },
+  { min: 0,  max: 3,  band: 2.0 },
+];
+
+function calcBandScore(rawScore) {
+  const entry = READING_BAND_TABLE.find(
+    (r) => rawScore >= r.min && rawScore <= r.max
+  );
+  return entry ? entry.band : 0;
+}
+
+/**
+ * Normalize a fill-in-blank answer for grading.
+ * Spec: trim + lowercase + remove leading/trailing punctuation + exact match.
+ * NO fuzzy matching.
+ */
+function normalizeAnswer(answer) {
+  if (!answer) return '';
+  return answer
+    .trim()
+    .toLowerCase()
+    .replace(/^[.,;:!?'"\-\s]+|[.,;:!?'"\-\s]+$/g, '') // strip leading/trailing punctuation
+    .replace(/\s+/g, ' ')                                 // collapse internal spaces
+    .trim();
+}
+
+/**
+ * Check if user answer is correct.
+ * - MCQ: exact label match ("A" === "A") after normalizing.
+ * - Fill-in-blank: normalized exact match. Supports correct_answers JSONB array.
+ * NO fuzzy matching.
+ */
+function isAnswerCorrect(userAnswer, correctAnswer, correctAnswers) {
+  const normalized = normalizeAnswer(userAnswer);
+  if (normalized === '') return false; // unanswered = wrong
+
+  // Multiple accepted answers (JSONB array)?
+  if (Array.isArray(correctAnswers) && correctAnswers.length > 0) {
+    return correctAnswers.some((ca) => normalizeAnswer(String(ca)) === normalized);
+  }
+
+  if (!correctAnswer) return false;
+  return normalizeAnswer(String(correctAnswer)) === normalized;
+}
+
+class AttemptService {
+  /**
+   * Submit a test attempt.
+   *
+   * Schema used (from 009_create_tests_schema.sql):
+   *   mock_tests → test_passages (passage_number) → question_blocks → questions
+   *   questions columns: id, test_id, block_id, question_order, question_text,
+   *                      options (jsonb), correct_answer, correct_answers (jsonb), explanation
+   *
+   * IDOR: userId always from req.user.id (JWT), never from body.
+   * Transaction: BEGIN → insert test_attempts → insert attempt_answers → COMMIT/ROLLBACK
+   *
+   * @param {string} testId
+   * @param {string} userId      - from JWT, not request body
+   * @param {Object} answers     - { [questionOrder]: answerString }
+   * @param {number} timeSpent   - seconds
+   * @param {boolean} practiceMode - true = untimed practice (still saved to DB with practice_mode=true)
+   */
+  static async submitAttempt(testId, userId, answers = {}, timeSpent = 0, practiceMode = false) {
+    // 0. Verify test exists
+    const testRes = await pool.query(
+      `SELECT id, title, skill FROM mock_tests WHERE id = $1`,
+      [testId]
+    );
+    if (testRes.rows.length === 0) {
+      const err = new Error('Test not found');
+      err.statusCode = 404;
+      throw err;
+    }
+
+    // 1. Fetch all questions for this test (via test_id — questions.test_id is directly set)
+    //    Schema: questions.test_id = mock_tests.id (set in createReadingTest)
+    const questionsRes = await pool.query(
+      `SELECT
+         q.id,
+         q.question_order,
+         q.correct_answer,
+         q.correct_answers
+       FROM questions q
+       WHERE q.test_id = $1
+       ORDER BY q.question_order ASC`,
+      [testId]
+    );
+    const questions = questionsRes.rows;
+
+    if (questions.length === 0) {
+      const err = new Error('Đề thi chưa có câu hỏi nào');
+      err.statusCode = 400;
+      throw err;
+    }
+
+    // 2. Grade each question
+    let rawScore = 0;
+    const gradedAnswers = questions.map((q) => {
+      const userAnswer = answers[q.question_order] || '';
+
+      // Parse correct_answers JSONB (stored as string or already object)
+      let correctAnswersParsed = [];
+      if (q.correct_answers) {
+        try {
+          correctAnswersParsed = typeof q.correct_answers === 'string'
+            ? JSON.parse(q.correct_answers)
+            : q.correct_answers;
+        } catch {
+          correctAnswersParsed = [];
+        }
+      }
+
+      const correct = isAnswerCorrect(userAnswer, q.correct_answer, correctAnswersParsed);
+      if (correct) rawScore++;
+
+      return {
+        questionId: q.id,
+        questionOrder: q.question_order,
+        userAnswer: userAnswer || null,
+        isCorrect: correct,
+        correctAnswer: q.correct_answer,
+      };
+    });
+
+    const totalQuestions = questions.length;
+    const bandScore = calcBandScore(rawScore);
+
+    // 3. Persist inside ONE transaction
+    //    Tables: test_attempts, attempt_answers (from 013 + 014 migrations)
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+
+      // Determine mode value for the enum column test_mode ('timed' | 'untimed')
+      const mode = practiceMode ? 'untimed' : 'timed';
+
+      // Insert attempt header
+      // Note: 'mode' column is original schema (enum test_mode); other columns added in migration 014
+      const attemptRes = await client.query(
+        `INSERT INTO test_attempts
+           (test_id, user_id, mode, status, raw_score, total_questions, band_score, time_spent, practice_mode)
+         VALUES ($1, $2, $3, 'completed', $4, $5, $6, $7, $8)
+         RETURNING id`,
+        [testId, userId, mode, rawScore, totalQuestions, bandScore, timeSpent, practiceMode]
+      );
+      const attemptId = attemptRes.rows[0].id;
+
+      // Insert per-question answers
+      for (const ans of gradedAnswers) {
+        await client.query(
+          `INSERT INTO attempt_answers
+             (attempt_id, question_id, question_order, user_answer, is_correct, correct_answer)
+           VALUES ($1, $2, $3, $4, $5, $6)`,
+          [attemptId, ans.questionId, ans.questionOrder, ans.userAnswer, ans.isCorrect, ans.correctAnswer]
+        );
+      }
+
+      await client.query('COMMIT');
+
+      return {
+        attemptId,
+        rawScore,
+        totalQuestions,
+        bandScore,
+        correctCount: rawScore,
+        incorrectCount: totalQuestions - rawScore,
+        timeSpent,
+        practiceMode,
+      };
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
+   * Get attempt summary by attemptId.
+   * IDOR: filters by user_id from JWT.
+   *
+   * Joins: test_attempts → mock_tests
+   */
+  static async getAttemptById(attemptId, userId) {
+    const res = await pool.query(
+      `SELECT
+         ta.id,
+         ta.test_id,
+         ta.raw_score,
+         ta.total_questions,
+         ta.band_score,
+         ta.time_spent,
+         ta.practice_mode,
+         ta.submitted_at,
+         mt.title       AS test_title,
+         mt.skill,
+         mt.difficulty
+       FROM test_attempts ta
+       JOIN mock_tests mt ON ta.test_id = mt.id
+       WHERE ta.id = $1 AND ta.user_id = $2`,
+      [attemptId, userId]
+    );
+
+    if (res.rows.length === 0) return null;
+    const row = res.rows[0];
+
+    return {
+      id: row.id,
+      testId: row.test_id,
+      testTitle: row.test_title,
+      skill: row.skill,
+      difficulty: row.difficulty,
+      rawScore: row.raw_score,
+      totalQuestions: row.total_questions,
+      bandScore: parseFloat(row.band_score),
+      correctCount: row.raw_score,
+      incorrectCount: row.total_questions - row.raw_score,
+      timeSpent: row.time_spent,
+      practiceMode: row.practice_mode,
+      submittedAt: row.submitted_at,
+    };
+  }
+
+  /**
+   * Get per-question breakdown for an attempt.
+   * IDOR: first verifies ownership via ta.user_id = userId.
+   *
+   * Joins: attempt_answers → questions (for question_text, explanation)
+   * Schema: questions.question_text (col name in 009_create_tests_schema.sql)
+   */
+  static async getAttemptDetail(attemptId, userId) {
+    // IDOR check first
+    const ownerRes = await pool.query(
+      `SELECT
+         ta.id,
+         mt.title AS test_title,
+         ta.raw_score,
+         ta.total_questions,
+         ta.band_score
+       FROM test_attempts ta
+       JOIN mock_tests mt ON ta.test_id = mt.id
+       WHERE ta.id = $1 AND ta.user_id = $2`,
+      [attemptId, userId]
+    );
+    if (ownerRes.rows.length === 0) return null;
+    const meta = ownerRes.rows[0];
+
+    // Fetch answers joined with question data
+    // questions.question_text is the correct column name per 009 schema
+    const answersRes = await pool.query(
+      `SELECT
+         aa.question_order,
+         aa.user_answer,
+         aa.correct_answer,
+         aa.is_correct,
+         q.question_text AS text,
+         q.explanation
+       FROM attempt_answers aa
+       JOIN questions q ON aa.question_id = q.id
+       WHERE aa.attempt_id = $1
+       ORDER BY aa.question_order ASC`,
+      [attemptId]
+    );
+
+    return {
+      id: meta.id,
+      testTitle: meta.test_title,
+      rawScore: meta.raw_score,
+      totalQuestions: meta.total_questions,
+      bandScore: parseFloat(meta.band_score),
+      answers: answersRes.rows.map((r) => ({
+        order: r.question_order,
+        text: r.text || '',
+        userAnswer: r.user_answer || '',
+        correctAnswer: r.correct_answer,
+        isCorrect: r.is_correct,
+        explanation: r.explanation || '',
+      })),
+    };
+  }
+
+  /**
+   * Get attempt history for the authenticated user.
+   * IDOR: only returns rows WHERE ta.user_id = userId.
+   * practiceMode included so HistoryPage can show timed vs untimed.
+   *
+   * @param {string} userId
+   * @param {string|null} skill - filter by mt.skill ('reading' | 'listening' | null)
+   */
+  static async getAttemptHistory(userId, skill = null) {
+    const res = await pool.query(
+      `SELECT
+         ta.id,
+         ta.raw_score,
+         ta.total_questions,
+         ta.band_score,
+         ta.time_spent,
+         ta.practice_mode,
+         ta.submitted_at,
+         mt.title      AS test_title,
+         mt.skill,
+         mt.difficulty
+       FROM test_attempts ta
+       JOIN mock_tests mt ON ta.test_id = mt.id
+       WHERE ta.user_id = $1
+         AND ($2::text IS NULL OR mt.skill::text = $2::text)
+       ORDER BY ta.submitted_at DESC`,
+      [userId, skill || null]
+    );
+
+    return res.rows.map((row) => ({
+      id: row.id,
+      testTitle: row.test_title,
+      skill: row.skill,
+      difficulty: row.difficulty,
+      bandScore: parseFloat(row.band_score),
+      rawScore: row.raw_score,
+      totalQuestions: row.total_questions,
+      timeSpent: row.time_spent,
+      practiceMode: row.practice_mode,
+      submittedAt: row.submitted_at,
+    }));
+  }
+}
+
+module.exports = AttemptService;

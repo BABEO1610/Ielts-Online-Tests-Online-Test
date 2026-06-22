@@ -28,6 +28,7 @@
     "file-type": "^19.6.0",
     "ioredis": "^5.11.0",
     "jsonwebtoken": "^9.0.3",
+    "melter": "^0.0.1",
     "multer": "^2.2.0",
     "nodemailer": "^8.0.10",
     "nodemon": "^3.1.14",

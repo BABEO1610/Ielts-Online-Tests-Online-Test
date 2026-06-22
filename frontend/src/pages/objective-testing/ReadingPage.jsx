@@ -1,226 +1,238 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import StudentNavbar from '../../components/layout/StudentNavbar';
 import ModeSelector from '../../components/objective-testing/ModeSelector';
+import { testService } from '../../services/test.service';
 
 /**
  * ReadingPage.jsx — /reading
- * Level 1: Danh sách đề Reading theo tháng
+ * Level 1: Danh sách đề Reading lấy từ API (skill=reading)
  * Level 2: Passages của đề đó (3 passages chuẩn IELTS Academic)
  * Level 3: Redirect vào ReadingTestPage (/tests/:id/reading)
  *
- * DESIGN: Uber-inspired — black/white duet, pill shapes (rounded.pill = 999px),
- *         cards (rounded.xl = 16px), UberMove/UberMoveText fonts, sentence-case.
+ * DESIGN: Uber-inspired — black/white duet, pill shapes, UberMove/UberMoveText fonts.
  */
 
-const MOCK_EXAMS = [
-  {
-    id: '1',
-    title: 'Đề thi tháng 6/2025',
-    date: 'Tháng 6, 2025',
-    difficulty: 'Trung bình',
-    topic: 'Science & Technology',
-    passages: [
-      { label: 'Passage 1', title: 'The History of Glass', questions: 13, type: 'Multiple choice, True/False/Not Given' },
-      { label: 'Passage 2', title: 'Urban Farming Revolution', questions: 13, type: 'Matching headings, Short answer' },
-      { label: 'Passage 3', title: 'The Future of Artificial Intelligence', questions: 14, type: 'Summary completion, Multiple choice' },
-    ],
-    totalQuestions: 40,
-    duration: 60,
-    description: 'Ba đoạn văn học thuật từ các tạp chí khoa học và công nghệ uy tín.'
-  },
-  {
-    id: '3',
-    title: 'Đề thi tháng 5/2025',
-    date: 'Tháng 5, 2025',
-    difficulty: 'Khó',
-    topic: 'Environment & Society',
-    passages: [
-      { label: 'Passage 1', title: 'Coral Reef Ecosystems', questions: 13, type: 'True/False/Not Given, Matching features' },
-      { label: 'Passage 2', title: 'The Economics of Recycling', questions: 13, type: 'Multiple choice, Sentence completion' },
-      { label: 'Passage 3', title: 'Behavioural Economics and Climate Policy', questions: 14, type: 'Matching information, Summary completion' },
-    ],
-    totalQuestions: 40,
-    duration: 60,
-    description: 'Các đoạn văn thách thức về môi trường và chính sách xã hội — phù hợp band 7+.'
-  },
-  {
-    id: '5',
-    title: 'Đề thi tháng 4/2025',
-    date: 'Tháng 4, 2025',
-    difficulty: 'Dễ',
-    topic: 'Culture & History',
-    passages: [
-      { label: 'Passage 1', title: 'The Origins of Writing', questions: 13, type: 'Multiple choice, True/False/Not Given' },
-      { label: 'Passage 2', title: 'Traditional Music Around the World', questions: 13, type: 'Matching headings, Gap fill' },
-      { label: 'Passage 3', title: 'Architecture of Ancient Rome', questions: 14, type: 'Multiple choice, Short answer' },
-    ],
-    totalQuestions: 40,
-    duration: 60,
-    description: 'Đề ở mức độ cơ bản — lý tưởng để luyện cấu trúc câu hỏi và kỹ thuật skimming/scanning.'
-  },
-  {
-    id: 'r4',
-    title: 'Đề thi tháng 3/2025',
-    date: 'Tháng 3, 2025',
-    difficulty: 'Trung bình',
-    topic: 'Health & Medicine',
-    passages: [
-      { label: 'Passage 1', title: 'Sleep and Human Performance', questions: 13, type: 'True/False/Not Given, Multiple choice' },
-      { label: 'Passage 2', title: 'The Development of Modern Vaccines', questions: 13, type: 'Matching features, Short answer' },
-      { label: 'Passage 3', title: 'Mental Health in the Digital Age', questions: 14, type: 'Summary completion, Multiple choice' },
-    ],
-    totalQuestions: 40,
-    duration: 60,
-    description: 'Ba đoạn văn về y tế và sức khoẻ với từ vựng học thuật chuyên ngành.'
-  }
-];
-
 const DIFFICULTY_STYLE = {
-  'Dễ':        { bg: '#efefef', color: '#5e5e5e' },
-  'Trung bình':{ bg: '#000',    color: '#fff'     },
-  'Khó':       { bg: '#282828', color: '#afafaf'  }
+  'easy':         { bg: '#efefef', color: '#5e5e5e', label: 'Dễ' },
+  'intermediate': { bg: '#000',    color: '#fff',     label: 'Trung bình' },
+  'advanced':     { bg: '#282828', color: '#afafaf',  label: 'Khó' },
+  'Dễ':           { bg: '#efefef', color: '#5e5e5e',  label: 'Dễ' },
+  'Trung bình':   { bg: '#000',    color: '#fff',     label: 'Trung bình' },
+  'Khó':          { bg: '#282828', color: '#afafaf',  label: 'Khó' },
 };
 
-// ─── Level 2: Passages của một đề ─────────────────────────────────────────────
+/** Map passage blocks to a display-friendly format */
+function mapPassageToDisplay(passage, idx) {
+  const questionCount = (passage.blocks || []).reduce(
+    (sum, b) => sum + (b.questions?.length || 0), 0
+  );
+
+  // Map question_type values (stored in question_blocks.question_type) to labels
+  const typeLabels = {
+    multiple_choice:      'Multiple Choice',
+    true_false:           'True/False/NG',
+    fill_blank:           'Fill in the Blank',
+    sentence_completion:  'Sentence Completion',
+    matching_headings:    'Matching Headings',
+    matching_information: 'Matching',
+    short_answer:         'Short Answer',
+  };
+  const distinctTypes = [
+    ...new Set((passage.blocks || []).map((b) => typeLabels[b.type] || b.type).filter(Boolean)),
+  ].join(' · ');
+
+  return {
+    label: `Passage ${passage.passageNumber || idx + 1}`,
+    title: passage.title || `Passage ${idx + 1}`,
+    questions: questionCount,
+    type: distinctTypes,
+  };
+}
+
+
+// ─── Skeleton Card ─────────────────────────────────────────────────────────────
+const SkeletonCard = () => (
+  <div className="col-md-6">
+    <div className="p-4 rounded-4 h-100" style={{ border: '1px solid #e2e2e2' }}>
+      <div style={{ height: 24, width: 80, backgroundColor: '#efefef', borderRadius: 999, marginBottom: 16 }} />
+      <div style={{ height: 28, width: '60%', backgroundColor: '#efefef', borderRadius: 8, marginBottom: 10 }} />
+      <div style={{ height: 16, width: '40%', backgroundColor: '#f5f5f5', borderRadius: 8, marginBottom: 8 }} />
+      <div style={{ height: 14, width: '80%', backgroundColor: '#f5f5f5', borderRadius: 8, marginBottom: 6 }} />
+      <div style={{ height: 14, width: '65%', backgroundColor: '#f5f5f5', borderRadius: 8, marginBottom: 24 }} />
+      <div style={{ height: 40, width: 120, backgroundColor: '#000', borderRadius: 999 }} />
+    </div>
+  </div>
+);
+
+// ─── Level 2: Passages của một đề ──────────────────────────────────────────────
 const PassageList = ({ exam, onBack }) => {
   const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
   const [showModeModal, setShowModeModal] = useState(false);
 
   const handleStartTest = (modeConfig) => {
-    // EARS[Event]: WHEN user tries to start test
     if (!isAuthenticated) {
-      // EARS[Unwanted]: IF user is not authenticated THEN redirect to login
       navigate('/login', { state: { message: 'Vui lòng đăng nhập để bắt đầu làm bài thi' } });
       return;
     }
     setShowModeModal(false);
-    navigate(`/tests/${exam.id}/reading`, { 
-      state: { 
+    navigate(`/tests/${exam.id}/reading`, {
+      state: {
         practiceMode: modeConfig.isPractice,
         selectedPartIds: modeConfig.selectedPartIds,
-        customTimeLimit: modeConfig.customTimeLimit
-      } 
+        customTimeLimit: modeConfig.customTimeLimit,
+      },
     });
   };
 
-  const partsForMode = exam.passages.map((p, idx) => ({ id: `p${idx + 1}`, label: p.label }));
+  const partsForMode = exam.displayPassages.map((p, idx) => ({
+    id: `p${idx + 1}`,
+    label: p.label,
+  }));
 
   return (
-  <div className="bg-white min-vh-100 pb-5">
-    <StudentNavbar />
-    <main className="container-fluid px-3 px-md-5 mt-4 mt-md-5" style={{ maxWidth: '1200px' }}>
-      <div className="d-flex align-items-center gap-3 mb-2">
-        <button
-          className="btn btn-light rounded-pill px-4 py-2 fw-medium border-0"
-          style={{ backgroundColor: '#efefef', fontSize: '14px' }}
-          onClick={onBack}
-        >
-          ← Tất cả đề thi
-        </button>
-      </div>
-
-      <div className="mb-5 mt-3">
-        <p className="text-muted mb-1 fw-medium" style={{ fontSize: '14px', fontFamily: 'UberMoveText, system-ui, sans-serif', textTransform: 'uppercase', letterSpacing: '1px' }}>
-          CHỦ ĐỀ: {exam.topic}
-        </p>
-        <h1 className="fw-bold mb-1 text-dark" style={{ fontFamily: 'UberMove, system-ui, sans-serif', fontSize: '40px' }}>
-          {exam.title}
-        </h1>
-        <p className="text-muted mb-0" style={{ fontFamily: 'UberMoveText, system-ui, sans-serif', fontSize: '18px' }}>
-          {exam.passages.length} passages · {exam.totalQuestions} câu hỏi · {exam.duration} phút
-        </p>
-      </div>
-
-      {/* Passages */}
-      <div className="d-flex flex-column gap-3 mb-5">
-        {exam.passages.map((p, idx) => (
-          <div
-            key={idx}
-            className="rounded-4 overflow-hidden"
-            style={{
-              border: '1px solid #e2e2e2',
-              backgroundColor: '#fff',
-              transition: 'box-shadow 0.15s ease'
-            }}
-            onMouseEnter={e => e.currentTarget.style.boxShadow = 'rgba(0,0,0,0.12) 0px 4px 16px'}
-            onMouseLeave={e => e.currentTarget.style.boxShadow = 'none'}
+    <div className="bg-white min-vh-100 pb-5">
+      <StudentNavbar />
+      <main className="container-fluid px-3 px-md-5 mt-4 mt-md-5" style={{ maxWidth: '1200px' }}>
+        <div className="d-flex align-items-center gap-3 mb-2">
+          <button
+            className="btn btn-light rounded-pill px-4 py-2 fw-medium border-0"
+            style={{ backgroundColor: '#efefef', fontSize: '14px' }}
+            onClick={onBack}
           >
-            <div className="d-flex align-items-center justify-content-between p-4 gap-4 flex-wrap">
-              <div className="d-flex align-items-center gap-4">
-                <div
-                  className="d-flex align-items-center justify-content-center fw-bold flex-shrink-0"
-                  style={{
-                    width: '56px', height: '56px', borderRadius: '999px',
-                    backgroundColor: '#000',
-                    color: '#fff',
-                    fontSize: '18px', fontFamily: 'UberMove, system-ui, sans-serif'
-                  }}
-                >
-                  {idx + 1}
-                </div>
-                <div>
-                  <p className="mb-1 fw-bold" style={{ fontSize: '13px', fontFamily: 'UberMoveText, system-ui, sans-serif', color: '#5e5e5e', textTransform: 'uppercase' }}>
-                    {p.label}
-                  </p>
-                  <h4 className="fw-bold mb-1" style={{ fontFamily: 'UberMove, system-ui, sans-serif', fontSize: '20px', color: '#000' }}>
-                    {p.title}
-                  </h4>
-                  <p className="mb-0" style={{ fontSize: '14px', color: '#5e5e5e', fontFamily: 'UberMoveText, system-ui, sans-serif' }}>
-                    {p.questions} câu · {p.type}
-                  </p>
+            ← Tất cả đề thi
+          </button>
+        </div>
+
+        <div className="mb-5 mt-3">
+          <p className="text-muted mb-1 fw-medium" style={{ fontSize: '14px', fontFamily: 'UberMoveText, system-ui, sans-serif', textTransform: 'uppercase', letterSpacing: '1px' }}>
+            {exam.skill?.toUpperCase()} · {exam.difficulty}
+          </p>
+          <h1 className="fw-bold mb-1 text-dark" style={{ fontFamily: 'UberMove, system-ui, sans-serif', fontSize: '40px' }}>
+            {exam.title}
+          </h1>
+          <p className="text-muted mb-0" style={{ fontFamily: 'UberMoveText, system-ui, sans-serif', fontSize: '18px' }}>
+            {exam.displayPassages.length} passages · {exam.questions} câu hỏi · {exam.duration || 60} phút
+          </p>
+        </div>
+
+        {/* Passages */}
+        <div className="d-flex flex-column gap-3 mb-5">
+          {exam.displayPassages.map((p, idx) => (
+            <div
+              key={idx}
+              className="rounded-4 overflow-hidden"
+              style={{ border: '1px solid #e2e2e2', backgroundColor: '#fff', transition: 'box-shadow 0.15s ease' }}
+              onMouseEnter={(e) => (e.currentTarget.style.boxShadow = 'rgba(0,0,0,0.12) 0px 4px 16px')}
+              onMouseLeave={(e) => (e.currentTarget.style.boxShadow = 'none')}
+            >
+              <div className="d-flex align-items-center justify-content-between p-4 gap-4 flex-wrap">
+                <div className="d-flex align-items-center gap-4">
+                  <div
+                    className="d-flex align-items-center justify-content-center fw-bold flex-shrink-0"
+                    style={{ width: '56px', height: '56px', borderRadius: '999px', backgroundColor: '#000', color: '#fff', fontSize: '18px', fontFamily: 'UberMove, system-ui, sans-serif' }}
+                  >
+                    {idx + 1}
+                  </div>
+                  <div>
+                    <p className="mb-1 fw-bold" style={{ fontSize: '13px', fontFamily: 'UberMoveText, system-ui, sans-serif', color: '#5e5e5e', textTransform: 'uppercase' }}>
+                      {p.label}
+                    </p>
+                    <h4 className="fw-bold mb-1" style={{ fontFamily: 'UberMove, system-ui, sans-serif', fontSize: '20px', color: '#000' }}>
+                      {p.title}
+                    </h4>
+                    <p className="mb-0" style={{ fontSize: '14px', color: '#5e5e5e', fontFamily: 'UberMoveText, system-ui, sans-serif' }}>
+                      {p.questions > 0 ? `${p.questions} câu` : ''}{p.type ? ` · ${p.type}` : ''}
+                    </p>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
 
-      {/* Start Full Test CTA */}
-      <div className="p-5 rounded-4 text-center" style={{ backgroundColor: '#000' }}>
-        <h3 className="fw-bold mb-2" style={{ fontFamily: 'UberMove, system-ui, sans-serif', fontSize: '32px', color: '#fff' }}>
-          Sẵn sàng chưa?
-        </h3>
-        <p className="mb-4" style={{ fontFamily: 'UberMoveText, system-ui, sans-serif', fontSize: '18px', color: '#afafaf' }}>
-          Làm toàn bộ đề trong {exam.duration} phút. Kết quả sẽ được chấm tự động ngay sau khi nộp.
-        </p>
-        <button
-          onClick={() => setShowModeModal(true)}
-          className="btn rounded-pill px-5 py-3 fw-bold"
-          style={{ backgroundColor: '#fff', color: '#000', fontFamily: 'UberMoveText, system-ui, sans-serif', fontSize: '18px', border: 'none' }}
-        >
-          Bắt đầu làm bài →
-        </button>
-      </div>
+        {/* Start Full Test CTA */}
+        <div className="p-5 rounded-4 text-center" style={{ backgroundColor: '#000' }}>
+          <h3 className="fw-bold mb-2" style={{ fontFamily: 'UberMove, system-ui, sans-serif', fontSize: '32px', color: '#fff' }}>
+            Sẵn sàng chưa?
+          </h3>
+          <p className="mb-4" style={{ fontFamily: 'UberMoveText, system-ui, sans-serif', fontSize: '18px', color: '#afafaf' }}>
+            Làm toàn bộ đề trong {exam.duration || 60} phút. Kết quả sẽ được chấm tự động ngay sau khi nộp.
+          </p>
+          <button
+            onClick={() => setShowModeModal(true)}
+            className="btn rounded-pill px-5 py-3 fw-bold"
+            style={{ backgroundColor: '#fff', color: '#000', fontFamily: 'UberMoveText, system-ui, sans-serif', fontSize: '18px', border: 'none' }}
+          >
+            Bắt đầu làm bài →
+          </button>
+        </div>
 
-      <ModeSelector 
-        show={showModeModal} 
-        onHide={() => setShowModeModal(false)} 
-        onSelectMode={handleStartTest} 
-        examType="Reading"
-        parts={partsForMode}
-        fullDuration={exam.duration}
-      />
-    </main>
-  </div>
+        <ModeSelector
+          show={showModeModal}
+          onHide={() => setShowModeModal(false)}
+          onSelectMode={handleStartTest}
+          examType="Reading"
+          parts={partsForMode}
+          fullDuration={exam.duration || 60}
+        />
+      </main>
+    </div>
   );
 };
 
+// ─── Level 1: Danh sách đề thi ─────────────────────────────────────────────────
 const ReadingPage = () => {
   const [selectedExam, setSelectedExam] = useState(null);
   const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
 
-  const handleViewExam = (exam) => {
-    // EARS[Event]: WHEN user tries to view exam details
+  const [exams, setExams] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    const fetchExams = async () => {
+      try {
+        setLoading(true);
+        const res = await testService.getTests('reading');
+        if (res.success && Array.isArray(res.data)) {
+          setExams(res.data);
+        } else {
+          setError('Không thể tải danh sách đề thi.');
+        }
+      } catch (err) {
+        setError('Lỗi kết nối đến server.');
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchExams();
+  }, []);
+
+  const handleViewExam = async (exam) => {
     if (!isAuthenticated) {
-      // EARS[Unwanted]: IF user is not authenticated THEN redirect to login
       navigate('/login', { state: { message: 'Vui lòng đăng nhập để xem chi tiết đề thi' } });
       return;
     }
-    setSelectedExam(exam);
+    try {
+      const res = await testService.getTestById(exam.id);
+      if (res.success && res.data) {
+        const fullExam = res.data;
+        const displayPassages = (fullExam.passages || []).map((p, idx) =>
+          mapPassageToDisplay(p, idx)
+        );
+        setSelectedExam({
+          ...exam,
+          displayPassages,
+          passages: fullExam.passages,
+        });
+      }
+    } catch {
+      setError('Không thể tải chi tiết đề thi.');
+    }
   };
 
   if (selectedExam) {
@@ -242,55 +254,68 @@ const ReadingPage = () => {
           </p>
         </div>
 
+        {/* Error */}
+        {error && (
+          <div className="alert rounded-4" style={{ backgroundColor: '#fdf2f2', color: '#c0392b', border: 'none', marginBottom: 32 }}>
+            {error}
+          </div>
+        )}
+
         {/* Exam Cards */}
         <div className="row g-4">
-          {MOCK_EXAMS.map((exam) => {
-            const diff = DIFFICULTY_STYLE[exam.difficulty];
-            return (
-              <div key={exam.id} className="col-md-6">
-                <div
-                  className="p-4 rounded-4 h-100 d-flex flex-column justify-content-between"
-                  style={{ border: '1px solid #e2e2e2', cursor: 'pointer', transition: 'box-shadow 0.2s ease' }}
-                  onMouseEnter={e => e.currentTarget.style.boxShadow = 'rgba(0,0,0,0.12) 0px 4px 16px 0px'}
-                  onMouseLeave={e => e.currentTarget.style.boxShadow = 'none'}
-                  onClick={() => handleViewExam(exam)}
-                >
-                  <div>
-                    <div className="d-flex justify-content-between align-items-start mb-3">
-                      <span
-                        className="rounded-pill px-3 py-1 fw-medium"
-                        style={{ backgroundColor: diff.bg, color: diff.color, fontSize: '13px', fontFamily: 'UberMoveText, system-ui, sans-serif' }}
-                      >
-                        {exam.difficulty}
-                      </span>
-                      <span className="text-muted fw-medium" style={{ fontSize: '13px' }}>
-                        {exam.totalQuestions} câu · {exam.duration} phút
-                      </span>
-                    </div>
-                    <h3 className="fw-bold mb-1 text-dark" style={{ fontFamily: 'UberMove, system-ui, sans-serif', fontSize: '24px' }}>
-                      {exam.title}
-                    </h3>
-                    <p className="fw-medium mb-3" style={{ fontSize: '14px', fontFamily: 'UberMoveText, system-ui, sans-serif', color: '#5e5e5e' }}>
-                      Chủ đề: {exam.topic}
-                    </p>
-                    <p className="text-muted mb-4" style={{ fontSize: '14px', fontFamily: 'UberMoveText, system-ui, sans-serif', lineHeight: '1.6' }}>
-                      {exam.description}
-                    </p>
-                    <p className="text-muted mb-4" style={{ fontSize: '13px' }}>
-                      {exam.passages.map(p => p.label).join(' · ')}
-                    </p>
-                  </div>
-                  <button
-                    className="btn btn-dark rounded-pill px-4 py-2 fw-medium align-self-start"
-                    style={{ fontFamily: 'UberMoveText, system-ui, sans-serif', fontSize: '15px' }}
-                    onClick={(e) => { e.stopPropagation(); handleViewExam(exam); }}
+          {loading ? (
+            Array.from({ length: 4 }).map((_, i) => <SkeletonCard key={i} />)
+          ) : exams.length === 0 ? (
+            <div className="col-12 text-center py-5">
+              <p style={{ fontFamily: 'UberMoveText, system-ui, sans-serif', fontSize: '18px', color: '#5e5e5e' }}>
+                Chưa có đề Reading nào. Vui lòng quay lại sau.
+              </p>
+            </div>
+          ) : (
+            exams.map((exam) => {
+              const diffInfo = DIFFICULTY_STYLE[exam.difficulty] || DIFFICULTY_STYLE['intermediate'];
+              return (
+                <div key={exam.id} className="col-md-6">
+                  <div
+                    className="p-4 rounded-4 h-100 d-flex flex-column justify-content-between"
+                    style={{ border: '1px solid #e2e2e2', cursor: 'pointer', transition: 'box-shadow 0.2s ease' }}
+                    onMouseEnter={(e) => (e.currentTarget.style.boxShadow = 'rgba(0,0,0,0.12) 0px 4px 16px 0px')}
+                    onMouseLeave={(e) => (e.currentTarget.style.boxShadow = 'none')}
+                    onClick={() => handleViewExam(exam)}
                   >
-                    Xem đề →
-                  </button>
+                    <div>
+                      <div className="d-flex justify-content-between align-items-start mb-3">
+                        <span
+                          className="rounded-pill px-3 py-1 fw-medium"
+                          style={{ backgroundColor: diffInfo.bg, color: diffInfo.color, fontSize: '13px', fontFamily: 'UberMoveText, system-ui, sans-serif' }}
+                        >
+                          {diffInfo.label}
+                        </span>
+                        <span className="text-muted fw-medium" style={{ fontSize: '13px' }}>
+                          {exam.questions} câu · {exam.duration || 60} phút
+                        </span>
+                      </div>
+                      <h3 className="fw-bold mb-1 text-dark" style={{ fontFamily: 'UberMove, system-ui, sans-serif', fontSize: '24px' }}>
+                        {exam.title}
+                      </h3>
+                      {exam.description && (
+                        <p className="text-muted mb-4" style={{ fontSize: '14px', fontFamily: 'UberMoveText, system-ui, sans-serif', lineHeight: '1.6' }}>
+                          {exam.description}
+                        </p>
+                      )}
+                    </div>
+                    <button
+                      className="btn btn-dark rounded-pill px-4 py-2 fw-medium align-self-start"
+                      style={{ fontFamily: 'UberMoveText, system-ui, sans-serif', fontSize: '15px' }}
+                      onClick={(e) => { e.stopPropagation(); handleViewExam(exam); }}
+                    >
+                      Xem đề →
+                    </button>
+                  </div>
                 </div>
-              </div>
-            );
-          })}
+              );
+            })
+          )}
         </div>
       </main>
     </div>

@@ -73,7 +73,12 @@ class TestService {
     const { title, description, difficulty, duration, publishAt } = data;
     const skill = TestService.normalizeSkill(data);
     const passages = TestService.normalizePassages(data);
-    const isPublished = !!publishAt;
+    
+    // Tutors cannot publish directly. Admin must approve.
+    const isPublished = false; 
+    const isDraft = !publishAt;
+    const reviewStatus = isDraft ? 'pending' : 'pending'; // Drafts also stay pending for now (or we could use 'draft' if DB allowed, but enum only has pending, approved, rejected)
+    const submittedAt = isDraft ? null : new Date().toISOString();
 
     const client = await pool.connect();
     try {
@@ -81,9 +86,9 @@ class TestService {
 
       // 1. Insert Test
       const testRes = await client.query(
-        `INSERT INTO mock_tests (title, description, skill, difficulty, duration_minutes, is_published, publish_at, created_by)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`,
-        [title, description, skill, difficulty, duration, isPublished, publishAt || null, userId]
+        `INSERT INTO mock_tests (title, description, skill, difficulty, duration_minutes, is_published, publish_at, created_by, review_status, submitted_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id`,
+        [title, description, skill, difficulty, duration, isPublished, publishAt || null, userId, reviewStatus, submittedAt]
       );
       const testId = testRes.rows[0].id;
 
@@ -145,8 +150,9 @@ class TestService {
 
   /**
    * Fetch all mock tests with their question counts.
+   * @param {string|null} skill - Optional filter: 'reading' | 'listening' | etc.
    */
-  static async getTests() {
+  static async getTests(skill = null, showAll = false, tutorId = null) {
     const query = `
       SELECT 
         mt.id, 
@@ -154,26 +160,48 @@ class TestService {
         mt.skill, 
         mt.difficulty,
         mt.is_published,
+        mt.review_status,
+        mt.submitted_at,
+        mt.duration_minutes,
+        mt.description,
         mt.created_at,
         COUNT(q.id) as questions
       FROM mock_tests mt
       LEFT JOIN questions q ON mt.id = q.test_id
+      WHERE ($1::text IS NULL OR mt.skill::text = $1::text)
+        AND ($2::boolean = true OR mt.is_published = true)
+        AND ($3::uuid IS NULL OR mt.created_by = $3::uuid)
       GROUP BY mt.id
       ORDER BY mt.created_at DESC;
     `;
 
-    const result = await pool.query(query);
+    const result = await pool.query(query, [skill || null, showAll, tutorId || null]);
 
-    return result.rows.map(row => ({
-      id: row.id,
-      title: row.title,
-      skill: row.skill,
-      difficulty: row.difficulty,
-      status: row.is_published ? 'published' : 'draft',
-      questions: parseInt(row.questions, 10),
-      createdAt: new Date(row.created_at).toISOString().split('T')[0] // formatted as YYYY-MM-DD for now
-    }));
+    return result.rows.map(row => {
+      let statusStr = row.is_published ? 'published' : 'draft';
+      // If it's not published, give more detail based on review_status and submitted_at
+      if (!row.is_published) {
+        if (row.review_status === 'pending') {
+          statusStr = row.submitted_at ? 'pending' : 'draft';
+        } else if (row.review_status === 'rejected') {
+          statusStr = 'rejected';
+        }
+      }
+
+      return {
+        id: row.id,
+        title: row.title,
+        skill: row.skill,
+        difficulty: row.difficulty,
+        description: row.description,
+        duration: row.duration_minutes,
+        status: statusStr,
+        questions: parseInt(row.questions, 10),
+        createdAt: new Date(row.created_at).toISOString().split('T')[0]
+      };
+    });
   }
+
 
   /**
    * Fetch full test details by ID
@@ -271,7 +299,14 @@ class TestService {
     const { title, description, difficulty, duration, publishAt } = data;
     const skill = TestService.normalizeSkill(data);
     const passages = TestService.normalizePassages(data);
-    const isPublished = !!publishAt;
+    
+    // Tutors cannot publish directly. Admin must approve.
+    // However, if an admin is updating, we might want to keep it published?
+    // For now, any update resets it to pending review unless it's just a draft.
+    const isPublished = false; 
+    const isDraft = !publishAt;
+    const reviewStatus = 'pending';
+    const submittedAt = isDraft ? null : new Date().toISOString();
 
     const client = await pool.connect();
     try {
@@ -280,15 +315,16 @@ class TestService {
       // 1. Update Test
       await client.query(
         `UPDATE mock_tests 
-         SET title = $1, description = $2, skill = $3, difficulty = $4, duration_minutes = $5, is_published = $6, publish_at = $7 
-         WHERE id = $8`,
-        [title, description, skill, difficulty, duration, isPublished, publishAt || null, testId]
+         SET title = $1, description = $2, skill = $3, difficulty = $4, duration_minutes = $5, is_published = $6, publish_at = $7, review_status = $8, submitted_at = $9 
+         WHERE id = $10`,
+        [title, description, skill, difficulty, duration, isPublished, publishAt || null, reviewStatus, submittedAt, testId]
       );
 
       // 2. Delete existing nested records before rebuilding the test.
       // Some older rows may not have block_id populated, so delete by test_id explicitly.
       await client.query(`DELETE FROM questions WHERE test_id = $1`, [testId]);
       await client.query(`DELETE FROM test_passages WHERE test_id = $1`, [testId]);
+
 
       let questionOrder = 1;
 
