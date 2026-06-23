@@ -1,77 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-
-// ─── Mock Data ────────────────────────────────────────────────────────────────
-const DEFAULT_MOCK_QUEUE = [
-  {
-    id: 'sub-001',
-    submittedAt: '15:30 10/06/2026',
-    skill: 'WRITING',
-    studentName: 'Nguyễn Văn A',
-    studentAvatar: 'https://ui-avatars.com/api/?name=Nguyen+Van+A&background=4f46e5&color=fff',
-    examTitle: 'Cambridge IELTS 18 Academic',
-    status: 'new',
-    deadline: '2h nữa',
-    deadlineUrgent: true,
-  },
-  {
-    id: 'sub-002',
-    submittedAt: '14:15 10/06/2026',
-    skill: 'SPEAKING',
-    studentName: 'Trần Thị B',
-    studentAvatar: 'https://ui-avatars.com/api/?name=Tran+Thi+B&background=059669&color=fff',
-    examTitle: 'Mock Test Tháng 6 - Part 1',
-    status: 'new',
-    deadline: '2h nữa',
-    deadlineUrgent: true,
-  },
-  {
-    id: 'sub-003',
-    submittedAt: '10:00 10/06/2026',
-    skill: 'WRITING',
-    studentName: null,
-    studentAvatar: null,
-    examTitle: 'Cambridge IELTS 18',
-    examSubtitle: 'Reading 1',
-    status: 'new',
-    deadline: '24h nữa',
-    deadlineUrgent: false,
-  },
-  {
-    id: 'sub-004',
-    submittedAt: '09:30 10/06/2026',
-    skill: 'WRITING',
-    studentName: null,
-    studentAvatar: null,
-    examTitle: 'Test mẫu v3',
-    examSubtitle: 'WRITING',
-    status: 'new',
-    deadline: 'Đã quá hạn',
-    deadlineUrgent: true,
-    deadlineOverdue: true,
-  },
-  {
-    id: 'sub-005',
-    submittedAt: '08:00 10/06/2026',
-    skill: 'SPEAKING',
-    studentName: 'Lê Văn C',
-    studentAvatar: 'https://ui-avatars.com/api/?name=Le+Van+C&background=dc2626&color=fff',
-    examTitle: 'IELTS Practice Test 5',
-    status: 'in_progress',
-    deadline: '6h nữa',
-    deadlineUrgent: false,
-  },
-];
-
-const STATS = {
-  total: 22,
-  newInLast2h: 4,
-  deadline24h: 6,
-  deadline24hWriting: 4,
-  deadline24hSpeaking: 2,
-  longestWait: '3 ngày',
-  longestExam: 'Đề Cambridge IELTS 18 - Reading 1',
-};
+import gradingService from '../../services/grading.service';
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 const StatCard = ({ title, value, sub, subRed }) => (
@@ -98,7 +27,7 @@ const StatCard = ({ title, value, sub, subRed }) => (
 );
 
 const SkillBadge = ({ skill }) => {
-  const isSpeaking = skill === 'SPEAKING';
+  const isSpeaking = skill === 'speaking';
   return (
     <span style={{
       display: 'inline-block',
@@ -110,6 +39,7 @@ const SkillBadge = ({ skill }) => {
       fontWeight: 700,
       letterSpacing: '0.5px',
       fontFamily: 'UberMoveText, system-ui, sans-serif',
+      textTransform: 'uppercase'
     }}>
       {skill}
     </span>
@@ -142,38 +72,107 @@ const TutorQueuePage = () => {
   const navigate = useNavigate();
   const [skillFilter, setSkillFilter] = useState('Tất cả');
   const [search, setSearch] = useState('');
+  
+  const [queueData, setQueueData] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  // Lấy dữ liệu từ localStorage để mock hành vi lưu trạng thái
-  const [queueData, setQueueData] = useState(() => {
-    const saved = localStorage.getItem('tutor_mock_queue');
-    if (saved) return JSON.parse(saved);
-    localStorage.setItem('tutor_mock_queue', JSON.stringify(DEFAULT_MOCK_QUEUE));
-    return DEFAULT_MOCK_QUEUE;
-  });
+  // Fetch queue data when filters change
+  useEffect(() => {
+    const fetchQueue = async () => {
+      setIsLoading(true);
+      setError(null);
+      try {
+        const filters = {};
+        if (skillFilter !== 'Tất cả') {
+          filters.submission_type = skillFilter.toLowerCase();
+        }
+        if (search.trim()) {
+          filters.search = search.trim();
+        }
+        
+        const response = await gradingService.getTutorQueue(filters);
+        if (response.success) {
+          setQueueData(response.data || []);
+        } else {
+          setError(response.error?.message || 'Có lỗi xảy ra khi tải dữ liệu');
+        }
+      } catch (err) {
+        console.error(err);
+        const serverMsg = err.response?.data?.error?.message;
+        setError(serverMsg || 'Lỗi kết nối máy chủ');
+      } finally {
+        setIsLoading(false);
+      }
+    };
 
-  const filtered = queueData.filter((item) => {
-    const matchSkill =
-      skillFilter === 'Tất cả' ||
-      item.skill === skillFilter.toUpperCase();
-    const q = search.toLowerCase();
-    const matchSearch =
-      !q ||
-      (item.studentName || '').toLowerCase().includes(q) ||
-      item.examTitle.toLowerCase().includes(q);
-    return matchSkill && matchSearch;
-  });
+    // Debounce the search input
+    const timeoutId = setTimeout(() => {
+      fetchQueue();
+    }, 300);
+
+    return () => clearTimeout(timeoutId);
+  }, [skillFilter, search]);
 
   const handleGrade = (item) => {
-    // Cập nhật trạng thái thành 'in_progress' và lưu vào localStorage
-    const updatedQueue = queueData.map(q => 
-      q.id === item.id ? { ...q, status: 'in_progress' } : q
-    );
-    setQueueData(updatedQueue);
-    localStorage.setItem('tutor_mock_queue', JSON.stringify(updatedQueue));
-    
-    // Chuyển hướng sang màn chấm bài
-    navigate(`/grading/tutor/grade/${item.skill.toLowerCase()}/${item.id}`);
+    navigate(`/grading/tutor/grade/${item.submission_type}/${item.submission_id}`);
   };
+
+  // Tính toán dynamic STATS dựa trên dữ liệu thật
+  const calculateStats = () => {
+    const total = queueData.length;
+    let newInLast2h = 0;
+    let deadline24hWriting = 0;
+    let deadline24hSpeaking = 0;
+
+    const now = new Date();
+
+    queueData.forEach(item => {
+      const submittedTime = new Date(item.submitted_at);
+      const hoursSinceSubmit = (now - submittedTime) / (1000 * 60 * 60);
+      
+      // Nếu nộp trong vòng 2h qua
+      if (hoursSinceSubmit <= 2) {
+        newInLast2h++;
+      }
+
+      // Deadline thường là 48h (ví dụ). Nếu đã qua 24h thì hạn chót chỉ còn trong 24h nữa
+      if (hoursSinceSubmit > 24 && hoursSinceSubmit <= 48) {
+        if (item.submission_type === 'writing') deadline24hWriting++;
+        if (item.submission_type === 'speaking') deadline24hSpeaking++;
+      }
+    });
+
+    const deadline24h = deadline24hWriting + deadline24hSpeaking;
+    
+    // Tìm bài chờ lâu nhất
+    let longestWait = '0 giờ';
+    let longestExam = 'N/A';
+    if (queueData.length > 0) {
+      const oldest = queueData.reduce((prev, current) => {
+        return (new Date(prev.submitted_at) < new Date(current.submitted_at)) ? prev : current;
+      });
+      const hoursWait = Math.floor((now - new Date(oldest.submitted_at)) / (1000 * 60 * 60));
+      if (hoursWait > 24) {
+        longestWait = `${Math.floor(hoursWait / 24)} ngày`;
+      } else {
+        longestWait = `${hoursWait} giờ`;
+      }
+      longestExam = `Bài của ${oldest.student_name || 'Học viên ẩn danh'}`;
+    }
+
+    return {
+      total,
+      newInLast2h,
+      deadline24h,
+      deadline24hWriting,
+      deadline24hSpeaking,
+      longestWait,
+      longestExam
+    };
+  };
+
+  const STATS = calculateStats();
 
   return (
     <div style={{
@@ -202,7 +201,7 @@ const TutorQueuePage = () => {
           title="Hạn chót trong 24h"
           value={STATS.deadline24h}
           sub={`${STATS.deadline24hWriting} Writing, ${STATS.deadline24hSpeaking} Speaking`}
-          subRed
+          subRed={STATS.deadline24h > 0}
         />
         <StatCard
           title="Chờ chấm lâu nhất"
@@ -224,7 +223,7 @@ const TutorQueuePage = () => {
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Tìm kiếm theo tên sĩ sinh, sinh..."
+            placeholder="Tìm kiếm theo tên học sinh..."
             style={{
               width: '100%',
               padding: '10px 16px 10px 40px',
@@ -246,6 +245,13 @@ const TutorQueuePage = () => {
           ))}
         </div>
       </div>
+
+      {/* ── Error State ── */}
+      {error && (
+        <div style={{ padding: '16px', backgroundColor: '#ffebee', color: '#c62828', borderRadius: '8px', marginBottom: '24px', fontWeight: 500 }}>
+          {error}
+        </div>
+      )}
 
       {/* ── Table ── */}
       <div style={{
@@ -272,113 +278,134 @@ const TutorQueuePage = () => {
             </tr>
           </thead>
           <tbody>
-            {filtered.length === 0 ? (
+            {isLoading ? (
+              <tr>
+                <td colSpan={6} style={{ padding: '48px', textAlign: 'center', color: '#666', fontSize: '14px' }}>
+                  Đang tải dữ liệu...
+                </td>
+              </tr>
+            ) : queueData.length === 0 ? (
               <tr>
                 <td colSpan={6} style={{ padding: '48px', textAlign: 'center', color: '#999', fontSize: '14px' }}>
-                  Không có bài nào trong hàng chờ
+                  Không có bài nào đang chờ chấm
                 </td>
               </tr>
             ) : (
-              filtered.map((item, idx) => (
-                <tr
-                  key={item.id}
-                  style={{
-                    borderBottom: idx < filtered.length - 1 ? '1px solid #f0f0f0' : 'none',
-                    transition: 'background 0.1s',
-                  }}
-                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#fafafa'}
-                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-                >
-                  {/* Thời gian nộp */}
-                  <td style={{ padding: '16px 20px', fontSize: '14px', color: '#333', whiteSpace: 'nowrap' }}>
-                    {item.submittedAt}
-                  </td>
+              queueData.map((item, idx) => {
+                // Tính toán deadline hiển thị
+                const submittedTime = new Date(item.submitted_at);
+                const hoursWait = (new Date() - submittedTime) / (1000 * 60 * 60);
+                let deadlineStr = '';
+                let deadlineUrgent = false;
+                let deadlineOverdue = false;
+                
+                if (hoursWait > 48) {
+                  deadlineStr = 'Đã quá hạn';
+                  deadlineOverdue = true;
+                  deadlineUrgent = true;
+                } else {
+                  const hoursLeft = Math.floor(48 - hoursWait);
+                  deadlineStr = `${hoursLeft}h nữa`;
+                  if (hoursLeft <= 24) deadlineUrgent = true;
+                }
 
-                  {/* Nhãn kỹ năng */}
-                  <td style={{ padding: '16px 20px' }}>
-                    <SkillBadge skill={item.skill} />
-                  </td>
+                // Avatar Fallback
+                const fallbackAvatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(item.student_name || 'A')}&background=4f46e5&color=fff`;
 
-                  {/* Đối tượng */}
-                  <td style={{ padding: '16px 20px' }}>
-                    {item.studentName ? (
+                // Format thời gian
+                const formattedDate = new Intl.DateTimeFormat('vi-VN', {
+                  hour: '2-digit', minute: '2-digit',
+                  day: '2-digit', month: '2-digit', year: 'numeric'
+                }).format(submittedTime).replace(',', '');
+
+                return (
+                  <tr
+                    key={item.submission_id}
+                    style={{
+                      borderBottom: idx < queueData.length - 1 ? '1px solid #f0f0f0' : 'none',
+                      transition: 'background 0.1s',
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#fafafa'}
+                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                  >
+                    {/* Thời gian nộp */}
+                    <td style={{ padding: '16px 20px', fontSize: '14px', color: '#333', whiteSpace: 'nowrap' }}>
+                      {formattedDate}
+                    </td>
+
+                    {/* Nhãn kỹ năng */}
+                    <td style={{ padding: '16px 20px' }}>
+                      <SkillBadge skill={item.submission_type} />
+                    </td>
+
+                    {/* Đối tượng */}
+                    <td style={{ padding: '16px 20px' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                         <img
-                          src={item.studentAvatar}
-                          alt={item.studentName}
+                          src={fallbackAvatar}
+                          alt={item.student_name}
                           style={{ width: '36px', height: '36px', borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }}
                         />
                         <div>
-                          <div style={{ fontSize: '14px', fontWeight: 600, color: '#000' }}>{item.studentName}</div>
-                          <div style={{ fontSize: '12px', color: '#777' }}>{item.examTitle}</div>
+                          <div style={{ fontSize: '14px', fontWeight: 600, color: '#000' }}>{item.student_name || 'Học viên ẩn danh'}</div>
+                          <div style={{ fontSize: '12px', color: '#777' }}>IELTS Mock Test</div>
                         </div>
                       </div>
-                    ) : (
-                      <div>
-                        <div style={{ fontSize: '14px', fontWeight: 600, color: '#000' }}>{item.examTitle}</div>
-                        {item.examSubtitle && (
-                          <div style={{ fontSize: '12px', color: '#777' }}>{item.examSubtitle}</div>
-                        )}
-                      </div>
-                    )}
-                  </td>
+                    </td>
 
-                  {/* Trạng thái */}
-                  <td style={{ padding: '16px 20px' }}>
-                    <span style={{ 
-                      fontSize: '14px', 
-                      color: item.status === 'completed' ? '#2e7d32' : '#333',
-                      fontWeight: item.status === 'completed' ? 600 : 400
-                    }}>
-                      {item.status === 'new' ? '➡ Bài nộp mới' : (item.status === 'in_progress' ? '✏ Đang chấm' : '✅ Đã chấm')}
-                    </span>
-                  </td>
+                    {/* Trạng thái */}
+                    <td style={{ padding: '16px 20px' }}>
+                      <span style={{ 
+                        fontSize: '14px', 
+                        color: '#333',
+                        fontWeight: 400
+                      }}>
+                        ➡ Bài nộp mới
+                      </span>
+                    </td>
 
-                  {/* Hạn chót */}
-                  <td style={{ padding: '16px 20px' }}>
-                    <span style={{
-                      fontSize: '14px',
-                      fontWeight: item.deadlineUrgent ? 700 : 400,
-                      color: item.deadlineOverdue ? '#c92a2a' : (item.deadlineUrgent ? '#e65100' : '#333'),
-                    }}>
-                      {item.deadline}
-                    </span>
-                  </td>
-
-                  {/* Thao tác */}
-                  <td style={{ padding: '16px 20px' }}>
-                    <button
-                      id={`btn-grade-${item.id}`}
-                      onClick={() => handleGrade(item)}
-                      style={{
-                        padding: '9px 20px',
-                        borderRadius: '8px',
-                        border: 'none',
-                        backgroundColor: item.status === 'completed' ? '#e0e0e0' : (item.status === 'in_progress' ? '#e65100' : '#1a1a1a'),
-                        color: item.status === 'completed' ? '#333' : '#fff',
+                    {/* Hạn chót */}
+                    <td style={{ padding: '16px 20px' }}>
+                      <span style={{
                         fontSize: '14px',
-                        fontWeight: 600,
-                        cursor: 'pointer',
-                        fontFamily: 'UberMoveText, system-ui, sans-serif',
-                        whiteSpace: 'nowrap',
-                        transition: 'background 0.15s ease',
-                      }}
-                      onMouseEnter={(e) => {
-                        if (item.status === 'completed') e.currentTarget.style.backgroundColor = '#d5d5d5';
-                        else if (item.status === 'in_progress') e.currentTarget.style.backgroundColor = '#f57c00';
-                        else e.currentTarget.style.backgroundColor = '#333';
-                      }}
-                      onMouseLeave={(e) => {
-                        if (item.status === 'completed') e.currentTarget.style.backgroundColor = '#e0e0e0';
-                        else if (item.status === 'in_progress') e.currentTarget.style.backgroundColor = '#e65100';
-                        else e.currentTarget.style.backgroundColor = '#1a1a1a';
-                      }}
-                    >
-                      {item.status === 'completed' ? '[Xem lại]' : (item.status === 'in_progress' ? '[Tiếp tục chấm]' : '[Chấm bài]')}
-                    </button>
-                  </td>
-                </tr>
-              ))
+                        fontWeight: deadlineUrgent ? 700 : 400,
+                        color: deadlineOverdue ? '#c92a2a' : (deadlineUrgent ? '#e65100' : '#333'),
+                      }}>
+                        {deadlineStr}
+                      </span>
+                    </td>
+
+                    {/* Thao tác */}
+                    <td style={{ padding: '16px 20px' }}>
+                      <button
+                        id={`btn-grade-${item.submission_id}`}
+                        onClick={() => handleGrade(item)}
+                        style={{
+                          padding: '9px 20px',
+                          borderRadius: '8px',
+                          border: 'none',
+                          backgroundColor: '#1a1a1a',
+                          color: '#fff',
+                          fontSize: '14px',
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                          fontFamily: 'UberMoveText, system-ui, sans-serif',
+                          whiteSpace: 'nowrap',
+                          transition: 'background 0.15s ease',
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.backgroundColor = '#333';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.backgroundColor = '#1a1a1a';
+                        }}
+                      >
+                        [Chấm bài]
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })
             )}
           </tbody>
         </table>

@@ -20,7 +20,6 @@ router.post(
 // Submit speaking (legacy - per part)
 router.post(
   '/speaking',
-  authenticateToken,
   SubmissionController.submitSpeaking
 );
 

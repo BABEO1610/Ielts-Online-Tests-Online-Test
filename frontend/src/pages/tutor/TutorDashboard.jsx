@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import ChangePwdModal from '../../components/profile/ChangePwdModal';
+import gradingService from '../../services/grading.service';
 
 /**
  * TutorDashboard.jsx — Trang chủ của Tutor
@@ -15,21 +16,6 @@ import ChangePwdModal from '../../components/profile/ChangePwdModal';
  */
 
 // ─── MOCK DATA (sẽ thay bằng API call) ────────────────────────────────────────
-const MOCK_STATS = {
-  pendingWriting: 5,
-  pendingSpeaking: 3,
-  gradedToday: 8,
-  totalTests: 12,
-  publishedTests: 9,
-  avgScore: 7.2,
-};
-
-const MOCK_QUEUE = [
-  { id: 'sub-w-001', type: 'writing', taskName: 'Tên bài 1', student: 'Nguyễn Văn A', avatar: null, status: 'pending', deadline: '1 giờ', priority: false },
-  { id: 'sub-s-002', type: 'speaking', taskName: 'Tên bài B', student: 'Trần Thị B', avatar: null, status: 'pending', deadline: '1 giờ', priority: false },
-  { id: 'sub-w-003', type: 'writing', taskName: 'Tên bài C', student: 'Lê Văn C', avatar: null, status: 'in_progress', deadline: '1 giờ', priority: true },
-  { id: 'sub-s-004', type: 'speaking', taskName: 'Phạm Thị D', student: 'Phạm Thị D', avatar: null, status: 'in_progress', deadline: '1 giờ', priority: false },
-];
 
 const MOCK_RECENT_TESTS = [
   { id: '1', title: 'Cambridge IELTS 18 — Reading Test 1', attempts: 47, chartData: [22, 18, 30, 47, 25, 35, 20] },
@@ -129,7 +115,7 @@ const StatCard = ({ label, value, dark = false, sublabel, chartData, extra }) =>
 );
 
 // ─── Queue Table ──────────────────────────────────────────────────────────────
-const QueueTable = () => (
+const QueueTable = ({ data = [], isLoading = false }) => (
   <div style={{
     backgroundColor: '#fff', border: '1px solid #e8e8e8',
     borderRadius: '16px', overflow: 'hidden',
@@ -154,95 +140,125 @@ const QueueTable = () => (
         </tr>
       </thead>
       <tbody>
-        {MOCK_QUEUE.map((item, idx) => (
-          <tr
-            key={item.id}
-            style={{
-              borderBottom: idx < MOCK_QUEUE.length - 1 ? '1px solid #f0f0f0' : 'none',
-              transition: 'background 0.15s ease',
-            }}
-            onMouseEnter={e => e.currentTarget.style.backgroundColor = '#fafafa'}
-            onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
-          >
-            {/* Thí sinh */}
-            <td style={{ padding: '14px 16px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <div style={{
-                  width: '34px', height: '34px', borderRadius: '50%',
-                  backgroundColor: '#e8e8e8',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: '13px', fontWeight: 700, color: '#555', flexShrink: 0,
-                }}>
-                  {getInitials(item.student)}
-                </div>
-                <span style={{ fontSize: '14px', fontWeight: 500, color: '#000', fontFamily: 'UberMoveText, system-ui, sans-serif' }}>
-                  {item.student}
-                </span>
-              </div>
-            </td>
-
-            {/* Loại */}
-            <td style={{ padding: '14px 16px' }}>
-              <span style={{
-                display: 'inline-block',
-                padding: '3px 10px', borderRadius: '999px',
-                fontSize: '11px', fontWeight: 700, letterSpacing: '0.4px',
-                textTransform: 'uppercase',
-                backgroundColor: item.type === 'writing' ? '#000' : '#efefef',
-                color: item.type === 'writing' ? '#fff' : '#333',
-                fontFamily: 'UberMoveText, system-ui, sans-serif',
-              }}>
-                {item.type}
-              </span>
-            </td>
-
-            {/* Tên bài */}
-            <td style={{ padding: '14px 16px' }}>
-              <span style={{ fontSize: '14px', color: '#000', fontFamily: 'UberMoveText, system-ui, sans-serif' }}>
-                {item.taskName}
-              </span>
-            </td>
-
-            {/* Trạng thái */}
-            <td style={{ padding: '14px 16px' }}>
-              {item.priority ? (
-                <span style={{ fontSize: '13px', color: '#e53935', fontWeight: 600, fontFamily: 'UberMoveText, system-ui, sans-serif' }}>
-                  Ưu tiên
-                </span>
-              ) : (
-                <span style={{ fontSize: '13px', color: '#888', fontFamily: 'UberMoveText, system-ui, sans-serif' }}>
-                  {item.status === 'in_progress' ? 'Đang chấm' : 'Chờ chấm'}
-                </span>
-              )}
-            </td>
-
-            {/* Hạn chấm */}
-            <td style={{ padding: '14px 16px' }}>
-              <span style={{ fontSize: '13px', color: '#e53935', fontWeight: 500, fontFamily: 'UberMoveText, system-ui, sans-serif' }}>
-                Hạn chấm:<br />
-                <strong>{item.deadline}</strong>
-              </span>
-            </td>
-
-            {/* Thao tác */}
-            <td style={{ padding: '14px 16px' }}>
-              <Link
-                to={`/grading/tutor/grade/${item.type}/${item.id}`}
-                style={{
-                  display: 'inline-block',
-                  padding: '7px 18px', borderRadius: '999px',
-                  backgroundColor: '#000', color: '#fff',
-                  fontSize: '13px', fontWeight: 600,
-                  textDecoration: 'none',
-                  fontFamily: 'UberMoveText, system-ui, sans-serif',
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                {item.status === 'in_progress' ? 'Tiếp tục' : 'Chấm →'}
-              </Link>
+        {isLoading ? (
+          <tr>
+            <td colSpan={6} style={{ padding: '32px', textAlign: 'center', color: '#666', fontSize: '13px' }}>
+              Đang tải dữ liệu...
             </td>
           </tr>
-        ))}
+        ) : data.length === 0 ? (
+          <tr>
+            <td colSpan={6} style={{ padding: '32px', textAlign: 'center', color: '#999', fontSize: '13px' }}>
+              Không có bài nào đang chờ chấm
+            </td>
+          </tr>
+        ) : (
+          data.slice(0, 5).map((item, idx) => {
+            const submittedTime = new Date(item.submitted_at);
+            const hoursWait = (new Date() - submittedTime) / (1000 * 60 * 60);
+            let deadlineStr = '';
+            let isUrgent = false;
+
+            if (hoursWait > 48) {
+              deadlineStr = 'Đã quá hạn';
+              isUrgent = true;
+            } else {
+              const hoursLeft = Math.floor(48 - hoursWait);
+              deadlineStr = `${hoursLeft}h nữa`;
+              if (hoursLeft <= 24) isUrgent = true;
+            }
+
+            return (
+              <tr
+                key={item.submission_id}
+                style={{
+                  borderBottom: idx < data.length - 1 ? '1px solid #f0f0f0' : 'none',
+                  transition: 'background 0.15s ease',
+                }}
+                onMouseEnter={e => e.currentTarget.style.backgroundColor = '#fafafa'}
+                onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
+              >
+                {/* Thí sinh */}
+                <td style={{ padding: '14px 16px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <div style={{
+                      width: '34px', height: '34px', borderRadius: '50%',
+                      backgroundColor: '#e8e8e8',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontSize: '13px', fontWeight: 700, color: '#555', flexShrink: 0,
+                    }}>
+                      {getInitials(item.student_name || 'A')}
+                    </div>
+                    <span style={{ fontSize: '14px', fontWeight: 500, color: '#000', fontFamily: 'UberMoveText, system-ui, sans-serif' }}>
+                      {item.student_name || 'Học viên ẩn danh'}
+                    </span>
+                  </div>
+                </td>
+
+                {/* Loại */}
+                <td style={{ padding: '14px 16px' }}>
+                  <span style={{
+                    display: 'inline-block',
+                    padding: '3px 10px', borderRadius: '999px',
+                    fontSize: '11px', fontWeight: 700, letterSpacing: '0.4px',
+                    textTransform: 'uppercase',
+                    backgroundColor: item.submission_type === 'writing' ? '#000' : '#efefef',
+                    color: item.submission_type === 'writing' ? '#fff' : '#333',
+                    fontFamily: 'UberMoveText, system-ui, sans-serif',
+                  }}>
+                    {item.submission_type}
+                  </span>
+                </td>
+
+                {/* Tên bài */}
+                <td style={{ padding: '14px 16px' }}>
+                  <span style={{ fontSize: '14px', color: '#000', fontFamily: 'UberMoveText, system-ui, sans-serif' }}>
+                    IELTS Mock Test
+                  </span>
+                </td>
+
+                {/* Trạng thái */}
+                <td style={{ padding: '14px 16px' }}>
+                  {isUrgent ? (
+                    <span style={{ fontSize: '13px', color: '#e53935', fontWeight: 600, fontFamily: 'UberMoveText, system-ui, sans-serif' }}>
+                      Ưu tiên
+                    </span>
+                  ) : (
+                    <span style={{ fontSize: '13px', color: '#888', fontFamily: 'UberMoveText, system-ui, sans-serif' }}>
+                      Chờ chấm
+                    </span>
+                  )}
+                </td>
+
+                {/* Hạn chấm */}
+                <td style={{ padding: '14px 16px' }}>
+                  <span style={{ fontSize: '13px', color: isUrgent ? '#e53935' : '#888', fontWeight: 500, fontFamily: 'UberMoveText, system-ui, sans-serif' }}>
+                    Hạn chấm:<br />
+                    <strong>{deadlineStr}</strong>
+                  </span>
+                </td>
+
+                {/* Thao tác */}
+                <td style={{ padding: '14px 16px' }}>
+                  <Link
+                    to={`/grading/tutor/grade/${item.submission_type}/${item.submission_id}`}
+                    style={{
+                      display: 'inline-block',
+                      padding: '7px 18px', borderRadius: '999px',
+                      backgroundColor: '#000', color: '#fff',
+                      fontSize: '13px', fontWeight: 600,
+                      textDecoration: 'none',
+                      fontFamily: 'UberMoveText, system-ui, sans-serif',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    Chấm →
+                  </Link>
+                </td>
+              </tr>
+            );
+          })
+        )}
       </tbody>
     </table>
   </div>
@@ -296,7 +312,29 @@ const RecentTestsWidget = () => (
 const TutorDashboard = () => {
   const { user } = useAuth();
   const firstName = user?.full_name ? user.full_name.split(' ').pop() : 'Tutor';
-  const total = MOCK_STATS.pendingWriting + MOCK_STATS.pendingSpeaking;
+  
+  const [queueData, setQueueData] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchQueue = async () => {
+      try {
+        const response = await gradingService.getTutorQueue();
+        if (response.success) {
+          setQueueData(response.data || []);
+        }
+      } catch (err) {
+        console.error("Failed to fetch tutor queue:", err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchQueue();
+  }, []);
+
+  const pendingWriting = queueData.filter(q => q.submission_type === 'writing').length;
+  const pendingSpeaking = queueData.filter(q => q.submission_type === 'speaking').length;
+  const total = queueData.length;
 
   return (
     <div style={{
@@ -344,27 +382,27 @@ const TutorDashboard = () => {
       }}>
         <StatCard
           label="Chờ chấm (Writing)"
-          value={MOCK_STATS.pendingWriting}
+          value={pendingWriting}
           dark
           sublabel="Bài nộp"
           chartData={[2, 3, 5, 4, 6, 3, 5]}
         />
         <StatCard
           label="Chờ chấm (Speaking)"
-          value={MOCK_STATS.pendingSpeaking}
+          value={pendingSpeaking}
           sublabel="Bài nộp"
           chartData={[1, 2, 3, 2, 4, 2, 3]}
         />
         <StatCard
           label="Đã chấm hôm nay"
-          value={MOCK_STATS.gradedToday}
+          value={8} // Vẫn giữ mock tạm cho mục này do chưa có API lịch sử chấm
           sublabel="Bài hoàn thành"
           chartData={[3, 5, 8, 6, 9, 4, 8]}
         />
         <StatCard
           label="Đề thi đang publish"
-          value={MOCK_STATS.publishedTests}
-          sublabel={`/ ${MOCK_STATS.totalTests} tổng`}
+          value={9} // Mock
+          sublabel={`/ 12 tổng`}
           extra="+ Tạo đề mới"
         />
       </div>
@@ -392,7 +430,7 @@ const TutorDashboard = () => {
               Xem tất cả →
             </Link>
           </div>
-          <QueueTable />
+          <QueueTable data={queueData} isLoading={isLoading} />
         </div>
 
         {/* Cột phải: Đề thi gần đây */}

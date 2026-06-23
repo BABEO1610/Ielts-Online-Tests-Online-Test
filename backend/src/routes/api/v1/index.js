@@ -29,5 +29,6 @@ router.use('/tests', testRoutes);
 router.use('/submissions', submissionsRoutes);
 router.use('/library', libraryRoutes);
 router.use('/submissions', submissionRoutes);
+router.use('/tutors', require('./tutors.routes'));
 
 module.exports = router;
