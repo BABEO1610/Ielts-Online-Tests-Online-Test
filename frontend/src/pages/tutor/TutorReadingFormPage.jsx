@@ -221,7 +221,7 @@ function TutorReadingFormPage({ testId }) {
       const payload = {
         ...formData,
         passages,
-        publishAt: isDraft ? null : new Date().toISOString()
+        publishAt: null // Always require admin approval
       };
       
       let res;
@@ -232,7 +232,7 @@ function TutorReadingFormPage({ testId }) {
       }
 
       if (res.success) {
-        alert(isDraft ? 'Draft saved successfully!' : 'Test saved and published!');
+        alert('Test submitted for approval successfully!');
         navigate('/tutor/tests'); // Or wherever we should redirect
       } else {
         alert('Failed to save test: ' + (res.error?.message || 'Unknown error'));
@@ -362,11 +362,8 @@ function TutorReadingFormPage({ testId }) {
       <div className="form-card mb-4">
         <div className="d-flex gap-3 mt-2">
           <button className="button-secondary flex-fill" style={{ padding: '14px 0', border: '1px solid var(--primary)', color: 'var(--primary)' }} onClick={() => setShowPreview(true)}>Preview Test</button>
-          <button className="button-primary flex-fill" style={{ padding: '14px 0' }} disabled={isSubmitting} onClick={() => handleSaveTest(false)}>
-            {isSubmitting ? 'Saving...' : 'Save Test'}
-          </button>
-          <button className="button-secondary flex-fill" style={{ padding: '14px 0' }} disabled={isSubmitting} onClick={() => handleSaveTest(true)}>
-            {isSubmitting ? 'Saving...' : 'Save as Draft'}
+          <button className="button-primary flex-fill" style={{ padding: '14px 0' }} disabled={isSubmitting} onClick={() => handleSaveTest(true)}>
+            {isSubmitting ? 'Saving...' : 'Submit for Approval'}
           </button>
         </div>
       </div>

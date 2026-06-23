@@ -2,12 +2,14 @@ const SubmissionService = require('../services/submission.service');
 const AppError = require('../utils/AppError');
 
 class SubmissionController {
+  /**
+   * Submit writing task response
+   */
   static async submitWriting(req, res, next) {
     try {
       const userId = req.user.id;
-
       const submission = await SubmissionService.submitWriting(userId, req.body);
-      
+
       res.status(201).json({
         success: true,
         data: {
@@ -23,6 +25,9 @@ class SubmissionController {
     }
   }
 
+  /**
+   * Upload audio temp (speaking)
+   */
   static async uploadSpeakingAudio(req, res, next) {
     try {
       if (!req.file) {
@@ -46,6 +51,9 @@ class SubmissionController {
     }
   }
 
+  /**
+   * Submit speaking (legacy - per part)
+   */
   static async submitSpeaking(req, res, next) {
     try {
       const userId = req.user.id;
@@ -58,10 +66,12 @@ class SubmissionController {
         test_id = null;
       }
 
-      if (!part_number || ![1, 2, 3].includes(parseInt(part_number))) {
+      if (!part_number || ![1, 2, 3].includes(parseInt(part_number, 10))) {
         throw new AppError('part_number must be 1, 2, or 3', 400, 'INVALID_FIELD');
       }
-      if (!temp_s3_key) throw new AppError('temp_s3_key is required', 400, 'MISSING_FIELD');
+      if (!temp_s3_key) {
+        throw new AppError('temp_s3_key is required', 400, 'MISSING_FIELD');
+      }
       if (!grader || !['ai', 'tutor'].includes(grader)) {
         throw new AppError('grader must be ai or tutor', 400, 'INVALID_FIELD');
       }
@@ -78,87 +88,30 @@ class SubmissionController {
       next(error);
     }
   }
+
+  /**
+   * Get feedback for a submission (speaking / writing)
+   */
   static async getFeedback(req, res, next) {
     try {
       const { id } = req.params;
       const { type } = req.query; // 'speaking' | 'writing'
+      const userId = req.user.id;
 
-      const { pool } = require('../db/pool');
+      const result = await SubmissionService.getFeedback(id, userId, type);
 
-      let submission = null;
-      let report = null;
-
-      if (type === 'speaking') {
-        const subRes = await pool.query(
-          'SELECT * FROM speaking_submissions WHERE id = $1 AND user_id = $2',
-          [id, req.user.id]
-        );
-        if (subRes.rows.length === 0) {
-          throw new AppError('Submission not found', 404, 'NOT_FOUND');
-        }
-        submission = subRes.rows[0];
-
-        if (submission.status === 'pending') {
-          return res.status(202).json({
-            success: true,
-            data: { status: 'pending', message: 'Bài đang được chấm, vui lòng chờ...' },
-            error: null,
-            meta: null
-          });
-        }
-
-        // Try to get AI report
-        const aiRes = await pool.query(
-          'SELECT * FROM ai_grading_reports WHERE submission_id = $1 AND submission_type = $2',
-          [id, 'speaking']
-        );
-        if (aiRes.rows.length > 0) report = { ai_report: aiRes.rows[0] };
-
-        // Try to get tutor report
-        const tutorRes = await pool.query(
-          'SELECT * FROM tutor_grading_reports WHERE submission_id = $1 AND submission_type = $2',
-          [id, 'speaking']
-        );
-        if (tutorRes.rows.length > 0) report = { ...(report || {}), tutor_report: tutorRes.rows[0] };
-
-      } else if (type === 'writing') {
-        const subRes = await pool.query(
-          'SELECT * FROM writing_submissions WHERE id = $1 AND user_id = $2',
-          [id, req.user.id]
-        );
-        if (subRes.rows.length === 0) {
-          throw new AppError('Submission not found', 404, 'NOT_FOUND');
-        }
-        submission = subRes.rows[0];
-
-        if (submission.status === 'pending') {
-          return res.status(202).json({
-            success: true,
-            data: { status: 'pending', message: 'Bài đang được chấm, vui lòng chờ...' },
-            error: null,
-            meta: null
-          });
-        }
-
-        const aiRes = await pool.query(
-          'SELECT * FROM ai_grading_reports WHERE submission_id = $1 AND submission_type = $2',
-          [id, 'writing']
-        );
-        if (aiRes.rows.length > 0) report = { ai_report: aiRes.rows[0] };
-
-        const tutorRes = await pool.query(
-          'SELECT * FROM tutor_grading_reports WHERE submission_id = $1 AND submission_type = $2',
-          [id, 'writing']
-        );
-        if (tutorRes.rows.length > 0) report = { ...(report || {}), tutor_report: tutorRes.rows[0] };
-
-      } else {
-        throw new AppError('type must be speaking or writing', 400, 'INVALID_FIELD');
+      if (result.status === 'pending') {
+        return res.status(202).json({
+          success: true,
+          data: result,
+          error: null,
+          meta: null
+        });
       }
 
       res.status(200).json({
         success: true,
-        data: report || {},
+        data: result,
         error: null,
         meta: null
       });
@@ -167,6 +120,73 @@ class SubmissionController {
     }
   }
 
+  /**
+   * Route for submitting a test (Listening / Reading)
+   */
+  static async submitTest(req, res, next) {
+    try {
+      const testId = req.params.testId;
+      const userId = req.user.id;
+      const { answers, timeSpentSeconds } = req.body;
+
+      const result = await SubmissionService.submitObjectiveTest(userId, testId, answers, timeSpentSeconds);
+
+      res.status(200).json({
+        success: true,
+        data: result,
+        meta: null,
+        error: null
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Route for fetching submission result
+   */
+  static async getSubmissionResult(req, res, next) {
+    try {
+      const attemptId = req.params.attemptId;
+      const userId = req.user.id;
+
+      const result = await SubmissionService.getSubmissionResult(attemptId, userId);
+
+      if (!result) {
+        throw new AppError('Submission not found', 404, 'NOT_FOUND');
+      }
+
+      res.status(200).json({
+        success: true,
+        data: result,
+        meta: null,
+        error: null
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Route for creating a speaking test attempt
+   */
+  static async createSpeakingAttempt(req, res, next) {
+    try {
+      const userId = req.user.id;
+      const { test_id } = req.body;
+
+      const result = await SubmissionService.createAttempt(userId, test_id);
+
+      res.status(201).json({
+        success: true,
+        data: result,
+        meta: null,
+        error: null
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 module.exports = SubmissionController;

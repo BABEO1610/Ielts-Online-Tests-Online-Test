@@ -85,5 +85,48 @@ export const testService = {
   deleteTest: async (id) => {
     const response = await api.delete(`/tests/${id}`);
     return response.data;
+  },
+
+  /**
+   * Fetch a test for a student (without answers)
+   * @param {string} id
+   * @returns {Promise<Object>}
+   */
+  getTestForStudent: async (id) => {
+    try {
+      const response = await api.get(`/tests/${id}/take`);
+      return response.data;
+    } catch (error) {
+      return getApiError(error);
+    }
+  },
+
+  /**
+   * Submit an objective test
+   * @param {string} testId
+   * @param {Object} payload - { answers: {}, timeSpentSeconds: number }
+   * @returns {Promise<Object>}
+   */
+  submitObjectiveTest: async (testId, payload) => {
+    try {
+      const response = await api.post(`/submissions/${testId}`, payload);
+      return response.data;
+    } catch (error) {
+      return getApiError(error);
+    }
+  },
+
+  /**
+   * Fetch the result of a submitted test
+   * @param {string} attemptId
+   * @returns {Promise<Object>}
+   */
+  getSubmissionResult: async (attemptId) => {
+    try {
+      const response = await api.get(`/submissions/${attemptId}`);
+      return response.data;
+    } catch (error) {
+      return getApiError(error);
+    }
   }
 };

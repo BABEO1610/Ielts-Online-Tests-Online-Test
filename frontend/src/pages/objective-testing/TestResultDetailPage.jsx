@@ -61,6 +61,11 @@ function TestResultDetailPage() {
 
   return (
     <div className="container py-4" style={{ maxWidth: 900 }}>
+      <div className="mb-3">
+        <button className="text-decoration-none text-muted btn btn-link p-0" onClick={() => navigate(`/results/${attemptId}`)}>
+          ← Quay lại tổng quan
+        </button>
+      </div>
       <div className="page-heading">
         <h1>Xem lại đáp án</h1>
         <p>

@@ -37,7 +37,7 @@ const OnboardingForm = () => {
 
       if (response.data && response.data.success) {
         // Redirect to dashboard on success
-        navigate('/dashboard');
+        navigate('/');
       }
     } catch (err) {
       // EARS[Unwanted]: IF API returns error (e.g. HTTP 400) THEN system displays error message

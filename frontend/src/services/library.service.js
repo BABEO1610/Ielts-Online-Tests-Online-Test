@@ -8,10 +8,12 @@ const BASE = '/library';
  */
 export async function fetchLibraryResources(paramsOrCategory) {
   let params = {};
-  if (typeof paramsOrCategory === 'object' && paramsOrCategory !== null) {
+  if (typeof paramsOrCategory === 'string') {
+    if (paramsOrCategory && paramsOrCategory !== 'All') {
+      params.category = paramsOrCategory;
+    }
+  } else if (paramsOrCategory && typeof paramsOrCategory === 'object') {
     params = { ...paramsOrCategory };
-  } else if (paramsOrCategory && paramsOrCategory !== 'All') {
-    params.category = paramsOrCategory;
   }
   const res = await api.get(BASE, { params });
   return res.data; // { success, data, error, meta }

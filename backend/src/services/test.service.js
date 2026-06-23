@@ -22,9 +22,12 @@ class TestService {
     if (data.skill === 'listening') {
       return (data.sections || []).map((section) => ({
         title: section.title,
-        instruction: section.audioUrl || null,
+        instruction: TestService.serializeJsonb({
+          show_transcript: section.showTranscript !== false,
+          start_time: section.startTime || null,
+          end_time: section.endTime || null
+        }),
         content: section.transcript || null,
-        showTranscript: section.showTranscript !== false,
         defaultRange: section.defaultRange,
         blocks: section.blocks || []
       }));
@@ -70,7 +73,7 @@ class TestService {
    * Create a reading test with passages, question blocks, and questions using a transaction.
    */
   static async createReadingTest(data, userId) {
-    const { title, description, difficulty, duration, publishAt } = data;
+    const { title, description, difficulty, duration, publishAt, audioUrl } = data;
     const skill = TestService.normalizeSkill(data);
     const passages = TestService.normalizePassages(data);
     
@@ -84,11 +87,11 @@ class TestService {
     try {
       await client.query('BEGIN');
 
-      // 1. Insert Test
+      // 1. Insert Test (with audio_url for listening tests)
       const testRes = await client.query(
-        `INSERT INTO mock_tests (title, description, skill, difficulty, duration_minutes, is_published, publish_at, created_by, review_status, submitted_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id`,
-        [title, description, skill, difficulty, duration, isPublished, publishAt || null, userId, reviewStatus, submittedAt]
+        `INSERT INTO mock_tests (title, description, skill, difficulty, duration_minutes, is_published, publish_at, created_by, audio_url)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
+        [title, description, skill, difficulty, duration, isPublished, publishAt || null, userId, audioUrl || null]
       );
       const testId = testRes.rows[0].id;
 
@@ -107,9 +110,9 @@ class TestService {
         if (passage.blocks && Array.isArray(passage.blocks)) {
           for (const [bIdx, block] of passage.blocks.entries()) {
             const bRes = await client.query(
-              `INSERT INTO question_blocks (passage_id, block_order, question_type, question_range)
-               VALUES ($1, $2, $3, $4) RETURNING id`,
-              [passageId, bIdx + 1, block.type, block.range]
+              `INSERT INTO question_blocks (passage_id, block_order, question_type, question_range, content)
+               VALUES ($1, $2, $3, $4, $5) RETURNING id`,
+              [passageId, bIdx + 1, block.type, block.range, block.content || null]
             );
             const blockId = bRes.rows[0].id;
 
@@ -160,34 +163,46 @@ class TestService {
    * Fetch all mock tests with their question counts.
    * @param {string|null} skill - Optional filter: 'reading' | 'listening' | etc.
    */
-  static async getTests(skill = null, showAll = false, tutorId = null) {
+  static async getTests(options = {}) {
+    const { skill, isPublished, tutor, all } = options;
+    let whereClause = 'WHERE 1=1';
+    const params = [];
+
+    if (skill) {
+      params.push(skill);
+      whereClause += ` AND mt.skill = $${params.length}`;
+    }
+
+    if (isPublished !== undefined) {
+      params.push(isPublished === 'true' || isPublished === true);
+      whereClause += ` AND mt.is_published = $${params.length}`;
+    }
+
     const query = `
       SELECT 
         mt.id, 
         mt.title, 
+        mt.description,
         mt.skill, 
         mt.difficulty,
+        mt.duration_minutes,
         mt.is_published,
         mt.review_status,
         mt.submitted_at,
-        mt.duration_minutes,
-        mt.description,
         mt.created_at,
         COUNT(q.id) as questions
       FROM mock_tests mt
       LEFT JOIN questions q ON mt.id = q.test_id
-      WHERE ($1::text IS NULL OR mt.skill::text = $1::text)
-        AND ($2::boolean = true OR mt.is_published = true)
-        AND ($3::uuid IS NULL OR mt.created_by = $3::uuid)
+      ${whereClause}
       GROUP BY mt.id
       ORDER BY mt.created_at DESC;
     `;
 
-    const result = await pool.query(query, [skill || null, showAll, tutorId || null]);
+    const result = await pool.query(query, params);
 
     return result.rows.map(row => {
       let statusStr = row.is_published ? 'published' : 'draft';
-      // If it's not published, give more detail based on review_status and submitted_at
+      // Give more detail based on review_status and submitted_at
       if (!row.is_published) {
         if (row.review_status === 'pending') {
           statusStr = row.submitted_at ? 'pending' : 'draft';
@@ -199,9 +214,10 @@ class TestService {
       return {
         id: row.id,
         title: row.title,
+        description: row.description,
         skill: row.skill,
         difficulty: row.difficulty,
-        description: row.description,
+        duration_minutes: row.duration_minutes,
         duration: row.duration_minutes,
         status: statusStr,
         questions: parseInt(row.questions, 10),
@@ -287,13 +303,17 @@ class TestService {
    * Fetch full test details by ID
    */
   static async getTestById(id) {
-    const testRes = await pool.query(`SELECT * FROM mock_tests WHERE id = $1`, [id]);
+    const normalizedId = String(id).replace(/\s+/g, '-');
+    const testRes = await pool.query(`SELECT * FROM mock_tests WHERE id::text = $1 OR id::text = $2`, [id, normalizedId]);
     if (testRes.rows.length === 0) return null;
     const test = testRes.rows[0];
+    
+    // Parse audio_url for listening tests
+    const audioUrl = test.audio_url || null;
 
     const passagesRes = await pool.query(
-      `SELECT * FROM test_passages WHERE test_id = $1 ORDER BY passage_number ASC`,
-      [id]
+      `SELECT * FROM test_passages WHERE test_id::text = $1 OR test_id::text = $2 ORDER BY passage_number ASC`,
+      [id, normalizedId]
     );
 
     const passageIds = passagesRes.rows.map(p => p.id);
@@ -302,14 +322,14 @@ class TestService {
 
     if (passageIds.length > 0) {
       const blocksRes = await pool.query(
-        `SELECT * FROM question_blocks WHERE passage_id = ANY($1) ORDER BY block_order ASC`,
+        `SELECT * FROM question_blocks WHERE passage_id::text = ANY($1::text[]) ORDER BY block_order ASC`,
         [passageIds]
       );
       blocks = blocksRes.rows;
 
       const questionsRes = await pool.query(
-        `SELECT * FROM questions WHERE test_id = $1 ORDER BY question_order ASC`,
-        [id]
+        `SELECT * FROM questions WHERE test_id::text = $1 OR test_id::text = $2 ORDER BY question_order ASC`,
+        [id, normalizedId]
       );
       questions = questionsRes.rows;
     }
@@ -331,6 +351,7 @@ class TestService {
           id: b.id,
           type: b.question_type,
           range: b.question_range,
+          content: b.content,
           questions: bQuestions
         };
       });
@@ -346,16 +367,27 @@ class TestService {
     });
 
     const sections = test.skill === 'listening'
-      ? passages.map((p, idx) => ({
-        id: p.id,
-        sectionNumber: p.passageNumber,
-        title: p.title,
-        audioUrl: p.instruction || '',
-        transcript: p.content || '',
-        showTranscript: true,
-        defaultRange: `${idx * 10 + 1}-${idx * 10 + 10}`,
-        blocks: p.blocks
-      }))
+      ? passages.map((p, idx) => {
+          // Parse instruction JSONB for listening metadata
+          let metadata = {};
+          try {
+            metadata = typeof p.instruction === 'string' ? JSON.parse(p.instruction) : (p.instruction || {});
+          } catch {
+            metadata = {};
+          }
+          
+          return {
+            id: p.id,
+            sectionNumber: p.passageNumber,
+            title: p.title,
+            transcript: p.content || '',
+            showTranscript: metadata.show_transcript !== false,
+            startTime: metadata.start_time || null,
+            endTime: metadata.end_time || null,
+            defaultRange: `${idx * 10 + 1}-${idx * 10 + 10}`,
+            blocks: p.blocks
+          };
+        })
       : undefined;
 
     return {
@@ -367,16 +399,44 @@ class TestService {
       duration: test.duration_minutes,
       isPublished: test.is_published,
       publishAt: test.publish_at,
+      audioUrl: audioUrl,  // Audio URL for listening tests
       passages,
       sections
     };
   }
 
   /**
+   * Fetch test for student (hide answers and explanations)
+   */
+  static async getTestForStudent(id) {
+    const test = await TestService.getTestById(id);
+    if (!test) return null;
+
+    // Filter out correct answers and explanations
+    const sanitizePassages = (passages) => passages.map(p => ({
+      ...p,
+      blocks: (p.blocks || []).map(b => ({
+        ...b,
+        questions: (b.questions || []).map(q => ({
+          id: q.id,
+          questionOrder: q.questionOrder,
+          text: q.text,
+          options: q.options
+        }))
+      }))
+    }));
+
+    if (test.passages) test.passages = sanitizePassages(test.passages);
+    if (test.sections) test.sections = sanitizePassages(test.sections);
+
+    return test;
+  }
+
+  /**
    * Update an existing reading test
    */
   static async updateReadingTest(testId, data, userId) {
-    const { title, description, difficulty, duration, publishAt } = data;
+    const { title, description, difficulty, duration, publishAt, audioUrl } = data;
     const skill = TestService.normalizeSkill(data);
     const passages = TestService.normalizePassages(data);
     
@@ -392,12 +452,12 @@ class TestService {
     try {
       await client.query('BEGIN');
 
-      // 1. Update Test
+      // 1. Update Test (including audio_url for listening tests)
       await client.query(
         `UPDATE mock_tests 
-         SET title = $1, description = $2, skill = $3, difficulty = $4, duration_minutes = $5, is_published = $6, publish_at = $7, review_status = $8, submitted_at = $9 
-         WHERE id = $10`,
-        [title, description, skill, difficulty, duration, isPublished, publishAt || null, reviewStatus, submittedAt, testId]
+         SET title = $1, description = $2, skill = $3, difficulty = $4, duration_minutes = $5, is_published = $6, publish_at = $7, audio_url = $8 
+         WHERE id = $9`,
+        [title, description, skill, difficulty, duration, isPublished, publishAt || null, audioUrl || null, testId]
       );
 
       // 2. Delete existing nested records before rebuilding the test.
@@ -420,9 +480,9 @@ class TestService {
         if (passage.blocks && Array.isArray(passage.blocks)) {
           for (const [bIdx, block] of passage.blocks.entries()) {
             const bRes = await client.query(
-              `INSERT INTO question_blocks (passage_id, block_order, question_type, question_range)
-               VALUES ($1, $2, $3, $4) RETURNING id`,
-              [passageId, bIdx + 1, block.type, block.range]
+              `INSERT INTO question_blocks (passage_id, block_order, question_type, question_range, content)
+               VALUES ($1, $2, $3, $4, $5) RETURNING id`,
+              [passageId, bIdx + 1, block.type, block.range, block.content || null]
             );
             const blockId = bRes.rows[0].id;
 

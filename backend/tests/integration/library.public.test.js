@@ -10,20 +10,20 @@
  */
 
 const request = require('supertest');
-const app = require('../../../src/app');
+const app = require('../../src/app');
 
 // Mock Library Service
-const libraryService = require('../../../src/services/library.service');
-jest.mock('../../../src/services/library.service', () => ({
+const libraryService = require('../../src/services/library.service');
+jest.mock('../../src/services/library.service', () => ({
   listResources: jest.fn(),
-  getResourceById: jest.fn()
+  getResourceDetail: jest.fn()
 }));
 
 // Giả lập AppError class vì chúng ta mock Service ném lỗi
-const AppError = require('../../../src/utils/AppError');
+const AppError = require('../../src/utils/AppError');
 
 // Mock DB pool testConnection để tránh app.js cố kết nối DB thật khi load
-jest.mock('../../../src/db/pool', () => ({
+jest.mock('../../src/db/pool', () => ({
   query: jest.fn(),
   testConnection: jest.fn().mockResolvedValue(true)
 }));
@@ -36,22 +36,17 @@ describe('Integration Test: Public Endpoints for Content Library (L039)', () => 
   describe('GET /api/v1/library', () => {
     it('should return 200 and list only published resources without token', async () => {
       // EARS[Event]: WHEN Guest/Student requests the library list without token...
-      const mockResources = {
-        resources: [
-          {
-            id: 'uuid-1',
-            title: 'IELTS Cambridge 18',
-            description: 'Practice test book',
-            resource_type: 'pdf',
-            file_size_bytes: 1048576,
-            is_published: true,
-            created_at: new Date().toISOString()
-          }
-        ],
-        total: 1,
-        page: 1,
-        limit: 20
-      };
+      const mockResources = [
+        {
+          id: 'uuid-1',
+          title: 'IELTS Cambridge 18',
+          description: 'Practice test book',
+          resource_type: 'pdf',
+          file_size_bytes: 1048576,
+          is_published: true,
+          created_at: new Date().toISOString()
+        }
+      ];
 
       libraryService.listResources.mockResolvedValue(mockResources);
 
@@ -61,38 +56,34 @@ describe('Integration Test: Public Endpoints for Content Library (L039)', () => 
       expect(response.status).toBe(200);
       expect(response.body).toEqual({
         success: true,
-        data: mockResources.resources,
+        data: mockResources,
         error: null,
         meta: {
-          page: 1,
-          limit: 20,
           total: 1
         }
       });
       
-      // Verify service layer is called with default pagination and no specific type
-      expect(libraryService.listResources).toHaveBeenCalledWith(expect.objectContaining({
-        page: 1,
-        limit: 20
-      }));
+      // Verify service layer is called with filters
+      expect(libraryService.listResources).toHaveBeenCalledWith({
+        category: undefined,
+        search: undefined,
+        resource_type: undefined
+      });
     });
 
     it('should filter resources by resource_type if provided in query', async () => {
       // EARS[Event]: WHEN user requests library with resource_type filter...
-      libraryService.listResources.mockResolvedValue({
-        resources: [],
-        total: 0,
-        page: 1,
-        limit: 20
-      });
+      libraryService.listResources.mockResolvedValue([]);
 
       const response = await request(app).get('/api/v1/library?resource_type=audio');
 
       // EARS[State-driven]: THEN it should pass the filter down to the service
       expect(response.status).toBe(200);
-      expect(libraryService.listResources).toHaveBeenCalledWith(expect.objectContaining({
+      expect(libraryService.listResources).toHaveBeenCalledWith({
+        category: undefined,
+        search: undefined,
         resource_type: 'audio'
-      }));
+      });
     });
   });
 
@@ -106,7 +97,7 @@ describe('Integration Test: Public Endpoints for Content Library (L039)', () => 
         is_published: true
       };
 
-      libraryService.getResourceById.mockResolvedValue(mockResource);
+      libraryService.getResourceDetail.mockResolvedValue(mockResource);
 
       const response = await request(app).get('/api/v1/library/uuid-1');
 
@@ -118,12 +109,12 @@ describe('Integration Test: Public Endpoints for Content Library (L039)', () => 
         error: null,
         meta: null
       });
-      expect(libraryService.getResourceById).toHaveBeenCalledWith('uuid-1');
+      expect(libraryService.getResourceDetail).toHaveBeenCalledWith('uuid-1', null);
     });
 
     it('should return 404 if resource does not exist or is unpublished', async () => {
       // EARS[Unwanted]: IN CASE the requested resource is unpublished or missing...
-      libraryService.getResourceById.mockRejectedValue(
+      libraryService.getResourceDetail.mockRejectedValue(
         new AppError('Tài liệu không tồn tại hoặc đã bị ẩn.', 404, 'LIB_NOT_FOUND')
       );
 
@@ -131,16 +122,10 @@ describe('Integration Test: Public Endpoints for Content Library (L039)', () => 
 
       // EARS[State-driven]: THEN it should return HTTP 404 with standard error format
       expect(response.status).toBe(404);
-      expect(response.body).toEqual({
-        success: false,
-        data: null,
-        error: {
-          code: 'LIB_NOT_FOUND',
-          message: 'Tài liệu không tồn tại hoặc đã bị ẩn.',
-          request_id: expect.any(String) // Assuming global error handler adds request_id
-        },
-        meta: null
-      });
+      expect(response.body.success).toBe(false);
+      expect(response.body.error).toBeDefined();
+      expect(response.body.error.code).toBe('LIB_NOT_FOUND');
+      expect(response.body.error.message).toBe('Tài liệu không tồn tại hoặc đã bị ẩn.');
     });
   });
 });

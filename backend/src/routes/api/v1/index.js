@@ -8,6 +8,8 @@ const testRoutes = require('./tests');
 const submissionsRoutes = require('./submissions.routes');
 const libraryRoutes = require('./library.routes');
 const attemptRoutes = require('./attempts.routes');
+const audioRoutes = require('./audio.routes');
+const assistantRoutes = require('../../../api/assistant/assistant.routes');
 
 // Health check endpoint for API v1
 router.get('/health', (req, res) => {
@@ -29,5 +31,7 @@ router.use('/tests', testRoutes);
 router.use('/submissions', submissionsRoutes);
 router.use('/library', libraryRoutes);
 router.use('/attempts', attemptRoutes);
+router.use('/audio', audioRoutes);
+router.use('/assistant', assistantRoutes);
 
 module.exports = router;

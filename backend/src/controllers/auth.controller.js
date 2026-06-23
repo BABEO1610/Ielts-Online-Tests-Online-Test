@@ -348,7 +348,7 @@ const googleCallback = async (req, res, next) => {
     } else if (user?.role === 'tutor') {
       return res.redirect(`${frontendUrl}/tutor/dashboard`);
     } else {
-      return res.redirect(`${frontendUrl}/dashboard`);
+      return res.redirect(`${frontendUrl}/`);
     }
   } catch (error) {
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
