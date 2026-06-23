@@ -22,7 +22,7 @@ class TestController {
 
   static async getTests(req, res, next) {
     try {
-      const tests = await TestService.getTests();
+      const tests = await TestService.getTests(req.query);
       
       res.status(200).json({
         success: true,
@@ -53,6 +53,30 @@ class TestController {
   static async getTestById(req, res, next) {
     try {
       const test = await TestService.getTestById(req.params.id);
+      
+      if (!test) {
+        return res.status(404).json({
+          success: false,
+          data: null,
+          meta: null,
+          error: { message: 'Test not found' }
+        });
+      }
+
+      res.status(200).json({
+        success: true,
+        data: test,
+        meta: null,
+        error: null
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async getTestForStudent(req, res, next) {
+    try {
+      const test = await TestService.getTestForStudent(req.params.id);
       
       if (!test) {
         return res.status(404).json({

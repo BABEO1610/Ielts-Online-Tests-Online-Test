@@ -1,6 +1,5 @@
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useLocation, useNavigate } from 'react-router-dom';
-import StudentNavbar from '../../components/layout/StudentNavbar';
 import TimerBar from '../../components/objective-testing/TimerBar';
 import SpeakingIntroScreen from '../../components/grading/SpeakingIntroScreen';
 import Part2Screen from '../../components/grading/Part2Screen';
@@ -8,7 +7,7 @@ import SpeakingSummaryScreen from '../../components/grading/SpeakingSummaryScree
 import SpeakingProgressBar from '../../components/grading/SpeakingProgressBar';
 import ExamRecorder from '../../components/grading/ExamRecorder';
 import FeedbackReport from '../../components/grading/FeedbackReport';
-import { MOCK_EXAMS } from './SpeakingPage';
+import { testService } from '../../services/test.service';
 import gradingService from '../../services/grading.service';
 
 const PART1_PER_Q = 40;  // 40s/câu → ~4 phút cho 6 câu (chuẩn IELTS Part 1)
@@ -272,14 +271,118 @@ const SpeakingTestScreen = ({ exam, practiceMode, customTimeLimit }) => {
   );
 };
 
+const parseSpeakingQuestions = (content) => {
+  if (!content) return [];
+  if (Array.isArray(content)) {
+    return content.map((item, idx) => (
+      typeof item === 'string' ? { id: `q${idx + 1}`, text: item } : item
+    ));
+  }
+
+  return content
+    .split('\n')
+    .map(line => line.trim())
+    .filter(Boolean)
+    .map((text, idx) => ({ id: `q${idx + 1}`, text }));
+};
+
+const buildSpeakingParts = (passages = []) => passages.map((passage, idx) => {
+  if (idx === 0) {
+    return {
+      partName: passage.title || 'Part 1: Introduction and Interview',
+      description: passage.instruction || 'Answer questions about yourself and familiar topics.',
+      questions: parseSpeakingQuestions(passage.content),
+      duration: '4-5 phút'
+    };
+  }
+  if (idx === 1) {
+    return {
+      partName: passage.title || 'Part 2: Long Turn',
+      description: passage.instruction || 'Cue card bullet points',
+      prompt: passage.title && passage.title !== 'Speaking Part 2' ? passage.title : passage.content || '',
+      preparationTime: 60,
+      speakingTime: 120,
+      duration: '3-4 phút'
+    };
+  }
+  if (idx === 2) {
+    return {
+      partName: passage.title || 'Part 3: Discussion',
+      description: passage.instruction || 'Follow-up discussion',
+      questions: parseSpeakingQuestions(passage.content),
+      duration: '4-5 phút'
+    };
+  }
+  return {
+    partName: passage.title || `Part ${idx + 1}`,
+    description: passage.instruction || '',
+    prompt: passage.content || '',
+    questions: parseSpeakingQuestions(passage.content),
+    duration: '4-5 phút'
+  };
+});
+
 export default function SpeakingTestPage() {
   const { id } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
   const practiceMode = location.state?.practiceMode || false;
   const customTimeLimit = location.state?.customTimeLimit || null;
+  const initialExam = location.state?.exam || null;
+  const [exam, setExam] = useState(initialExam);
+  const [loading, setLoading] = useState(!initialExam);
+  const [error, setError] = useState(null);
 
-  const exam = MOCK_EXAMS.find(e => e.id.toString() === id);
+  useEffect(() => {
+    const loadExam = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const res = await testService.getTestById(id);
+        if (res.success && res.data) {
+          const fullExam = res.data;
+          const parts = buildSpeakingParts(fullExam.passages || []);
+          setExam({
+            ...fullExam,
+            parts,
+            topic: fullExam.topic || fullExam.title || 'Tổng hợp',
+          });
+        } else {
+          setError(res.error?.message || 'Không thể tải đề thi Speaking.');
+        }
+      } catch (err) {
+        setError('Không thể tải đề thi Speaking.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (!initialExam || initialExam.id.toString() !== id) {
+      loadExam();
+    }
+  }, [id, initialExam]);
+
+  if (loading) {
+    return (
+      <div className="bg-white min-vh-100 d-flex align-items-center justify-content-center">
+        <div className="text-center">
+          <div className="spinner-border text-dark" role="status" style={{ width: '3rem', height: '3rem' }} />
+          <p className="mt-3">Đang tải đề thi Speaking...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="bg-white min-vh-100 d-flex align-items-center justify-content-center">
+        <div className="text-center">
+          <h3 className="fw-bold mb-3 text-danger">{error}</h3>
+          <button className="btn btn-dark rounded-pill px-4" onClick={() => navigate('/speaking')}>Quay lại</button>
+        </div>
+      </div>
+    );
+  }
 
   if (!exam) {
     return (

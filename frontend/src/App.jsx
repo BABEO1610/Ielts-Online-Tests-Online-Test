@@ -1,4 +1,3 @@
-import React from 'react';
 import { BrowserRouter, Routes, Route, Link, Navigate } from 'react-router-dom';
 
 // ── Auth Guard ─────────────────────────────────────────────────────────────────
@@ -28,7 +27,6 @@ import TutorActivityLogPage from './pages/tutor/TutorActivityLogPage';
 import TutorLibraryPage from './pages/tutor/TutorLibraryPage';
 import TutorLibraryCreatePage from './pages/tutor/TutorLibraryCreatePage';
 import TutorLibraryEditPage from './pages/tutor/TutorLibraryEditPage';
-import StudentLayout from './layouts/StudentLayout';
 import ProfileLayout from './layouts/ProfileLayout';
 
 // ── Admin Section — Layout + nested pages ──────────────────────────────────────
@@ -81,6 +79,7 @@ import TestResultDetailPage from './pages/objective-testing/TestResultDetailPage
 // ── Objective Testing — Tutor / Admin Views ────────────────────────────────────
 
 import AuditLogPage from './pages/objective-testing/AuditLogPage';
+import GlobalAssistantButton from './features/global-assistant/components/GlobalAssistantButton';
 
 import './App.css';
 
@@ -274,6 +273,7 @@ function App() {
         <Route path="*" element={<NotFoundPage />} />
 
       </Routes>
+      <GlobalAssistantButton />
     </BrowserRouter>
   );
 }

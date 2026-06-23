@@ -37,6 +37,94 @@ function TutorReadingFormPage({ testId }) {
     { id: 3, title: '', content: '', instruction: 'Read the passage below and answer Questions 27–40.', defaultRange: '27–40', blocks: [] }
   ]);
 
+  /**
+   * Normalize a block fetched from DB (getTestById response) into the shape
+   * that editors (MultipleChoiceEditor, MatchingEditor, etc.) expect.
+   *
+   * DB shape:  { id (UUID), type, range, questions: [{ id (UUID), text, options (JSONB), correctAnswer, correctAnswers (JSONB), explanation }] }
+   * Editor shape: { id (number), type, range, options: [{id (number), text}], questions: [{id (number), text, options, correctAnswers (array of option ids), correctAnswer, explanation}] }
+   */
+  const normalizeBlockFromDB = (block) => {
+    const blockId = Date.now() + Math.random();
+
+    // ── Multiple Choice ──────────────────────────────────────────────────────
+    // Per-question options stored in q.options as JSONB
+    if (block.type === 'Multiple Choice') {
+      const questions = (block.questions || []).map((q, qi) => {
+        // options: [{label:'A',text:'...'}, ...] or [{id,text},...] or [string,...]
+        let rawOpts = q.options;
+        if (typeof rawOpts === 'string') { try { rawOpts = JSON.parse(rawOpts); } catch { rawOpts = []; } }
+        rawOpts = Array.isArray(rawOpts) ? rawOpts : [];
+
+        const normalizedOpts = rawOpts.map((opt, oi) => ({
+          id: Date.now() + qi * 100 + oi + 1,
+          text: typeof opt === 'object' ? (opt.text || opt.label || '') : String(opt),
+        }));
+
+        // correctAnswers: stored as JSONB — could be array of option labels/texts or indices
+        let rawCA = q.correctAnswers;
+        if (typeof rawCA === 'string') { try { rawCA = JSON.parse(rawCA); } catch { rawCA = []; } }
+        rawCA = Array.isArray(rawCA) ? rawCA : [];
+        // Map correctAnswers values to matching option ids
+        const correctAnswerIds = rawCA.map(ca => {
+          const caStr = String(ca);
+          const match = normalizedOpts.find(o => o.text === caStr || String.fromCharCode(65 + normalizedOpts.indexOf(o)) === caStr);
+          return match ? match.id : normalizedOpts[0]?.id;
+        }).filter(Boolean);
+
+        return {
+          id: Date.now() + qi * 100,
+          text: q.text || '',
+          explanation: q.explanation || '',
+          options: normalizedOpts,
+          correctAnswers: correctAnswerIds,
+        };
+      });
+      return { id: blockId, type: block.type, range: block.range || '', questions };
+    }
+
+    // ── Matching types ───────────────────────────────────────────────────────
+    if (['Matching Headings', 'Matching Information', 'Matching Features', 'Matching Sentence Endings'].includes(block.type)) {
+      // Block-level options pool: stored in first question's options JSONB, or block.options
+      let rawOpts = block.options || (block.questions?.[0]?.options) || [];
+      if (typeof rawOpts === 'string') { try { rawOpts = JSON.parse(rawOpts); } catch { rawOpts = []; } }
+      rawOpts = Array.isArray(rawOpts) ? rawOpts : [];
+
+      const normalizedOpts = rawOpts.map((opt, oi) => ({
+        id: Date.now() + oi + 1,
+        text: typeof opt === 'object' ? (opt.text || opt.label || '') : String(opt),
+      }));
+
+      const questions = (block.questions || []).map((q, qi) => {
+        // correctAnswer is the label (A, B, C...) or option text
+        const ca = q.correctAnswer || '';
+        // Try to find the option id matching by label letter
+        const letterIdx = ca.charCodeAt(0) - 65; // 'A'→0, 'B'→1...
+        const matchId = normalizedOpts[letterIdx]?.id || normalizedOpts.find(o => o.text === ca)?.id || '';
+
+        return {
+          id: Date.now() + qi * 100,
+          text: q.text || '',
+          correctAnswer: matchId,
+          explanation: q.explanation || '',
+        };
+      });
+
+      return { id: blockId, type: block.type, range: block.range || '', options: normalizedOpts, questions };
+    }
+
+    // ── Completion / Short-answer types ──────────────────────────────────────
+    const questions = (block.questions || []).map((q, qi) => ({
+      id: Date.now() + qi * 100,
+      text: q.text || '',
+      correctAnswer: q.correctAnswer || '',
+      explanation: q.explanation || '',
+    }));
+    return { id: blockId, type: block.type, range: block.range || '', questions };
+  };
+
+
+
   useEffect(() => {
     if (testId) {
       const loadTest = async () => {
@@ -53,12 +141,12 @@ function TutorReadingFormPage({ testId }) {
             });
             if (t.passages && t.passages.length > 0) {
               setPassages(t.passages.map(p => ({
-                id: p.passageNumber, // we use passageNumber as id in frontend state
+                id: p.passageNumber,
                 title: p.title || '',
                 content: p.content || '',
                 instruction: p.instruction || '',
-                defaultRange: p.blocks && p.blocks.length > 0 ? p.blocks[0].range : '', // approximation
-                blocks: p.blocks || []
+                defaultRange: p.blocks && p.blocks.length > 0 ? p.blocks[0].range : '',
+                blocks: (p.blocks || []).map(b => normalizeBlockFromDB(b))
               })));
             }
           }
@@ -72,6 +160,7 @@ function TutorReadingFormPage({ testId }) {
       loadTest();
     }
   }, [testId]);
+
 
   const handleChange = (field, value) => setFormData(prev => ({ ...prev, [field]: value }));
 
@@ -132,7 +221,7 @@ function TutorReadingFormPage({ testId }) {
       const payload = {
         ...formData,
         passages,
-        publishAt: isDraft ? null : new Date().toISOString()
+        publishAt: null // Always require admin approval
       };
       
       let res;
@@ -143,7 +232,7 @@ function TutorReadingFormPage({ testId }) {
       }
 
       if (res.success) {
-        alert(isDraft ? 'Draft saved successfully!' : 'Test saved and published!');
+        alert('Test submitted for approval successfully!');
         navigate('/tutor/tests'); // Or wherever we should redirect
       } else {
         alert('Failed to save test: ' + (res.error?.message || 'Unknown error'));
@@ -273,11 +362,8 @@ function TutorReadingFormPage({ testId }) {
       <div className="form-card mb-4">
         <div className="d-flex gap-3 mt-2">
           <button className="button-secondary flex-fill" style={{ padding: '14px 0', border: '1px solid var(--primary)', color: 'var(--primary)' }} onClick={() => setShowPreview(true)}>Preview Test</button>
-          <button className="button-primary flex-fill" style={{ padding: '14px 0' }} disabled={isSubmitting} onClick={() => handleSaveTest(false)}>
-            {isSubmitting ? 'Saving...' : 'Save Test'}
-          </button>
-          <button className="button-secondary flex-fill" style={{ padding: '14px 0' }} disabled={isSubmitting} onClick={() => handleSaveTest(true)}>
-            {isSubmitting ? 'Saving...' : 'Save as Draft'}
+          <button className="button-primary flex-fill" style={{ padding: '14px 0' }} disabled={isSubmitting} onClick={() => handleSaveTest(true)}>
+            {isSubmitting ? 'Saving...' : 'Submit for Approval'}
           </button>
         </div>
       </div>

@@ -66,6 +66,16 @@ class ContentService {
     test.passages = passages;
     test.questions = questions;
 
+    // Add normalized sections for Listening tests to match TestService structure
+    if (test.skill === 'listening') {
+      const TestService = require('./test.service');
+      const fullTest = await TestService.getTestById(testId);
+      if (fullTest) {
+        test.sections = fullTest.sections;
+        test.passages = fullTest.passages;
+      }
+    }
+
     return test;
   }
 

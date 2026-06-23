@@ -14,7 +14,7 @@ function TutorTestManagePage() {
 
   const fetchTests = async () => {
     try {
-      const res = await testService.getTests();
+      const res = await testService.getTests({ tutor: true });
       if (res.success) {
         setTests(res.data || []);
       }
@@ -45,6 +45,21 @@ function TutorTestManagePage() {
     }
   };
 
+  const getStatusBadge = (status) => {
+    switch (status) {
+      case 'published':
+        return <span className="badge-status published">Published</span>;
+      case 'draft':
+        return <span className="badge-status draft" style={{backgroundColor: '#f3f4f6', color: '#4b5563', border: '1px solid #d1d5db', borderRadius: '9999px', padding: '0.25rem 0.75rem', fontSize: '0.875rem', fontWeight: 500}}>Draft</span>;
+      case 'pending':
+        return <span className="badge-status pending" style={{backgroundColor: '#fef3c7', color: '#92400e', border: '1px solid #fde68a', borderRadius: '9999px', padding: '0.25rem 0.75rem', fontSize: '0.875rem', fontWeight: 500}}>Pending Review</span>;
+      case 'rejected':
+        return <span className="badge-status rejected" style={{backgroundColor: '#fee2e2', color: '#b91c1c', border: '1px solid #fecaca', borderRadius: '9999px', padding: '0.25rem 0.75rem', fontSize: '0.875rem', fontWeight: 500}}>Rejected</span>;
+      default:
+        return <span className="badge-status">{status}</span>;
+    }
+  };
+
   return (
     <div className="container py-4" style={{ maxWidth: 1100 }}>
       <div className="d-flex justify-content-between align-items-center mb-4">
@@ -61,6 +76,7 @@ function TutorTestManagePage() {
         <select id="filter-tutor-status" defaultValue="">
           <option value="">All Status</option>
           <option value="published">Published</option>
+          <option value="pending">Pending Review</option>
           <option value="draft">Draft</option>
         </select>
         <select id="filter-tutor-skill" defaultValue="">
@@ -105,9 +121,7 @@ function TutorTestManagePage() {
                     <td><span className="badge-difficulty">{formatLabel(t.difficulty)}</span></td>
                     <td className="text-nowrap">{t.skill === 'writing' ? '2 tasks' : `${t.questions || 0}/40`}</td>
                     <td>
-                      <span className={`badge-status ${t.status}`}>
-                        {t.status === 'published' ? 'Published' : 'Draft'}
-                      </span>
+                      {getStatusBadge(t.status)}
                     </td>
                     <td className="body-sm text-nowrap" style={{ color: 'var(--body)' }}>{t.createdAt}</td>
                     <td>

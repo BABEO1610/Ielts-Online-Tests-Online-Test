@@ -4,6 +4,7 @@ import { Loader, Play } from 'lucide-react';
 import ListeningQuestionBlockEditor from '../../components/tutor/listening/ListeningQuestionBlockEditor';
 import ListeningTestPreviewModal from '../../components/tutor/listening/ListeningTestPreviewModal';
 import { testService } from '../../services/test.service';
+import api from '../../services/api';
 import '../../styles/objective-testing.css';
 
 const LISTENING_QUESTION_TYPES = [
@@ -17,10 +18,10 @@ const LISTENING_QUESTION_TYPES = [
 ];
 
 const DEFAULT_SECTIONS = [
-  { id: 1, title: '', audioUrl: '', transcript: '', showTranscript: true, defaultRange: '1-10', blocks: [] },
-  { id: 2, title: '', audioUrl: '', transcript: '', showTranscript: true, defaultRange: '11-20', blocks: [] },
-  { id: 3, title: '', audioUrl: '', transcript: '', showTranscript: true, defaultRange: '21-30', blocks: [] },
-  { id: 4, title: '', audioUrl: '', transcript: '', showTranscript: true, defaultRange: '31-40', blocks: [] },
+  { id: 1, title: '', transcript: '', showTranscript: true, defaultRange: '1-10', blocks: [] },
+  { id: 2, title: '', transcript: '', showTranscript: true, defaultRange: '11-20', blocks: [] },
+  { id: 3, title: '', transcript: '', showTranscript: true, defaultRange: '21-30', blocks: [] },
+  { id: 4, title: '', transcript: '', showTranscript: true, defaultRange: '31-40', blocks: [] },
 ];
 
 const readAudioAsDataUrl = (file) => new Promise((resolve, reject) => {
@@ -32,17 +33,18 @@ const readAudioAsDataUrl = (file) => new Promise((resolve, reject) => {
 
 function TutorListeningFormPage({ testId }) {
   const navigate = useNavigate();
-  const fileInputRef = useRef(null);
-  const [uploadTargetSectionId, setUploadTargetSectionId] = useState(null);
+  const audioFileInputRef = useRef(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(!!testId);
+  const [isUploadingAudio, setIsUploadingAudio] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
-  const [previewAudioSectionId, setPreviewAudioSectionId] = useState(null);
+  const [showAudioPlayer, setShowAudioPlayer] = useState(false);
   const [formData, setFormData] = useState({
     title: '',
     description: '',
     difficulty: 'intermediate',
     duration: 30,
+    audioUrl: '',
   });
 
   const [sections, setSections] = useState(DEFAULT_SECTIONS);
@@ -60,13 +62,13 @@ function TutorListeningFormPage({ testId }) {
             description: test.description || '',
             difficulty: test.difficulty || 'intermediate',
             duration: test.duration || 30,
+            audioUrl: test.audioUrl || '',
           });
 
           if (Array.isArray(test.sections) && test.sections.length > 0) {
             setSections(test.sections.map((section, idx) => ({
               id: section.sectionNumber || idx + 1,
               title: section.title || '',
-              audioUrl: section.audioUrl || '',
               transcript: section.transcript || '',
               showTranscript: section.showTranscript !== false,
               defaultRange: section.defaultRange || `${idx * 10 + 1}-${idx * 10 + 10}`,
@@ -134,40 +136,53 @@ function TutorListeningFormPage({ testId }) {
     }));
   };
 
-  const handleUploadClick = (sectionId) => {
-    setUploadTargetSectionId(sectionId);
-    fileInputRef.current?.click();
+  const handleAudioUploadClick = () => {
+    audioFileInputRef.current?.click();
   };
 
   const handleAudioFileChange = async (event) => {
     const file = event.target.files?.[0];
-    if (!file || !uploadTargetSectionId) return;
+    if (!file) return;
 
     if (!file.type.startsWith('audio/')) {
       alert('Please choose an audio file.');
       event.target.value = '';
       return;
     }
-    if (file.size > 8 * 1024 * 1024) {
-      alert('Please choose an audio file smaller than 8MB.');
+    if (file.size > 50 * 1024 * 1024) {
+      alert('Please choose an audio file smaller than 50MB.');
       event.target.value = '';
       return;
     }
 
+    setIsUploadingAudio(true);
     try {
-      const audioUrl = await readAudioAsDataUrl(file);
-      updateSection(uploadTargetSectionId, 'audioUrl', audioUrl);
-      setPreviewAudioSectionId(uploadTargetSectionId);
+      const uploadData = new FormData();
+      uploadData.append('audio', file);
+      
+      const res = await api.post('/audio/upload', uploadData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      
+      if (res.data.success) {
+        handleChange('audioUrl', res.data.data.url);
+        setShowAudioPlayer(true);
+      } else {
+        throw new Error(res.data.error?.message || 'Upload failed');
+      }
     } catch (err) {
-      console.error('Failed to read audio file', err);
-      alert('Failed to read the selected audio file.');
+      console.error('Failed to upload audio file', err);
+      alert('Failed to upload the selected audio file. ' + (err.response?.data?.error?.message || err.message));
     } finally {
+      setIsUploadingAudio(false);
       event.target.value = '';
     }
   };
 
-  const handlePreviewAudio = (sectionId) => {
-    setPreviewAudioSectionId(prev => prev === sectionId ? null : sectionId);
+  const handleToggleAudioPlayer = () => {
+    setShowAudioPlayer(prev => !prev);
   };
 
   const calculateTotalQuestions = () => {
@@ -189,28 +204,48 @@ function TutorListeningFormPage({ testId }) {
     return total;
   };
 
-  const buildPayload = (isDraft) => ({
-    ...formData,
+  const buildPayload = () => ({
+    title: formData.title,
+    description: formData.description,
+    difficulty: formData.difficulty,
+    duration: formData.duration,
+    audioUrl: formData.audioUrl,
     skill: 'listening',
     sections,
-    publishAt: isDraft ? null : new Date().toISOString(),
+    publishAt: null, // Always require admin approval
   });
 
   const handleSaveTest = async (isDraft) => {
     try {
+      // Validation
       if (!formData.title.trim()) {
         alert('Test title is required');
         return;
       }
 
+      if (!formData.audioUrl && !isDraft) {
+        alert('Audio file is required before publishing');
+        return;
+      }
+
+      // Warning for non-standard question count (not blocking)
+      if (totalQuestions !== 40 && !isDraft) {
+        const confirmed = window.confirm(
+          `Standard IELTS Listening test has 40 questions.\n` +
+          `Current test has ${totalQuestions} questions.\n\n` +
+          `Do you want to publish anyway?`
+        );
+        if (!confirmed) return;
+      }
+
       setIsSubmitting(true);
-      const payload = buildPayload(isDraft);
+      const payload = buildPayload();
       const res = testId
         ? await testService.updateTest(testId, payload)
         : await testService.createTest(payload);
 
       if (res.success) {
-        alert(isDraft ? 'Draft saved successfully!' : 'Test saved and published!');
+        alert('Test submitted for approval successfully!');
         navigate('/tutor/tests');
       } else {
         alert('Failed to save test: ' + (res.error?.message || 'Unknown error'));
@@ -266,6 +301,56 @@ function TutorListeningFormPage({ testId }) {
           </div>
         </div>
 
+        <div className="form-card mb-4" style={{ borderLeft: '4px solid var(--primary)' }}>
+          <h4 className="mb-3">Audio File (All 4 Sections)</h4>
+          <p className="body-sm text-secondary mb-3">
+            Upload ONE audio file containing all 4 sections of the listening test. The audio will play continuously from start to finish.
+          </p>
+          
+          <div className="form-group">
+            <label>Audio File or URL</label>
+            <div className="d-flex gap-2 align-items-center">
+              <input 
+                type="text" 
+                placeholder="https://... or upload a file" 
+                style={{ flex: 1 }} 
+                value={formData.audioUrl} 
+                onChange={(e) => handleChange('audioUrl', e.target.value)} 
+              />
+              <button 
+                type="button" 
+                className="button-secondary" 
+                style={{ width: 'auto', padding: '0 16px' }} 
+                onClick={handleAudioUploadClick}
+                disabled={isUploadingAudio}
+              >
+                {isUploadingAudio ? 'Uploading...' : 'Upload'}
+              </button>
+              {formData.audioUrl && (
+                <button 
+                  type="button" 
+                  className="button-secondary d-inline-flex align-items-center gap-2" 
+                  style={{ width: 'auto', padding: '0 16px', color: 'var(--primary)', borderColor: 'var(--primary)' }} 
+                  onClick={handleToggleAudioPlayer}
+                >
+                  <Play size={16} /> {showAudioPlayer ? 'Hide' : 'Preview'} Audio
+                </button>
+              )}
+            </div>
+            {showAudioPlayer && formData.audioUrl && (
+              <audio controls src={formData.audioUrl} className="mt-2" style={{ width: '100%' }}>
+                Your browser does not support audio playback.
+              </audio>
+            )}
+            {isUploadingAudio && (
+              <div className="mt-2 body-sm text-secondary">
+                <Loader className="spin d-inline-block me-2" size={14} />
+                Uploading audio file... This may take a moment for large files.
+              </div>
+            )}
+          </div>
+        </div>
+
         {sections.map(section => (
           <div key={section.id} className="form-card mb-4" style={{ borderLeft: '4px solid var(--warning)' }}>
             <div className="d-flex justify-content-between align-items-center mb-3">
@@ -281,24 +366,6 @@ function TutorListeningFormPage({ testId }) {
             <div className="form-group">
               <label>Section Title</label>
               <input type="text" placeholder="e.g. Booking a Hotel Room" value={section.title} onChange={(e) => updateSection(section.id, 'title', e.target.value)} />
-            </div>
-
-            <div className="form-group">
-              <label>Audio File or URL</label>
-              <div className="d-flex gap-2 align-items-center">
-                <input type="text" placeholder="https://..." style={{ flex: 1 }} value={section.audioUrl} onChange={(e) => updateSection(section.id, 'audioUrl', e.target.value)} />
-                <button type="button" className="button-secondary" style={{ width: 'auto', padding: '0 16px' }} onClick={() => handleUploadClick(section.id)}>Upload</button>
-                {section.audioUrl && (
-                  <button type="button" className="button-secondary d-inline-flex align-items-center gap-2" style={{ width: 'auto', padding: '0 16px', color: 'var(--primary)', borderColor: 'var(--primary)' }} onClick={() => handlePreviewAudio(section.id)}>
-                    <Play size={16} /> Preview Audio
-                  </button>
-                )}
-              </div>
-              {previewAudioSectionId === section.id && section.audioUrl && (
-                <audio controls src={section.audioUrl} className="mt-2" style={{ width: '100%' }}>
-                  Your browser does not support audio playback.
-                </audio>
-              )}
             </div>
 
             <div className="form-group">
@@ -357,12 +424,18 @@ function TutorListeningFormPage({ testId }) {
 
         <div className="form-card mb-4 text-center py-4" style={{ backgroundColor: 'var(--surface-sunken)', border: 'none' }}>
           <h4 className="mb-1">Summary</h4>
-          <div style={{ fontSize: '1.25rem', fontWeight: 600, color: totalQuestions === 40 ? 'var(--success)' : (totalQuestions > 40 ? 'var(--danger)' : 'var(--text-primary)') }}>
+          <div style={{ fontSize: '1.25rem', fontWeight: 600, color: totalQuestions === 40 ? 'var(--success)' : (totalQuestions > 40 ? 'var(--danger)' : 'var(--warning)') }}>
             Total Questions: {totalQuestions} / 40
           </div>
           {totalQuestions !== 40 && (
-            <div className="body-sm text-secondary mt-1">
-              Please ensure you have exactly 40 questions before publishing.
+            <div className="body-sm mt-2" style={{ color: totalQuestions > 40 ? 'var(--danger)' : 'var(--warning)' }}>
+              {totalQuestions < 40 && '⚠️ Standard IELTS Listening test has 40 questions.'}
+              {totalQuestions > 40 && '❌ Too many questions! IELTS Listening test must have exactly 40 questions.'}
+            </div>
+          )}
+          {totalQuestions === 40 && (
+            <div className="body-sm text-success mt-1">
+              ✅ Perfect! Standard IELTS question count.
             </div>
           )}
         </div>
@@ -370,21 +443,19 @@ function TutorListeningFormPage({ testId }) {
         <div className="form-card mb-4">
           <div className="d-flex gap-3 mt-2">
             <button type="button" className="button-secondary flex-fill" style={{ padding: '14px 0', border: '1px solid var(--primary)', color: 'var(--primary)' }} onClick={() => setShowPreview(true)}>Preview Test</button>
-            <button type="button" className="button-secondary flex-fill" style={{ padding: '14px 0' }} disabled={isSubmitting} onClick={() => handleSaveTest(true)}>
-              {isSubmitting ? 'Saving...' : 'Save as Draft'}
-            </button>
-            <button type="button" className="button-primary flex-fill" style={{ padding: '14px 0' }} disabled={isSubmitting} onClick={() => handleSaveTest(false)}>
-              {isSubmitting ? 'Saving...' : 'Publish Test'}
+            <button type="button" className="button-primary flex-fill" style={{ padding: '14px 0' }} disabled={isSubmitting} onClick={() => handleSaveTest(true)}>
+              {isSubmitting ? 'Saving...' : 'Submit for Approval'}
             </button>
           </div>
         </div>
-        <input ref={fileInputRef} type="file" accept="audio/*" className="d-none" onChange={handleAudioFileChange} />
+        <input ref={audioFileInputRef} type="file" accept="audio/*" className="d-none" onChange={handleAudioFileChange} />
       </div>
 
       {showPreview && (
         <ListeningTestPreviewModal
           formData={formData}
           sections={sections}
+          audioUrl={formData.audioUrl}
           onClose={() => setShowPreview(false)}
         />
       )}
