@@ -80,8 +80,16 @@ const Part2Screen = ({ part, onComplete }) => {
                </p>
             </div>
             
-            <div className="prompt-content mb-4 flex-grow-1" style={{ fontSize: '20px', fontFamily: 'UberMoveText, system-ui, sans-serif', fontWeight: 500, whiteSpace: 'pre-line', lineHeight: '1.8', color: '#000' }}>
-              {part.prompt}
+            <div className="prompt-content mb-4 flex-grow-1" style={{ fontFamily: 'UberMoveText, system-ui, sans-serif', color: '#000' }}>
+              <div style={{ fontSize: '20px', fontWeight: 500, whiteSpace: 'pre-line', lineHeight: '1.8' }}>
+                {part.prompt}
+              </div>
+              {part.bulletPoints && (
+                <div className="mt-4 p-3 rounded-4" style={{ backgroundColor: '#fdfdfd', border: '1px solid #e9e9e9', fontSize: '16px', lineHeight: '1.8' }}>
+                  <p className="fw-bold mb-2">You should say:</p>
+                  <div style={{ whiteSpace: 'pre-line', color: '#333' }}>{part.bulletPoints}</div>
+                </div>
+              )}
             </div>
             
             <div className="p-4 rounded-4 mt-auto" style={{ backgroundColor: '#f8f9fa', border: '1px solid #f0f0f0' }}>

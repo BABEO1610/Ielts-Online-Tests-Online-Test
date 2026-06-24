@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Loader } from 'lucide-react';
 import QuestionBlockEditor from '../../components/tutor/reading/QuestionBlockEditor';
 import ReadingTestPreviewModal from '../../components/tutor/reading/ReadingTestPreviewModal';
+import BulkAddModal from '../../components/tutor/BulkAddModal';
 import { testService } from '../../services/test.service';
 import '../../styles/objective-testing.css';
 
@@ -26,6 +27,7 @@ function TutorReadingFormPage({ testId }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(!!testId);
   const [showPreview, setShowPreview] = useState(false);
+  const [showBulkAdd, setShowBulkAdd] = useState({ visible: false, targetPassageId: null });
   const [formData, setFormData] = useState({
     title: '', description: '', difficulty: 'intermediate', duration: 60,
     publishAt: '',
@@ -176,6 +178,16 @@ function TutorReadingFormPage({ testId }) {
       }
       return p;
     }));
+  };
+
+  const handleBulkAddConfirm = (newBlocks) => {
+    setPassages(prev => prev.map(p => {
+      if (p.id === showBulkAdd.targetPassageId) {
+        return { ...p, blocks: [...p.blocks, ...newBlocks] };
+      }
+      return p;
+    }));
+    setShowBulkAdd({ visible: false, targetPassageId: null });
   };
 
   const updateBlock = (passageId, blockId, field, value) => {
@@ -355,6 +367,9 @@ function TutorReadingFormPage({ testId }) {
             <button className="button-secondary" style={{ width: 'auto', padding: '8px 16px', fontSize: '0.875rem' }} onClick={() => addQuestionBlock(passage.id)}>
               + Add Question Block
             </button>
+            <button className="button-secondary ms-2 border" style={{ width: 'auto', padding: '8px 16px', fontSize: '0.875rem', backgroundColor: '#e9ecef', color: '#495057' }} onClick={() => setShowBulkAdd({ visible: true, targetPassageId: passage.id })}>
+              + Nhập Nhanh (Bulk Add)
+            </button>
           </div>
         </div>
       ))}
@@ -374,6 +389,13 @@ function TutorReadingFormPage({ testId }) {
         formData={formData}
         passages={passages}
         onClose={() => setShowPreview(false)}
+      />
+    )}
+
+    {showBulkAdd.visible && (
+      <BulkAddModal
+        onClose={() => setShowBulkAdd({ visible: false, targetPassageId: null })}
+        onConfirm={handleBulkAddConfirm}
       />
     )}
     </>

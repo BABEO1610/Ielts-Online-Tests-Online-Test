@@ -356,7 +356,6 @@ class SubmissionService {
     if (tutorRes.rows.length > 0) report.tutor_report = tutorRes.rows[0];
     return report;
   }
-  }
 }
 
 module.exports = SubmissionService;

@@ -53,6 +53,7 @@ const buildSpeakingParts = (passages = []) => passages.map((passage, idx) => {
       partName: passage.title || 'Part 2: Long Turn',
       description: passage.instruction || 'Cue card bullet points',
       prompt: passage.title && passage.title !== 'Speaking Part 2' ? passage.title : passage.content || '',
+      bulletPoints: passage.content || '',
       preparationTime: 60,
       speakingTime: 120,
       duration: '3-4 phút'

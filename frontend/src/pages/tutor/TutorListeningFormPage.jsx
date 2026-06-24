@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Loader, Play } from 'lucide-react';
 import ListeningQuestionBlockEditor from '../../components/tutor/listening/ListeningQuestionBlockEditor';
 import ListeningTestPreviewModal from '../../components/tutor/listening/ListeningTestPreviewModal';
+import BulkAddModal from '../../components/tutor/BulkAddModal';
 import { testService } from '../../services/test.service';
 import api from '../../services/api';
 import '../../styles/objective-testing.css';
@@ -38,6 +39,7 @@ function TutorListeningFormPage({ testId }) {
   const [isLoading, setIsLoading] = useState(!!testId);
   const [isUploadingAudio, setIsUploadingAudio] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
+  const [showBulkAdd, setShowBulkAdd] = useState({ visible: false, targetSectionId: null });
   const [showAudioPlayer, setShowAudioPlayer] = useState(false);
   const [formData, setFormData] = useState({
     title: '',
@@ -101,6 +103,16 @@ function TutorListeningFormPage({ testId }) {
       }
       return s;
     }));
+  };
+
+  const handleBulkAddConfirm = (newBlocks) => {
+    setSections(prev => prev.map(s => {
+      if (s.id === showBulkAdd.targetSectionId) {
+        return { ...s, blocks: [...s.blocks, ...newBlocks] };
+      }
+      return s;
+    }));
+    setShowBulkAdd({ visible: false, targetSectionId: null });
   };
 
   const updateBlock = (sectionId, blockId, field, value) => {
@@ -418,6 +430,9 @@ function TutorListeningFormPage({ testId }) {
               <button type="button" className="button-secondary" style={{ width: 'auto', padding: '8px 16px', fontSize: '0.875rem' }} onClick={() => addQuestionBlock(section.id)}>
                 + Add Question Block
               </button>
+              <button type="button" className="button-secondary ms-2 border" style={{ width: 'auto', padding: '8px 16px', fontSize: '0.875rem', backgroundColor: '#e9ecef', color: '#495057' }} onClick={() => setShowBulkAdd({ visible: true, targetSectionId: section.id })}>
+                + Nhập Nhanh (Bulk Add)
+              </button>
             </div>
           </div>
         ))}
@@ -457,6 +472,13 @@ function TutorListeningFormPage({ testId }) {
           sections={sections}
           audioUrl={formData.audioUrl}
           onClose={() => setShowPreview(false)}
+        />
+      )}
+
+      {showBulkAdd.visible && (
+        <BulkAddModal
+          onClose={() => setShowBulkAdd({ visible: false, targetSectionId: null })}
+          onConfirm={handleBulkAddConfirm}
         />
       )}
     </>

@@ -74,7 +74,7 @@ import ListeningPage from './pages/objective-testing/ListeningPage';
 import ReadingTestPage from './pages/objective-testing/ReadingTestPage';
 import ListeningTestPage from './pages/objective-testing/ListeningTestPage';
 import TestResultPage from './pages/objective-testing/TestResultPage';
-import TestResultDetailPage from './pages/objective-testing/TestResultDetailPage';
+import TestReviewRouter from './pages/objective-testing/TestReviewRouter';
 
 // ── Objective Testing — Tutor / Admin Views ────────────────────────────────────
 
@@ -258,8 +258,8 @@ function App() {
         <Route path="/results/:attemptId" element={
           <ProtectedRoute><TestResultPage /></ProtectedRoute>
         } />
-        <Route path="/results/:attemptId/detail" element={
-          <ProtectedRoute><TestResultDetailPage /></ProtectedRoute>
+        <Route path="/results/:attemptId/review" element={
+          <ProtectedRoute><TestReviewRouter /></ProtectedRoute>
         } />
 
         {/* ── Objective Testing — Tutor: Test Management (Moved to TutorLayout) ── */}
