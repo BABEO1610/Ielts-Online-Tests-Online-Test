@@ -136,7 +136,14 @@ const normalizeAndSelfCheck = ({ rawAnswer, contextInjection, allowPlainText = f
     fallbackLinks: contextInjection.suggestedLinks,
     allowPlainText,
   });
-  return selfCheckResponse({ response: normalized, contextInjection });
+  const checked = selfCheckResponse({ response: normalized, contextInjection });
+  if (contextInjection.suggestedLinks?.length) {
+    return {
+      ...checked,
+      suggestedLinks: contextInjection.suggestedLinks,
+    };
+  }
+  return checked;
 };
 
 const generateCheckedAnswer = async ({ payload, contextInjection }) => {
