@@ -2,33 +2,42 @@ import React, { useState } from 'react';
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import ChangePwdModal from '../components/profile/ChangePwdModal';
+import ContactHistoryModal from '../components/profile/ContactHistoryModal';
 import '../styles/profile.css';
+import api from '../services/api';
 
 const ProfileLayout = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [showPwdModal, setShowPwdModal] = useState(false);
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
   
   const [contactMessage, setContactMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitStatus, setSubmitStatus] = useState(null);
 
-  const handleContactSubmit = (e) => {
+  const handleContactSubmit = async (e) => {
     e.preventDefault();
     if (!contactMessage.trim()) return;
     
     setIsSubmitting(true);
     
-    // Fake API call
-    setTimeout(() => {
+    try {
+      const response = await api.post('/support/contact', { message: contactMessage });
+      if (response.data.success) {
+        setSubmitStatus('success');
+        setContactMessage('');
+      } else {
+        setSubmitStatus('error');
+      }
+    } catch (error) {
+      console.error("Lỗi gửi liên hệ:", error);
+      setSubmitStatus('error');
+    } finally {
       setIsSubmitting(false);
-      setSubmitStatus('success');
-      setContactMessage('');
-      
-      // reset status after 3s
       setTimeout(() => setSubmitStatus(null), 3000);
-    }, 800);
+    }
   };
 
   const handleLogout = async () => {
@@ -163,9 +172,22 @@ const ProfileLayout = () => {
                   >
                     {isSubmitting ? 'Đang gửi...' : 'Gửi tin nhắn'}
                   </button>
+                  <button 
+                    type="button"
+                    className="btn btn-outline-secondary fw-medium rounded-pill w-100 py-1 mt-2"
+                    style={{ fontSize: '13px' }}
+                    onClick={() => setShowHistoryModal(true)}
+                  >
+                    <i className="bi bi-clock-history me-1"></i> Xem lịch sử phản hồi
+                  </button>
                   {submitStatus === 'success' && (
                     <div className="text-success fw-medium text-center mt-2" style={{ fontSize: '12px' }}>
                       <i className="bi bi-check-circle-fill me-1"></i> Đã gửi!
+                    </div>
+                  )}
+                  {submitStatus === 'error' && (
+                    <div className="text-danger fw-medium text-center mt-2" style={{ fontSize: '12px' }}>
+                      <i className="bi bi-x-circle-fill me-1"></i> Lỗi gửi tin.
                     </div>
                   )}
                 </div>
@@ -197,6 +219,7 @@ const ProfileLayout = () => {
       </footer>
 
       <ChangePwdModal isOpen={showPwdModal} onClose={() => setShowPwdModal(false)} />
+      <ContactHistoryModal isOpen={showHistoryModal} onClose={() => setShowHistoryModal(false)} />
     </div>
   );
 };

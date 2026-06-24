@@ -27,7 +27,7 @@ router.delete('/sessions/:id', authenticate, authorize('admin'), adminController
 // API hộp thư liên hệ (Contact Inbox)
 // SEC-07: GET read-only cũng cần authenticate vì dữ liệu nhạy cảm
 router.get('/contacts', authenticate, authorize('admin'), adminController.listContacts);
-router.put('/contacts/:id/resolve', authenticate, authorize('admin'), adminController.resolveContact);
+router.put('/contacts/:id/status', authenticate, authorize('admin'), adminController.updateContactStatus);
 
 // -------------------------------------------------------------
 // T040: API duyệt nội dung (Content Review) dành cho Admin

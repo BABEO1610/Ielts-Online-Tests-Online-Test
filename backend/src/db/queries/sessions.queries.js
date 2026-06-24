@@ -77,7 +77,7 @@ const revokeOldestSession = async (userId) => {
       SELECT id
       FROM v_active_sessions
       WHERE user_id = $1
-      ORDER BY updated_at ASC
+      ORDER BY last_active_at ASC
       LIMIT 1
     )
     RETURNING *;
