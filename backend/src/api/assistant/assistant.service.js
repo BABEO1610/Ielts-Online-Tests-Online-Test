@@ -17,6 +17,8 @@ const buildErrorResult = (code, message = ERROR_MESSAGES[code]) => ({
   answer: null,
   suggestedLinks: [],
   conversationId: null,
+  messageId: null,
+  intent: null,
   code,
   message,
 });
@@ -35,6 +37,38 @@ const buildSuccessResult = ({
   intent,
   code: null,
 });
+
+const isLookupIntent = (intent) =>
+  intent === ASSISTANT_INTENTS.FIND_TEST || intent === ASSISTANT_INTENTS.FIND_LESSON;
+
+const isEmptyLookupContext = (contextInjection) =>
+  isLookupIntent(contextInjection.mode) && contextInjection.databaseResults.length === 0;
+
+const getResultTitle = (item) => item.title || item.name || item.label || 'nội dung IELTS';
+
+const summarizeLookupResults = (items) => {
+  const names = items.slice(0, 3).map(getResultTitle).join(', ');
+  return items.length > 3 ? `${names}...` : names;
+};
+
+const buildLookupFallbackAnswer = (contextInjection) => {
+  const items = contextInjection.databaseResults || [];
+  if (items.length === 0) return MISSING_DATA_MESSAGE;
+
+  const summary = summarizeLookupResults(items);
+  if (contextInjection.mode === ASSISTANT_INTENTS.FIND_TEST) {
+    return `Mình tìm thấy ${items.length} đề phù hợp trong hệ thống: ${summary}. Bạn có thể mở các link gợi ý bên dưới.`;
+  }
+  return `Mình tìm thấy ${items.length} tài liệu phù hợp trong thư viện: ${summary}. Bạn có thể mở các link gợi ý bên dưới.`;
+};
+
+const getFallbackAnswer = (contextInjection) => {
+  if (isLookupIntent(contextInjection.mode)) return buildLookupFallbackAnswer(contextInjection);
+  if (contextInjection.mode === ASSISTANT_INTENTS.POST_TEST_REVIEW) {
+    return ERROR_MESSAGES[ERROR_CODES.MISSING_EXPLANATION];
+  }
+  return 'Mình có thể hỗ trợ nội dung IELTS trên website như tìm test, lesson, study tips, navigation hoặc review đáp án sau khi nộp bài.';
+};
 
 const safeCreateSession = async (userId) => {
   try {
@@ -63,221 +97,154 @@ const safeSaveAssistantMessage = async (sessionId, answer, userId) => {
   }
 };
 
-const immediateResponseForContext = (contextInjection) => {
-  if (contextInjection.errorCode) {
-    return buildErrorResult(contextInjection.errorCode);
+const buildImmediateIntentResult = (intent) => {
+  if (intent === ASSISTANT_INTENTS.OUT_OF_SCOPE) {
+    return buildSuccessResult({ answer: ERROR_MESSAGES[ERROR_CODES.OUT_OF_SCOPE], intent });
   }
-
-  if (
-    (contextInjection.mode === ASSISTANT_INTENTS.FIND_TEST ||
-      contextInjection.mode === ASSISTANT_INTENTS.FIND_LESSON) &&
-    contextInjection.databaseResults.length === 0
-  ) {
-    return buildSuccessResult({
-      answer: MISSING_DATA_MESSAGE,
-      suggestedLinks: [],
-      intent: contextInjection.mode,
-    });
-  }
-
-  if (contextInjection.mode === ASSISTANT_INTENTS.OUT_OF_SCOPE) {
-    return buildErrorResult(ERROR_CODES.OUT_OF_SCOPE);
-  }
-
   return null;
 };
 
-const buildFallbackAnswer = (contextInjection) => {
-  if (contextInjection.mode === ASSISTANT_INTENTS.FIND_TEST || contextInjection.mode === ASSISTANT_INTENTS.FIND_LESSON) {
-    return MISSING_DATA_MESSAGE;
+const buildGuardrailResult = ({ message, context }) => {
+  const guardrail = evaluateGuardrails({ message, context });
+  if (guardrail.blocked) return buildErrorResult(guardrail.code, guardrail.message);
+  if (context.pageType === 'active-test') {
+    return buildErrorResult(ERROR_CODES.ASSISTANT_DISABLED_DURING_TEST);
   }
-
-  if (contextInjection.mode === ASSISTANT_INTENTS.POST_TEST_REVIEW) {
-    return ERROR_MESSAGES[ERROR_CODES.MISSING_EXPLANATION];
-  }
-
-  if (contextInjection.mode === ASSISTANT_INTENTS.GREETING) {
-    return 'Chào bạn! Mình có thể hỗ trợ tìm test, lesson, study tips, navigation hoặc giải thích đáp án sau khi bạn nộp bài.';
-  }
-
-  return 'Mình có thể hỗ trợ nội dung IELTS trên website như tìm test, lesson, study tips, navigation hoặc review đáp án sau khi nộp bài.';
+  return null;
 };
 
-const finalizeAiResponse = ({ rawAnswer, contextInjection, allowPlainText = false }) => {
+const buildImmediateContextResult = (contextInjection) => {
+  if (contextInjection.directAnswer) {
+    return buildSuccessResult({
+      answer: contextInjection.directAnswer,
+      suggestedLinks: contextInjection.suggestedLinks || [],
+      intent: contextInjection.mode,
+    });
+  }
+  if (contextInjection.errorCode) return buildErrorResult(contextInjection.errorCode);
+  if (isEmptyLookupContext(contextInjection)) {
+    return buildSuccessResult({ answer: MISSING_DATA_MESSAGE, intent: contextInjection.mode });
+  }
+  return null;
+};
+
+const normalizeAndSelfCheck = ({ rawAnswer, contextInjection, allowPlainText = false }) => {
   const normalized = normalizeAssistantResponse({
     rawText: rawAnswer,
     mode: contextInjection.mode,
-    fallbackAnswer: buildFallbackAnswer(contextInjection),
+    fallbackAnswer: getFallbackAnswer(contextInjection),
     fallbackLinks: contextInjection.suggestedLinks,
     allowPlainText,
   });
-
-  return selfCheckResponse({
-    response: normalized,
-    contextInjection,
-  });
+  return selfCheckResponse({ response: normalized, contextInjection });
 };
 
-const buildPipelineContext = async ({ user, payload, sessionId }) => {
-  const intent = detectIntent({
-    message: payload.message,
-    context: payload.context,
-  });
-
-  const guardrail = evaluateGuardrails({
-    message: payload.message,
-    context: payload.context,
-  });
-
-  if (guardrail.blocked) {
-    return {
-      blockedResult: buildErrorResult(guardrail.code, guardrail.message),
-      intent,
-    };
-  }
-
-  if (payload.context.pageType === 'active-test') {
-    return {
-      blockedResult: buildErrorResult(ERROR_CODES.ASSISTANT_DISABLED_DURING_TEST),
-      intent,
-    };
-  }
-
-  const contextInjection = await buildContextInjection({
-    intent,
-    message: payload.message,
-    context: payload.context,
-    user,
-    sessionId,
-  });
-
-  return {
-    intent,
-    contextInjection,
-    blockedResult: immediateResponseForContext(contextInjection),
-  };
-};
-
-const generateResponse = async ({ payload, contextInjection }) => {
-  const prompt = buildPrompt({
-    message: payload.message,
-    contextInjection,
-  });
-
+const generateCheckedAnswer = async ({ payload, contextInjection }) => {
+  const prompt = buildPrompt({ message: payload.message, contextInjection });
   const rawAnswer = await aiService.generateAssistantAnswer({
     mode: contextInjection.mode,
     message: payload.message,
     systemPrompt: prompt.systemPrompt,
     userPrompt: prompt.userPrompt,
   });
+  return normalizeAndSelfCheck({ rawAnswer, contextInjection });
+};
 
-  return finalizeAiResponse({ rawAnswer, contextInjection });
+const generateCheckedStreamAnswer = async ({ payload, contextInjection }) => {
+  const prompt = buildPrompt({ message: payload.message, contextInjection });
+  let streamedText = '';
+  const rawAnswer = await aiService.streamAssistantAnswer({
+    mode: contextInjection.mode,
+    message: payload.message,
+    systemPrompt: `${prompt.systemPrompt}\nReturn only final answer text for streaming.`,
+    userPrompt: `${prompt.userPrompt}\n\nReturn only answer text. Do not wrap it in JSON.`,
+    onDelta: (delta) => {
+      streamedText += delta;
+    },
+  });
+  return normalizeAndSelfCheck({
+    rawAnswer: rawAnswer || streamedText,
+    contextInjection,
+    allowPlainText: true,
+  });
+};
+
+const buildAiResult = async ({ payload, contextInjection, useStream }) => {
+  const response = useStream
+    ? await generateCheckedStreamAnswer({ payload, contextInjection })
+    : await generateCheckedAnswer({ payload, contextInjection });
+  return buildSuccessResult({
+    answer: response.answer,
+    suggestedLinks: response.suggestedLinks,
+    intent: contextInjection.mode,
+  });
+};
+
+const runAssistantPipeline = async ({ user, payload, useStream = false }) => {
+  const intent = detectIntent({ message: payload.message, context: payload.context });
+  const intentResult = buildImmediateIntentResult(intent);
+  if (intentResult) return intentResult;
+
+  const guardrailResult = buildGuardrailResult({ message: payload.message, context: payload.context });
+  if (guardrailResult) return { ...guardrailResult, intent };
+
+  const contextInjection = await buildContextInjection({
+    intent,
+    message: payload.message,
+    context: payload.context,
+    user,
+    sessionId: null,
+  });
+  const contextResult = buildImmediateContextResult(contextInjection);
+  if (contextResult) return contextResult;
+
+  return buildAiResult({ payload, contextInjection, useStream });
+};
+
+const persistSuccessfulResult = async ({ user, payload, result }) => {
+  if (result.code || !result.answer) return result;
+  const sessionId = await safeCreateSession(user.id);
+  await safeSaveUserMessage(sessionId, payload.message, user.id);
+  const saved = await safeSaveAssistantMessage(sessionId, result.answer, user.id);
+  return { ...result, conversationId: sessionId, messageId: saved?.id || null };
 };
 
 const handleChat = async ({ user, payload }) => {
-  const sessionId = await safeCreateSession(user.id);
-  await safeSaveUserMessage(sessionId, payload.message, user.id);
-
   try {
-    const pipeline = await buildPipelineContext({ user, payload, sessionId });
-    if (pipeline.blockedResult) {
-      if (!pipeline.blockedResult.code && pipeline.blockedResult.answer) {
-        const saved = await safeSaveAssistantMessage(sessionId, pipeline.blockedResult.answer, user.id);
-        return {
-          ...pipeline.blockedResult,
-          conversationId: sessionId,
-          messageId: saved?.id || null,
-          intent: pipeline.intent,
-        };
-      }
-      return pipeline.blockedResult;
-    }
-
-    const response = await generateResponse({
-      payload,
-      contextInjection: pipeline.contextInjection,
-    });
-    const saved = await safeSaveAssistantMessage(sessionId, response.answer, user.id);
-
-    return buildSuccessResult({
-      answer: response.answer,
-      suggestedLinks: response.suggestedLinks,
-      conversationId: sessionId,
-      messageId: saved?.id || null,
-      intent: pipeline.intent,
-    });
+    const result = await runAssistantPipeline({ user, payload });
+    return persistSuccessfulResult({ user, payload, result });
   } catch (error) {
     if (error.code && ERROR_MESSAGES[error.code]) {
       return buildErrorResult(error.code, error.message);
     }
-
     throw createAssistantError(ERROR_CODES.INTERNAL_ERROR);
   }
 };
 
 const handleChatStream = async ({ user, payload, onEvent }) => {
-  const sessionId = await safeCreateSession(user.id);
-  await safeSaveUserMessage(sessionId, payload.message, user.id);
-
-  const pipeline = await buildPipelineContext({ user, payload, sessionId });
-  if (pipeline.blockedResult) {
-    if (pipeline.blockedResult.code) {
-      onEvent('assistant.error', pipeline.blockedResult);
-      return pipeline.blockedResult;
-    }
-
-    const saved = await safeSaveAssistantMessage(sessionId, pipeline.blockedResult.answer, user.id);
-    const result = {
-      ...pipeline.blockedResult,
-      conversationId: sessionId,
-      messageId: saved?.id || null,
-      intent: pipeline.intent,
-    };
-    onEvent('assistant.start', { conversationId: sessionId, intent: pipeline.intent });
-    onEvent('assistant.delta', { delta: result.answer });
-    onEvent('assistant.done', result);
+  try {
+    const result = await runAssistantPipeline({ user, payload, useStream: true });
+    const savedResult = await persistSuccessfulResult({ user, payload, result });
+    emitStreamResult({ onEvent, result: savedResult });
+    return savedResult;
+  } catch (error) {
+    const result = buildErrorResult(error.code || ERROR_CODES.INTERNAL_ERROR, error.message);
+    onEvent('assistant.error', result);
     return result;
   }
+};
 
-  const prompt = buildPrompt({
-    message: payload.message,
-    contextInjection: pipeline.contextInjection,
-  });
-
+const emitStreamResult = ({ onEvent, result }) => {
+  if (result.code) {
+    onEvent('assistant.error', result);
+    return;
+  }
   onEvent('assistant.start', {
-    conversationId: sessionId,
-    intent: pipeline.intent,
+    conversationId: result.conversationId,
+    intent: result.intent,
   });
-
-  let streamedText = '';
-  const rawAnswer = await aiService.streamAssistantAnswer({
-    mode: pipeline.contextInjection.mode,
-    message: payload.message,
-    systemPrompt: `${prompt.systemPrompt}\nFor this streaming response, return only the final answer text, not JSON.`,
-    userPrompt: `${prompt.userPrompt}\n\nStreaming output rule: return only answer text. Do not wrap it in JSON.`,
-    onDelta: (delta) => {
-      streamedText += delta;
-      onEvent('assistant.delta', { delta });
-    },
-  });
-
-  const response = finalizeAiResponse({
-    rawAnswer: rawAnswer || streamedText,
-    contextInjection: pipeline.contextInjection,
-    allowPlainText: true,
-  });
-  const saved = await safeSaveAssistantMessage(sessionId, response.answer, user.id);
-
-  const result = buildSuccessResult({
-    answer: response.answer,
-    suggestedLinks: response.suggestedLinks,
-    conversationId: sessionId,
-    messageId: saved?.id || null,
-    intent: pipeline.intent,
-  });
-
+  onEvent('assistant.delta', { delta: result.answer });
   onEvent('assistant.done', result);
-  return result;
 };
 
 const getHistory = async (userId) => {
@@ -291,31 +258,14 @@ const getHistory = async (userId) => {
 };
 
 const rateMessage = async ({ userId, messageId, rating, reason }) => {
-  const result = await repository.rateAssistantMessage({
-    userId,
+  const result = await repository.rateAssistantMessage({ userId, messageId, rating, reason });
+  if (result.saved) return { success: true, messageId: result.messageId, rating, code: null };
+  return {
+    success: false,
     messageId,
     rating,
-    reason,
-  });
-
-  if (!result.saved) {
-    return {
-      success: false,
-      messageId,
-      rating,
-      code: result.reason === 'message_not_found_or_forbidden' ? ERROR_CODES.FORBIDDEN : ERROR_CODES.MISSING_CONTEXT,
-      message:
-        result.reason === 'rating_column_missing'
-          ? 'Schema hiện tại chưa có cột rating cho chatbot_messages. Cần thêm migration nhỏ sau khi inspect Supabase schema.'
-          : ERROR_MESSAGES[ERROR_CODES.MISSING_CONTEXT],
-    };
-  }
-
-  return {
-    success: true,
-    messageId: result.messageId,
-    rating,
-    code: null,
+    code: result.reason === 'message_not_found_or_forbidden' ? ERROR_CODES.FORBIDDEN : ERROR_CODES.MISSING_CONTEXT,
+    message: ERROR_MESSAGES[ERROR_CODES.MISSING_CONTEXT],
   };
 };
 
@@ -326,4 +276,5 @@ module.exports = {
   rateMessage,
   buildErrorResult,
   buildSuccessResult,
+  runAssistantPipeline,
 };
