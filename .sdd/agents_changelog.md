@@ -176,3 +176,5 @@ npm run dev
 
 ---
 
+[2026-06-24] | [AGENT] | [.sdd/agents_changelog.md] | [Normalized final changelog entry format before assistant quality documentation updates.]
+[2026-06-24] | [AGENT] | [.sdd/agents_changelog.md, .sdd/context/db-schema-snapshot.md, .sdd/shared_context.md, .sdd/specs/global-ielts-virtual-assistant/spec.md, backend/src/api/assistant/assistant.constants.js, .sdd/rfcs/rfc-2026-06-24-assistant-quality-upgrade.md, .sdd/specs/global-ielts-virtual-assistant/eval-set.md] | [Added schema snapshot, feature-table mapping, Global Assistant schema reconciliation, intent context map, RFC, and golden eval set.]
