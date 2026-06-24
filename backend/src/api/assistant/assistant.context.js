@@ -7,18 +7,30 @@ const {
   INTENT_CONTEXT_MAP,
 } = require('./assistant.constants');
 
+const FRONTEND_BASE_URL = (process.env.FRONTEND_URL || process.env.CLIENT_URL || 'http://localhost:5173').replace(/\/+$/, '');
+
+const toFrontendUrl = (path) => `${FRONTEND_BASE_URL}${path}`;
+
+const SKILL_ROUTES = {
+  reading: '/reading',
+  writing: '/writing',
+  speaking: '/speaking',
+};
+
+const getSkillRoute = (skill) => SKILL_ROUTES[String(skill || '').toLowerCase()] || '/reading';
+
 const WEBSITE_ROUTES = [
-  { label: 'Danh sách bài test', href: '/tests' },
-  { label: 'Thư viện lesson/tài liệu', href: '/library' },
-  { label: 'Hồ sơ cá nhân', href: '/profile' },
-  { label: 'Lịch sử luyện tập', href: '/practice-history' },
+  { label: 'Reading', href: toFrontendUrl('/reading') },
+  { label: 'Writing', href: toFrontendUrl('/writing') },
+  { label: 'Speaking', href: toFrontendUrl('/speaking') },
+  { label: 'Library', href: toFrontendUrl('/library') },
 ];
 
 const STUDY_TIPS = [
-  'Reading: skim câu hỏi trước, scan keyword, kiểm tra paraphrase và tránh đọc từng chữ quá lâu.',
-  'Listening: đọc trước câu hỏi, dự đoán loại từ, chú ý signposting và distractors.',
-  'Writing/Speaking: phase này chỉ hỗ trợ tips học tập, không chấm bài hoặc tạo band score.',
-  'Sau mỗi attempt, hãy review lỗi sai và ghi lại keyword/paraphrase thường gặp.',
+  'Reading: skim questions first, scan keywords, check paraphrases, and avoid reading every word too slowly.',
+  'Listening: preview questions, predict word types, and pay attention to signposting and distractors.',
+  'Writing/Speaking: this assistant only gives study tips in this phase. It does not grade or generate band scores.',
+  'After each attempt, review mistakes and record common keywords or paraphrases.',
 ];
 
 const createBaseContext = ({ intent, sessionMemory = [] }) => {
@@ -70,13 +82,13 @@ const normalizeUuid = (value) => {
 const toTestLinks = (tests) =>
   tests.map((item) => ({
     label: item.title || 'IELTS test',
-    href: item.id ? `/tests/${item.id}` : '/tests',
+    href: toFrontendUrl(getSkillRoute(item.skill)),
   }));
 
 const toLessonLinks = (resources) =>
   resources.map((item) => ({
     label: item.title || 'IELTS resource',
-    href: item.fileUrl || '/library',
+    href: toFrontendUrl('/library'),
   }));
 
 const queryPublishedTests = async (message) => {
@@ -84,18 +96,23 @@ const queryPublishedTests = async (message) => {
     `SELECT id, title, description, skill, difficulty, duration_minutes
      FROM mock_tests
      WHERE is_published = TRUE
+       AND skill::text IN ('reading', 'writing', 'speaking')
        AND ($1::text IS NULL OR skill::text = $1)
        AND ($2::text IS NULL OR difficulty::text = $2)
      ORDER BY created_at DESC
      LIMIT 5`,
     [detectSkill(message), detectDifficulty(message)]
   );
-  return result.rows.map((row) => ({ ...row, type: 'test', link: `/tests/${row.id}` }));
+  return result.rows.map((row) => ({
+    ...row,
+    type: 'test',
+    link: toFrontendUrl(getSkillRoute(row.skill)),
+  }));
 };
 
 const queryPublishedResources = async (message) => {
   const result = await pool.query(
-    `SELECT id, title, description, resource_type, file_url, file_size_bytes
+    `SELECT id, title, description, resource_type, file_size_bytes
      FROM library_resources
      WHERE is_published = TRUE
        AND ($1::text IS NULL OR resource_type::text = $1)
@@ -109,9 +126,8 @@ const queryPublishedResources = async (message) => {
     title: row.title,
     description: row.description,
     resourceType: row.resource_type,
-    fileUrl: row.file_url,
     fileSizeBytes: row.file_size_bytes,
-    link: row.file_url || '/library',
+    link: toFrontendUrl('/library'),
   }));
 };
 
