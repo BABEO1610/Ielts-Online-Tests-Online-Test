@@ -579,3 +579,20 @@ WHERE s.revoked_at IS NULL
   AND s.expires_at > NOW();
 
 ```
+
+## Feature-to-Table Mapping
+
+| Feature | Bảng chính | Bảng phụ | View nếu có |
+|---|---|---|---|
+| Auth & Sessions | `users`, `user_sessions` | `oauth_accounts`, `password_history`, `audit_logs` | `v_active_sessions` |
+| Email Verification | `email_verification_tokens` | `users`, `audit_logs` | - |
+| Password Reset | `password_reset_tokens` | `users`, `password_history`, `audit_logs` | - |
+| Objective Testing | `mock_tests`, `questions`, `test_attempts`, `question_answers` | `users` | `v_student_dashboard` |
+| Writing Grading | `writing_submissions`, `ai_feedback_reports`, `tutor_feedback_reports` | `users`, `mock_tests`, `tutor_student_notes` | `v_tutor_grading_queue` |
+| Speaking Grading | `speaking_submissions`, `ai_feedback_reports`, `tutor_feedback_reports` | `users`, `mock_tests`, `tutor_student_notes` | `v_tutor_grading_queue` |
+| Content Library | `library_resources` | `users`, `audit_logs` | - |
+| AI Chatbot | `chatbot_sessions`, `chatbot_messages` | `users`, `platform_metrics_snapshots` | `v_admin_usage_report` |
+| AI Explain | `ai_explain_requests` | `users`, `questions` | - |
+| Admin Audit | `audit_logs`, `platform_metrics_snapshots` | `users` | `v_admin_usage_report` |
+| Global Assistant (General) | `chatbot_sessions`, `chatbot_messages` | `mock_tests`, `library_resources`, `questions`, `users` | `v_active_sessions` |
+| Global Assistant (Post-test Review) | `test_attempts`, `questions`, `question_answers` | `users`, `chatbot_sessions`, `chatbot_messages`, `ai_explain_requests` | `v_student_dashboard` |
