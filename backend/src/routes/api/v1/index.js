@@ -30,6 +30,7 @@ router.use('/admin', adminRoutes);
 router.use('/tests', testRoutes);
 router.use('/submissions', submissionsRoutes);
 router.use('/library', libraryRoutes);
+router.use('/tutors', require('./tutors.routes'));
 router.use('/attempts', attemptRoutes);
 router.use('/audio', audioRoutes);
 router.use('/assistant', assistantRoutes);

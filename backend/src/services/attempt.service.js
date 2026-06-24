@@ -153,15 +153,18 @@ class AttemptService {
 
       // Determine mode value for the enum column test_mode ('timed' | 'untimed')
       const mode = practiceMode ? 'untimed' : 'timed';
+      
+      const isObjective = testRes.rows[0].skill === 'reading' || testRes.rows[0].skill === 'listening';
+      const finalStatus = isObjective ? 'graded' : 'submitted';
+      const finalBandScore = isObjective ? bandScore : null;
 
       // Insert attempt header
-      // Note: status='submitted' means pending tutor grading; band_score=NULL until graded
       const attemptRes = await client.query(
         `INSERT INTO test_attempts
            (test_id, user_id, mode, status, raw_score, total_questions, band_score, time_spent, practice_mode)
-         VALUES ($1, $2, $3, 'submitted', $4, $5, NULL, $6, $7)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
          RETURNING id`,
-        [testId, userId, mode, rawScore, totalQuestions, timeSpent, practiceMode]
+        [testId, userId, mode, finalStatus, rawScore, totalQuestions, finalBandScore, timeSpent, practiceMode]
       );
       const attemptId = attemptRes.rows[0].id;
 
@@ -179,14 +182,15 @@ class AttemptService {
 
       return {
         attemptId,
-        status: 'submitted',  // Pending tutor grading
+        status: finalStatus,
         rawScore,
         totalQuestions,
+        bandScore: finalBandScore,
         correctCount: rawScore,
         incorrectCount: totalQuestions - rawScore,
         timeSpent,
         practiceMode,
-        message: 'Bài làm của bạn đã được nộp. Vui lòng chờ giáo viên chấm điểm.'
+        message: isObjective ? 'Bài làm của bạn đã được nộp và tự động chấm điểm.' : 'Bài làm của bạn đã được nộp. Vui lòng chờ giáo viên chấm điểm.'
       };
     } catch (error) {
       await client.query('ROLLBACK');
@@ -254,7 +258,9 @@ class AttemptService {
     const ownerRes = await pool.query(
       `SELECT
          ta.id,
+         ta.test_id,
          mt.title AS test_title,
+         mt.skill,
          ta.raw_score,
          ta.total_questions,
          ta.band_score
@@ -270,6 +276,7 @@ class AttemptService {
     // questions.question_text is the correct column name per 009 schema
     const answersRes = await pool.query(
       `SELECT
+         aa.question_id,
          aa.question_order,
          aa.user_answer,
          aa.correct_answer,
@@ -285,11 +292,14 @@ class AttemptService {
 
     return {
       id: meta.id,
+      testId: meta.test_id,
+      skill: meta.skill,
       testTitle: meta.test_title,
       rawScore: meta.raw_score,
       totalQuestions: meta.total_questions,
       bandScore: parseFloat(meta.band_score),
       answers: answersRes.rows.map((r) => ({
+        questionId: r.question_id,
         order: r.question_order,
         text: r.text || '',
         userAnswer: r.user_answer || '',

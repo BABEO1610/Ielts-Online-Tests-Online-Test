@@ -219,6 +219,7 @@ class TestService {
         difficulty: row.difficulty,
         duration_minutes: row.duration_minutes,
         duration: row.duration_minutes,
+        reviewStatus: row.review_status,
         status: statusStr,
         questions: parseInt(row.questions, 10),
         createdAt: new Date(row.created_at).toISOString().split('T')[0]

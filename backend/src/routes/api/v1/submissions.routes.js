@@ -19,7 +19,12 @@ router.post(
 );
 
 // Submit speaking (legacy - per part)
-router.post('/speaking', SubmissionController.submitSpeaking);
+router.post(
+  '/speaking',
+  SubmissionController.submitSpeaking
+);
+
+
 
 // Create speaking test attempt
 router.post('/speaking/attempt', SubmissionController.createSpeakingAttempt);

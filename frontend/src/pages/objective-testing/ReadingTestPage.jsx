@@ -54,9 +54,10 @@ function flattenTestData(testData, allowedPassageNumbers) {
         if (['multiple_choice', 'multiplechoice', 'mcq', 'single_choice', 'singlechoice'].includes(t)) return 'mcq';
         if (['multiple_choice_multiple', 'multiple_choice_multipleanswer', 'multiple_choice_multiplechoice', 'multiplechoice_multiple'].includes(t)) return 'mcq_multi';
         if (['true_false', 'truefalse', 'true_false_ng', 'true_false_not_given'].includes(t)) return 'true_false';
-        if (['fill_blank', 'fill_in_blank', 'fillblank', 'sentence_completion'].includes(t)) return 'fill';
+        if (['yes_no', 'yesno', 'yes_no_not_given', 'yes_no_ng'].includes(t)) return 'yes_no';
+        if (['fill_blank', 'fill_in_blank', 'fillblank', 'sentence_completion', 'summary_completion', 'note_table_flowchart_completion'].includes(t)) return 'fill';
         if (['matching_headings', 'matching_information', 'matching', 'match_the_following'].includes(t)) return 'matching';
-        if (['short_answer', 'shortanswer', 'short'].includes(t)) return 'short';
+        if (['short_answer', 'shortanswer', 'short', 'short_answer_questions'].includes(t)) return 'short';
         return 'fill';
       };
 
@@ -395,14 +396,40 @@ function ReadingTestPage() {
                   {q.type === 'true_false' && (
                     <div className="d-flex flex-column gap-2">
                       {(() => {
-                        // True/False/Not Given always has 3 options, even if backend doesn't send them
-                        const opts = ['True', 'False', 'Not Given'];
-                        return opts.map((text, i) => {
-                          const label = String.fromCharCode(65 + i); // A, B, C
-                          const selected = answers[q.order] === label;
+                        // Store the actual value ('TRUE', 'FALSE', 'NOT GIVEN') to match DB correctAnswer
+                        const opts = [
+                          { label: 'A', text: 'True',      value: 'TRUE' },
+                          { label: 'B', text: 'False',     value: 'FALSE' },
+                          { label: 'C', text: 'Not Given', value: 'NOT GIVEN' },
+                        ];
+                        return opts.map(({ label, text, value }) => {
+                          const selected = answers[q.order] === value;
                           return (
-                            <label key={label} className={`option-card ${selected ? 'selected' : ''}`} style={{ margin: 0, padding: '12px 16px', alignItems: 'flex-start' }}>
-                              <input type="radio" name={`q-${q.order}`} className="form-check-input flex-shrink-0 mt-1" value={label} checked={selected} onChange={() => handleAnswer(q.order, label)} />
+                            <label key={value} className={`option-card ${selected ? 'selected' : ''}`} style={{ margin: 0, padding: '12px 16px', alignItems: 'flex-start' }}>
+                              <input type="radio" name={`q-${q.order}`} className="form-check-input flex-shrink-0 mt-1" value={value} checked={selected} onChange={() => handleAnswer(q.order, value)} />
+                              <span className="body-md-strong flex-shrink-0 mt-1 mx-2">{label}.</span>
+                              <span className="body-md mt-1">{text}</span>
+                            </label>
+                          );
+                        });
+                      })()}
+                    </div>
+                  )}
+
+                  {q.type === 'yes_no' && (
+                    <div className="d-flex flex-column gap-2">
+                      {(() => {
+                        // Store 'YES', 'NO', 'NOT GIVEN' to match DB correctAnswer format
+                        const opts = [
+                          { label: 'A', text: 'Yes',       value: 'YES' },
+                          { label: 'B', text: 'No',        value: 'NO' },
+                          { label: 'C', text: 'Not Given', value: 'NOT GIVEN' },
+                        ];
+                        return opts.map(({ label, text, value }) => {
+                          const selected = answers[q.order] === value;
+                          return (
+                            <label key={value} className={`option-card ${selected ? 'selected' : ''}`} style={{ margin: 0, padding: '12px 16px', alignItems: 'flex-start' }}>
+                              <input type="radio" name={`q-${q.order}`} className="form-check-input flex-shrink-0 mt-1" value={value} checked={selected} onChange={() => handleAnswer(q.order, value)} />
                               <span className="body-md-strong flex-shrink-0 mt-1 mx-2">{label}.</span>
                               <span className="body-md mt-1">{text}</span>
                             </label>

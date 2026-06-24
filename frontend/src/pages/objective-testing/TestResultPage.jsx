@@ -94,7 +94,7 @@ function TestResultPage() {
           { id: 'stat-raw', label: 'Raw Score', val: `${r.rawScore}/${r.totalQuestions}` },
           { id: 'stat-correct', label: 'Đúng', val: r.correctCount, color: '#1e4620' },
           { id: 'stat-incorrect', label: 'Sai', val: r.incorrectCount, color: '#e02424' },
-          { id: 'stat-time', label: 'Thời gian', val: r.timeSpent },
+          { id: 'stat-time', label: 'Thời gian', val: formatTime(r.timeSpent) },
         ].map(s => (
           <div className="col-md-3 col-6" key={s.id}>
             <div className="card-content text-center" id={s.id}>
@@ -110,7 +110,7 @@ function TestResultPage() {
           className="button-primary flex-fill"
           id="btn-view-detail"
           style={{ textAlign: 'center', padding: '14px 0', border: 'none', cursor: 'pointer' }}
-          onClick={() => navigate(`/results/${attemptId}/detail`)}
+          onClick={() => navigate(`/results/${attemptId}/review`)}
         >
           Xem chi tiết đáp án
         </button>
