@@ -13,7 +13,8 @@ const normalizeText = (value) =>
   String(value || '')
     .toLowerCase()
     .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '');
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/g, 'd');
 
 const hasAny = (text, patterns) => patterns.some((pattern) => pattern.test(text));
 
@@ -55,8 +56,10 @@ const detectIntent = ({ message, context = {} }) => {
   }
 
   if (hasAny(text, [
-    /\b(mock test|practice test|ielts test|test|de thi|de reading|de listening|de writing|de speaking)\b/,
-    /\b(co|tim|find|search|goi y|de xuat)\b.*\b(de|test|mock|reading|listening|writing|speaking|topic)\b/,
+    /\b(mock test|practice test|ielts test|test|bai test|bai thi|de thi|de bai|de reading|de listening|de writing|de speaking)\b/,
+    /\b(co|co may|bao nhieu|danh sach|hien thi|liet ke|tim|find|search|goi y|de xuat)\b.*\b(de|bai|test|mock|reading|listening|writing|speaking|topic)\b/,
+    /\b(reading|listening|writing|speaking)\b.*\b(de|bai|test|mock)\b/,
+    /\b(de|bai|test|mock)\b.*\b(reading|listening|writing|speaking)\b/,
   ])) {
     return ASSISTANT_INTENTS.FIND_TEST;
   }

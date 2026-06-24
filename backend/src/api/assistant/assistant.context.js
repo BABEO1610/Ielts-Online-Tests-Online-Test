@@ -95,12 +95,10 @@ const queryPublishedTests = async (message) => {
   const result = await pool.query(
     `SELECT id, title, description, skill, difficulty, duration_minutes
      FROM mock_tests
-     WHERE is_published = TRUE
-       AND skill::text IN ('reading', 'writing', 'speaking')
-       AND ($1::text IS NULL OR skill::text = $1)
+     WHERE ($1::text IS NULL OR skill::text = $1)
        AND ($2::text IS NULL OR difficulty::text = $2)
      ORDER BY created_at DESC
-     LIMIT 5`,
+     LIMIT 10`,
     [detectSkill(message), detectDifficulty(message)]
   );
   return result.rows.map((row) => ({

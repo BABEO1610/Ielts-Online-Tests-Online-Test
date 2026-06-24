@@ -62,7 +62,8 @@ const normalize = (value) =>
   String(value || '')
     .toLowerCase()
     .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '');
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/g, 'd');
 
 const extractTerms = (message) => {
   const stopWords = new Set([
@@ -375,14 +376,8 @@ const findMockTests = async (message) => {
   const conditions = [];
   const values = [];
 
-  if (columns.has('is_published')) {
-    conditions.push('is_published = TRUE');
-  }
-  if (columns.has('skill')) {
-    conditions.push("skill::text IN ('reading', 'writing', 'speaking')");
-  }
   if (columns.has('review_status')) {
-    conditions.push("review_status = 'approved'");
+    conditions.push("(review_status = 'approved' OR review_status IS NULL OR review_status = 'pending')");
   }
   if (skill && columns.has('skill')) {
     values.push(skill);

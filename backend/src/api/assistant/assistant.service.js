@@ -44,7 +44,7 @@ const isLookupIntent = (intent) =>
 const isEmptyLookupContext = (contextInjection) =>
   isLookupIntent(contextInjection.mode) && contextInjection.databaseResults.length === 0;
 
-const getResultTitle = (item) => item.title || item.name || item.label || 'nội dung IELTS';
+const getResultTitle = (item) => item.title || item.name || item.label || 'IELTS content';
 
 const summarizeLookupResults = (items) => {
   const names = items.slice(0, 3).map(getResultTitle).join(', ');
@@ -57,9 +57,9 @@ const buildLookupFallbackAnswer = (contextInjection) => {
 
   const summary = summarizeLookupResults(items);
   if (contextInjection.mode === ASSISTANT_INTENTS.FIND_TEST) {
-    return `Mình tìm thấy ${items.length} đề phù hợp trong hệ thống: ${summary}. Bạn có thể mở các link gợi ý bên dưới.`;
+    return `Mình tìm thấy ${items.length} đề trong hệ thống: ${summary}. Bạn có thể mở đúng trang kỹ năng ở phần link gợi ý bên dưới.`;
   }
-  return `Mình tìm thấy ${items.length} tài liệu phù hợp trong thư viện: ${summary}. Bạn có thể mở các link gợi ý bên dưới.`;
+  return `Mình tìm thấy ${items.length} tài liệu trong thư viện: ${summary}. Bạn có thể mở trang Library ở phần link gợi ý bên dưới.`;
 };
 
 const getFallbackAnswer = (contextInjection) => {
@@ -68,6 +68,14 @@ const getFallbackAnswer = (contextInjection) => {
     return ERROR_MESSAGES[ERROR_CODES.MISSING_EXPLANATION];
   }
   return 'Mình có thể hỗ trợ nội dung IELTS trên website như tìm test, lesson, study tips, navigation hoặc review đáp án sau khi nộp bài.';
+};
+
+const isGenericAssistantAnswer = (answer) => {
+  const text = String(answer || '').toLowerCase();
+  return text.includes('mình có thể hỗ trợ nội dung ielts') ||
+    text.includes('tim test, lesson') ||
+    text.includes('tìm test, lesson') ||
+    text.includes('review đáp án');
 };
 
 const safeCreateSession = async (userId) => {
@@ -137,6 +145,15 @@ const normalizeAndSelfCheck = ({ rawAnswer, contextInjection, allowPlainText = f
     allowPlainText,
   });
   const checked = selfCheckResponse({ response: normalized, contextInjection });
+  if (isLookupIntent(contextInjection.mode) && contextInjection.databaseResults?.length && isGenericAssistantAnswer(checked.answer)) {
+    return {
+      ...checked,
+      answer: buildLookupFallbackAnswer(contextInjection),
+      suggestedLinks: contextInjection.suggestedLinks || [],
+      usedDatabase: true,
+      needsMoreContext: false,
+    };
+  }
   if (contextInjection.suggestedLinks?.length) {
     return {
       ...checked,
