@@ -197,7 +197,7 @@ const ReadingPage = () => {
     const fetchExams = async () => {
       try {
         setLoading(true);
-        const res = await testService.getTests('reading');
+        const res = await testService.getTests({ skill: 'reading', isPublished: 'true' });
         if (res.success && Array.isArray(res.data)) {
           setExams(res.data);
         } else {
