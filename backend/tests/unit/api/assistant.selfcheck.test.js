@@ -19,19 +19,36 @@ describe('Assistant self-check', () => {
     expect(result.needsMoreContext).toBe(true);
   });
 
-  it('blocks band score claims', () => {
+  it('allows general band criteria explanations for IELTS_KNOWLEDGE', () => {
     const result = selfCheckResponse({
       response: {
-        answer: 'Bài này khoảng band 7.0.',
+        answer: 'Band 7 Writing thường cần lập trường rõ, đoạn văn logic, từ vựng linh hoạt và ngữ pháp đa số chính xác.',
         suggestedLinks: [],
       },
       contextInjection: {
-        mode: ASSISTANT_INTENTS.GENERAL_STUDY_TIPS,
-        databaseResults: [{ type: 'study_tip' }],
+        mode: ASSISTANT_INTENTS.IELTS_KNOWLEDGE,
+        databaseResults: [],
+      },
+    });
+
+    expect(result.answer).toContain('Band 7 Writing');
+    expect(result.safety?.outOfScope).not.toBe(true);
+  });
+
+  it('blocks band score predictions for user work', () => {
+    const result = selfCheckResponse({
+      response: {
+        answer: 'Bài essay của bạn là band 7.0.',
+        suggestedLinks: [],
+      },
+      contextInjection: {
+        mode: ASSISTANT_INTENTS.IELTS_KNOWLEDGE,
+        databaseResults: [],
       },
     });
 
     expect(result.answer).toBe(ERROR_MESSAGES[ERROR_CODES.OUT_OF_SCOPE]);
     expect(result.safety.outOfScope).toBe(true);
+    expect(result.safety.containsBandScore).toBe(true);
   });
 });
