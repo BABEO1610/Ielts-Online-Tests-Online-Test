@@ -110,7 +110,7 @@ class TestService {
       }
       if (missingAnswer) break;
     }
-    if (missingAnswer) {
+    if (missingAnswer && !isDraft) {
       const error = new Error('Không thể publish đề thi: Vẫn còn câu hỏi chưa có đáp án đúng.');
       error.statusCode = 400; // Will be handled by errorHandler
       throw error;
@@ -223,7 +223,17 @@ class TestService {
         mt.review_status,
         mt.submitted_at,
         mt.created_at,
-        COUNT(q.id) as questions
+        COALESCE(SUM(
+          GREATEST(
+            COALESCE(jsonb_array_length(
+              CASE 
+                WHEN jsonb_typeof(q.correct_answers) = 'array' THEN q.correct_answers 
+                ELSE '[]'::jsonb 
+              END
+            ), 0),
+            1
+          )
+        ), 0) as questions
       FROM mock_tests mt
       LEFT JOIN questions q ON mt.id = q.test_id
       ${whereClause}

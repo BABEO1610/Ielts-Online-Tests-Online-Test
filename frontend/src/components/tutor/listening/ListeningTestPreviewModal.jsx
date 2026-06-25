@@ -5,76 +5,7 @@ function getQuestionCount(block) {
   return (block.questions || []).length;
 }
 
-function renderQuestion(block, question, qNum, answers, onAnswer) {
-  const value = answers[qNum] || '';
-
-  if (block.type === 'Multiple Choice') {
-    const selected = answers[qNum] || [];
-    return (
-      <div className="mb-4" key={question.id || qNum}>
-        <p className="fw-semibold mb-2">
-          <span className="me-2 badge rounded-pill text-bg-dark">{qNum}</span>
-          {question.text || 'Untitled question'}
-        </p>
-        {(question.options || []).map((opt, idx) => (
-          <button
-            type="button"
-            key={opt.id || idx}
-            className={`option-card w-100 text-start ${selected.includes(opt.id) ? 'selected' : ''}`}
-            onClick={() => onAnswer(qNum, [opt.id])}
-          >
-            <span className="fw-bold me-2">{String.fromCharCode(65 + idx)}.</span>
-            {opt.text}
-          </button>
-        ))}
-      </div>
-    );
-  }
-
-  if (block.type === 'Matching') {
-    return (
-      <div className="mb-4" key={question.id || qNum}>
-        <p className="fw-semibold mb-2">
-          <span className="me-2 badge rounded-pill text-bg-dark">{qNum}</span>
-          {question.text || 'Untitled matching item'}
-        </p>
-        <select className="form-select form-select-sm" value={value} onChange={(e) => onAnswer(qNum, e.target.value)}>
-          <option value="">Select answer...</option>
-          {(block.options || []).map((opt, idx) => (
-            <option key={opt.id || idx} value={opt.id || opt.text}>
-              {String.fromCharCode(65 + idx)}. {opt.text}
-            </option>
-          ))}
-        </select>
-      </div>
-    );
-  }
-
-  return (
-    <div className="mb-4" key={question.id || qNum}>
-      <p className="fw-semibold mb-2">
-        <span className="me-2 badge rounded-pill text-bg-dark">{qNum}</span>
-        {question.text || 'Answer'}
-      </p>
-      <input
-        className="form-control form-control-sm"
-        type="text"
-        value={value}
-        placeholder="Type your answer..."
-        onChange={(e) => onAnswer(qNum, e.target.value)}
-      />
-    </div>
-  );
-}
-
-function renderBlockContent(content) {
-  if (!content) return null;
-  const isImageUrl = /^https?:\/\/.+\.(jpg|jpeg|png|gif|webp|svg)(\?.*)?$/i.test(content.trim());
-  if (isImageUrl) {
-    return <img src={content.trim()} alt="Diagram / Map" className="img-fluid rounded border mb-2" style={{ maxHeight: '400px', display: 'block', margin: '10px auto' }} />;
-  }
-  return <div dangerouslySetInnerHTML={{ __html: content }} />;
-}
+import ListeningBlockRenderer from './ListeningBlockRenderer';
 
 function ListeningTestPreviewModal({ formData, sections, onClose }) {
   const [activeSectionIdx, setActiveSectionIdx] = useState(0);
@@ -161,21 +92,26 @@ function ListeningTestPreviewModal({ formData, sections, onClose }) {
 
         <div style={{ overflowY: 'auto', padding: '32px 40px' }}>
           {(activeSection?.blocks || []).length > 0 ? (
-            activeSection.blocks.map((block, blockIdx) => (
-              <div className="mb-5" key={block.id || blockIdx}>
-                <div className="mb-3 p-2 rounded" style={{ background: '#f5f5f5', borderLeft: '3px solid #111' }}>
-                  <p className="mb-0 fw-semibold" style={{ fontSize: '0.85rem' }}>{block.type || 'Question Block'} - Questions {block.range || '?'}</p>
-                </div>
-                {block.content && (
-                  <div className="mb-3 p-3 rounded bg-white border">
-                    {renderBlockContent(block.content)}
-                  </div>
-                )}
-                {(block.questions || []).map((question, qIdx) => (
-                  renderQuestion(block, question, startNums[activeSectionIdx][blockIdx] + qIdx, answers, handleAnswer)
-                ))}
-              </div>
-            ))
+            activeSection.blocks.map((block, blockIdx) => {
+              const startNum = startNums[activeSectionIdx][blockIdx];
+              // Clone the block and assign questionOrder to match the visual preview order
+              const previewBlock = {
+                ...block,
+                questions: (block.questions || []).map((q, qIdx) => ({
+                  ...q,
+                  questionOrder: startNum + qIdx
+                }))
+              };
+              return (
+                <ListeningBlockRenderer
+                  key={block.id || blockIdx}
+                  block={previewBlock}
+                  answers={answers}
+                  onAnswer={handleAnswer}
+                  answeredQuestions={Object.keys(answers).map(Number)}
+                />
+              );
+            })
           ) : (
             <div className="p-5 text-center text-secondary">No question blocks added to this section yet.</div>
           )}
