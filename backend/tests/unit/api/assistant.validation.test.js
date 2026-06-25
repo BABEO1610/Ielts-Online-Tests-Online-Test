@@ -4,7 +4,7 @@ const { ERROR_CODES } = require('../../../src/api/assistant/assistant.constants'
 describe('Assistant validation', () => {
   it('accepts a valid chat payload', () => {
     const result = validateChatPayload({
-      message: 'Có lesson Listening level beginner không?',
+      message: 'Co lesson Listening level beginner khong?',
       context: {
         pageType: 'home',
         attemptId: null,
@@ -13,7 +13,23 @@ describe('Assistant validation', () => {
     });
 
     expect(result.error).toBeNull();
-    expect(result.value.message).toBe('Có lesson Listening level beginner không?');
+    expect(result.value.message).toBe('Co lesson Listening level beginner khong?');
+  });
+
+  it('accepts library page context with route and visibleItems', () => {
+    const result = validateChatPayload({
+      message: 'co de tam trong thu vien khong',
+      context: {
+        pageType: 'library',
+        route: '/library',
+        attemptId: null,
+        questionId: null,
+        visibleItems: [{ id: 'res-1', title: 'tam', type: 'audio', route: '/library' }],
+      },
+    });
+
+    expect(result.error).toBeNull();
+    expect(result.value.context.visibleItems[0].title).toBe('tam');
   });
 
   it('rejects empty message', () => {
