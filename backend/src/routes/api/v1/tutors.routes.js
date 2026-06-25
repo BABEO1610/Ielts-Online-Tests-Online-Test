@@ -17,5 +17,18 @@ router.get(
   authorize(['tutor', 'admin']),
   TutorController.getTutorQueue
 );
+// GET /api/v1/tutors/submissions/:type/:submissionId
+router.get(
+  '/submissions/:type/:submissionId',
+  authorize(['tutor', 'admin']),
+  TutorController.getSubmissionDetail
+);
+
+// POST /api/v1/tutors/submissions/:type/:submissionId/grade
+router.post(
+  '/submissions/:type/:submissionId/grade',
+  authorize(['tutor']),
+  TutorController.gradeSubmission
+);
 
 module.exports = router;

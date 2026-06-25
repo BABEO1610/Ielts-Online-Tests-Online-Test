@@ -18,16 +18,14 @@ router.post(
   SubmissionController.uploadSpeakingAudio
 );
 
-// Submit speaking (legacy - per part)
+// Submit full speaking test (must be BEFORE generic /speaking to avoid Express match issue)
+router.post('/speaking/full', SubmissionController.submitFullSpeaking);
+
+// Submit speaking (legacy - per part, deprecated)
 router.post(
   '/speaking',
   SubmissionController.submitSpeaking
 );
-
-
-
-// Create speaking test attempt
-router.post('/speaking/attempt', SubmissionController.createSpeakingAttempt);
 
 // Get feedback for a submission
 router.get('/:id/feedback', SubmissionController.getFeedback);

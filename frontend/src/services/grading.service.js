@@ -26,6 +26,12 @@ const gradingService = {
     return response.data;
   },
 
+  // EARS[Event]: WHEN user submits full speaking test THEN send parts and grader preference
+  submitFullSpeaking: async (data) => {
+    const response = await api.post('/submissions/speaking/full', data);
+    return response.data;
+  },
+
   // EARS[State-driven]: WHEN student wants to view feedback THEN fetch feedback report
   getFeedback: async (submissionId, type) => {
     const response = await api.get(`/submissions/${submissionId}/feedback`, {
@@ -47,34 +53,15 @@ const gradingService = {
     const response = await api.get('/tutors/queue', { params: filters });
     return response.data;
   },
-
-  // EARS[Event]: WHEN tutor claims a submission THEN call claim endpoint
-  claimSubmission: async (submissionId, type) => {
-    const response = await api.post(`/tutors/submissions/${submissionId}/claim`, { type });
+  // EARS[State-driven]: WHEN tutor views submission detail THEN fetch detail
+  getSubmissionDetail: async (type, submissionId) => {
+    const response = await api.get(`/tutors/submissions/${type}/${submissionId}`);
     return response.data;
   },
 
   // EARS[Event]: WHEN tutor submits grading result THEN call grade endpoint
-  gradeSubmission: async (submissionId, gradeData) => {
-    const response = await api.post(`/tutors/submissions/${submissionId}/grade`, gradeData);
-    return response.data;
-  },
-
-  // EARS[Event]: WHEN tutor requests AI grammar check THEN call prelim-check endpoint
-  runPrelimCheck: async (submissionId) => {
-    const response = await api.post(`/tutors/submissions/${submissionId}/prelim-check`);
-    return response.data;
-  },
-
-  // EARS[Event]: WHEN tutor adds a note for a student THEN call notes endpoint
-  addTutorNote: async (studentId, note) => {
-    const response = await api.post(`/tutors/students/${studentId}/notes`, { note });
-    return response.data;
-  },
-
-  // EARS[State-driven]: WHEN tutor views student context THEN fetch previous notes
-  getTutorNotes: async (studentId) => {
-    const response = await api.get(`/tutors/students/${studentId}/notes`);
+  gradeSubmission: async (type, submissionId, gradeData) => {
+    const response = await api.post(`/tutors/submissions/${type}/${submissionId}/grade`, gradeData);
     return response.data;
   },
 
