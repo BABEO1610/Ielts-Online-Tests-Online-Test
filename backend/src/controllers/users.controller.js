@@ -56,8 +56,53 @@ const updateProfile = async (req, res, next) => {
     next(error);
   }
 };
+const AvatarStorageService = require('../services/avatarStorage.service');
+const AppError = require('../utils/AppError');
+
+/**
+ * Upload an avatar image for the current user.
+ * @param {Object} req - Express request object.
+ * @param {Object} res - Express response object.
+ * @param {Function} next - Express next middleware function.
+ */
+const uploadAvatar = async (req, res, next) => {
+  try {
+    const userId = req.user.id;
+
+    if (!req.file) {
+      throw new AppError('No avatar file provided', 400, 'UPLOAD_ERR_001');
+    }
+
+    const { buffer, originalname, mimetype } = req.file;
+
+    // Upload to Supabase
+    const uploadResult = await AvatarStorageService.uploadImage(
+      buffer,
+      originalname,
+      mimetype,
+      userId
+    );
+
+    if (!uploadResult.success) {
+      throw new AppError(uploadResult.error || 'Avatar upload failed', 500, 'UPLOAD_ERR_002');
+    }
+
+    // Return the URL so the frontend can fill the form and submit PATCH /me
+    res.status(200).json({
+      success: true,
+      data: {
+        avatar_url: uploadResult.url
+      },
+      error: null,
+      meta: null
+    });
+  } catch (error) {
+    next(error);
+  }
+};
 
 module.exports = {
   getProfile,
-  updateProfile
+  updateProfile,
+  uploadAvatar
 };
