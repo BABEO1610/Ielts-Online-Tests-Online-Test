@@ -596,3 +596,7 @@ WHERE s.revoked_at IS NULL
 | Admin Audit | `audit_logs`, `platform_metrics_snapshots` | `users` | `v_admin_usage_report` |
 | Global Assistant (General) | `chatbot_sessions`, `chatbot_messages` | `mock_tests`, `library_resources`, `questions`, `users` | `v_active_sessions` |
 | Global Assistant (Post-test Review) | `test_attempts`, `questions`, `question_answers` | `users`, `chatbot_sessions`, `chatbot_messages`, `ai_explain_requests` | `v_student_dashboard` |
+
+## Extended Architectures
+
+- **Assistant Database Grounding**: Read [.sdd/context/assistant-db-grounding-architecture.md](file:///d:/Workspace/SWP391_PROJECT/Ielts-Online-Tests-Online-Test/.sdd/context/assistant-db-grounding-architecture.md) for details on how the Global IELTS Assistant accesses and grounds itself on DB schema and rows.
