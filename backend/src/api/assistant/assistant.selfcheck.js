@@ -7,20 +7,53 @@ const normalizeText = (value) =>
   String(value || '')
     .toLowerCase()
     .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '');
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/g, 'd')
+    .replace(/Ä‘/g, 'd');
 
-const containsUnsafeClaim = (answer) => {
+const containsBandPrediction = (answer) => {
   const text = normalizeText(answer);
-  return /\bband\s*[0-9]/.test(text) ||
-    /\b(cham|grade|score|danh gia)\b.*\b(writing|speaking|essay|bai noi|bai viet)\b/.test(text) ||
-    /\b(system prompt|internal prompt|developer prompt|hidden prompt)\b/.test(text);
+  return [
+    /\b(your|bai cua ban|cau tra loi cua ban|essay cua ban|speaking cua ban)\b.*\bband\s*[0-9]/,
+    /\b(bai|essay|speaking|answer|response|cau tra loi)\b.*\bcua ban\b.*\bband\s*[0-9]/,
+    /\bcua ban\b.*\bband\s*[0-9]/,
+    /\bband\s*[0-9](\.[05])?\b.*\b(cho bai nay|for your|cua ban|essay nay|response nay|answer nay)\b/,
+    /\b(cham|grade|score|danh gia|du doan|predict)\b.*\bband\s*[0-9]/,
+    /\b(duoc|dat|khoang)\s*band\s*[0-9](\.[05])?\b.*\b(bai|essay|speaking|answer|response|cau tra loi)\b/,
+  ].some((pattern) => pattern.test(text));
 };
+
+const containsWritingSpeakingGrading = (answer) => {
+  const text = normalizeText(answer);
+  return [
+    /\b(cham|grade|score|danh gia)\b.*\b(writing|speaking|essay|bai noi|bai viet)\b/,
+    /\b(writing|speaking|essay|bai noi|bai viet)\b.*\b(cham|grade|score|danh gia)\b/,
+  ].some((pattern) => pattern.test(text));
+};
+
+const containsFakeOfficialContent = (answer) => {
+  const text = normalizeText(answer);
+  return [
+    /\b(de thi|mock test|ielts test)\b.*\b(chinh thuc|official)\b.*\b(dap an|answer key)\b/,
+    /\b(day la|here is)\b.*\b(de thi|mock test|ielts test)\b.*\b(dap an|answer key)\b/,
+  ].some((pattern) => pattern.test(text));
+};
+
+const containsPromptLeak = (answer) =>
+  /\b(system prompt|internal prompt|developer prompt|hidden prompt)\b/.test(normalizeText(answer));
 
 const hasExternalLinks = (links) =>
   links.some((link) => {
     const href = String(link.href || '');
     return /^https?:\/\//i.test(href) && !href.includes('localhost') && !href.includes('ielts');
   });
+
+const isUnsafeResponse = (response) =>
+  containsBandPrediction(response.answer) ||
+  containsWritingSpeakingGrading(response.answer) ||
+  containsFakeOfficialContent(response.answer) ||
+  containsPromptLeak(response.answer) ||
+  hasExternalLinks(response.suggestedLinks || []);
 
 const selfCheckResponse = ({ response, contextInjection }) => {
   const databaseResults = contextInjection.databaseResults || [];
@@ -49,7 +82,7 @@ const selfCheckResponse = ({ response, contextInjection }) => {
     };
   }
 
-  if (containsUnsafeClaim(response.answer) || hasExternalLinks(response.suggestedLinks || [])) {
+  if (isUnsafeResponse(response)) {
     return {
       ...response,
       answer: ERROR_MESSAGES[ERROR_CODES.OUT_OF_SCOPE],
@@ -57,6 +90,8 @@ const selfCheckResponse = ({ response, contextInjection }) => {
       safety: {
         ...(response.safety || {}),
         outOfScope: true,
+        containsBandScore: containsBandPrediction(response.answer),
+        containsWritingSpeakingGrading: containsWritingSpeakingGrading(response.answer),
       },
     };
   }
@@ -67,4 +102,7 @@ const selfCheckResponse = ({ response, contextInjection }) => {
 module.exports = {
   MISSING_DATA_MESSAGE,
   selfCheckResponse,
+  normalizeText,
+  containsBandPrediction,
+  containsWritingSpeakingGrading,
 };
