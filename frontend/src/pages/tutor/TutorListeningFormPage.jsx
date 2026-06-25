@@ -16,6 +16,7 @@ const LISTENING_QUESTION_TYPES = [
   'Sentence Completion',
   'Short-answer Questions',
   'Note/Table/Flow-chart Completion',
+  'Notes Completion',
 ];
 
 const DEFAULT_SECTIONS = [
@@ -200,15 +201,41 @@ function TutorListeningFormPage({ testId }) {
   const calculateTotalQuestions = () => {
     let total = 0;
     sections.forEach(sec => {
-      sec.blocks.forEach(b => {
-        if (b.questions && b.questions.length > 0) {
-          total += b.questions.length;
-        } else if (b.range && b.range.includes('-')) {
-          const parts = b.range.split('-');
-          const start = parseInt(parts[0].trim(), 10);
-          const end = parseInt(parts[1].trim(), 10);
-          if (!isNaN(start) && !isNaN(end) && end >= start) {
-            total += end - start + 1;
+      sec.blocks.forEach(block => {
+        const rangeStr = block.questionRange || block.range;
+        if (rangeStr) {
+          const range = String(rangeStr).trim();
+          if (range.includes('-')) {
+            const [start, end] = range.split('-').map(Number);
+            if (!Number.isNaN(start) && !Number.isNaN(end) && end >= start) {
+              total += end - start + 1;
+              return;
+            }
+          }
+          const single = Number(range);
+          if (!Number.isNaN(single)) {
+            total += 1;
+            return;
+          }
+        }
+        
+        if (Array.isArray(block.questionNumbers)) {
+          total += block.questionNumbers.length;
+          return;
+        }
+        
+        if (Array.isArray(block.questions)) {
+          let blockTotal = 0;
+          block.questions.forEach(q => {
+            if (Array.isArray(q.questionNumbers)) {
+              blockTotal += q.questionNumbers.length;
+            } else {
+              blockTotal += 1;
+            }
+          });
+          if (blockTotal > 0) {
+             total += blockTotal;
+             return;
           }
         }
       });
