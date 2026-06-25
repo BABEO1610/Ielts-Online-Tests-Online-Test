@@ -1,7 +1,7 @@
 import { BookOpen, Loader2 } from 'lucide-react';
 import ChatMessageItem from './ChatMessageItem';
 
-const ChatMessageList = ({ messages, isLoading, onRate }) => {
+const ChatMessageList = ({ messages, isLoading, onRate, listRef }) => {
   if (messages.length === 0 && !isLoading) {
     return (
       <div className="assistant-empty-state">
@@ -13,7 +13,7 @@ const ChatMessageList = ({ messages, isLoading, onRate }) => {
   }
 
   return (
-    <div className="assistant-message-list" aria-live="polite">
+    <div className="assistant-message-list" aria-live="polite" ref={listRef}>
       {messages.map((message) => (
         <ChatMessageItem key={message.id} message={message} onRate={onRate} />
       ))}

@@ -11,7 +11,7 @@ const getPageType = (pathname) => {
   if (REVIEW_PATTERN.test(pathname)) return 'review';
   if (RESULT_PATTERN.test(pathname)) return 'result';
   if (pathname === '/tests' || pathname.startsWith('/tests/')) return 'test-list';
-  if (pathname === '/library' || pathname.includes('library')) return 'lesson';
+  if (pathname === '/library' || pathname.includes('library')) return 'library';
   if (['/reading', '/listening', '/writing', '/speaking'].includes(pathname)) return 'lesson';
   return 'home';
 };
@@ -40,6 +40,7 @@ export const useAssistantAvailability = () => {
       isGuest: !isLoading && !isAuthenticated,
       user,
       pageType,
+      route: location.pathname,
       attemptId: getAttemptId(location.pathname),
       questionId: searchParams.get('questionId'),
       disabledReason: isActiveTest ? 'ASSISTANT_DISABLED_DURING_TEST' : null,
