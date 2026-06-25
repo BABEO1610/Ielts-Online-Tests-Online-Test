@@ -48,11 +48,15 @@ const HTTP_STATUS_BY_CODE = {
 
 const PAGE_TYPES = new Set([
   'home',
+  'test',
   'test-list',
+  'library',
   'lesson',
+  'profile',
   'result',
   'review',
   'active-test',
+  'unknown',
 ]);
 
 const SUBMITTED_ATTEMPT_STATUSES = new Set([
@@ -91,16 +95,36 @@ const INTENT_CONTEXT_MAP = {
     allowedActions: ['give_general_ielts_study_tips', 'ask_clarifying_question'],
     forbiddenActions: ['grade_writing', 'grade_speaking', 'generate_band_score', 'invent_website_data'],
   },
+  IELTS_KNOWLEDGE: {
+    tables: [],
+    filters: [],
+    requires: [],
+    allowedActions: [
+      'explain_ielts_concepts',
+      'explain_grammar_vocabulary',
+      'give_skill_strategy',
+      'paraphrase_user_text',
+      'ask_clarifying_question',
+    ],
+    forbiddenActions: [
+      'grade_writing',
+      'grade_speaking',
+      'predict_band_score',
+      'invent_tests',
+      'invent_answer_keys',
+      'invent_website_data',
+    ],
+  },
   FIND_TEST: {
     tables: ['mock_tests'],
-    filters: ['is_published = TRUE', 'skill', 'difficulty'],
+    filters: ['is_published = TRUE', 'title', 'description', 'skill', 'difficulty'],
     requires: [],
     allowedActions: ['recommend_existing_tests', 'say_missing_data'],
     forbiddenActions: ['invent_tests', 'invent_links', 'generate_band_score'],
   },
   FIND_LESSON: {
     tables: ['library_resources'],
-    filters: ['is_published = TRUE', 'resource_type'],
+    filters: ['is_published = TRUE', 'title', 'description', 'resource_type', 'category'],
     requires: [],
     allowedActions: ['recommend_existing_lessons', 'say_missing_data'],
     forbiddenActions: ['invent_lessons', 'invent_links', 'generate_band_score'],

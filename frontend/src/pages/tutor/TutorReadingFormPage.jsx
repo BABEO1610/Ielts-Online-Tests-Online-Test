@@ -8,18 +8,18 @@ import { testService } from '../../services/test.service';
 import '../../styles/objective-testing.css';
 
 const QUESTION_TYPES = [
-  'Multiple Choice',
-  'True/False/Not Given',
-  'Yes/No/Not Given',
-  'Matching Headings',
-  'Matching Information',
-  'Matching Features',
-  'Matching Sentence Endings',
-  'Sentence Completion',
-  'Summary Completion',
-  'Note/Table/Flow-chart Completion',
-  'Diagram Label Completion',
-  'Short-answer Questions'
+  'MATCHING_INFORMATION',
+  'MATCHING_HEADINGS',
+  'MATCHING_FEATURES',
+  'MATCHING_SENTENCE_ENDINGS',
+  'SENTENCE_COMPLETION',
+  'SUMMARY_COMPLETION',
+  'NOTE_COMPLETION',
+  'TRUE_FALSE_NOT_GIVEN',
+  'YES_NO_NOT_GIVEN',
+  'MULTIPLE_CHOICE_SINGLE',
+  'MULTIPLE_CHOICE_MULTI',
+  'SHORT_ANSWER_QUESTIONS'
 ];
 
 function TutorReadingFormPage({ testId }) {
@@ -229,6 +229,32 @@ function TutorReadingFormPage({ testId }) {
         alert('Test title is required');
         return;
       }
+
+      // Validate missing answers before submitting
+      let hasMissingAnswers = false;
+      for (const p of passages) {
+        if (p.blocks) {
+          for (const b of p.blocks) {
+            if (b.questions) {
+              for (const q of b.questions) {
+                const isMissing = q.options?.requiresManualAnswer || (!q.correctAnswer && (!q.correctAnswers || q.correctAnswers.length === 0));
+                if (isMissing) {
+                  hasMissingAnswers = true;
+                  break;
+                }
+              }
+            }
+            if (hasMissingAnswers) break;
+          }
+        }
+        if (hasMissingAnswers) break;
+      }
+      
+      if (hasMissingAnswers) {
+        alert('Không thể lưu/submit đề thi: Vẫn còn câu hỏi chưa có đáp án đúng. Vui lòng kiểm tra lại (đặc biệt là các câu được import nhanh).');
+        return;
+      }
+
       setIsSubmitting(true);
       const payload = {
         ...formData,
@@ -342,7 +368,10 @@ function TutorReadingFormPage({ testId }) {
                   <div className="row g-2">
                     <div className="col-md-8 form-group mb-0">
                       <label style={{ fontSize: '0.8rem' }}>Question Type</label>
-                      <select value={block.type} onChange={(e) => updateBlock(passage.id, block.id, 'type', e.target.value)}>
+                      <select value={block.questionType || block.type} onChange={(e) => {
+                        updateBlock(passage.id, block.id, 'questionType', e.target.value);
+                        updateBlock(passage.id, block.id, 'type', e.target.value);
+                      }}>
                         <option value="">Select type...</option>
                         {QUESTION_TYPES.map(qt => <option key={qt} value={qt}>{qt}</option>)}
                       </select>

@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { X, CheckCircle, AlertTriangle } from 'lucide-react';
-import { parseBulkText, parseAdvancedText, validateParsedQuestions } from '../../utils/questionParser';
+import { parseBulkText, parseAdvancedText, parseSmartText, validateParsedQuestions } from '../../utils/questionParser';
 
 const SUPPORTED_TYPES = [
   'Multiple Choice',
@@ -13,14 +13,17 @@ const SUPPORTED_TYPES = [
 ];
 
 function BulkAddModal({ onClose, onConfirm }) {
-  const [isAdvancedMode, setIsAdvancedMode] = useState(false);
+  const [mode, setMode] = useState('simple'); // 'simple', 'advanced', 'smart'
   const [blockType, setBlockType] = useState('');
   const [rawText, setRawText] = useState('');
   
   const { blocks, validationErrors } = useMemo(() => {
     if (!rawText.trim()) return { blocks: [], validationErrors: null };
     
-    if (isAdvancedMode) {
+    if (mode === 'smart') {
+      const { blocks: parsedBlocks, errors } = parseSmartText(rawText);
+      return { blocks: parsedBlocks || [], validationErrors: errors };
+    } else if (mode === 'advanced') {
       const { blocks: parsedBlocks, errors } = parseAdvancedText(rawText);
       return { blocks: parsedBlocks || [], validationErrors: errors };
     } else {
@@ -37,12 +40,17 @@ function BulkAddModal({ onClose, onConfirm }) {
         validationErrors: null 
       };
     }
-  }, [rawText, blockType, isAdvancedMode]);
+  }, [rawText, blockType, mode]);
 
   const handleConfirm = () => {
     if (validationErrors && validationErrors.length > 0) return;
     if (!blocks || blocks.length === 0) return;
     
+    if (mode === 'smart') {
+      onConfirm(blocks);
+      return;
+    }
+
     const newBlocks = blocks.map((b, index) => ({
       id: Date.now() + index,
       type: b.type,
@@ -55,7 +63,21 @@ function BulkAddModal({ onClose, onConfirm }) {
   };
 
   const getFormatHint = () => {
-    if (isAdvancedMode) {
+    if (mode === 'smart') {
+      return (
+        <div className="bg-light p-2 mb-3 rounded" style={{ fontSize: '0.85rem' }}>
+          <strong>Format mẫu Smart Mode (đề nguyên bản):</strong><br />
+          <code>
+            Questions 1-4<br/>
+            Which paragraph contains each of the following pieces of information?<br/>
+            1. A possible security problem<br/>
+            2. The cost of M-Pesa<br/>
+          </code>
+        </div>
+      );
+    }
+
+    if (mode === 'advanced') {
       return (
         <div className="bg-light p-2 mb-3 rounded" style={{ fontSize: '0.85rem' }}>
           <strong>Format mẫu Advanced:</strong><br />
@@ -117,7 +139,7 @@ function BulkAddModal({ onClose, onConfirm }) {
   const isConfirmDisabled = () => {
     if (!rawText.trim()) return true;
     if (validationErrors && validationErrors.length > 0) return true;
-    if (!isAdvancedMode && !blockType) return true;
+    if (mode === 'simple' && !blockType) return true;
     if (blocks.length === 0) return true;
     return false;
   };
@@ -135,27 +157,27 @@ function BulkAddModal({ onClose, onConfirm }) {
         </div>
         
         <div className="modal-body p-3 overflow-auto" style={{ flex: 1 }}>
-          <div className="alert alert-info py-2 d-flex justify-content-between align-items-center" style={{ fontSize: '0.9rem' }}>
-            <span>Giúp thêm nhanh câu hỏi bằng cách copy & paste.</span>
-            
-            <div className="form-check form-switch m-0">
-              <input 
-                className="form-check-input" 
-                type="checkbox" 
-                id="advancedModeSwitch"
-                checked={isAdvancedMode}
-                onChange={(e) => {
-                  setIsAdvancedMode(e.target.checked);
-                  setRawText(''); // Clear text when switching modes to avoid invalid state
-                }}
-              />
-              <label className="form-check-label fw-bold" htmlFor="advancedModeSwitch">Advanced Mode (Markers)</label>
+          <div className="alert alert-info py-2 d-flex flex-column" style={{ fontSize: '0.9rem' }}>
+            <span className="mb-2">Giúp thêm nhanh câu hỏi bằng cách copy & paste. Vui lòng chọn chế độ:</span>
+            <div className="d-flex gap-3">
+              <div className="form-check">
+                <input className="form-check-input" type="radio" name="modeRadio" id="modeSimple" checked={mode === 'simple'} onChange={() => { setMode('simple'); setRawText(''); }} />
+                <label className="form-check-label fw-bold" htmlFor="modeSimple">Simple Mode</label>
+              </div>
+              <div className="form-check">
+                <input className="form-check-input" type="radio" name="modeRadio" id="modeAdvanced" checked={mode === 'advanced'} onChange={() => { setMode('advanced'); setRawText(''); }} />
+                <label className="form-check-label fw-bold" htmlFor="modeAdvanced">Advanced Mode (Markers)</label>
+              </div>
+              <div className="form-check">
+                <input className="form-check-input" type="radio" name="modeRadio" id="modeSmart" checked={mode === 'smart'} onChange={() => { setMode('smart'); setRawText(''); }} />
+                <label className="form-check-label fw-bold" htmlFor="modeSmart">Smart Mode (IELTS Raw Text)</label>
+              </div>
             </div>
           </div>
           
           <div className="row h-100">
             <div className="col-md-6 h-100 d-flex flex-column">
-              {!isAdvancedMode ? (
+              {mode === 'simple' && (
                 <>
                   <label className="form-label fw-bold">1. Chọn loại câu hỏi</label>
                   <select 
@@ -167,27 +189,33 @@ function BulkAddModal({ onClose, onConfirm }) {
                     {SUPPORTED_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
                   </select>
                 </>
-              ) : (
+              )}
+              {mode === 'advanced' && (
                 <div className="mb-2 text-primary fw-bold" style={{ fontSize: '0.9rem' }}>
                   Chế độ Advanced: Hệ thống tự chia khối câu hỏi dựa trên các thẻ Marker `[MCQ]`, `[T/F/NG]`...
+                </div>
+              )}
+              {mode === 'smart' && (
+                <div className="mb-2 text-success fw-bold" style={{ fontSize: '0.9rem' }}>
+                  Chế độ Smart: Tự động chia khối dựa trên pattern `Questions X-Y`. Không cần marker.
                 </div>
               )}
               
               {getFormatHint()}
               
-              <label className="form-label fw-bold">{isAdvancedMode ? '1' : '2'}. Dán văn bản vào đây</label>
+              <label className="form-label fw-bold">{mode !== 'simple' ? '1' : '2'}. Dán văn bản vào đây</label>
               <textarea 
                 className="form-control flex-grow-1"
                 style={{ resize: 'none', minHeight: '300px' }}
-                placeholder={isAdvancedMode ? "Ví dụ:\n[MCQ]\n1. Câu hỏi\n*A. Đáp án" : "Dán nội dung vào đây..."}
+                placeholder={mode === 'advanced' ? "Ví dụ:\n[MCQ]\n1. Câu hỏi\n*A. Đáp án" : mode === 'smart' ? "Dán đề IELTS (Questions 1-4...) vào đây..." : "Dán nội dung vào đây..."}
                 value={rawText}
                 onChange={e => setRawText(e.target.value)}
-                disabled={!isAdvancedMode && !blockType}
+                disabled={mode === 'simple' && !blockType}
               />
             </div>
             
             <div className="col-md-6 h-100 d-flex flex-column border-start ps-3">
-              <label className="form-label fw-bold">{isAdvancedMode ? '2' : '3'}. Kết quả (Preview)</label>
+              <label className="form-label fw-bold">{mode !== 'simple' ? '2' : '3'}. Kết quả (Preview)</label>
               
               <div className="flex-grow-1 overflow-auto bg-light rounded p-2" style={{ border: '1px solid #dee2e6' }}>
                 {!rawText.trim() && (
@@ -211,41 +239,77 @@ function BulkAddModal({ onClose, onConfirm }) {
                   <div>
                     <div className="alert alert-success d-flex align-items-center gap-2 py-2">
                       <CheckCircle size={18} />
-                      Nhận diện thành công {blocks.length} khối ({blocks.reduce((acc, b) => acc + b.questions.length, 0)} câu hỏi).
+                      Nhận diện thành công {blocks.length} khối ({blocks.reduce((acc, b) => acc + (b.questions ? b.questions.length : 0), 0)} câu hỏi).
                     </div>
                     
                     {blocks.map((block, bIdx) => (
                       <div key={bIdx} className="mb-4">
-                        <div className="badge bg-secondary mb-2 fs-6">{block.type}</div>
-                        {block.questions.map((q, qIdx) => (
-                          <div key={qIdx} className="card mb-2 border-0 shadow-sm border-start border-4 border-primary">
-                            <div className="card-body p-2" style={{ fontSize: '0.85rem' }}>
-                              <div className="fw-bold mb-1">Câu {qIdx + 1}: {q.text}</div>
-                              
-                              {block.type === 'Multiple Choice' && q.options && (
-                                <ul className="list-unstyled ms-3 mb-1">
-                                  {q.options.map((opt, oIdx) => (
-                                    <li key={opt.id} style={{ color: q.correctAnswers.includes(opt.id) ? 'var(--success)' : 'inherit', fontWeight: q.correctAnswers.includes(opt.id) ? 'bold' : 'normal' }}>
-                                      {String.fromCharCode(65 + oIdx)}. {opt.text} {q.correctAnswers.includes(opt.id) && '✓'}
-                                    </li>
-                                  ))}
-                                </ul>
-                              )}
-                              
-                              {block.type !== 'Multiple Choice' && (
-                                <div className="text-success fw-bold ms-3 mb-1">
-                                  Đáp án: {q.correctAnswer}
-                                </div>
-                              )}
-                              
-                              {q.explanation && (
-                                <div className="text-muted ms-3 fst-italic">
-                                  Giải thích: {q.explanation}
-                                </div>
-                              )}
+                        <div className="badge bg-secondary mb-2 fs-6">{mode === 'smart' ? `${block.type} (Q${block.range})` : block.type}</div>
+                        {mode === 'smart' && block.warnings && block.warnings.length > 0 && (
+                           <div className="alert alert-warning py-1 px-2 mb-2" style={{fontSize: '0.8rem'}}>
+                             {block.warnings.map((w, wI) => <div key={wI}>⚠️ {w}</div>)}
+                           </div>
+                        )}
+                        {block.questions && block.questions.map((q, qIdx) => {
+                          // Handle multiple types of question shape
+                          const text = q.text || q.questionText;
+                          const correct = q.correctAnswer || q.correctAnswers;
+                          
+                          return (
+                            <div key={qIdx} className="card mb-2 border-0 shadow-sm border-start border-4 border-primary">
+                              <div className="card-body p-2" style={{ fontSize: '0.85rem' }}>
+                                <div className="fw-bold mb-1">Câu {q.questionOrder || (qIdx + 1)}: {text}</div>
+                                
+                                {q.options && q.options.choices && q.options.choices.length > 0 && (
+                                  <ul className="list-unstyled ms-3 mb-1">
+                                    {q.options.choices.map((opt, oIdx) => (
+                                      <li key={oIdx}>
+                                        {opt.label}. {opt.text}
+                                      </li>
+                                    ))}
+                                  </ul>
+                                )}
+                                {(block.type === 'Multiple Choice' || (q.options && Array.isArray(q.options))) && !q.options?.choices && (
+                                  <ul className="list-unstyled ms-3 mb-1">
+                                    {Array.isArray(q.options) && q.options.map((opt, oIdx) => (
+                                      <li key={opt.id || oIdx} style={{ color: (correct && correct.includes(opt.id)) ? 'var(--success)' : 'inherit', fontWeight: (correct && correct.includes(opt.id)) ? 'bold' : 'normal' }}>
+                                        {String.fromCharCode(65 + oIdx)}. {opt.text} {(correct && correct.includes(opt.id)) && '✓'}
+                                      </li>
+                                    ))}
+                                  </ul>
+                                )}
+                                
+                                {(!Array.isArray(q.options) || block.type !== 'Multiple Choice') && !q.options?.choices && (
+                                  <>
+                                    {correct ? (
+                                      <div className="text-success fw-bold ms-3 mb-1">
+                                        Đáp án: {correct}
+                                      </div>
+                                    ) : (
+                                      mode === 'smart' && (
+                                        <div className="text-warning fw-bold ms-3 mb-1" style={{ fontSize: '0.8rem' }}>
+                                          ⚠️ Missing answer
+                                        </div>
+                                      )
+                                    )}
+                                  </>
+                                )}
+                                
+                                {q.explanation ? (
+                                  <div className="text-muted ms-3 fst-italic">
+                                    Giải thích: {q.explanation}
+                                  </div>
+                                ) : (
+                                  mode === 'smart' && correct && (
+                                    <div className="text-secondary ms-3 mb-1" style={{ fontSize: '0.8rem' }}>
+                                      ⚠️ Missing explanation
+                                    </div>
+                                  )
+                                )}
+                              </div>
                             </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     ))}
                   </div>

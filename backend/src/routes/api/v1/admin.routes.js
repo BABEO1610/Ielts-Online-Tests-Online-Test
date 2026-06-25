@@ -48,4 +48,11 @@ router.get('/change-logs', authenticate, authorize('admin'), adminController.lis
 router.get('/change-logs/:id', authenticate, authorize('admin'), adminController.getChangeLogDetail);
 router.post('/change-logs/:id/undo', authenticate, authorize('admin'), adminController.undoChangeLog);
 
+// -------------------------------------------------------------
+// T042: API phân công giảng viên (Tutor Assignment per submission)
+// -------------------------------------------------------------
+const adminTutorController = require('../../../controllers/adminTutor.controller');
+router.get('/tutor-assignments', authenticate, authorize('admin'), adminTutorController.getTutorAssignments);
+router.put('/tutor-assignments/:submissionId', authenticate, authorize('admin'), adminTutorController.assignTutor);
+
 module.exports = router;

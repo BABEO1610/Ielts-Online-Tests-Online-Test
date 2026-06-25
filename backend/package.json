@@ -14,7 +14,9 @@
     "test:coverage": "jest --runInBand --coverage",
     "lint": "eslint src/ tests/ --ext .js",
     "migrate": "node scripts/migrate.js",
-    "test:api": "newman run \"DemoNewMan/IeltsZone Test API.postman_collection.json\" -e \"DemoNewMan/IeltsZone.postman_environment.json\" -r htmlextra"
+    "test:api": "newman run \"DemoNewMan/IeltsZone Test API.postman_collection.json\" -e \"DemoNewMan/IeltsZone.postman_environment.json\" -r htmlextra",
+    "assistant:inspect-schema": "node scripts/assistant-inspect-schema.js",
+    "assistant:debug-db": "node scripts/assistant-debug-db.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.108.2",

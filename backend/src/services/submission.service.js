@@ -216,16 +216,16 @@ class SubmissionService {
   }
 
   /**
-   * Submit speaking record.
-   * The audio is already uploaded to Supabase by /speaking/upload; this method
-   * records the Supabase object path/public URL against the submission.
+   * Submit full speaking test.
+   * Receives an array of parts and saves them within one transaction, generating a group UUID.
    */
-  static async submitSpeaking(userId, testId, partNumber, tempS3Key, grader) {
-    if (testId) {
+  static async submitFullSpeaking(userId, testId, grader, parts) {
+    const normalizedTestId = normalizeOptionalUuid(testId);
+    if (normalizedTestId) {
       try {
-        const testRes = await pool.query('SELECT id FROM mock_tests WHERE id = $1', [testId]);
+        const testRes = await pool.query('SELECT id FROM mock_tests WHERE id = $1', [normalizedTestId]);
         if (testRes.rows.length === 0) {
-          throw new AppError('Test not found', 404, 'TEST_NOT_FOUND');
+          throw new AppError('Speaking test not found', 404, 'TEST_NOT_FOUND');
         }
       } catch (err) {
         if (err instanceof AppError) throw err;
@@ -233,29 +233,36 @@ class SubmissionService {
       }
     }
 
-    // 2. Validate the uploaded Supabase object belongs to this user.
-    const storagePath = String(tempS3Key || '').replace(/^\/+/, '');
-    const expectedPrefix = `speaking/${userId}/`;
-    if (!storagePath.startsWith(expectedPrefix) || storagePath.includes('..')) {
-      throw new AppError('Invalid speaking audio path', 400, 'INVALID_AUDIO_PATH');
-    }
-
-    const audioUrl = toPublicSpeakingAudioUrl(storagePath);
+    const { randomUUID } = require('crypto');
+    const speakingGroupId = randomUUID();
 
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
-      // 3. Insert into speaking_submissions
-      const insertRes = await client.query(
-        `INSERT INTO speaking_submissions (user_id, test_id, part_number, audio_url, grader, status)
-         VALUES ($1, $2, $3, $4, $5, 'pending') RETURNING *`,
-        [userId, testId, partNumber, audioUrl, grader]
-      );
+      
+      const insertedParts = [];
+      for (const part of parts) {
+        // Validate the uploaded Supabase object belongs to this user.
+        const storagePath = String(part.temp_s3_key || '').replace(/^\/+/, '');
+        const expectedPrefix = `speaking/${userId}/`;
+        if (!storagePath.startsWith(expectedPrefix) || storagePath.includes('..')) {
+          throw new AppError('Invalid speaking audio path', 400, 'INVALID_AUDIO_PATH');
+        }
+        const audioUrl = toPublicSpeakingAudioUrl(storagePath);
+        
+        const insertRes = await client.query(
+          `INSERT INTO speaking_submissions (user_id, test_id, part_number, audio_url, grader, status, speaking_group_id)
+           VALUES ($1, $2, $3, $4, $5, 'pending', $6) RETURNING *`,
+          [userId, normalizedTestId, part.part_number, audioUrl, grader, speakingGroupId]
+        );
+        insertedParts.push(insertRes.rows[0]);
+      }
+
       await client.query('COMMIT');
-      return insertRes.rows[0];
-    } catch (error) {
+      return { speaking_group_id: speakingGroupId, parts: insertedParts };
+    } catch (err) {
       await client.query('ROLLBACK');
-      throw mapSpeakingDbError(error);
+      throw mapSpeakingDbError(err);
     } finally {
       client.release();
     }
@@ -296,36 +303,7 @@ class SubmissionService {
     return audioUrl;
   }
 
-  static async createAttempt(userId, testId) {
-    const normalizedTestId = normalizeOptionalUuid(testId);
-    if (normalizedTestId) {
-      try {
-        const testRes = await pool.query('SELECT id FROM mock_tests WHERE id = $1', [normalizedTestId]);
-        if (testRes.rows.length === 0) {
-          throw new AppError('Speaking test not found', 404, 'TEST_NOT_FOUND');
-        }
-      } catch (err) {
-        if (err instanceof AppError) throw err;
-        throw new AppError('Invalid test ID format', 400, 'INVALID_TEST_ID');
-      }
-    }
 
-    const client = await pool.connect();
-    try {
-      await client.query('BEGIN');
-      const insertRes = await client.query(
-        `INSERT INTO speaking_attempts (user_id, test_id, status) VALUES ($1, $2, 'in_progress') RETURNING id, status`,
-        [userId, normalizedTestId]
-      );
-      await client.query('COMMIT');
-      return insertRes.rows[0];
-    } catch (err) {
-      await client.query('ROLLBACK');
-      throw mapSpeakingDbError(err);
-    } finally {
-      client.release();
-    }
-  }
 
   static async getFeedback(id, userId, type) {
     if (type !== 'speaking' && type !== 'writing') {

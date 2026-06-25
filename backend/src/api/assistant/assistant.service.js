@@ -29,12 +29,14 @@ const buildSuccessResult = ({
   conversationId = null,
   messageId = null,
   intent = null,
+  fallbackUsed = false,
 }) => ({
   answer,
   suggestedLinks,
   conversationId,
   messageId,
   intent,
+  fallbackUsed,
   code: null,
 });
 
@@ -55,11 +57,30 @@ const buildLookupFallbackAnswer = (contextInjection) => {
   const items = contextInjection.databaseResults || [];
   if (items.length === 0) return MISSING_DATA_MESSAGE;
 
-  const summary = summarizeLookupResults(items);
   if (contextInjection.mode === ASSISTANT_INTENTS.FIND_TEST) {
-    return `Mình tìm thấy ${items.length} đề trong hệ thống: ${summary}. Bạn có thể mở đúng trang kỹ năng ở phần link gợi ý bên dưới.`;
+    const skill = contextInjection.debug?.skillFilter || 'IELTS';
+    let msg = `Mình tìm thấy ${items.length} đề ${skill} đang được publish trong hệ thống:\n\n`;
+    items.slice(0, 5).forEach((item, index) => {
+      msg += `${index + 1}. ${item.title || 'Untitled'} — ${item.skill || 'Skill'}, ${item.difficulty || 'Difficulty'}\n`;
+    });
+    msg += '\nBạn muốn mở đề nào?';
+    return msg;
   }
-  return `Mình tìm thấy ${items.length} tài liệu trong thư viện: ${summary}. Bạn có thể mở trang Library ở phần link gợi ý bên dưới.`;
+  
+  if (contextInjection.mode === ASSISTANT_INTENTS.FIND_LESSON) {
+    if (items.length === 1) {
+      const item = items[0];
+      return `Mình tìm thấy tài liệu '${item.title || 'Untitled'}' trong thư viện. Loại tài liệu: ${item.resourceType || 'N/A'}. Category: ${item.category || 'N/A'}.`;
+    }
+    let msg = `Mình tìm thấy ${items.length} tài liệu trong thư viện:\n\n`;
+    items.slice(0, 5).forEach((item, index) => {
+      msg += `${index + 1}. ${item.title || 'Untitled'} — ${item.resourceType || 'N/A'}, ${item.category || 'N/A'}\n`;
+    });
+    msg += '\nBạn có thể mở trang Library ở phần link gợi ý bên dưới.';
+    return msg;
+  }
+  
+  return MISSING_DATA_MESSAGE;
 };
 
 const getFallbackAnswer = (contextInjection) => {
@@ -76,6 +97,39 @@ const isGenericAssistantAnswer = (answer) => {
     text.includes('tim test, lesson') ||
     text.includes('tìm test, lesson') ||
     text.includes('review đáp án');
+};
+
+const emitAssistantDebug = (data) => {
+  if (process.env.ASSISTANT_DEBUG === 'false') return;
+  console.info('[AssistantDebug]', {
+    message: data.message || null,
+    route: data.route || null,
+    pageType: data.pageType || null,
+    ruleIntent: data.ruleIntent || null,
+    classifierUsed: Boolean(data.classifierUsed),
+    classifierIntent: data.classifierIntent || null,
+    classifierConfidence: data.classifierConfidence || 0,
+    classifierError: data.classifierError || null,
+    finalIntent: data.finalIntent || null,
+    queryTable: data.queryTable || null,
+    selectedColumns: data.selectedColumns || null,
+    publishFilter: data.publishFilter || null,
+    searchTerms: data.searchTerms || [],
+    exactTitleMatch: Boolean(data.exactTitleMatch),
+    fuzzyTitleMatch: Boolean(data.fuzzyTitleMatch),
+    skillFilter: data.skillFilter || null,
+    resourceTypeFilter: data.resourceTypeFilter || null,
+    rowCount: data.rowCount || 0,
+    resultTitles: data.resultTitles || [],
+    fallbackUsed: Boolean(data.fallbackUsed),
+    fallbackReason: data.fallbackReason || null,
+    classifierProviderCalled: Boolean(data.classifierProviderCalled),
+    answerProviderCalled: Boolean(data.answerProviderCalled),
+    totalAiCalls: data.totalAiCalls || 0,
+    finalResponseMode: data.finalResponseMode || 'safe_missing_data',
+    'dbError.message': data.dbError?.message || null,
+    'dbError.code': data.dbError?.code || null,
+  });
 };
 
 const safeCreateSession = async (userId) => {
@@ -105,9 +159,25 @@ const safeSaveAssistantMessage = async (sessionId, answer, userId) => {
   }
 };
 
+const {
+  buildGreetingResponse,
+  buildClarificationResponse,
+  buildSafeGradingResponse,
+  buildOutOfScopeResponse,
+} = require('./assistant.responses');
+
 const buildImmediateIntentResult = (intent) => {
   if (intent === ASSISTANT_INTENTS.OUT_OF_SCOPE) {
-    return buildSuccessResult({ answer: ERROR_MESSAGES[ERROR_CODES.OUT_OF_SCOPE], intent });
+    return buildSuccessResult({ answer: buildOutOfScopeResponse(), intent });
+  }
+  if (intent === ASSISTANT_INTENTS.GREETING) {
+    return buildSuccessResult({ answer: buildGreetingResponse(), intent });
+  }
+  if (intent === ASSISTANT_INTENTS.CLARIFICATION) {
+    return buildSuccessResult({ answer: buildClarificationResponse(), intent });
+  }
+  if (intent === ASSISTANT_INTENTS.GRADING_REQUEST_SAFE_FEEDBACK) {
+    return buildSuccessResult({ answer: buildSafeGradingResponse(), intent });
   }
   return null;
 };
@@ -152,15 +222,18 @@ const normalizeAndSelfCheck = ({ rawAnswer, contextInjection, allowPlainText = f
       suggestedLinks: contextInjection.suggestedLinks || [],
       usedDatabase: true,
       needsMoreContext: false,
+      fallbackUsed: true,
+      finalResponseMode: 'deterministic_fallback'
     };
   }
   if (contextInjection.suggestedLinks?.length) {
     return {
       ...checked,
       suggestedLinks: contextInjection.suggestedLinks,
+      finalResponseMode: 'ai'
     };
   }
-  return checked;
+  return { ...checked, finalResponseMode: 'ai' };
 };
 
 const generateCheckedAnswer = async ({ payload, contextInjection }) => {
@@ -197,20 +270,68 @@ const buildAiResult = async ({ payload, contextInjection, useStream }) => {
   const response = useStream
     ? await generateCheckedStreamAnswer({ payload, contextInjection })
     : await generateCheckedAnswer({ payload, contextInjection });
-  return buildSuccessResult({
-    answer: response.answer,
-    suggestedLinks: response.suggestedLinks,
-    intent: contextInjection.mode,
+  return {
+    ...buildSuccessResult({
+      answer: response.answer,
+      suggestedLinks: response.suggestedLinks,
+      intent: contextInjection.mode,
+      fallbackUsed: response.fallbackUsed,
+    }),
+    finalResponseMode: response.finalResponseMode
+  };
+};
+
+const tracePipeline = ({ payload, ruleIntent, classifierUsed, classifierResult, contextInjection, answerProviderCalled, fallbackUsed, finalResponseMode }) => {
+  const classifierProviderCalled = Boolean(classifierUsed);
+  emitAssistantDebug({
+    message: payload.message,
+    route: payload.context.route,
+    pageType: payload.context.pageType,
+    ruleIntent,
+    classifierUsed,
+    classifierIntent: classifierResult?.intent || null,
+    classifierConfidence: classifierResult?.confidence || 0,
+    classifierError: classifierResult?.error || null,
+    finalIntent: classifierResult?.intent || ruleIntent,
+    ...(contextInjection?.debug || {}),
+    classifierProviderCalled,
+    answerProviderCalled: Boolean(answerProviderCalled),
+    totalAiCalls: (classifierProviderCalled ? 1 : 0) + (answerProviderCalled ? 1 : 0),
+    fallbackUsed,
+    finalResponseMode,
   });
 };
 
 const runAssistantPipeline = async ({ user, payload, useStream = false }) => {
-  const intent = detectIntent({ message: payload.message, context: payload.context });
+  const originalIntent = detectIntent({ message: payload.message, context: payload.context });
+  let intent = originalIntent;
+  let classifierUsed = false;
+  let classifierResult = null;
+
+  if (intent === ASSISTANT_INTENTS.UNKNOWN) {
+    const { classifyScope } = require('./assistant.scope-classifier');
+    classifierResult = await classifyScope(payload.message);
+    classifierUsed = true;
+    intent = classifierResult.intent;
+    
+    if (classifierResult.error) {
+      const intentResult = buildImmediateIntentResult(ASSISTANT_INTENTS.CLARIFICATION);
+      tracePipeline({ payload, ruleIntent: originalIntent, classifierUsed, classifierResult, answerProviderCalled: false, finalResponseMode: 'classifier_error_clarification' });
+      return intentResult;
+    }
+  }
+
   const intentResult = buildImmediateIntentResult(intent);
-  if (intentResult) return intentResult;
+  if (intentResult) {
+    tracePipeline({ payload, ruleIntent: originalIntent, classifierUsed, classifierResult, answerProviderCalled: false, finalResponseMode: 'immediate' });
+    return intentResult;
+  }
 
   const guardrailResult = buildGuardrailResult({ message: payload.message, context: payload.context });
-  if (guardrailResult) return { ...guardrailResult, intent };
+  if (guardrailResult) {
+    tracePipeline({ payload, ruleIntent: originalIntent, classifierUsed, classifierResult, answerProviderCalled: false, finalResponseMode: 'guardrail_blocked' });
+    return { ...guardrailResult, intent };
+  }
 
   const contextInjection = await buildContextInjection({
     intent,
@@ -220,9 +341,23 @@ const runAssistantPipeline = async ({ user, payload, useStream = false }) => {
     sessionId: null,
   });
   const contextResult = buildImmediateContextResult(contextInjection);
-  if (contextResult) return contextResult;
+  if (contextResult) {
+    tracePipeline({ payload, ruleIntent: originalIntent, classifierUsed, classifierResult, contextInjection, answerProviderCalled: false, finalResponseMode: 'safe_missing_data' });
+    return contextResult;
+  }
 
-  return buildAiResult({ payload, contextInjection, useStream });
+  const result = await buildAiResult({ payload, contextInjection, useStream });
+  tracePipeline({
+    payload,
+    ruleIntent: originalIntent,
+    classifierUsed,
+    classifierResult,
+    contextInjection,
+    answerProviderCalled: true,
+    fallbackUsed: result.fallbackUsed,
+    finalResponseMode: result.finalResponseMode || 'ai'
+  });
+  return result;
 };
 
 const persistSuccessfulResult = async ({ user, payload, result }) => {
