@@ -158,11 +158,10 @@ class AttemptService {
       const finalStatus = isObjective ? 'graded' : 'submitted';
       const finalBandScore = isObjective ? bandScore : null;
 
-      // Insert attempt header
       const attemptRes = await client.query(
         `INSERT INTO test_attempts
-           (test_id, user_id, mode, status, raw_score, total_questions, band_score, time_spent, practice_mode)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+           (test_id, user_id, mode, status, raw_score, total_questions, band_score, time_spent, practice_mode, submitted_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())
          RETURNING id`,
         [testId, userId, mode, finalStatus, rawScore, totalQuestions, finalBandScore, timeSpent, practiceMode]
       );
