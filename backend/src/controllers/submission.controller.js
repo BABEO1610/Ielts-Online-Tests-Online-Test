@@ -89,15 +89,14 @@ class SubmissionController {
   }
 
   /**
-   * Submit speaking (legacy - per part)
+   * Submit speaking (legacy - per part, deprecated)
+   * Kept for backward compatibility. Wraps submitFullSpeaking with single part.
    */
   static async submitSpeaking(req, res, next) {
     try {
       const userId = req.user.id;
       let { test_id, part_number, temp_s3_key, grader } = req.body;
 
-      // Basic validation
-      // Allow test_id to be invalid dummy ID (convert to null) so frontend can test mock exams
       const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
       if (test_id && !uuidRegex.test(test_id)) {
         test_id = null;
@@ -113,11 +112,14 @@ class SubmissionController {
         throw new AppError('grader must be ai or tutor', 400, 'INVALID_FIELD');
       }
 
-      const submission = await SubmissionService.submitSpeaking(userId, test_id, part_number, temp_s3_key, grader);
+      // Delegate to submitFullSpeaking with single part (speaking_group_id will be generated)
+      const result = await SubmissionService.submitFullSpeaking(userId, test_id, grader, [
+        { part_number: parseInt(part_number, 10), temp_s3_key }
+      ]);
 
       res.status(201).json({
         success: true,
-        data: submission,
+        data: result.parts[0],
         error: null,
         meta: null
       });
@@ -230,14 +232,18 @@ class SubmissionController {
   }
 
   /**
-   * Route for creating a speaking test attempt
+   * Route for submitting a full speaking test
    */
-  static async createSpeakingAttempt(req, res, next) {
+  static async submitFullSpeaking(req, res, next) {
     try {
       const userId = req.user.id;
-      const { test_id } = req.body;
+      const { test_id, grader, parts } = req.body;
 
-      const result = await SubmissionService.createAttempt(userId, test_id);
+      if (!parts || !Array.isArray(parts) || parts.length !== 3) {
+        throw new AppError('Full speaking submission requires exactly 3 parts', 400, 'INVALID_FIELD');
+      }
+
+      const result = await SubmissionService.submitFullSpeaking(userId, test_id, grader, parts);
 
       res.status(201).json({
         success: true,

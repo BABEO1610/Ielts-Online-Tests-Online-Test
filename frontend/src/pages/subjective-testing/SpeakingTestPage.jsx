@@ -153,15 +153,11 @@ const SpeakingTestScreen = ({ exam, practiceMode, customTimeLimit }) => {
 
   const handleFinalSubmit = async (grader) => {
     try {
-      // Gọi submit cho từng file đã lưu (3 parts)
-      for (const ans of answers) {
-        await gradingService.submitSpeaking({
-          test_id: exam.id.toString(),
-          part_number: ans.part_number,
-          temp_s3_key: ans.temp_s3_key,
-          grader
-        });
-      }
+      await gradingService.submitFullSpeaking({
+        test_id: exam.id.toString(),
+        grader,
+        parts: answers
+      });
       setPhase('result');
     } catch (err) {
       alert('Nộp bài thất bại. Vui lòng thử lại.');
