@@ -3,7 +3,7 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer,
   RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, Legend
 } from 'recharts';
-import api from '../services/api';
+import api from '../../services/api';
 
 const StudyPlanPage = () => {
   const [data, setData] = useState({
