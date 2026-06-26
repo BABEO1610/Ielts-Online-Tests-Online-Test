@@ -11,6 +11,9 @@ router.use(authenticate);
 // Submit a writing task response
 router.post('/writing', SubmissionController.submitWriting);
 
+// Submit full writing test
+router.post('/writing/full', SubmissionController.submitFullWriting);
+
 // Upload audio temp (speaking)
 router.post(
   '/speaking/upload',
@@ -26,6 +29,9 @@ router.post(
   '/speaking',
   SubmissionController.submitSpeaking
 );
+
+// Get submission history for a student
+router.get('/history', SubmissionController.getHistory);
 
 // Get feedback for a submission
 router.get('/:id/feedback', SubmissionController.getFeedback);

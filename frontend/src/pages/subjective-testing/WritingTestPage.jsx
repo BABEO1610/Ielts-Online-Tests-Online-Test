@@ -5,6 +5,7 @@ import WritingEditor from '../../components/grading/WritingEditor';
 import FeedbackReport from '../../components/grading/FeedbackReport';
 import TimerBar from '../../components/objective-testing/TimerBar';
 import AutoSubmitModal from '../../components/objective-testing/AutoSubmitModal';
+import gradingService from '../../services/grading.service';
 
 /**
  * WritingTestScreen — Component màn hình làm bài
@@ -17,28 +18,49 @@ const WritingTestScreen = ({ exam, onBack, onSubmitSuccess, practiceMode, custom
   // Tính tổng thời gian của cả 2 task (thường là 60 phút)
   const durationMinutes = exam.tasks.reduce((total, task) => total + (parseInt(task.duration) || 0), 0);
 
-  const handleTimeUp = useCallback(() => {
+  const submitAllTasks = useCallback(async () => {
     setShowAutoSubmit(true);
-    editorRefs.current.forEach(ref => {
-      if (ref && ref.submit) ref.submit();
-    });
-  }, []);
+    try {
+      const tasksData = [];
+      let globalGrader = 'tutor';
+
+      for (const ref of editorRefs.current) {
+        if (ref && ref.getTaskData) {
+          const data = ref.getTaskData();
+          tasksData.push(data);
+          if (data.grader) globalGrader = data.grader;
+        }
+      }
+
+      if (tasksData.length === 0) {
+        throw new Error('Không có dữ liệu bài làm.');
+      }
+
+      const payload = {
+        test_id: exam.id,
+        grader: globalGrader,
+        tasks: tasksData
+      };
+
+      const response = await gradingService.submitFullWriting(payload);
+      setShowAutoSubmit(false);
+      if (onSubmitSuccess) onSubmitSuccess(response);
+    } catch (error) {
+      console.error(error);
+      setShowAutoSubmit(false);
+      window.alert(error.message || 'Đã xảy ra lỗi khi nộp bài.');
+    }
+  }, [exam.id, onSubmitSuccess]);
+
+  const handleTimeUp = useCallback(() => {
+    submitAllTasks();
+  }, [submitAllTasks]);
 
   const handleSubmitEarly = useCallback(() => {
-    setShowAutoSubmit(true);
-    editorRefs.current.forEach(ref => {
-      if (ref && ref.submit) ref.submit();
-    });
-  }, []);
-
-  const handleSuccess = (res) => {
-    setShowAutoSubmit(false);
-    if (onSubmitSuccess) onSubmitSuccess(res);
-  };
-
-  const handleError = (error) => {
-    setShowAutoSubmit(false);
-  };
+    if (window.confirm('Bạn có chắc chắn muốn nộp toàn bộ bài thi Viết ngay bây giờ?')) {
+      submitAllTasks();
+    }
+  }, [submitAllTasks]);
 
   const activeTask = exam.tasks[activeTaskIndex];
 
@@ -101,8 +123,6 @@ const WritingTestScreen = ({ exam, onBack, onSubmitSuccess, practiceMode, custom
                 taskNumber={task.task_number}
                 promptText={task.prompt_text}
                 status="new"
-                onSubmitSuccess={handleSuccess}
-                onSubmitError={handleError}
               />
             </div>
           ))}
@@ -147,7 +167,7 @@ function WritingTestPage() {
   const [submittedId, setSubmittedId] = useState(null);
 
   const handleSubmitSuccess = (response) => {
-    const sid = response?.data?.submission_id || 'mock-write-demo';
+    const sid = response?.data?.writing_group_id || response?.data?.submission_id || 'mock-write-demo';
     setSubmittedId(sid);
   };
 

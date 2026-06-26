@@ -195,7 +195,7 @@ const StudentHistoryPage = () => {
                       {sub.type}
                     </td>
                     <td className="py-3 px-4 border-0 text-muted" style={{ fontSize: '14px' }}>
-                      {sub.type === 'writing' ? `Task ${sub.task_number}` : `Part ${sub.part_number}`}
+                      {sub.task_number || sub.part_number ? (sub.type === 'writing' ? `Task ${sub.task_number}` : `Part ${sub.part_number}`) : 'Full Test'}
                     </td>
                     <td className="py-3 px-4 border-0">
                       <StatusBadge status={sub.status} />
@@ -246,7 +246,7 @@ const StudentHistoryPage = () => {
             {/* Modal Header */}
             <div className="d-flex justify-content-between align-items-center p-4 border-bottom">
               <h4 className="fw-bold mb-0 text-dark" style={{ fontFamily: 'UberMove, system-ui, sans-serif' }}>
-                Kết quả — {selectedSubmission.type === 'writing' ? `Writing Task ${selectedSubmission.task_number}` : `Speaking Part ${selectedSubmission.part_number}`}
+                Kết quả — {selectedSubmission.task_number || selectedSubmission.part_number ? (selectedSubmission.type === 'writing' ? `Writing Task ${selectedSubmission.task_number}` : `Speaking Part ${selectedSubmission.part_number}`) : (selectedSubmission.type === 'writing' ? 'Writing Test' : 'Speaking Test')}
               </h4>
               <button
                 className="btn btn-light rounded-pill px-3 py-1 fw-medium border-0"
