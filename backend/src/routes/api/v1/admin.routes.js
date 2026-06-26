@@ -48,6 +48,14 @@ router.get('/change-logs', authenticate, authorize('admin'), adminController.lis
 router.get('/change-logs/:id', authenticate, authorize('admin'), adminController.getChangeLogDetail);
 router.post('/change-logs/:id/undo', authenticate, authorize('admin'), adminController.undoChangeLog);
 
+// API nhật ký hoạt động (Activity Logs)
+router.get('/activity-logs', authenticate, authorize('admin'), adminController.listActivityLogs);
+router.get('/activity-logs/stats', authenticate, authorize('admin'), adminController.getActivityLogStats);
+
+// Alias: Frontend gọi /audit-logs — trỏ vào cùng controller
+router.get('/audit-logs', authenticate, authorize('admin'), adminController.listActivityLogs);
+router.get('/audit-logs/stats', authenticate, authorize('admin'), adminController.getActivityLogStats);
+
 // -------------------------------------------------------------
 // T042: API phân công giảng viên (Tutor Assignment per submission)
 // -------------------------------------------------------------

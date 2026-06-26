@@ -10,7 +10,8 @@ const {
     listAuditLogs,
     getAuditLogById,
     markAuditLogUndone,
-    getAuditLogSummary
+    getAuditLogSummary,
+    getActivityLogStats
 } = require('../db/queries/audit.queries');
 
 class AuditLogService {
@@ -62,6 +63,39 @@ class AuditLogService {
             limit: Math.min(100, Math.max(1, parseInt(filters.limit, 10) || 20)),
             summary
         };
+    }
+
+    static async listActivityLogs(filters) {
+        // Chuyển severity ('suspicious'/'normal') thành danh sách action tương ứng để filter
+        const enrichedFilters = { ...filters };
+        if (filters.severity === 'suspicious') {
+            if (!enrichedFilters.action) {
+                // Dùng danh sách SUSPICIOUS_ACTIONS chuẩn — được định nghĩa cuối file
+                enrichedFilters.severityActions = [
+                    'login_failed', 'account_locked', 'user_deactivated',
+                    'role_changed', 'password_changed_by_admin', 'permission_denied'
+                ];
+            }
+        }
+
+        const result = await listAuditLogs(pool, enrichedFilters);
+        let rows = result.rows.map(formatActivityLogItem);
+
+        // Filter phía service nếu severity=normal (loại bỏ suspicious)
+        if (filters.severity === 'normal') {
+            rows = rows.filter(r => r.severity === 'normal');
+        }
+
+        return {
+            logs: rows,
+            total: result.total,
+            page: Math.max(1, parseInt(filters.page, 10) || 1),
+            limit: Math.min(100, Math.max(1, parseInt(filters.limit, 10) || 20))
+        };
+    }
+
+    static async getActivityLogStats() {
+        return await getActivityLogStats(pool);
     }
 
     static async getChangeLogDetail(id) {
@@ -252,7 +286,58 @@ const getTargetLabel = (log) => {
     if (log.old_value && log.old_value.email) return log.old_value.email;
     if (log.old_value && log.old_value.title) return log.old_value.title;
     if (log.old_value && log.old_value.file_name) return log.old_value.file_name;
-    return log.target_id;
+    // Thay vì trả UUID thô, trả dạng ngắn có context (table#id_prefix)
+    if (log.target_id) return `${log.target_table ?? 'record'}#${log.target_id.substring(0, 8)}`;
+    return '—';
+};
+
+/**
+ * normalizeIp — chuẩn hoá địa chỉ IP từ IPv4-mapped IPv6 sang IPv4 thuần
+ * Ví dụ: ::ffff:127.0.0.1 → 127.0.0.1 | ::1 → 127.0.0.1
+ */
+const normalizeIp = (ip) => {
+    if (!ip) return null;
+    const cleaned = ip.replace(/^::ffff:/i, '');
+    if (cleaned === '::1') return '127.0.0.1';
+    return cleaned;
+};
+
+/**
+ * formatActivityLogItem — trả về đúng field names mà AdminActivityLogPage.jsx đọc:
+ *   actor (string), target (string), ip (string), reason (string),
+ *   severity ('normal'|'suspicious'), created_at (ISO string)
+ */
+const formatActivityLogItem = (log) => ({
+    id: log.id,
+    created_at: log.created_at,               // Frontend: r.created_at
+    actor: log.actor_name || '—',             // Frontend: r.actor (plain string)
+    action: log.action,                        // Frontend: r.action (for actionLabel helper)
+    target: getTargetLabel(log),               // Frontend: r.target
+    ip: normalizeIp(log.ip_address),          // Frontend: r.ip (normalized IPv4)
+    severity: getSeverity(log),               // Frontend: r.severity === 'suspicious'
+    reason: getNote(log)                      // Frontend: r.reason
+});
+
+const SUSPICIOUS_ACTIONS = [
+    'login_failed',
+    'account_locked',
+    'user_deactivated',
+    'role_changed',
+    'password_changed_by_admin',
+    'permission_denied'
+];
+
+const getSeverity = (log) => {
+    return SUSPICIOUS_ACTIONS.includes(log.action) ? 'suspicious' : 'normal';
+};
+
+const getNote = (log) => {
+    if (log.new_value && log.new_value.reason) return log.new_value.reason;
+    if (log.old_value && log.old_value.reason) return log.old_value.reason;
+    if (log.action === 'login_failed' && log.old_value && log.old_value.email) {
+        return `Đăng nhập thất bại: ${log.old_value.email}`;
+    }
+    return null;
 };
 
 const buildUserUndoPlan = (log) => {

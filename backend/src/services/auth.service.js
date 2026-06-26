@@ -113,14 +113,16 @@ const verifyEmail = async (rawToken) => {
  * 
  * @param {string} email
  * @param {string} password
+ * @param {string} ipAddress
  * @returns {Promise<Object>} The authenticated user without password_hash
  */
-const verifyLogin = async (email, password) => {
+const verifyLogin = async (email, password, ipAddress) => {
     // 1. Find user by email
     const user = await findUserByEmail(email);
 
     if (!user) {
         // EARS[Unwanted]: Incorrect credentials
+        await AuditLogService.logAction(null, 'login_failed', 'users', null, { email }, { reason: 'Email không tồn tại' }, ipAddress);
         const error = new Error('Incorrect email or password.');
         error.code = 'AUTH_LOG_001';
         error.statusCode = 401;
@@ -130,6 +132,7 @@ const verifyLogin = async (email, password) => {
     // 2. Check if account is temporarily locked
     if (user.locked_until && new Date() < new Date(user.locked_until)) {
         // EARS[Unwanted]: Account locked due to brute-force
+        await AuditLogService.logAction(user.id, 'login_failed', 'users', user.id, { email }, { reason: 'Tài khoản bị khoá tạm thời 15 phút' }, ipAddress);
         const error = new Error('Account temporarily locked due to multiple failed attempts. Try again in 15 minutes.');
         error.code = 'AUTH_LOG_002';
         error.statusCode = 429;
@@ -143,6 +146,7 @@ const verifyLogin = async (email, password) => {
         // 4. If wrong, log failed attempt in DB
         await pool.query('SELECT handle_failed_login($1)', [user.id]);
         
+        await AuditLogService.logAction(user.id, 'login_failed', 'users', user.id, { email }, { reason: 'Sai mật khẩu' }, ipAddress);
         const error = new Error('Incorrect email or password.');
         error.code = 'AUTH_LOG_001';
         error.statusCode = 401;
@@ -151,6 +155,7 @@ const verifyLogin = async (email, password) => {
 
     // 5. Check if user is banned or pending
     if (user.status === 'banned' || user.status === 'pending') {
+        await AuditLogService.logAction(user.id, 'login_failed', 'users', user.id, { email }, { reason: `Tài khoản ${user.status}` }, ipAddress);
         const error = new Error('You do not have permission to perform this action.');
         error.code = 'AUTH_PERM_001';
         error.statusCode = 403;
@@ -181,7 +186,7 @@ const verifyLogin = async (email, password) => {
  */
 const login = async (email, password, ipAddress, userAgent) => {
     // 1. Verify credentials and get safe user profile
-    const user = await verifyLogin(email, password);
+    const user = await verifyLogin(email, password, ipAddress);
 
     // 2. Check current active sessions
     const activeSessionsCount = await countActiveSessions(user.id);
@@ -209,7 +214,15 @@ const login = async (email, password, ipAddress, userAgent) => {
         session_token: sessionToken 
     });
 
-    // 6. Return safeUser and tokens
+    // 6. Audit log successful login (không log password, token)
+    await AuditLogService.logAction(
+        user.id, 'login', 'users', user.id,
+        null,
+        { email: user.email || email, role: user.role },
+        ipAddress
+    );
+
+    // 7. Return safeUser and tokens
     return {
         user,
         tokens: {
@@ -439,6 +452,7 @@ const loginWithGoogle = async (googleProfile, ipAddress, userAgent) => {
 
     // 2. Check if user is banned
     if (user.status === 'banned') {
+        await AuditLogService.logAction(userId, 'login_failed', 'users', userId, { email: googleProfile.email, oauth_provider: 'google' }, { reason: 'Tài khoản bị khoá vĩnh viễn' }, ipAddress);
         const error = new Error('You do not have permission to perform this action.');
         error.code = 'AUTH_PERM_001';
         error.statusCode = 403;
@@ -482,6 +496,9 @@ const loginWithGoogle = async (googleProfile, ipAddress, userAgent) => {
     // 8. Return safeUser and tokens
     const { password_hash, ...safeUser } = user;
     safeUser.has_password = !!password_hash;
+
+    // 9. Audit log successful login
+    await AuditLogService.logAction(userId, 'login', 'users', userId, { email: googleProfile.email, oauth_provider: 'google' }, null, ipAddress);
 
     return {
         user: safeUser,
