@@ -51,6 +51,9 @@ const ACTION_LABELS = {
   change_reverted: 'Hoàn tác thay đổi',
   account_locked: 'Khoá tài khoản',
   permission_denied: 'Từ chối truy cập',
+  submission_graded: 'Công bố điểm',
+  submission_drafted: 'Lưu nháp',
+  private_note_added: 'Ghi chú riêng',
 };
 
 export const actionLabel = (action) => ACTION_LABELS[action] || action;

@@ -46,4 +46,18 @@ router.post(
   TutorController.transcribeSpeaking
 );
 
+// GET /api/v1/tutors/activity-logs
+router.get(
+  '/activity-logs',
+  authorize(['tutor', 'admin']),
+  TutorController.listActivityLogs
+);
+
+// GET /api/v1/tutors/activity-logs/stats
+router.get(
+  '/activity-logs/stats',
+  authorize(['tutor', 'admin']),
+  TutorController.getActivityLogStats
+);
+
 module.exports = router;
