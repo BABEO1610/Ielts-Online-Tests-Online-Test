@@ -1,4 +1,5 @@
 const TutorService = require('../services/tutor.service');
+const AuditLogService = require('../services/audit.service');
 
 class TutorController {
   /**
@@ -97,7 +98,7 @@ class TutorController {
       }
 
       // Call service using transaction
-      const result = await TutorService.gradeSubmission(type, submissionId, tutorId, payload);
+      const result = await TutorService.gradeSubmission(type, submissionId, tutorId, payload, req.ip);
 
       // Emit socket event
       const io = req.app.get('io');
@@ -136,6 +137,63 @@ class TutorController {
       });
     } catch (error) {
       next(error);
+    }
+  }
+  /**
+   * GET /api/v1/tutors/activity-logs
+   */
+  static async listActivityLogs(req, res, next) {
+    try {
+      const { page, limit, action, target, severity, dateRange } = req.query;
+      
+      const filters = {
+        page: parseInt(page, 10) || 1,
+        limit: parseInt(limit, 10) || 20,
+        actorId: req.user.id, // Only tutor's own logs
+        action: action || null,
+        targetTable: target || null,
+        severity: severity || null,
+      };
+
+      // Handle frontend "7 days" filter logic if passed
+      if (dateRange === '7_days') {
+        const d = new Date();
+        d.setDate(d.getDate() - 7);
+        filters.startDate = d.toISOString();
+      }
+
+      const result = await AuditLogService.listActivityLogs(filters);
+
+      res.status(200).json({
+        success: true,
+        data: result.logs,
+        error: null,
+        meta: {
+          page: result.page,
+          limit: result.limit,
+          total: result.total
+        }
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  /**
+   * GET /api/v1/tutors/activity-logs/stats
+   */
+  static async getActivityLogStats(req, res, next) {
+    try {
+      const stats = await TutorService.getActivityLogStats(req.user.id);
+
+      res.status(200).json({
+        success: true,
+        data: stats,
+        error: null,
+        meta: null
+      });
+    } catch (err) {
+      next(err);
     }
   }
 }

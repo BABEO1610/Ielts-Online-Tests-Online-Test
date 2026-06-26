@@ -1,5 +1,6 @@
 const { pool } = require('../db/pool');
 const AppError = require('../utils/AppError');
+const AuditLogService = require('./audit.service');
 
 class TutorService {
   /**
@@ -201,8 +202,9 @@ class TutorService {
    * @param {string} submissionId 
    * @param {string} tutorId 
    * @param {Object} payload 
+   * @param {string} ipAddress
    */
-  static async gradeSubmission(type, submissionId, tutorId, payload) {
+  static async gradeSubmission(type, submissionId, tutorId, payload, ipAddress = null) {
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
@@ -324,6 +326,24 @@ class TutorService {
 
       await client.query('COMMIT');
       
+      // Ghi audit log sau khi commit thành công
+      try {
+        await AuditLogService.logAction(
+          tutorId,
+          'submission_graded',
+          type === 'writing' ? 'writing_submissions' : 'speaking_submissions',
+          submissionId,
+          null, // old_value
+          { 
+            reason: `Band ${payload.bandScore}`, 
+            band_score: payload.bandScore 
+          }, // new_value
+          ipAddress
+        );
+      } catch (auditErr) {
+        console.error('[TutorService] Failed to insert audit log for gradeSubmission:', auditErr);
+      }
+
       return { success: true, studentId };
     } catch (error) {
       await client.query('ROLLBACK');
@@ -460,6 +480,20 @@ class TutorService {
       pendingWritingChartData,
       pendingSpeakingChartData
     };
+  }
+
+  /**
+   * Get Activity Log Stats for Tutor
+   */
+  static async getActivityLogStats(tutorId) {
+    const query = `
+      SELECT 
+        (SELECT COUNT(*)::int FROM audit_logs WHERE actor_id = $1 AND created_at::date = CURRENT_DATE) as today_actions,
+        (SELECT COUNT(*)::int FROM audit_logs WHERE actor_id = $1 AND action = 'submission_graded' AND created_at >= NOW() - INTERVAL '7 days') as graded_week,
+        (SELECT COUNT(*)::int FROM audit_logs WHERE actor_id = $1 AND action IN ('test_updated', 'resource_uploaded', 'resource_reviewed', 'test_reviewed')) as content_updates
+    `;
+    const result = await pool.query(query, [tutorId]);
+    return result.rows[0] || { today_actions: 0, graded_week: 0, content_updates: 0 };
   }
 }
 
