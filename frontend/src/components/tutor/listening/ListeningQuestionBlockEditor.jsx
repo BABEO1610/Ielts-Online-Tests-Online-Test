@@ -91,17 +91,17 @@ function ListeningQuestionBlockEditor({ block, onChange }) {
                 type="text"
                 className="form-control form-control-sm mb-2"
                 placeholder={promptPlaceholder}
-                value={q.text || ''}
+                value={q.text || q.questionText || ''}
                 onChange={(e) => updateQuestion(q.id, 'text', e.target.value)}
               />
               <input
                 type="text"
-                className={`form-control form-control-sm ${!(q.correctAnswer || '').trim() ? 'is-invalid' : 'border-success'}`}
+                className={`form-control form-control-sm ${!(typeof q.correctAnswer === 'string' ? q.correctAnswer : String(q.correctAnswer || '')).trim() ? 'is-invalid' : 'border-success'}`}
                 placeholder={answerLabel}
-                value={q.correctAnswer || ''}
+                value={typeof q.correctAnswer === 'string' ? q.correctAnswer : (Array.isArray(q.correctAnswer) ? q.correctAnswer.join(', ') : q.correctAnswer || '')}
                 onChange={(e) => updateQuestion(q.id, 'correctAnswer', e.target.value)}
               />
-              {!(q.correctAnswer || '').trim() && <div className="invalid-feedback d-block">Answer is required.</div>}
+              {!(typeof q.correctAnswer === 'string' ? q.correctAnswer : String(q.correctAnswer || '')).trim() && <div className="invalid-feedback d-block">Answer is required.</div>}
               <ExplanationField
                 value={q.explanation}
                 onChange={(value) => updateQuestion(q.id, 'explanation', value)}
@@ -135,7 +135,7 @@ function ListeningQuestionBlockEditor({ block, onChange }) {
       onChange({
         ...block,
         questions: questions.map(q => q.id === qId
-          ? { ...q, options: (q.options || []).map(opt => opt.id === optId ? { ...opt, text } : opt) }
+          ? { ...q, options: (Array.isArray(q.options) ? q.options : (q.options?.choices || [])).map(opt => (opt.id || opt.label) === optId ? { ...opt, text } : opt) }
           : q),
       });
     };
@@ -144,7 +144,7 @@ function ListeningQuestionBlockEditor({ block, onChange }) {
       onChange({
         ...block,
         questions: questions.map(q => q.id === qId
-          ? { ...q, options: [...(q.options || []), { id: makeId(), text: 'New Option' }] }
+          ? { ...q, options: [...(Array.isArray(q.options) ? q.options : (q.options?.choices || [])), { id: makeId(), text: 'New Option' }] }
           : q),
       });
     };
@@ -153,10 +153,12 @@ function ListeningQuestionBlockEditor({ block, onChange }) {
       onChange({
         ...block,
         questions: questions.map(q => {
-          if (q.id !== qId || (q.options || []).length <= 2) return q;
+          if (q.id !== qId) return q;
+          const optsArray = Array.isArray(q.options) ? q.options : (q.options?.choices || []);
+          if (optsArray.length <= 2) return q;
           return {
             ...q,
-            options: q.options.filter(opt => opt.id !== optId),
+            options: optsArray.filter(opt => (opt.id || opt.label) !== optId),
             correctAnswers: (q.correctAnswers || []).filter(id => id !== optId),
           };
         }),
@@ -166,7 +168,20 @@ function ListeningQuestionBlockEditor({ block, onChange }) {
     const selectCorrectAnswer = (qId, optId) => {
       onChange({
         ...block,
-        questions: questions.map(q => q.id === qId ? { ...q, correctAnswers: [optId] } : q),
+        questions: questions.map(q => {
+          if (q.id !== qId) return q;
+          
+          if (block.type === 'MULTIPLE_CHOICE_MULTI' || (q.options && q.options.answerFormat === 'MULTI_SELECT')) {
+            const currentAnswers = q.correctAnswers || [];
+            if (currentAnswers.includes(optId)) {
+               return { ...q, correctAnswers: currentAnswers.filter(id => id !== optId) };
+            } else {
+               return { ...q, correctAnswers: [...currentAnswers, optId] };
+            }
+          }
+          
+          return { ...q, correctAnswers: [optId] };
+        }),
       });
     };
 
@@ -175,40 +190,44 @@ function ListeningQuestionBlockEditor({ block, onChange }) {
         {questions.map((q, idx) => (
           <div key={q.id} className="card mb-3 border-0 shadow-sm" data-testid="listening-mcq-question">
             <div className="card-header bg-white d-flex justify-content-between align-items-center py-2">
-              <span className="fw-bold" style={{ fontSize: '0.9rem' }}>Question {idx + 1}</span>
+              <span className="fw-bold" style={{ fontSize: '0.9rem' }}>
+                {q.questionNumbers && q.questionNumbers.length > 1 
+                  ? `Questions ${q.questionNumbers[0]}-${q.questionNumbers[q.questionNumbers.length - 1]}` 
+                  : `Question ${q.questionOrder || idx + 1}`}
+              </span>
               <button className="btn btn-sm text-danger p-1" onClick={() => removeQuestion(q.id)}>
                 <Trash2 size={16} />
               </button>
             </div>
             <div className="card-body p-3">
               <textarea
-                className={`form-control form-control-sm mb-2 ${!(q.text || '').trim() ? 'is-invalid' : ''}`}
+                className={`form-control form-control-sm mb-2 ${!String(q.text || q.questionText || '').trim() ? 'is-invalid' : ''}`}
                 rows="2"
                 placeholder="Question text..."
-                value={q.text || ''}
+                value={q.text || q.questionText || ''}
                 onChange={(e) => updateQuestion(q.id, 'text', e.target.value)}
               />
-              {!(q.text || '').trim() && <div className="invalid-feedback d-block mb-2">Question text is required.</div>}
+              {!String(q.text || q.questionText || '').trim() && <div className="invalid-feedback d-block mb-2">Question text is required.</div>}
 
-              {(q.options || []).map((opt, optIdx) => (
-                <div key={opt.id} className="d-flex align-items-center gap-2 mb-2" style={{ minWidth: 0 }}>
+              {(Array.isArray(q.options) ? q.options : (q.options?.choices || [])).map((opt, optIdx) => (
+                <div key={opt.id || opt.label || optIdx} className="d-flex align-items-center gap-2 mb-2" style={{ minWidth: 0 }}>
                   <input
                     className="form-check-input m-0"
-                    type="radio"
+                    type={block.type === 'MULTIPLE_CHOICE_MULTI' || (q.options && q.options.answerFormat === 'MULTI_SELECT') ? 'checkbox' : 'radio'}
                     name={`listening-correct-${q.id}`}
-                    checked={(q.correctAnswers || []).includes(opt.id)}
-                    onChange={() => selectCorrectAnswer(q.id, opt.id)}
+                    checked={(q.correctAnswers || []).includes(opt.id) || (opt.label && (q.correctAnswers || []).includes(opt.label))}
+                    onChange={() => selectCorrectAnswer(q.id, opt.id || opt.label)}
                     style={{ width: 18, height: 18, flex: '0 0 18px', padding: 0 }}
                   />
                   <span className="fw-bold text-center" style={{ width: 24, flex: '0 0 24px' }}>{String.fromCharCode(65 + optIdx)}.</span>
                   <input
                     type="text"
-                    className={`form-control form-control-sm ${(q.correctAnswers || []).includes(opt.id) ? 'border-success bg-success-subtle' : ''}`}
+                    className={`form-control form-control-sm ${((q.correctAnswers || []).includes(opt.id) || (opt.label && (q.correctAnswers || []).includes(opt.label))) ? 'border-success bg-success-subtle' : ''}`}
                     style={{ minWidth: 0, flex: '1 1 auto' }}
                     value={opt.text || ''}
-                    onChange={(e) => updateQuestionOption(q.id, opt.id, e.target.value)}
+                    onChange={(e) => updateQuestionOption(q.id, opt.id || opt.label, e.target.value)}
                   />
-                  <button className="btn btn-sm text-danger p-0" style={{ flex: '0 0 24px' }} disabled={(q.options || []).length <= 2} onClick={() => removeQuestionOption(q.id, opt.id)}>
+                  <button className="btn btn-sm text-danger p-0" style={{ flex: '0 0 24px' }} disabled={(Array.isArray(q.options) ? q.options : (q.options?.choices || [])).length <= 2} onClick={() => removeQuestionOption(q.id, opt.id || opt.label)}>
                     <Trash2 size={16} />
                   </button>
                 </div>
@@ -279,7 +298,7 @@ function ListeningQuestionBlockEditor({ block, onChange }) {
                   className="form-control form-control-sm mb-2"
                   rows="2"
                   placeholder="Statement, speaker, or item to match..."
-                  value={q.text || ''}
+                  value={q.text || q.questionText || ''}
                   onChange={(e) => updateQuestion(q.id, 'text', e.target.value)}
                 />
                 <select
@@ -313,8 +332,12 @@ function ListeningQuestionBlockEditor({ block, onChange }) {
 
   switch (block.type) {
     case 'Multiple Choice':
+    case 'MULTIPLE_CHOICE_SINGLE':
+    case 'MULTIPLE_CHOICE_MULTI':
       return renderMultipleChoiceEditor();
     case 'Matching':
+    case 'MATCHING_INFORMATION':
+    case 'MATCHING_HEADINGS':
       return renderMatchingEditor();
     case 'Map/Plan/Diagram Labeling':
       return renderCompletionEditor({
@@ -325,6 +348,7 @@ function ListeningQuestionBlockEditor({ block, onChange }) {
         promptPlaceholder: 'Label position or prompt, e.g. Next to the entrance',
       });
     case 'Sentence Completion':
+    case 'SENTENCE_COMPLETION':
       return renderCompletionEditor({
         title: 'Sentence Completion Answers',
         contentLabel: 'Sentence Set / Instructions',
@@ -339,6 +363,9 @@ function ListeningQuestionBlockEditor({ block, onChange }) {
         promptPlaceholder: 'Question prompt...',
       });
     case 'Note/Table/Flow-chart Completion':
+    case 'NOTE_COMPLETION':
+    case 'Notes Completion':
+    case 'NOTES_COMPLETION':
       return renderCompletionEditor({
         title: 'Note / Table / Flow-chart Answers',
         contentLabel: 'Note / Table / Flow-chart Content',
@@ -347,6 +374,7 @@ function ListeningQuestionBlockEditor({ block, onChange }) {
         promptPlaceholder: 'Blank label or context...',
       });
     case 'Form Completion':
+    case 'FORM_COMPLETION':
     default:
       return renderCompletionEditor({
         title: 'Form Completion Answers',

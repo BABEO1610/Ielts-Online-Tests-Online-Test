@@ -31,6 +31,31 @@ class SubmissionController {
   }
 
   /**
+   * Submit full writing test (both tasks)
+   */
+  static async submitFullWriting(req, res, next) {
+    try {
+      const userId = req.user.id;
+      const { test_id, grader, tasks } = req.body;
+      
+      if (!tasks || !Array.isArray(tasks) || tasks.length === 0) {
+        throw new AppError('Tasks are required', 400, 'MISSING_FIELD');
+      }
+
+      const result = await SubmissionService.submitFullWriting(userId, test_id, grader, tasks);
+
+      res.status(201).json({
+        success: true,
+        data: result,
+        meta: null,
+        error: null
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
    * Upload audio temp (speaking)
    */
   static async uploadSpeakingAudio(req, res, next) {
@@ -145,6 +170,24 @@ class SubmissionController {
           presigned_url: audioUrl,
           audio_url: audioUrl
         },
+        error: null,
+        meta: null
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Get submission history for a student
+   */
+  static async getHistory(req, res, next) {
+    try {
+      const userId = req.user.id;
+      const history = await SubmissionService.getHistory(userId);
+      res.status(200).json({
+        success: true,
+        data: history,
         error: null,
         meta: null
       });

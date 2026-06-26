@@ -153,7 +153,7 @@ function BulkAddModal({ onClose, onConfirm }) {
       <div className="modal-content bg-white rounded shadow-lg" style={{ width: '900px', maxWidth: '95vw', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
         <div className="modal-header p-3 border-bottom d-flex justify-content-between align-items-center">
           <h5 className="m-0">Nhập Nhanh Câu Hỏi (Bulk Add)</h5>
-          <button className="btn-close" onClick={onClose}><X size={20} /></button>
+          <button className="btn-close" aria-label="Close" onClick={onClose}></button>
         </div>
         
         <div className="modal-body p-3 overflow-auto" style={{ flex: 1 }}>

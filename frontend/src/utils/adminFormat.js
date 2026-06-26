@@ -35,16 +35,22 @@ const ACTION_LABELS = {
   test_created: 'Tạo đề thi',
   test_updated: 'Sửa đề thi',
   test_deleted: 'Xoá đề thi',
+  test_reviewed: 'Duyệt đề thi',
   answer_key_updated: 'Cập nhật đáp án',
   resource_uploaded: 'Tải tài liệu lên',
   resource_deleted: 'Xoá tài liệu',
+  resource_reviewed: 'Duyệt tài liệu',
   login: 'Đăng nhập',
   logout: 'Đăng xuất',
   login_failed: 'Đăng nhập thất bại',
   password_changed: 'Đổi mật khẩu',
+  password_changed_by_admin: 'Đổi mật khẩu (Admin)',
   password_reset_requested: 'Yêu cầu đặt lại mật khẩu',
   oauth_linked: 'Liên kết OAuth',
   oauth_unlinked: 'Huỷ liên kết OAuth',
+  change_reverted: 'Hoàn tác thay đổi',
+  account_locked: 'Khoá tài khoản',
+  permission_denied: 'Từ chối truy cập',
 };
 
 export const actionLabel = (action) => ACTION_LABELS[action] || action;

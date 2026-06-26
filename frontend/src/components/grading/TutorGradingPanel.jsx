@@ -172,14 +172,10 @@ const TutorGradingPanel = ({ submissionId, type, studentId, onGradingComplete, t
             </div>
           )}
 
-          {type === 'speaking' && (
+          {type === 'speaking' && audioUrl && (
             <div className="mb-4">
               <h5 className="text-ink fw-bold">Student Audio</h5>
-              {audioUrl ? (
-                <audio src={audioUrl} controls className="w-100" data-testid="audio-player" />
-              ) : (
-                <p className="text-body">No audio available.</p>
-              )}
+              <audio src={audioUrl} controls className="w-100" data-testid="audio-player" />
             </div>
           )}
 

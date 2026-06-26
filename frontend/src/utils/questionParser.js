@@ -321,25 +321,53 @@ export const parseSmartText = (rawText) => {
   let duplicateAnsError = null;
   const ansLines = answersText.split('\n');
   for (const line of ansLines) {
-    const m = line.trim().match(/^(\d+)\s*[\.\)\-:]?\s+(.+)$/i);
+    const m = line.trim().match(/^(\d+)(?:\s*-\s*(\d+))?\s*[\.\)\-:]?\s+(.+)$/i);
     if (m) {
-      const qNum = parseInt(m[1], 10);
-      let rawAns = m[2];
+      const qNumStart = parseInt(m[1], 10);
+      const qNumEnd = m[2] ? parseInt(m[2], 10) : qNumStart;
+      let rawAns = m[3];
       
-      let norm = rawAns.trim();
-      let up = norm.toUpperCase();
-      if (up === 'T' || up === 'TRUE') norm = 'TRUE';
-      else if (up === 'F' || up === 'FALSE') norm = 'FALSE';
-      else if (up === 'NG' || up === 'NOTGIVEN' || up === 'NOT GIVEN') norm = 'NOT GIVEN';
-      else if (up === 'Y' || up === 'YES') norm = 'YES';
-      else if (up === 'N' || up === 'NO') norm = 'NO';
-      else if (norm.length === 1 && up.match(/[A-Z]/)) norm = up;
-
-      if (answerMap[qNum] !== undefined) {
-         duplicateAnsError = `Lỗi: Có nhiều đáp án cho cùng câu hỏi số ${qNum} (Duplicate answer key)`;
-         break;
+      let inlineExplanation = '';
+      if (rawAns.includes('||')) {
+        const parts = rawAns.split('||');
+        rawAns = parts[0];
+        inlineExplanation = parts.slice(1).join('||').trim();
       }
-      answerMap[qNum] = norm;
+      
+      let answers = [rawAns.trim()];
+      if (qNumEnd > qNumStart) {
+         // It's a range like 28-30. D, E, F
+         const parts = rawAns.split(',').map(s => s.trim()).filter(Boolean);
+         if (parts.length === qNumEnd - qNumStart + 1) {
+            answers = parts;
+         } else {
+            // If they didn't provide comma separated, just duplicate it?
+            answers = Array(qNumEnd - qNumStart + 1).fill(rawAns.trim());
+         }
+      }
+
+      for (let i = 0; i <= qNumEnd - qNumStart; i++) {
+        const qNum = qNumStart + i;
+        const ans = answers[i] || answers[0];
+        
+        let norm = ans;
+        let up = norm.toUpperCase();
+        if (up === 'T' || up === 'TRUE') norm = 'TRUE';
+        else if (up === 'F' || up === 'FALSE') norm = 'FALSE';
+        else if (up === 'NG' || up === 'NOTGIVEN' || up === 'NOT GIVEN') norm = 'NOT GIVEN';
+        else if (up === 'Y' || up === 'YES') norm = 'YES';
+        else if (up === 'N' || up === 'NO') norm = 'NO';
+        else if (norm.length === 1 && up.match(/[A-Z]/)) norm = up;
+
+        if (answerMap[qNum] !== undefined) {
+           duplicateAnsError = `Lỗi: Có nhiều đáp án cho cùng câu hỏi số ${qNum} (Duplicate answer key)`;
+           break;
+        }
+        answerMap[qNum] = norm;
+        if (inlineExplanation) {
+          explanationMap[qNum] = inlineExplanation;
+        }
+      }
     }
   }
 
@@ -403,35 +431,40 @@ export const parseSmartText = (rawText) => {
   for (const block of blocksData) {
     let { rangeStart, rangeEnd, lines } = block;
     
-    // Normalize lines to handle "1.\n text" or "1\n text"
-    const normalizedLines = [];
-    for (let i = 0; i < lines.length; i++) {
-      let l = lines[i].trim();
-      if (!l) continue;
-      if (l.match(/^\d+\.?$/) && i + 1 < lines.length) {
-         l = l + ' ' + lines[i+1].trim();
-         i++; // skip next line
-      }
-      normalizedLines.push(l);
-    }
-    lines = normalizedLines;
-
     let typeDetectInstruction = '';
     let detectedType = '';
     let answerFormat = '';
     
+    // Type detection uses raw lines (usually first few lines are instructions)
     for (let i = 0; i < Math.min(6, lines.length); i++) {
-      typeDetectInstruction += lines[i] + ' ';
+      typeDetectInstruction += lines[i].trim() + ' ';
     }
     
     const instrUpper = typeDetectInstruction.toUpperCase();
+    
+    let isNotes = false;
+    if (instrUpper.includes('COMPLETE THE NOTES BELOW') || instrUpper.includes('COMPLETE THE NOTES BY FILLING IN THE BLANKS')) {
+       isNotes = true;
+    } else {
+       for (const l of lines) {
+         const tl = l.trim().toUpperCase();
+         if (tl === 'NOTES' || tl === 'VISAS' || tl === 'CURRENCY' || tl === 'NOTES FOR STUDENTS' || tl === 'SOME MISCELLANEOUS GENERAL ADVICE') {
+            isNotes = true;
+            break;
+         }
+       }
+    }
+
     if (instrUpper.includes('WHICH PARAGRAPH CONTAINS')) {
       detectedType = 'MATCHING_INFORMATION';
       answerFormat = 'A-Z';
     } else if (instrUpper.includes('HEADINGS BEST FIT') || instrUpper.includes('CHOOSE THE CORRECT HEADING')) {
       detectedType = 'MATCHING_HEADINGS';
       answerFormat = 'i-x';
-    } else if (instrUpper.includes('COMPLETE THE FOLLOWING SENTENCES') || instrUpper.includes('NO MORE THAN')) {
+    } else if (isNotes) {
+      detectedType = 'NOTES_COMPLETION';
+      answerFormat = 'NO_MORE_THAN_THREE_WORDS';
+    } else if (instrUpper.includes('COMPLETE THE FOLLOWING SENTENCES') || (!isNotes && instrUpper.includes('NO MORE THAN'))) {
       detectedType = 'SENTENCE_COMPLETION';
       answerFormat = 'NO_MORE_THAN_THREE_WORDS';
     } else if (instrUpper.includes('TRUE') && instrUpper.includes('FALSE') && instrUpper.includes('NOT GIVEN')) {
@@ -440,16 +473,34 @@ export const parseSmartText = (rawText) => {
     } else if (instrUpper.includes('YES') && instrUpper.includes('NO') && instrUpper.includes('NOT GIVEN')) {
       detectedType = 'YES_NO_NOT_GIVEN';
       answerFormat = 'Y/N/NG';
-    } else if (instrUpper.includes('ONE OF THE CHOICES IS CORRECT') || instrUpper.includes('CHOOSE THE CORRECT LETTER')) {
-      detectedType = 'MULTIPLE_CHOICE_SINGLE';
-      answerFormat = 'A-D';
-    } else if (instrUpper.includes('OF THE FOLLOWING STATEMENTS ARE TRUE') || instrUpper.match(/CHOOSE \w+ LETTERS/)) {
+    } else if (instrUpper.match(/(?:CHOOSE|MARK)\s+(?:TWO|THREE|FOUR|FIVE|SIX|SEVEN|EIGHT|NINE|TEN|\d+)\s+LETTERS/)) {
       detectedType = 'MULTIPLE_CHOICE_MULTI';
       answerFormat = 'MULTI_SELECT';
+    } else if (instrUpper.includes('CHOOSE THE CORRECT LETTER') || instrUpper.includes('CHOOSE THE CORRECT ANSWER') || instrUpper.includes('ONE OF THE CHOICES IS CORRECT')) {
+      detectedType = 'MULTIPLE_CHOICE_SINGLE';
+      answerFormat = 'A-D';
     }
 
     if (!detectedType) {
       detectedType = 'UNKNOWN_TYPE';
+    }
+
+    // Normalize lines to handle "1.\n text" or "1\n text" ONLY for non-inline types
+    if (detectedType !== 'NOTES_COMPLETION' && detectedType !== 'SENTENCE_COMPLETION') {
+      const normalizedLines = [];
+      for (let i = 0; i < lines.length; i++) {
+        let l = lines[i].trim();
+        if (!l) continue;
+        if (l.match(/^\d+\.?$/) && i + 1 < lines.length) {
+           l = l + ' ' + lines[i+1].trim();
+           i++; // skip next line
+        }
+        normalizedLines.push(l);
+      }
+      lines = normalizedLines;
+    } else {
+      // For Notes/Sentence Completion, just filter empty lines
+      lines = lines.map(l => l.trim()).filter(l => l);
     }
 
     // STRICT INSTRUCTION EXTRACTION
@@ -459,16 +510,21 @@ export const parseSmartText = (rawText) => {
       if (!l) continue;
       
       let isQuestionLine = false;
-      if (detectedType === 'SENTENCE_COMPLETION') {
-         for (let q = rangeStart; q <= rangeEnd; q++) {
-            if (l.match(new RegExp(`^${q}\\.\\s+`)) || l.match(new RegExp(`^${q}\\s+`)) || l === `${q}` || l.match(new RegExp(`(^|\\s)${q}(\\s|$)`))) {
-               isQuestionLine = true;
-               if (l === `${q}` && i > 0 && instructionBreakIdx > i - 1) {
-                  instructionBreakIdx = i - 1;
-               } else if (instructionBreakIdx > i) {
-                  instructionBreakIdx = i;
+      if (detectedType === 'SENTENCE_COMPLETION' || detectedType === 'NOTES_COMPLETION') {
+         if (detectedType === 'NOTES_COMPLETION' && (l.toUpperCase() === 'NOTES' || l.toUpperCase() === 'VISAS' || l.toUpperCase() === 'CURRENCY' || l.toUpperCase() === 'NOTES FOR STUDENTS' || l.toUpperCase() === 'SOME MISCELLANEOUS GENERAL ADVICE')) {
+            isQuestionLine = true;
+            if (instructionBreakIdx > i) instructionBreakIdx = i;
+         } else {
+            for (let q = rangeStart; q <= rangeEnd; q++) {
+               if (l.match(new RegExp(`^${q}\\.\\s+`)) || l.match(new RegExp(`^${q}\\s+`)) || l === `${q}` || l.match(new RegExp(`(^|\\s)${q}(\\s|$)`))) {
+                  isQuestionLine = true;
+                  if (l === `${q}` && i > 0 && instructionBreakIdx > i - 1) {
+                     instructionBreakIdx = i - 1;
+                  } else if (instructionBreakIdx > i) {
+                     instructionBreakIdx = i;
+                  }
+                  break;
                }
-               break;
             }
          }
       } else if (detectedType === 'MULTIPLE_CHOICE_MULTI') {
@@ -634,31 +690,44 @@ export const parseSmartText = (rawText) => {
        }
        if (curQ) questions.push(curQ);
     } else if (detectedType === 'MULTIPLE_CHOICE_MULTI') {
-       const optRegex = /^([A-Za-z])[\.\)]?\s+(.*)/;
+       const optRegex = /^([A-Za-z])[\.\)]?(?:\s+(.+))?$/;
        const choices = [];
-       for (const line of lines) {
+       let questionTextLines = [];
+       let foundOptions = false;
+       let currentOptLabel = null;
+       
+       for (let i = instructionBreakIdx; i < lines.length; i++) {
+         const line = lines[i];
          const optM = line.match(optRegex);
-         if (optM) {
+         if (optM && optM[1]) {
+           foundOptions = true;
+           currentOptLabel = optM[1].toUpperCase();
            choices.push({
-             label: optM[1].toUpperCase(),
-             text: optM[2].trim()
+             label: currentOptLabel,
+             text: optM[2] ? optM[2].trim() : ''
            });
+         } else if (foundOptions && currentOptLabel) {
+           choices[choices.length - 1].text += (choices[choices.length - 1].text ? ' ' : '') + line.trim();
+         } else {
+           questionTextLines.push(line.trim());
          }
        }
        
        const maxSelections = rangeEnd - rangeStart + 1;
        const extraOptions = { maxSelections, isGrouped: true };
+       const questionNumbers = Array.from({length: maxSelections}, (_, i) => rangeStart + i);
        
-       for (let q = rangeStart; q <= rangeEnd; q++) {
-         questions.push({
-           questionOrder: q,
-           questionText: '',
-           correctAnswer: '',
-           options: buildOptions(choices, extraOptions)
-         });
-       }
-    } else if (detectedType === 'SENTENCE_COMPLETION') {
+       questions.push({
+         questionOrder: rangeStart,
+         questionNumbers: questionNumbers,
+         questionText: questionTextLines.join('\n').trim(),
+         correctAnswers: [],
+         options: buildOptions(choices, extraOptions)
+       });
+    } else if (detectedType === 'SENTENCE_COMPLETION' || detectedType === 'NOTES_COMPLETION') {
        let fullText = lines.join('\n');
+       let contentRows = [];
+       let absorbedIndices = new Set();
        
        for (let q = rangeStart; q <= rangeEnd; q++) {
          let qText = '';
@@ -668,30 +737,62 @@ export const parseSmartText = (rawText) => {
             const l = qLines[i].trim();
             if (!l) continue;
             
-            // If it starts with "36. ", the blank is already inside the text
             const startMatchDot = l.match(new RegExp(`^${q}\\.\\s+(.*)`));
             if (startMatchDot) {
               qText = startMatchDot[1];
+              absorbedIndices.add(i);
+              contentRows.push({ type: 'question', qNum: q, qText, sourceIndex: i });
               break;
             }
             
-            // If it starts with "5 ", it might be the blank itself at the start
             const startMatchNoDot = l.match(new RegExp(`^${q}\\s+(.*)`));
             if (startMatchNoDot) {
               qText = `_____ ` + startMatchNoDot[1];
+              absorbedIndices.add(i);
+              contentRows.push({ type: 'question', qNum: q, qText, sourceIndex: i });
               break;
             }
             
             if (l === `${q}`) {
                const prev = i > 0 ? qLines[i-1].trim() : '';
-               const next = i < qLines.length - 1 ? qLines[i+1].trim() : '';
+               absorbedIndices.add(i);
+               if (i > 0) absorbedIndices.add(i-1);
+               
+               let next = '';
+               if (i < qLines.length - 1) {
+                   let isNextLinePrefixForNextQ = false;
+                   const nextTrimmed = qLines[i+1].trim();
+                   if (i + 2 < qLines.length && qLines[i+2].trim().match(/^(\d+)$/)) {
+                       isNextLinePrefixForNextQ = true;
+                   }
+                   if (nextTrimmed.match(/^\d+[\.\)\-\s]/)) {
+                       isNextLinePrefixForNextQ = true;
+                   }
+                   
+                   if (detectedType === 'NOTES_COMPLETION') {
+                       const startsLower = /^[a-z]/.test(nextTrimmed);
+                       const startsPrepos = /^(for|with|of|in|on|at|by|to|from|and|or)\b/i.test(nextTrimmed);
+                       if (!startsLower && !startsPrepos) {
+                          isNextLinePrefixForNextQ = true;
+                       }
+                   }
+
+                   if (!isNextLinePrefixForNextQ) {
+                       next = nextTrimmed;
+                       absorbedIndices.add(i+1);
+                   }
+               }
+               
                qText = `${prev} _____ ${next}`.trim();
+               contentRows.push({ type: 'question', qNum: q, qText, sourceIndex: i });
                break;
             }
             
             const inlineRegex = new RegExp(`(^|\\s)${q}(\\s|$)`);
             if (l.match(inlineRegex)) {
               qText = l.replace(inlineRegex, '$1_____$2').trim();
+              absorbedIndices.add(i);
+              contentRows.push({ type: 'question', qNum: q, qText, sourceIndex: i });
               break;
             }
          }
@@ -705,6 +806,22 @@ export const parseSmartText = (rawText) => {
            });
          }
        }
+       
+       const finalContentRows = [];
+       for (let i = instructionBreakIdx; i < lines.length; i++) {
+          const l = lines[i].trim();
+          if (!l) continue;
+          
+          if (absorbedIndices.has(i)) {
+             const qRow = contentRows.find(r => r.sourceIndex === i);
+             if (qRow) {
+                finalContentRows.push({ type: 'question', qNum: qRow.qNum, qText: qRow.qText });
+             }
+          } else {
+             finalContentRows.push({ type: 'text', text: l });
+          }
+       }
+       parsedBlock.contentRows = finalContentRows;
     } else {
        // UNKNOWN_TYPE: Try to at least parse numbered questions
        const qRegex = /^(\d+)\.\s+(.*)/;
@@ -739,7 +856,9 @@ export const parseSmartText = (rawText) => {
       instruction: instruction,
       warnings: parsedBlock.warnings,
       questions: questions,
-      options: []
+      options: [],
+      contentRows: parsedBlock.contentRows || null,
+      content: parsedBlock.contentRows ? JSON.stringify(parsedBlock.contentRows) : null
     });
   }
 
@@ -750,7 +869,11 @@ export const parseSmartText = (rawText) => {
   const allParsedQNums = new Set();
   for (const block of finalBlocks) {
     for (const q of block.questions) {
-      allParsedQNums.add(q.questionOrder);
+      if (q.questionNumbers) {
+         q.questionNumbers.forEach(n => allParsedQNums.add(n));
+      } else {
+         allParsedQNums.add(q.questionOrder);
+      }
     }
   }
 
@@ -766,22 +889,44 @@ export const parseSmartText = (rawText) => {
     for (const q of block.questions) {
       const qNum = q.questionOrder;
       
-      if (answerMap[qNum] !== undefined) {
-        q.correctAnswer = answerMap[qNum];
-        if (q.options) {
-          q.options.requiresManualAnswer = false;
-        }
+      if (block.type === 'MULTIPLE_CHOICE_MULTI') {
+         q.correctAnswers = [];
+         let hasMissing = false;
+         for (const n of q.questionNumbers) {
+            if (answerMap[n] !== undefined) {
+               q.correctAnswers.push(answerMap[n]);
+            } else {
+               hasMissing = true;
+               missingAnsCount++;
+            }
+            if (explanationMap[n] !== undefined) {
+               q.explanation = (q.explanation ? q.explanation + '\n' : '') + explanationMap[n];
+            } else if (answerMap[n] !== undefined) {
+               block.warnings.push(`Câu ${n} có đáp án nhưng thiếu giải thích`);
+            }
+         }
+         if (!hasMissing && q.options) {
+            q.options.requiresManualAnswer = false;
+         }
       } else {
-        missingAnsCount++;
-      }
-      
-      if (explanationMap[qNum] !== undefined) {
-        q.explanation = explanationMap[qNum];
-      } else {
-        q.explanation = '';
         if (answerMap[qNum] !== undefined) {
-          // Has answer but no explanation -> warning
-          block.warnings.push(`Câu ${qNum} có đáp án nhưng thiếu giải thích`);
+          q.correctAnswer = answerMap[qNum];
+          q.correctAnswers = [answerMap[qNum]];
+          if (q.options) {
+            q.options.requiresManualAnswer = false;
+          }
+        } else {
+          missingAnsCount++;
+        }
+        
+        if (explanationMap[qNum] !== undefined) {
+          q.explanation = explanationMap[qNum];
+        } else {
+          q.explanation = '';
+          if (answerMap[qNum] !== undefined) {
+            // Has answer but no explanation -> warning
+            block.warnings.push(`Câu ${qNum} có đáp án nhưng thiếu giải thích`);
+          }
         }
       }
     }
