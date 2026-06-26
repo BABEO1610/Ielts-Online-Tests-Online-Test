@@ -12,7 +12,8 @@ class TutorController {
 
       const filters = {
         submission_type: submission_type?.toLowerCase(),
-        search: search?.trim()
+        search: search?.trim(),
+        tutorId: req.user.id
       };
 
       const queueData = await TutorService.getQueue(filters);

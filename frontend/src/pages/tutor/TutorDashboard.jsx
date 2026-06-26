@@ -26,10 +26,20 @@ const MOCK_RECENT_TESTS = [
 const getInitials = (name = '') =>
   name.split(' ').slice(-1)[0]?.charAt(0)?.toUpperCase() || '?';
 
+const getLast7DaysLabels = () => {
+  const days = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
+  const labels = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    labels.push(days[d.getDay()]);
+  }
+  return labels;
+};
+
 // ─── Mini Bar Chart ───────────────────────────────────────────────────────────
-const MiniBarChart = ({ data = [], dark = false }) => {
+const MiniBarChart = ({ data = [], dark = false, labels = getLast7DaysLabels() }) => {
   const max = Math.max(...data, 1);
-  const labels = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
   return (
     <div style={{ display: 'flex', alignItems: 'flex-end', gap: '3px', height: '40px' }}>
       {data.map((v, i) => (
@@ -303,8 +313,8 @@ const RecentTestsWidget = ({ recentTests = [] }) => (
 
     {/* Full chart legend */}
     <div style={{ marginTop: '16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-      {['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'].map(d => (
-        <span key={d} style={{ fontSize: '10px', color: '#bbb', fontFamily: 'UberMoveText, system-ui, sans-serif' }}>{d}</span>
+      {getLast7DaysLabels().map((d, i) => (
+        <span key={i} style={{ fontSize: '10px', color: '#bbb', fontFamily: 'UberMoveText, system-ui, sans-serif' }}>{d}</span>
       ))}
     </div>
   </div>
@@ -320,7 +330,10 @@ const TutorDashboard = () => {
     gradedToday: 0,
     publishedTests: 0,
     totalTests: 0,
-    recentTests: []
+    recentTests: [],
+    gradedChartData: [0,0,0,0,0,0,0],
+    pendingWritingChartData: [0,0,0,0,0,0,0],
+    pendingSpeakingChartData: [0,0,0,0,0,0,0]
   });
   const [isLoading, setIsLoading] = useState(true);
 
@@ -399,19 +412,19 @@ const TutorDashboard = () => {
           value={pendingWriting}
           dark
           sublabel="Bài nộp"
-          chartData={[2, 3, 5, 4, 6, 3, 5]}
+          chartData={stats.pendingWritingChartData || [0,0,0,0,0,0,0]}
         />
         <StatCard
           label="Chờ chấm (Speaking)"
           value={pendingSpeaking}
           sublabel="Bài nộp"
-          chartData={[1, 2, 3, 2, 4, 2, 3]}
+          chartData={stats.pendingSpeakingChartData || [0,0,0,0,0,0,0]}
         />
         <StatCard
           label="Đã chấm hôm nay"
           value={stats.gradedToday}
           sublabel="Bài hoàn thành"
-          chartData={[3, 5, 8, 6, 9, 4, 8]}
+          chartData={stats.gradedChartData || [0,0,0,0,0,0,0]}
         />
         <StatCard
           label="Đề thi đang publish"
