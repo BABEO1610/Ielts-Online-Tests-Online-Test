@@ -361,10 +361,12 @@ class SubmissionService {
         MIN(ws.submitted_at) AS submitted_at,
         MIN(ws.status::text) AS status,
         MIN(ws.grader::text) AS grader,
-        MAX(COALESCE(tfr.band_score, agr.band_score)) AS band_score
+        MAX(COALESCE(tfr.band_score, agr.band_score)) AS band_score,
+        MIN(mt.title) AS test_title
       FROM writing_submissions ws
       LEFT JOIN tutor_feedback_reports tfr ON ws.id = tfr.writing_submission_id
       LEFT JOIN ai_grading_reports agr ON ws.id = agr.submission_id AND agr.submission_type = 'writing'
+      LEFT JOIN mock_tests mt ON mt.id = ws.test_id
       WHERE ws.user_id = $1
       GROUP BY ws.writing_group_id
 
@@ -378,10 +380,12 @@ class SubmissionService {
         MIN(ss.submitted_at) AS submitted_at,
         MIN(ss.status::text) AS status,
         MIN(ss.grader::text) AS grader,
-        MAX(COALESCE(tfr.band_score, agr.band_score)) AS band_score
+        MAX(COALESCE(tfr.band_score, agr.band_score)) AS band_score,
+        MIN(mt.title) AS test_title
       FROM speaking_submissions ss
       LEFT JOIN tutor_feedback_reports tfr ON ss.id = tfr.speaking_submission_id
       LEFT JOIN ai_grading_reports agr ON ss.id = agr.submission_id AND agr.submission_type = 'speaking'
+      LEFT JOIN mock_tests mt ON mt.id = ss.test_id
       WHERE ss.user_id = $1
       GROUP BY ss.speaking_group_id
 
@@ -396,7 +400,8 @@ class SubmissionService {
       submitted_at: row.submitted_at,
       status: row.status,
       grader: row.grader,
-      band_score: row.band_score ? parseFloat(row.band_score) : null
+      band_score: row.band_score ? parseFloat(row.band_score) : null,
+      testTitle: row.test_title
     }));
   }
 

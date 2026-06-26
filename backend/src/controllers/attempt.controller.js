@@ -147,10 +147,40 @@ class AttemptController {
         skill || null
       );
 
+      // Fetch subjective submissions history
+      const SubmissionService = require('../services/submission.service');
+      let subjectiveHistory = await SubmissionService.getHistory(userId);
+
+      // Filter subjective history if skill is provided
+      if (skill) {
+        subjectiveHistory = subjectiveHistory.filter(h => h.type === skill);
+      }
+
+      // Merge and map
+      const mergedHistory = [
+        ...history,
+        ...subjectiveHistory.map(sub => ({
+          id: sub.id,
+          testTitle: sub.testTitle || 'Bài thi tự luận', // Need to check if SubmissionService.getHistory returns testTitle
+          skill: sub.type,
+          difficulty: 'N/A',
+          bandScore: sub.band_score,
+          rawScore: null,
+          totalQuestions: null,
+          timeSpent: null,
+          practiceMode: false,
+          submittedAt: sub.submitted_at,
+          status: sub.status // useful for UI
+        }))
+      ];
+
+      // Sort by submitted_at desc
+      mergedHistory.sort((a, b) => new Date(b.submittedAt) - new Date(a.submittedAt));
+
       res.status(200).json({
         success: true,
-        data: history,
-        meta: { total: history.length },
+        data: mergedHistory,
+        meta: { total: mergedHistory.length },
         error: null,
       });
     } catch (error) {

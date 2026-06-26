@@ -20,12 +20,13 @@ class TutorService {
         COUNT(ws.id)::int AS parts_count,
         MIN(ws.submitted_at) AS submitted_at,
         MIN(ws.status::text)::submission_status AS status,
-        MIN(ws.grader::text)::grader_type AS grader
+        MIN(ws.grader::text)::grader_type AS grader,
+        ws.assigned_tutor_id
       FROM writing_submissions ws
       JOIN users u ON u.id = ws.user_id
       LEFT JOIN mock_tests mt ON mt.id = ws.test_id
       WHERE ws.status = 'pending' AND ws.grader = 'tutor'
-      GROUP BY ws.writing_group_id, ws.user_id, u.full_name, mt.title
+      GROUP BY ws.writing_group_id, ws.user_id, u.full_name, mt.title, ws.assigned_tutor_id
       
       UNION ALL
       
@@ -39,12 +40,13 @@ class TutorService {
         COUNT(ss.id)::int AS parts_count,
         MIN(ss.submitted_at) AS submitted_at,
         MIN(ss.status::text)::submission_status AS status,
-        MIN(ss.grader::text)::grader_type AS grader
+        MIN(ss.grader::text)::grader_type AS grader,
+        ss.assigned_tutor_id
       FROM speaking_submissions ss
       JOIN users u ON u.id = ss.user_id
       LEFT JOIN mock_tests mt ON mt.id = ss.test_id
       WHERE ss.status = 'pending' AND ss.grader = 'tutor'
-      GROUP BY ss.speaking_group_id, ss.user_id, u.full_name, mt.title
+      GROUP BY ss.speaking_group_id, ss.user_id, u.full_name, mt.title, ss.assigned_tutor_id
     `;
     let query = `SELECT * FROM (${baseQuery}) q WHERE 1=1`;
     const params = [];
@@ -59,6 +61,12 @@ class TutorService {
     if (filters.search) {
       params.push(`%${filters.search}%`);
       query += ` AND student_name ILIKE $${params.length}`;
+    }
+
+    // Filter by assigned tutor
+    if (filters.tutorId) {
+      params.push(filters.tutorId);
+      query += ` AND assigned_tutor_id = $${params.length}`;
     }
 
     query += ' ORDER BY submitted_at ASC';
@@ -370,34 +378,87 @@ class TutorService {
     const publishedTests = parseInt(publishedTestsResult.rows[0].published_tests, 10);
     const totalTests = parseInt(publishedTestsResult.rows[0].total_tests, 10);
 
-    // 3. Recent Tests (Top 5 tests by recent attempts)
-    const recentTestsQuery = `
+    // 3. Graded Chart Data (Last 7 Days)
+    const gradedChartQuery = `
       SELECT 
-        mt.id, 
-        mt.title, 
-        COUNT(ta.id) AS attempts_count
-      FROM mock_tests mt
-      LEFT JOIN test_attempts ta ON ta.test_id = mt.id
-      WHERE mt.is_published = true
-      GROUP BY mt.id, mt.title
-      ORDER BY attempts_count DESC
-      LIMIT 3
+        COUNT(tfr.id) AS count
+      FROM generate_series(CURRENT_DATE - INTERVAL '6 days', CURRENT_DATE, '1 day'::interval) d(date)
+      LEFT JOIN tutor_feedback_reports tfr ON tfr.created_at::date = d.date::date AND tfr.tutor_id = $1
+      GROUP BY d.date::date
+      ORDER BY d.date::date ASC;
+    `;
+    const gradedChartResult = await pool.query(gradedChartQuery, [tutorId]);
+    const gradedChartData = gradedChartResult.rows.map(r => parseInt(r.count, 10));
+
+    // 4. Pending Writing Chart Data (Last 7 Days)
+    const pendingWritingChartQuery = `
+      SELECT 
+        COUNT(DISTINCT ws.writing_group_id) AS count
+      FROM generate_series(CURRENT_DATE - INTERVAL '6 days', CURRENT_DATE, '1 day'::interval) d(date)
+      LEFT JOIN writing_submissions ws ON ws.submitted_at::date = d.date::date AND ws.status = 'pending' AND ws.grader = 'tutor'
+      GROUP BY d.date::date
+      ORDER BY d.date::date ASC;
+    `;
+    const pendingWritingChartResult = await pool.query(pendingWritingChartQuery);
+    const pendingWritingChartData = pendingWritingChartResult.rows.map(r => parseInt(r.count, 10));
+
+    // 5. Pending Speaking Chart Data (Last 7 Days)
+    const pendingSpeakingChartQuery = `
+      SELECT 
+        COUNT(DISTINCT ss.speaking_group_id) AS count
+      FROM generate_series(CURRENT_DATE - INTERVAL '6 days', CURRENT_DATE, '1 day'::interval) d(date)
+      LEFT JOIN speaking_submissions ss ON ss.submitted_at::date = d.date::date AND ss.status = 'pending' AND ss.grader = 'tutor'
+      GROUP BY d.date::date
+      ORDER BY d.date::date ASC;
+    `;
+    const pendingSpeakingChartResult = await pool.query(pendingSpeakingChartQuery);
+    const pendingSpeakingChartData = pendingSpeakingChartResult.rows.map(r => parseInt(r.count, 10));
+
+    // 6. Recent Tests with daily attempts chart data
+    const recentTestsQuery = `
+      WITH top_tests AS (
+        SELECT mt.id, mt.title, COUNT(ta.id) AS attempts_count
+        FROM mock_tests mt
+        LEFT JOIN test_attempts ta ON ta.test_id = mt.id
+        WHERE mt.is_published = true
+        GROUP BY mt.id, mt.title
+        ORDER BY attempts_count DESC
+        LIMIT 3
+      )
+      SELECT 
+        t.id, t.title, t.attempts_count,
+        d.date::date AS day,
+        COUNT(ta.id) AS daily_attempts
+      FROM top_tests t
+      CROSS JOIN generate_series(CURRENT_DATE - INTERVAL '6 days', CURRENT_DATE, '1 day'::interval) d(date)
+      LEFT JOIN test_attempts ta ON ta.test_id = t.id AND ta.submitted_at::date = d.date::date
+      GROUP BY t.id, t.title, t.attempts_count, d.date::date
+      ORDER BY t.attempts_count DESC, t.id, d.date::date ASC;
     `;
     const recentTestsResult = await pool.query(recentTestsQuery);
     
-    // Create random chart data for the UI since we don't track daily attempts yet
-    const recentTests = recentTestsResult.rows.map(row => ({
-      id: row.id,
-      title: row.title,
-      attempts: parseInt(row.attempts_count, 10),
-      chartData: Array.from({ length: 7 }, () => Math.floor(Math.random() * 50) + 10)
-    }));
+    const recentTestsMap = {};
+    recentTestsResult.rows.forEach(row => {
+      if (!recentTestsMap[row.id]) {
+        recentTestsMap[row.id] = {
+          id: row.id,
+          title: row.title,
+          attempts: parseInt(row.attempts_count, 10),
+          chartData: []
+        };
+      }
+      recentTestsMap[row.id].chartData.push(parseInt(row.daily_attempts, 10));
+    });
+    const recentTests = Object.values(recentTestsMap);
 
     return {
       gradedToday,
       publishedTests,
       totalTests,
-      recentTests
+      recentTests,
+      gradedChartData,
+      pendingWritingChartData,
+      pendingSpeakingChartData
     };
   }
 }
