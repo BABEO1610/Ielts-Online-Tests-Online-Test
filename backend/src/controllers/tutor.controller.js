@@ -34,6 +34,26 @@ class TutorController {
   }
 
   /**
+   * GET /api/v1/tutors/dashboard-stats
+   * Fetch dashboard stats for tutor
+   */
+  static async getDashboardStats(req, res, next) {
+    try {
+      const tutorId = req.user.id;
+      const stats = await TutorService.getDashboardStats(tutorId);
+
+      res.status(200).json({
+        success: true,
+        data: stats,
+        error: null,
+        meta: null
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  /**
    * GET /api/v1/tutors/submissions/:type/:submissionId
    */
   static async getSubmissionDetail(req, res, next) {
@@ -49,40 +69,7 @@ class TutorController {
       }
 
       // Format response base on type as plan
-      let responseData;
-      if (type === 'writing') {
-        responseData = {
-          type: 'writing',
-          submissionId: detail.submission_id,
-          student: {
-            id: detail.student_id,
-            fullName: detail.student_name
-          },
-          taskNumber: detail.task_number,
-          promptText: detail.prompt_text,
-          responseText: detail.response_text,
-          fileUrl: detail.file_url,
-          submittedAt: detail.submitted_at,
-          status: detail.status,
-          grader: detail.grader
-        };
-      } else {
-        responseData = {
-          type: 'speaking',
-          submissionId: detail.submission_id,
-          student: {
-            id: detail.student_id,
-            fullName: detail.student_name
-          },
-          partNumber: detail.part_number,
-          promptText: detail.prompt_text,
-          audioUrl: detail.audio_url,
-          transcript: detail.transcript,
-          submittedAt: detail.submitted_at,
-          status: detail.status,
-          grader: detail.grader
-        };
-      }
+      let responseData = detail;
 
       res.status(200).json({
         success: true,
@@ -129,6 +116,24 @@ class TutorController {
       });
     } catch (error) {
       // Pass the AppError to the error handler (it handles the status code 409 etc.)
+      next(error);
+    }
+  }
+  /**
+   * POST /api/v1/tutors/submissions/speaking/:partId/transcribe
+   */
+  static async transcribeSpeaking(req, res, next) {
+    try {
+      const { partId } = req.params;
+      const transcript = await TutorService.transcribeSpeakingPart(partId);
+      
+      res.status(200).json({
+        success: true,
+        data: { transcript },
+        error: null,
+        meta: null
+      });
+    } catch (error) {
       next(error);
     }
   }

@@ -17,6 +17,14 @@ router.get(
   authorize(['tutor', 'admin']),
   TutorController.getTutorQueue
 );
+
+// GET /api/v1/tutors/dashboard-stats
+router.get(
+  '/dashboard-stats',
+  authorize(['tutor', 'admin']),
+  TutorController.getDashboardStats
+);
+
 // GET /api/v1/tutors/submissions/:type/:submissionId
 router.get(
   '/submissions/:type/:submissionId',
@@ -29,6 +37,13 @@ router.post(
   '/submissions/:type/:submissionId/grade',
   authorize(['tutor']),
   TutorController.gradeSubmission
+);
+
+// POST /api/v1/tutors/submissions/speaking/:partId/transcribe
+router.post(
+  '/submissions/speaking/:partId/transcribe',
+  authorize(['tutor', 'admin']),
+  TutorController.transcribeSpeaking
 );
 
 module.exports = router;

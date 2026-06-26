@@ -154,7 +154,7 @@ const QueueTable = ({ data = [], isLoading = false }) => (
           </tr>
         ) : (
           data.slice(0, 5).map((item, idx) => {
-            const submittedTime = new Date(item.submitted_at);
+            const submittedTime = new Date(item.submittedAt || new Date());
             const hoursWait = (new Date() - submittedTime) / (1000 * 60 * 60);
             let deadlineStr = '';
             let isUrgent = false;
@@ -170,7 +170,7 @@ const QueueTable = ({ data = [], isLoading = false }) => (
 
             return (
               <tr
-                key={item.submission_id}
+                key={item.submissionId}
                 style={{
                   borderBottom: idx < data.length - 1 ? '1px solid #f0f0f0' : 'none',
                   transition: 'background 0.15s ease',
@@ -187,10 +187,10 @@ const QueueTable = ({ data = [], isLoading = false }) => (
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                       fontSize: '13px', fontWeight: 700, color: '#555', flexShrink: 0,
                     }}>
-                      {getInitials(item.student_name || 'A')}
+                      {getInitials(item.studentName || 'A')}
                     </div>
                     <span style={{ fontSize: '14px', fontWeight: 500, color: '#000', fontFamily: 'UberMoveText, system-ui, sans-serif' }}>
-                      {item.student_name || 'Học viên ẩn danh'}
+                      {item.studentName || 'Học viên ẩn danh'}
                     </span>
                   </div>
                 </td>
@@ -202,18 +202,18 @@ const QueueTable = ({ data = [], isLoading = false }) => (
                     padding: '3px 10px', borderRadius: '999px',
                     fontSize: '11px', fontWeight: 700, letterSpacing: '0.4px',
                     textTransform: 'uppercase',
-                    backgroundColor: item.submission_type === 'writing' ? '#000' : '#efefef',
-                    color: item.submission_type === 'writing' ? '#fff' : '#333',
+                    backgroundColor: item.submissionType === 'writing' ? '#000' : '#efefef',
+                    color: item.submissionType === 'writing' ? '#fff' : '#333',
                     fontFamily: 'UberMoveText, system-ui, sans-serif',
                   }}>
-                    {item.submission_type}
+                    {item.submissionType}
                   </span>
                 </td>
 
                 {/* Tên bài */}
                 <td style={{ padding: '14px 16px' }}>
                   <span style={{ fontSize: '14px', color: '#000', fontFamily: 'UberMoveText, system-ui, sans-serif' }}>
-                    IELTS Mock Test
+                    {item.testTitle || 'IELTS Mock Test'}
                   </span>
                 </td>
 
@@ -241,7 +241,7 @@ const QueueTable = ({ data = [], isLoading = false }) => (
                 {/* Thao tác */}
                 <td style={{ padding: '14px 16px' }}>
                   <Link
-                    to={`/grading/tutor/grade/${item.submission_type}/${item.submission_id}`}
+                    to={`/grading/tutor/grade/${item.submissionType}/${item.submissionId}`}
                     style={{
                       display: 'inline-block',
                       padding: '7px 18px', borderRadius: '999px',
@@ -265,7 +265,7 @@ const QueueTable = ({ data = [], isLoading = false }) => (
 );
 
 // ─── Recent Tests Widget ───────────────────────────────────────────────────────
-const RecentTestsWidget = () => (
+const RecentTestsWidget = ({ recentTests = [] }) => (
   <div style={{
     backgroundColor: '#fff', border: '1px solid #e8e8e8',
     borderRadius: '16px', padding: '20px',
@@ -278,13 +278,15 @@ const RecentTestsWidget = () => (
       Đề thi gần đây & Thống kê lượt thi
     </h3>
 
-    {MOCK_RECENT_TESTS.map((test, idx) => (
+    {recentTests.length === 0 ? (
+      <p style={{ fontSize: '13px', color: '#888' }}>Không có đề thi nào đang publish</p>
+    ) : recentTests.map((test, idx) => (
       <div
         key={test.id}
         style={{
-          paddingBottom: idx < MOCK_RECENT_TESTS.length - 1 ? '16px' : 0,
-          marginBottom: idx < MOCK_RECENT_TESTS.length - 1 ? '16px' : 0,
-          borderBottom: idx < MOCK_RECENT_TESTS.length - 1 ? '1px solid #f0f0f0' : 'none',
+          paddingBottom: idx < recentTests.length - 1 ? '16px' : 0,
+          marginBottom: idx < recentTests.length - 1 ? '16px' : 0,
+          borderBottom: idx < recentTests.length - 1 ? '1px solid #f0f0f0' : 'none',
         }}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
@@ -314,26 +316,38 @@ const TutorDashboard = () => {
   const firstName = user?.full_name ? user.full_name.split(' ').pop() : 'Tutor';
   
   const [queueData, setQueueData] = useState([]);
+  const [stats, setStats] = useState({
+    gradedToday: 0,
+    publishedTests: 0,
+    totalTests: 0,
+    recentTests: []
+  });
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const fetchQueue = async () => {
+    const fetchData = async () => {
       try {
-        const response = await gradingService.getTutorQueue();
-        if (response.success) {
-          setQueueData(response.data || []);
+        const [queueRes, statsRes] = await Promise.all([
+          gradingService.getTutorQueue(),
+          gradingService.getTutorDashboardStats()
+        ]);
+        if (queueRes.success) {
+          setQueueData(queueRes.data || []);
+        }
+        if (statsRes.success) {
+          setStats(statsRes.data || { gradedToday: 0, publishedTests: 0, totalTests: 0, recentTests: [] });
         }
       } catch (err) {
-        console.error("Failed to fetch tutor queue:", err);
+        console.error("Failed to fetch dashboard data:", err);
       } finally {
         setIsLoading(false);
       }
     };
-    fetchQueue();
+    fetchData();
   }, []);
 
-  const pendingWriting = queueData.filter(q => q.submission_type === 'writing').length;
-  const pendingSpeaking = queueData.filter(q => q.submission_type === 'speaking').length;
+  const pendingWriting = queueData.filter(q => q.submissionType === 'writing').length;
+  const pendingSpeaking = queueData.filter(q => q.submissionType === 'speaking').length;
   const total = queueData.length;
 
   return (
@@ -395,14 +409,14 @@ const TutorDashboard = () => {
         />
         <StatCard
           label="Đã chấm hôm nay"
-          value={8} // Vẫn giữ mock tạm cho mục này do chưa có API lịch sử chấm
+          value={stats.gradedToday}
           sublabel="Bài hoàn thành"
           chartData={[3, 5, 8, 6, 9, 4, 8]}
         />
         <StatCard
           label="Đề thi đang publish"
-          value={9} // Mock
-          sublabel={`/ 12 tổng`}
+          value={stats.publishedTests}
+          sublabel={`/ ${stats.totalTests} tổng`}
           extra="+ Tạo đề mới"
         />
       </div>
@@ -434,7 +448,7 @@ const TutorDashboard = () => {
         </div>
 
         {/* Cột phải: Đề thi gần đây */}
-        <RecentTestsWidget />
+        <RecentTestsWidget recentTests={stats.recentTests} />
       </div>
 
     </div>
