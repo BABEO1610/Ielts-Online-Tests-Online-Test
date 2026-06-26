@@ -41,14 +41,7 @@ const SAMPLE_SCHEDULE = [
   { id: 'r9', title: 'Vocabulary Booklet - Unit 5.pdf', kind: 'Tài liệu', publish_at: iso(7), created_by: 'Đạt Nguyễn Văn' },
 ];
 
-const SAMPLE_SUBMISSIONS = [
-  { id: 'w1', type: 'writing', student: 'Not Hướng Dương', skill: 'Writing Task 2', grader: 'ai', status: 'pending', submitted_at: iso(0, -1) },
-  { id: 'w2', type: 'writing', student: 'Đạt Nguyễn Văn', skill: 'Writing Task 1', grader: 'ai', status: 'grading_failed', submitted_at: iso(0, -2) },
-  { id: 's1', type: 'speaking', student: 'Bá Minh', skill: 'Speaking Part 2', grader: 'tutor', status: 'pending', submitted_at: iso(0, -4) },
-  { id: 'w3', type: 'writing', student: 'huhu', skill: 'Writing Task 2', grader: 'ai', status: 'ai_graded', submitted_at: iso(-1) },
-  { id: 's2', type: 'speaking', student: 'hâha', skill: 'Speaking Part 3', grader: 'tutor', status: 'tutor_graded', submitted_at: iso(-1, -2) },
-  { id: 'w4', type: 'writing', student: 'Nguyễn Bá Quang Minh', skill: 'Writing Task 1', grader: 'ai', status: 'grading_failed', submitted_at: iso(-2) },
-];
+
 
 const SAMPLE_SESSIONS = [
   { id: 'se1', user: 'Le Tien Thanh', email: 'thanhthe171416@fpt.edu.vn', ip: '113.161.42.10', device: 'Chrome · Windows', is_oauth: false, provider: null, last_active_at: iso(0, -1), expires_at: iso(6) },
@@ -120,12 +113,17 @@ export async function fetchResourceDetail(id) {
 
 // ── Grading oversight ─────────────────────────────────────────────────────────
 export async function fetchSubmissions() {
-  try { return ok((await api.get('/admin/submissions')).data.data); }
-  catch { return sample(SAMPLE_SUBMISSIONS); }
+  const res = await api.get('/admin/submissions');
+  return ok(res.data.data ?? []);
 }
 export async function retryGrading(type, id) {
-  try { await api.post(`/admin/submissions/${type}/${id}/retry`); return true; }
-  catch { return true; }
+  try {
+    await api.post(`/admin/submissions/${type}/${id}/retry`);
+    return true;
+  } catch (error) {
+    const msg = error?.response?.data?.error?.message || 'Không thể chấm lại. Vui lòng thử lại.';
+    throw new Error(msg);
+  }
 }
 
 // ── Sessions ──────────────────────────────────────────────────────────────────

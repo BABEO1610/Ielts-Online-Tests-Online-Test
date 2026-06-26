@@ -321,6 +321,78 @@ const adminControllerFactory = (usersService, AppError, sessionsService, contact
       } catch (error) {
         next(error);
       }
+    },
+
+    /**
+     * Handler for listing activity logs for Admin dashboard.
+     * EARS[Event]: WHEN Admin requests GET /admin/activity-logs, THE system SHALL return paginated activity logs.
+     *
+     * @param {import('express').Request} req
+     * @param {import('express').Response} res
+     * @param {import('express').NextFunction} next
+     */
+    listActivityLogs: async (req, res, next) => {
+      try {
+        const {
+          page = 1,
+          limit = 20,
+          action,
+          target_table,
+          target_id,
+          from,
+          to,
+          search,
+          severity   // 'suspicious' hoặc 'normal' — Frontend dùng để filter tab
+        } = req.query;
+
+        const result = await auditService.listActivityLogs({
+          page,
+          limit,
+          action,
+          target_table,
+          target_id,
+          from,
+          to,
+          search,
+          severity
+        });
+
+        res.status(200).json({
+          success: true,
+          data: result.logs,
+          error: null,
+          meta: {
+            page: result.page,
+            limit: result.limit,
+            total: result.total
+          }
+        });
+      } catch (error) {
+        next(error);
+      }
+    },
+
+    /**
+     * Handler for getting activity log stats.
+     * EARS[Event]: WHEN Admin requests GET /admin/activity-logs/stats, THE system SHALL return stats.
+     *
+     * @param {import('express').Request} req
+     * @param {import('express').Response} res
+     * @param {import('express').NextFunction} next
+     */
+    getActivityLogStats: async (req, res, next) => {
+      try {
+        const stats = await auditService.getActivityLogStats();
+
+        res.status(200).json({
+          success: true,
+          data: stats,
+          error: null,
+          meta: null
+        });
+      } catch (error) {
+        next(error);
+      }
     }
   };
 };
