@@ -106,9 +106,14 @@ const PracticeHistoryPage = () => {
   // Với filter hiện tại ta dùng history đã filter
   const summary = useMemo(() => calcSummary(history), [history]);
 
-  const getStatusLabel = (item) => {
-    if (item.skill === 'writing' || item.skill === 'speaking') return 'Đã chấm';
-    return 'Hoàn thành';
+  const getStatusInfo = (item) => {
+    if (item.skill === 'writing' || item.skill === 'speaking') {
+      if (item.status === 'pending') return { text: 'Đang chờ chấm', color: 'warning' };
+      if (item.status === 'tutor_graded') return { text: 'GV đã chấm', color: 'success' };
+      if (item.status === 'ai_graded') return { text: 'AI đã chấm', color: 'success' };
+      return { text: 'Đã nộp', color: 'info' };
+    }
+    return { text: 'Hoàn thành', color: 'success' };
   };
 
   return (
@@ -183,7 +188,12 @@ const PracticeHistoryPage = () => {
               <span className="iot-history-skill">{SKILL_LABEL[item.skill] || item.skill}</span>
               <span>{item.bandScore ? item.bandScore.toFixed(1) : '—'}</span>
               <span>{formatDate(item.submittedAt)}</span>
-              <span className="iot-badge iot-badge--success">{getStatusLabel(item)}</span>
+              {(() => {
+                const statusInfo = getStatusInfo(item);
+                return (
+                  <span className={`iot-badge iot-badge--${statusInfo.color}`}>{statusInfo.text}</span>
+                );
+              })()}
             </div>
           ))}
 

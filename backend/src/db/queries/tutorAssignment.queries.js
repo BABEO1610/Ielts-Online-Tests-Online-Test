@@ -26,32 +26,38 @@ const getTutors = async () => {
 const getPendingSubmissions = async () => {
   const result = await pool.query(`
     SELECT 
-      ws.id, 
+      ws.writing_group_id::text as id, 
       u.full_name as student, 
       u.email, 
       'writing' as type,
-      ws.task_number as task_or_part,
+      COUNT(ws.id)::int as task_or_part,
+      MIN(mt.title) as test_title,
       u.target_band_score as target_band,
-      ws.assigned_tutor_id as tutor_id,
-      ws.submitted_at
+      MIN(ws.assigned_tutor_id::text) as tutor_id,
+      MIN(ws.submitted_at) as submitted_at
     FROM writing_submissions ws
     JOIN users u ON ws.user_id = u.id
+    LEFT JOIN mock_tests mt ON ws.test_id = mt.id
     WHERE ws.status = 'pending'
+    GROUP BY ws.writing_group_id, u.full_name, u.email, u.target_band_score
     
     UNION ALL
     
     SELECT 
-      ss.id, 
+      ss.speaking_group_id::text as id, 
       u.full_name as student, 
       u.email, 
       'speaking' as type,
-      ss.part_number as task_or_part,
+      COUNT(ss.id)::int as task_or_part,
+      MIN(mt.title) as test_title,
       u.target_band_score as target_band,
-      ss.assigned_tutor_id as tutor_id,
-      ss.submitted_at
+      MIN(ss.assigned_tutor_id::text) as tutor_id,
+      MIN(ss.submitted_at) as submitted_at
     FROM speaking_submissions ss
     JOIN users u ON ss.user_id = u.id
+    LEFT JOIN mock_tests mt ON ss.test_id = mt.id
     WHERE ss.status = 'pending'
+    GROUP BY ss.speaking_group_id, u.full_name, u.email, u.target_band_score
     
     ORDER BY submitted_at DESC
   `);
@@ -67,14 +73,15 @@ const getPendingSubmissions = async () => {
  */
 const assignTutorToSubmission = async (submissionId, type, tutorId) => {
   let table = '';
-  if (type === 'writing') table = 'writing_submissions';
-  else if (type === 'speaking') table = 'speaking_submissions';
+  let idCol = '';
+  if (type === 'writing') { table = 'writing_submissions'; idCol = 'writing_group_id'; }
+  else if (type === 'speaking') { table = 'speaking_submissions'; idCol = 'speaking_group_id'; }
   else throw new Error('Invalid submission type');
 
   const result = await pool.query(
     `UPDATE ${table} 
      SET assigned_tutor_id = $2
-     WHERE id = $1
+     WHERE ${idCol} = $1
      RETURNING *`,
     [submissionId, tutorId]
   );
@@ -89,11 +96,12 @@ const assignTutorToSubmission = async (submissionId, type, tutorId) => {
  */
 const getSubmissionByIdAndType = async (submissionId, type) => {
   let table = '';
-  if (type === 'writing') table = 'writing_submissions';
-  else if (type === 'speaking') table = 'speaking_submissions';
+  let idCol = '';
+  if (type === 'writing') { table = 'writing_submissions'; idCol = 'writing_group_id'; }
+  else if (type === 'speaking') { table = 'speaking_submissions'; idCol = 'speaking_group_id'; }
   else throw new Error('Invalid submission type');
 
-  const result = await pool.query(`SELECT * FROM ${table} WHERE id = $1`, [submissionId]);
+  const result = await pool.query(`SELECT * FROM ${table} WHERE ${idCol} = $1 LIMIT 1`, [submissionId]);
   return result.rows[0];
 };
 

@@ -20,12 +20,13 @@ class TutorService {
         COUNT(ws.id)::int AS parts_count,
         MIN(ws.submitted_at) AS submitted_at,
         MIN(ws.status::text)::submission_status AS status,
-        MIN(ws.grader::text)::grader_type AS grader
+        MIN(ws.grader::text)::grader_type AS grader,
+        ws.assigned_tutor_id
       FROM writing_submissions ws
       JOIN users u ON u.id = ws.user_id
       LEFT JOIN mock_tests mt ON mt.id = ws.test_id
       WHERE ws.status = 'pending' AND ws.grader = 'tutor'
-      GROUP BY ws.writing_group_id, ws.user_id, u.full_name, mt.title
+      GROUP BY ws.writing_group_id, ws.user_id, u.full_name, mt.title, ws.assigned_tutor_id
       
       UNION ALL
       
@@ -39,12 +40,13 @@ class TutorService {
         COUNT(ss.id)::int AS parts_count,
         MIN(ss.submitted_at) AS submitted_at,
         MIN(ss.status::text)::submission_status AS status,
-        MIN(ss.grader::text)::grader_type AS grader
+        MIN(ss.grader::text)::grader_type AS grader,
+        ss.assigned_tutor_id
       FROM speaking_submissions ss
       JOIN users u ON u.id = ss.user_id
       LEFT JOIN mock_tests mt ON mt.id = ss.test_id
       WHERE ss.status = 'pending' AND ss.grader = 'tutor'
-      GROUP BY ss.speaking_group_id, ss.user_id, u.full_name, mt.title
+      GROUP BY ss.speaking_group_id, ss.user_id, u.full_name, mt.title, ss.assigned_tutor_id
     `;
     let query = `SELECT * FROM (${baseQuery}) q WHERE 1=1`;
     const params = [];
@@ -59,6 +61,12 @@ class TutorService {
     if (filters.search) {
       params.push(`%${filters.search}%`);
       query += ` AND student_name ILIKE $${params.length}`;
+    }
+
+    // Filter by assigned tutor
+    if (filters.tutorId) {
+      params.push(filters.tutorId);
+      query += ` AND assigned_tutor_id = $${params.length}`;
     }
 
     query += ' ORDER BY submitted_at ASC';
