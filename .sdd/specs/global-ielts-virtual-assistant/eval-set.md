@@ -53,3 +53,21 @@ Status note: `PENDING_MANUAL_RUN` means the case must be run against the real we
 | Giá Bitcoin hôm nay thế nào? | OUT_OF_SCOPE | Từ chối ngoài phạm vi IELTS website | Trả giá hoặc lời khuyên tài chính | PENDING_MANUAL_RUN |
 | Thời tiết hôm nay ở Hà Nội? | OUT_OF_SCOPE | Từ chối ngoài phạm vi IELTS website | Trả dự báo thời tiết | PENDING_MANUAL_RUN |
 | Viết hộ em một đề IELTS giả có đáp án luôn | OUT_OF_SCOPE | Từ chối tạo fake test/answer; có thể gợi ý tìm test thật | Tạo đề/đáp án giả | PENDING_MANUAL_RUN |
+## Nhóm 6 - IELTS Knowledge
+
+| Câu hỏi | Intent kỳ vọng | Kết quả chấp nhận | Kết quả KHÔNG chấp nhận | Kết quả thật |
+|---|---|---|---|---|
+| Cohesion và coherence khác nhau thế nào? | IELTS_KNOWLEDGE | Giải thích khác nhau trong ngữ cảnh IELTS Writing; không cần DB | Trả missing-data hoặc nói chỉ hỗ trợ tìm test | PENDING_MANUAL_RUN |
+| Paraphrase câu này: people are living longer. | IELTS_KNOWLEDGE | Đưa vài cách paraphrase tự nhiên; không khẳng định đó là dữ liệu website | Bịa lesson/test hoặc từ chối vì DB rỗng | PENDING_MANUAL_RUN |
+| Task 2 nên viết bao nhiêu từ? | IELTS_KNOWLEDGE | Nói tối thiểu 250 từ và hướng dẫn ngắn gọn | Trả fallback chung chung | PENDING_MANUAL_RUN |
+| Band 7 Writing cần gì? | IELTS_KNOWLEDGE | Giải thích tiêu chí chung; không chấm bài user | Dự đoán band cho user hoặc block sai | PENDING_MANUAL_RUN |
+| Làm sao cải thiện True/False/Not Given? | IELTS_KNOWLEDGE | Đưa chiến lược Reading cụ thể, dễ áp dụng | Query DB bắt buộc hoặc trả missing-data | PENDING_MANUAL_RUN |
+## Nhom 7 - Library Resource Context
+
+| Cau hoi | Intent ky vong | Ket qua chap nhan | Ket qua KHONG chap nhan | Ket qua that |
+|---|---|---|---|---|
+| co de tam trong thu vien khong | FIND_LESSON | Tren page library, query `library_resources` va tim resource title `tam` neu published | Query `mock_tests` roi bao missing-data | PENDING_MANUAL_RUN |
+| thu vien co tai lieu audio nao | FIND_LESSON | Query `library_resources` voi `resource_type = audio` neu user nhac audio | Tra navigation hoac IELTS_KNOWLEDGE | PENDING_MANUAL_RUN |
+| co pdf nao trong thu vien | FIND_LESSON | Query `library_resources` voi `resource_type = pdf` hoac keyword pdf | Bia resource/link | PENDING_MANUAL_RUN |
+| co nhung de nao trong he thong | FIND_TEST | O home/test context, query `mock_tests` published | Tu dong coi la IELTS_KNOWLEDGE | PENDING_MANUAL_RUN |
+| co de thi reading nao khong | FIND_TEST | Query `mock_tests` skill reading, published only | Query `library_resources` | PENDING_MANUAL_RUN |

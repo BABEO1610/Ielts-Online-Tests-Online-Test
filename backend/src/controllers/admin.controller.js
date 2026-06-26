@@ -194,18 +194,22 @@ const adminControllerFactory = (usersService, AppError, sessionsService, contact
     },
 
     /**
-     * Đánh dấu một liên hệ là đã xử lý.
-     * EARS[Event]: WHEN Admin calls PUT /admin/contacts/:id/resolve,
-     * THE system SHALL set resolved = TRUE on the contact record.
+     * Cập nhật trạng thái và phản hồi cho liên hệ.
+     * EARS[Event]: WHEN Admin calls PUT /admin/contacts/:id/status,
+     * THE system SHALL update the status, admin_notes, and reply_message.
      *
      * @param {import('express').Request} req
      * @param {import('express').Response} res
      * @param {import('express').NextFunction} next
      */
-    resolveContact: async (req, res, next) => {
+    updateContactStatus: async (req, res, next) => {
       try {
         const { id } = req.params;
-        const updated = await contactsService.resolveContact(id, AppError);
+        const { status, admin_notes, reply_message } = req.body;
+        const admin_id = req.user.id;
+        
+        const updated = await contactsService.updateContact(id, status, admin_notes, reply_message, admin_id, AppError);
+        
         res.status(200).json({
           success: true,
           data: updated,

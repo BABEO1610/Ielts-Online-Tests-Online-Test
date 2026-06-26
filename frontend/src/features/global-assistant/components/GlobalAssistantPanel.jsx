@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { AlertCircle, ExternalLink, X } from 'lucide-react';
 import assistantApi from '../services/assistantApi';
 import ChatInputBox from './ChatInputBox';
@@ -19,6 +19,22 @@ const toMessage = (row) => ({
   content: row.content || row.answer || '',
 });
 
+const collectVisibleItems = () => {
+  const selectors = [
+    '[data-testid="library-page"] h3',
+    '[data-testid="library-page"] h4',
+    '.card h3',
+    '.card h4',
+    'main h3',
+    'main h4',
+  ];
+  return [...document.querySelectorAll(selectors.join(','))]
+    .map((node) => node.textContent?.trim())
+    .filter(Boolean)
+    .slice(0, 20)
+    .map((title) => ({ title }));
+};
+
 const GlobalAssistantPanel = ({ availability, onClose }) => {
   const [messages, setMessages] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -26,12 +42,15 @@ const GlobalAssistantPanel = ({ availability, onClose }) => {
   const [error, setError] = useState(null);
   const [suggestedLinks, setSuggestedLinks] = useState([]);
   const [requiresLogin, setRequiresLogin] = useState(false);
+  const messageListRef = useRef(null);
 
   const context = useMemo(() => ({
     pageType: availability.pageType,
     attemptId: availability.attemptId,
     questionId: availability.questionId,
-  }), [availability.attemptId, availability.pageType, availability.questionId]);
+    route: availability.route,
+  }), [availability.attemptId, availability.pageType, availability.questionId, availability.route]);
+  const showLoginPrompt = requiresLogin || availability.isGuest;
 
   useEffect(() => {
     let isMounted = true;
@@ -57,6 +76,15 @@ const GlobalAssistantPanel = ({ availability, onClose }) => {
       isMounted = false;
     };
   }, [availability.isAuthenticated, historyLoaded]);
+
+  useEffect(() => {
+    if (showLoginPrompt) return undefined;
+    const frameId = window.requestAnimationFrame(() => {
+      const list = messageListRef.current;
+      if (list) list.scrollTop = list.scrollHeight;
+    });
+    return () => window.cancelAnimationFrame(frameId);
+  }, [historyLoaded, isLoading, messages, showLoginPrompt, suggestedLinks.length]);
 
   const handleSendError = (response) => {
     setIsLoading(false);
@@ -102,10 +130,11 @@ const GlobalAssistantPanel = ({ availability, onClose }) => {
     setIsLoading(true);
     setError(null);
     setSuggestedLinks([]);
+    const requestContext = { ...context, visibleItems: collectVisibleItems() };
 
     const streamed = await assistantApi.streamChat({
       message,
-      context,
+      context: requestContext,
       onStart: () => {
         setMessages((current) => [
           ...current,
@@ -149,7 +178,7 @@ const GlobalAssistantPanel = ({ availability, onClose }) => {
     });
 
     if (streamed?.code && !receivedDelta) {
-      const fallback = await assistantApi.sendChat({ message, context });
+      const fallback = await assistantApi.sendChat({ message, context: requestContext });
       if (handleSendError(fallback)) return;
 
       setMessages((current) => [
@@ -193,7 +222,6 @@ const GlobalAssistantPanel = ({ availability, onClose }) => {
     );
   };
 
-  const showLoginPrompt = requiresLogin || availability.isGuest;
   const hasStreamingMessage = messages.some((item) => item.isStreaming);
 
   return (
@@ -223,6 +251,7 @@ const GlobalAssistantPanel = ({ availability, onClose }) => {
             messages={messages}
             isLoading={isLoading && !hasStreamingMessage}
             onRate={handleRate}
+            listRef={messageListRef}
           />
 
           {suggestedLinks.length > 0 && (
