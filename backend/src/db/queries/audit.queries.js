@@ -141,6 +141,13 @@ const listAuditLogs = async (pool, filters = {}) => {
         paramIndex++;
     }
 
+    // severityActions: filter chỉ lấy những action thuộc nhóm 'suspicious' hoặc 'normal'
+    if (filters.severityActions && Array.isArray(filters.severityActions) && filters.severityActions.length > 0) {
+        const placeholders = filters.severityActions.map(() => `$${paramIndex++}`).join(', ');
+        whereClauses.push(`audit_logs.action = ANY(ARRAY[${placeholders}]::log_action[])`);
+        queryParams.push(...filters.severityActions);
+    }
+
     const whereString = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : '';
 
     const joinString = `
@@ -245,10 +252,28 @@ const getAuditLogSummary = async (pool) => {
     return result.rows[0];
 };
 
+const getActivityLogStats = async (pool) => {
+    const result = await pool.query(`
+        SELECT
+            COUNT(*)::int AS total,
+            COUNT(*) FILTER (
+                WHERE action IN (
+                    'login_failed', 'account_locked', 'user_deactivated',
+                    'role_changed', 'password_changed_by_admin', 'permission_denied'
+                )
+            )::int AS suspicious,
+            COUNT(*) FILTER (WHERE action = 'login_failed')::int AS failed_logins
+        FROM audit_logs
+    `);
+
+    return result.rows[0];
+};
+
 module.exports = {
     insertAuditLog,
     listAuditLogs,
     getAuditLogById,
     markAuditLogUndone,
-    getAuditLogSummary
+    getAuditLogSummary,
+    getActivityLogStats
 };

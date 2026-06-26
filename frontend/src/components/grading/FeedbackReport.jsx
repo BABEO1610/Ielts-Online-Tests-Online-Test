@@ -92,17 +92,23 @@ const FeedbackReport = ({ submissionId, type }) => {
   const report = reportData.tutor_report || reportData.ai_report;
   const isTutor = !!reportData.tutor_report;
 
-  // UI/UX Chuẩn Bootstrap 5 - Trạng thái Success
+  const formatScore = (score) => {
+    if (score === null || score === undefined) return 'N/A';
+    const num = parseFloat(score);
+    return isNaN(num) ? 'N/A' : num.toFixed(1);
+  };
+
+  // UI/UX Minimalist Black & White Theme (Uber-like)
   return (
-    <div className="feedback-report mt-4">
+    <div className="feedback-report mt-4" style={{ fontFamily: 'UberMoveText, system-ui, sans-serif' }}>
       {/* Nổi bật Điểm Overall */}
-      <div className="card shadow-sm border-0 mb-4">
-        <div className="card-body text-center py-5 bg-light rounded">
-          <h2 className="text-uppercase text-muted mb-2">Overall Band Score</h2>
-          <div className="display-1 fw-bold text-primary mb-3">
-            {report.band_score?.toFixed(1) || 'N/A'}
+      <div className="card shadow-none border mb-4 rounded-4" style={{ borderColor: '#e2e2e2' }}>
+        <div className="card-body text-center py-5 bg-white rounded-4">
+          <h2 className="text-uppercase fw-bold text-dark mb-2" style={{ fontSize: '16px', letterSpacing: '1px' }}>Overall Band Score</h2>
+          <div className="display-1 fw-bold text-dark mb-4" style={{ fontFamily: 'UberMove, system-ui, sans-serif', fontSize: '80px' }}>
+            {formatScore(report.band_score)}
           </div>
-          <span className={`badge ${isTutor ? 'bg-success' : 'bg-primary'} fs-5 px-3 py-2`}>
+          <span className="badge bg-dark text-white rounded-pill fs-6 px-4 py-2 fw-medium">
             Graded by {isTutor ? 'Tutor' : 'AI'}
           </span>
         </div>
@@ -110,81 +116,78 @@ const FeedbackReport = ({ submissionId, type }) => {
 
       {/* 4 tiêu chí thành phần hiển thị dạng Grid */}
       <div className="row g-4 mb-4">
-        <div className="col-md-6 col-lg-3">
-          <div className="card h-100 border-start border-4 border-primary shadow-sm">
-            <div className="card-body">
-              <h6 className="card-title text-muted fw-bold">Task Achievement / Response</h6>
-              <h3 className="card-text fw-bold text-dark">{report.task_achievement_score?.toFixed(1) || 'N/A'}</h3>
+        {type === 'writing' ? (
+          <>
+            <div className="col-6 col-lg-3">
+              <div className="card h-100 border shadow-none rounded-4" style={{ borderColor: '#e2e2e2', backgroundColor: '#fdfdfd' }}>
+                <div className="card-body p-3 p-lg-4 text-center">
+                  <h6 className="card-title text-muted fw-medium mb-2 mb-lg-3" style={{ fontSize: '13px' }}>Task Achievement / Response</h6>
+                  <h3 className="card-text fw-bold text-dark mb-0" style={{ fontFamily: 'UberMove, system-ui, sans-serif', fontSize: '28px' }}>{formatScore(report.task_achievement_score || report.task_response_score)}</h3>
+                </div>
+              </div>
+            </div>
+            <div className="col-6 col-lg-3">
+              <div className="card h-100 border shadow-none rounded-4" style={{ borderColor: '#e2e2e2', backgroundColor: '#fdfdfd' }}>
+                <div className="card-body p-3 p-lg-4 text-center">
+                  <h6 className="card-title text-muted fw-medium mb-2 mb-lg-3" style={{ fontSize: '13px' }}>Coherence & Cohesion</h6>
+                  <h3 className="card-text fw-bold text-dark mb-0" style={{ fontFamily: 'UberMove, system-ui, sans-serif', fontSize: '28px' }}>{formatScore(report.coherence_score)}</h3>
+                </div>
+              </div>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="col-6 col-lg-3">
+              <div className="card h-100 border shadow-none rounded-4" style={{ borderColor: '#e2e2e2', backgroundColor: '#fdfdfd' }}>
+                <div className="card-body p-3 p-lg-4 text-center">
+                  <h6 className="card-title text-muted fw-medium mb-2 mb-lg-3" style={{ fontSize: '13px' }}>Fluency & Coherence</h6>
+                  <h3 className="card-text fw-bold text-dark mb-0" style={{ fontFamily: 'UberMove, system-ui, sans-serif', fontSize: '28px' }}>{formatScore(report.fluency_score)}</h3>
+                </div>
+              </div>
+            </div>
+            <div className="col-6 col-lg-3">
+              <div className="card h-100 border shadow-none rounded-4" style={{ borderColor: '#e2e2e2', backgroundColor: '#fdfdfd' }}>
+                <div className="card-body p-3 p-lg-4 text-center">
+                  <h6 className="card-title text-muted fw-medium mb-2 mb-lg-3" style={{ fontSize: '13px' }}>Pronunciation</h6>
+                  <h3 className="card-text fw-bold text-dark mb-0" style={{ fontFamily: 'UberMove, system-ui, sans-serif', fontSize: '28px' }}>{formatScore(report.pronunciation_score)}</h3>
+                </div>
+              </div>
+            </div>
+          </>
+        )}
+        <div className="col-6 col-lg-3">
+          <div className="card h-100 border shadow-none rounded-4" style={{ borderColor: '#e2e2e2', backgroundColor: '#fdfdfd' }}>
+            <div className="card-body p-3 p-lg-4 text-center">
+              <h6 className="card-title text-muted fw-medium mb-2 mb-lg-3" style={{ fontSize: '13px' }}>Lexical Resource</h6>
+              <h3 className="card-text fw-bold text-dark mb-0" style={{ fontFamily: 'UberMove, system-ui, sans-serif', fontSize: '28px' }}>{formatScore(report.lexical_score)}</h3>
             </div>
           </div>
         </div>
-        <div className="col-md-6 col-lg-3">
-          <div className="card h-100 border-start border-4 border-success shadow-sm">
-            <div className="card-body">
-              <h6 className="card-title text-muted fw-bold">Coherence & Cohesion</h6>
-              <h3 className="card-text fw-bold text-dark">{report.coherence_score?.toFixed(1) || 'N/A'}</h3>
-            </div>
-          </div>
-        </div>
-        <div className="col-md-6 col-lg-3">
-          <div className="card h-100 border-start border-4 border-warning shadow-sm">
-            <div className="card-body">
-              <h6 className="card-title text-muted fw-bold">Lexical Resource</h6>
-              <h3 className="card-text fw-bold text-dark">{report.lexical_score?.toFixed(1) || 'N/A'}</h3>
-            </div>
-          </div>
-        </div>
-        <div className="col-md-6 col-lg-3">
-          <div className="card h-100 border-start border-4 border-danger shadow-sm">
-            <div className="card-body">
-              <h6 className="card-title text-muted fw-bold">Grammatical Range & Accuracy</h6>
-              <h3 className="card-text fw-bold text-dark">{report.grammar_score?.toFixed(1) || 'N/A'}</h3>
+        <div className="col-6 col-lg-3">
+          <div className="card h-100 border shadow-none rounded-4" style={{ borderColor: '#e2e2e2', backgroundColor: '#fdfdfd' }}>
+            <div className="card-body p-3 p-lg-4 text-center">
+              <h6 className="card-title text-muted fw-medium mb-2 mb-lg-3" style={{ fontSize: '13px' }}>Grammatical Range & Accuracy</h6>
+              <h3 className="card-text fw-bold text-dark mb-0" style={{ fontFamily: 'UberMove, system-ui, sans-serif', fontSize: '28px' }}>{formatScore(report.grammar_score)}</h3>
             </div>
           </div>
         </div>
       </div>
 
-      {/* For Speaking: Fluency and Pronunciation */}
-      {(report.fluency_score !== undefined || report.pronunciation_score !== undefined) && (
-        <div className="row g-4 mb-4">
-          {report.fluency_score !== undefined && (
-            <div className="col-md-6">
-              <div className="card h-100 border-start border-4 border-info shadow-sm">
-                <div className="card-body">
-                  <h6 className="card-title text-muted fw-bold">Fluency & Coherence</h6>
-                  <h3 className="card-text fw-bold text-dark">{report.fluency_score?.toFixed(1) || 'N/A'}</h3>
-                </div>
-              </div>
-            </div>
-          )}
-          {report.pronunciation_score !== undefined && (
-            <div className="col-md-6">
-              <div className="card h-100 border-start border-4 border-secondary shadow-sm">
-                <div className="card-body">
-                  <h6 className="card-title text-muted fw-bold">Pronunciation</h6>
-                  <h3 className="card-text fw-bold text-dark">{report.pronunciation_score?.toFixed(1) || 'N/A'}</h3>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
       {/* Error Highlights */}
       {report.error_highlights && report.error_highlights.length > 0 && (
-        <div className="card shadow-sm mb-4 border-0">
-          <div className="card-header bg-danger text-white">
-            <h5 className="mb-0"><i className="bi bi-exclamation-triangle-fill me-2"></i>Error Highlights</h5>
+        <div className="card shadow-none mb-4 rounded-4 border" style={{ borderColor: '#e2e2e2' }}>
+          <div className="card-header bg-dark text-white rounded-top-4 py-3 border-0">
+            <h5 className="mb-0 fw-bold" style={{ fontFamily: 'UberMove, system-ui, sans-serif' }}><i className="bi bi-exclamation-triangle-fill me-2 text-warning"></i>Error Highlights</h5>
           </div>
-          <div className="card-body">
-            <ul className="list-group list-group-flush">
+          <div className="card-body p-0">
+            <ul className="list-group list-group-flush rounded-bottom-4">
               {report.error_highlights.map((err, idx) => (
-                <li key={idx} className="list-group-item px-0 py-3">
-                  <div className="mb-1">
-                    <span className="badge bg-danger me-2">{err.type || 'Error'}</span>
+                <li key={idx} className="list-group-item px-4 py-4 border-bottom" style={{ borderColor: '#e2e2e2' }}>
+                  <div className="mb-2">
+                    <span className="badge bg-secondary rounded-pill px-3 py-1 fw-medium">{err.type || 'Error'}</span>
                   </div>
-                  <div className="fst-italic text-muted mb-1 text-decoration-line-through">"{err.text}"</div>
-                  <div className="fw-bold text-success">&rarr; {err.suggestion}</div>
+                  <div className="fst-italic text-muted mb-2 text-decoration-line-through" style={{ fontSize: '15px' }}>"{err.text}"</div>
+                  <div className="fw-bold text-dark" style={{ fontSize: '15px' }}>&rarr; {err.suggestion}</div>
                 </li>
               ))}
             </ul>
@@ -192,19 +195,15 @@ const FeedbackReport = ({ submissionId, type }) => {
         </div>
       )}
 
-      {/* Feedback & Suggestions */}
-      {(report.suggestions || report.written_feedback) && (
-        <div className="card shadow-sm border-0">
-          <div className="card-header bg-info text-white">
-            <h5 className="mb-0"><i className="bi bi-chat-left-text-fill me-2"></i>Feedback & Suggestions</h5>
-          </div>
-          <div className="card-body bg-light">
-            <p className="card-text fs-5" style={{ whiteSpace: 'pre-line', lineHeight: '1.6' }}>
-              {report.written_feedback || report.suggestions}
-            </p>
-          </div>
+      {/* Feedback chi tiết */}
+      <div className="card shadow-none rounded-4 border" style={{ borderColor: '#e2e2e2' }}>
+        <div className="card-header bg-white border-bottom py-3 rounded-top-4" style={{ borderColor: '#e2e2e2' }}>
+          <h5 className="mb-0 fw-bold text-dark" style={{ fontFamily: 'UberMove, system-ui, sans-serif' }}>Detailed Feedback</h5>
         </div>
-      )}
+        <div className="card-body p-4 bg-white rounded-bottom-4" style={{ whiteSpace: 'pre-wrap', lineHeight: '1.8', fontSize: '15px' }}>
+          {report.written_feedback || report.feedback_text || 'Không có nhận xét chi tiết.'}
+        </div>
+      </div>
     </div>
   );
 };

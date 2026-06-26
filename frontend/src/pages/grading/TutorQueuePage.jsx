@@ -115,7 +115,7 @@ const TutorQueuePage = () => {
   }, [skillFilter, search]);
 
   const handleGrade = (item) => {
-    navigate(`/grading/tutor/grade/${item.submission_type}/${item.submission_id}`);
+    navigate(`/grading/tutor/grade/${item.submissionType}/${item.submissionId}`);
   };
 
   // Tính toán dynamic STATS dựa trên dữ liệu thật
@@ -128,7 +128,7 @@ const TutorQueuePage = () => {
     const now = new Date();
 
     queueData.forEach(item => {
-      const submittedTime = new Date(item.submitted_at);
+      const submittedTime = new Date(item.submittedAt);
       const hoursSinceSubmit = (now - submittedTime) / (1000 * 60 * 60);
       
       // Nếu nộp trong vòng 2h qua
@@ -138,8 +138,8 @@ const TutorQueuePage = () => {
 
       // Deadline thường là 48h (ví dụ). Nếu đã qua 24h thì hạn chót chỉ còn trong 24h nữa
       if (hoursSinceSubmit > 24 && hoursSinceSubmit <= 48) {
-        if (item.submission_type === 'writing') deadline24hWriting++;
-        if (item.submission_type === 'speaking') deadline24hSpeaking++;
+        if (item.submissionType === 'writing') deadline24hWriting++;
+        if (item.submissionType === 'speaking') deadline24hSpeaking++;
       }
     });
 
@@ -150,15 +150,15 @@ const TutorQueuePage = () => {
     let longestExam = 'N/A';
     if (queueData.length > 0) {
       const oldest = queueData.reduce((prev, current) => {
-        return (new Date(prev.submitted_at) < new Date(current.submitted_at)) ? prev : current;
+        return (new Date(prev.submittedAt) < new Date(current.submittedAt)) ? prev : current;
       });
-      const hoursWait = Math.floor((now - new Date(oldest.submitted_at)) / (1000 * 60 * 60));
+      const hoursWait = Math.floor((now - new Date(oldest.submittedAt)) / (1000 * 60 * 60));
       if (hoursWait > 24) {
         longestWait = `${Math.floor(hoursWait / 24)} ngày`;
       } else {
         longestWait = `${hoursWait} giờ`;
       }
-      longestExam = `Bài của ${oldest.student_name || 'Học viên ẩn danh'}`;
+      longestExam = `Bài của ${oldest.studentName || 'Học viên ẩn danh'}`;
     }
 
     return {
@@ -293,7 +293,7 @@ const TutorQueuePage = () => {
             ) : (
               queueData.map((item, idx) => {
                 // Tính toán deadline hiển thị
-                const submittedTime = new Date(item.submitted_at);
+                const submittedTime = new Date(item.submittedAt);
                 const hoursWait = (new Date() - submittedTime) / (1000 * 60 * 60);
                 let deadlineStr = '';
                 let deadlineUrgent = false;
@@ -310,7 +310,7 @@ const TutorQueuePage = () => {
                 }
 
                 // Avatar Fallback
-                const fallbackAvatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(item.student_name || 'A')}&background=4f46e5&color=fff`;
+                const fallbackAvatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(item.studentName || 'A')}&background=4f46e5&color=fff`;
 
                 // Format thời gian
                 const formattedDate = new Intl.DateTimeFormat('vi-VN', {
@@ -320,7 +320,7 @@ const TutorQueuePage = () => {
 
                 return (
                   <tr
-                    key={item.submission_id}
+                    key={item.submissionId}
                     style={{
                       borderBottom: idx < queueData.length - 1 ? '1px solid #f0f0f0' : 'none',
                       transition: 'background 0.1s',
@@ -335,7 +335,7 @@ const TutorQueuePage = () => {
 
                     {/* Nhãn kỹ năng */}
                     <td style={{ padding: '16px 20px' }}>
-                      <SkillBadge skill={item.submission_type} />
+                      <SkillBadge skill={item.submissionType} />
                     </td>
 
                     {/* Đối tượng */}
@@ -343,11 +343,11 @@ const TutorQueuePage = () => {
                       <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                         <img
                           src={fallbackAvatar}
-                          alt={item.student_name}
+                          alt={item.studentName}
                           style={{ width: '36px', height: '36px', borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }}
                         />
                         <div>
-                          <div style={{ fontSize: '14px', fontWeight: 600, color: '#000' }}>{item.student_name || 'Học viên ẩn danh'}</div>
+                          <div style={{ fontSize: '14px', fontWeight: 600, color: '#000' }}>{item.studentName || 'Học viên ẩn danh'}</div>
                           <div style={{ fontSize: '12px', color: '#777' }}>IELTS Mock Test</div>
                         </div>
                       </div>
@@ -378,7 +378,7 @@ const TutorQueuePage = () => {
                     {/* Thao tác */}
                     <td style={{ padding: '16px 20px' }}>
                       <button
-                        id={`btn-grade-${item.submission_id}`}
+                        id={`btn-grade-${item.submissionId}`}
                         onClick={() => handleGrade(item)}
                         style={{
                           padding: '9px 20px',

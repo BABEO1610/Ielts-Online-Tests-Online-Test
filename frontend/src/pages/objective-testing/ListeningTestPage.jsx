@@ -13,6 +13,7 @@ import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import TimerBar from '../../components/objective-testing/TimerBar';
 import AutoSubmitModal from '../../components/objective-testing/AutoSubmitModal';
 import ReviewModal from '../../components/objective-testing/ReviewModal';
+import ListeningBlockRenderer from '../../components/tutor/listening/ListeningBlockRenderer';
 import { testService } from '../../services/test.service';
 import '../../styles/objective-testing.css';
 
@@ -223,112 +224,15 @@ function ListeningTestPage() {
                   if (blockQuestions.length === 0) return null;
 
                   return (
-                    <div key={b.id || blockIdx} className="test-block mb-5">
-                      {b.content && (
-                        <div className="block-content mb-4 p-3 bg-light rounded shadow-sm">
-                          {renderBlockContent(b.content)}
-                        </div>
-                      )}
-
-                      {b.type === 'Matching' && blockQuestions[0]?.options && blockQuestions[0].options.length > 0 && (
-                        <div className="matching-options mb-4 p-3 border rounded bg-white shadow-sm">
-                          <h6 className="mb-3 text-muted">Options:</h6>
-                          <ul className="list-unstyled mb-0 d-flex flex-wrap gap-3">
-                            {blockQuestions[0].options.map((opt, i) => (
-                              <li key={opt.id || i} className="p-2 border rounded" style={{ minWidth: '120px', background: 'var(--canvas-soft)' }}>
-                                <strong>{String.fromCharCode(65 + i)}</strong>. {typeof opt === 'object' ? opt.text : opt}
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
-
-                      {blockQuestions.map((q) => {
-                        const qOrder = q.questionOrder;
-                        const isMcq = (b.type === 'multiple_choice' || b.type === 'Multiple Choice');
-                        const isMatching = (b.type === 'Matching');
-
-                        return (
-                          <div
-                            key={q.id}
-                            id={`lq-${qOrder}`}
-                            className="card-content mb-3"
-                            style={{
-                              border: currentQuestion === qOrder ? '2px solid var(--ink)' : '2px solid transparent',
-                            }}
-                            onClick={() => setCurrentQuestion(qOrder)}
-                          >
-                            <div className="d-flex align-items-center gap-2 mb-3">
-                              <span style={{
-                                width: 28, height: 28, borderRadius: 'var(--rounded-md)',
-                                background: answeredQuestions.includes(qOrder) ? 'var(--ink)' : 'var(--canvas-soft)',
-                                color: answeredQuestions.includes(qOrder) ? '#fff' : 'var(--ink)',
-                                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                fontSize: 12, fontWeight: 700,
-                              }}>
-                                {qOrder}
-                              </span>
-                              <span className="badge-difficulty" style={{ fontSize: 11 }}>
-                                {b.type || 'Question'}
-                              </span>
-                            </div>
-                            <p className="body-md-strong mb-3">{q.text}</p>
-
-                            {isMcq ? (
-                              <div className="d-flex flex-column gap-2">
-                                {(q.options || []).map((opt, i) => {
-                                  const val = opt.label || String.fromCharCode(65 + i);
-                                  return (
-                                  <label
-                                    key={val}
-                                    className={`option-card ${answers[qOrder] === val ? 'selected' : ''}`}
-                                    id={`l-option-${qOrder}-${val}`}
-                                    style={{ margin: 0, padding: '12px 16px', alignItems: 'flex-start' }}
-                                  >
-                                    <input
-                                      type="radio"
-                                      name={`lq-${qOrder}`}
-                                      className="form-check-input flex-shrink-0 mt-1"
-                                      value={val}
-                                      checked={answers[qOrder] === val}
-                                      onChange={() => handleAnswer(qOrder, val)}
-                                      style={{ margin: 0 }}
-                                    />
-                                    <span className="body-md-strong flex-shrink-0 mt-1" style={{ minWidth: 24 }}>{val}.</span>
-                                    <span className="body-md mt-1">{typeof opt === 'object' ? opt.text : opt}</span>
-                                  </label>
-                                )})}
-                              </div>
-                            ) : isMatching ? (
-                              <select
-                                className="form-select w-100"
-                                id={`l-input-${qOrder}`}
-                                value={answers[qOrder] || ''}
-                                onChange={(e) => handleAnswer(qOrder, e.target.value)}
-                                style={{ maxWidth: '300px' }}
-                              >
-                                <option value="">-- Select an option --</option>
-                                {(q.options || []).map((opt, i) => {
-                                  const val = String.fromCharCode(65 + i);
-                                  return (
-                                    <option key={val} value={val}>{val}. {typeof opt === 'object' ? opt.text : opt}</option>
-                                  );
-                                })}
-                              </select>
-                            ) : (
-                              <input
-                                type="text"
-                                className="text-input w-100"
-                                id={`l-input-${qOrder}`}
-                                placeholder="Type your answer..."
-                                value={answers[qOrder] || ''}
-                                onChange={(e) => handleAnswer(qOrder, e.target.value)}
-                              />
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
+                    <ListeningBlockRenderer
+                      key={b.id || blockIdx}
+                      block={b}
+                      answers={answers}
+                      onAnswer={handleAnswer}
+                      answeredQuestions={answeredQuestions}
+                      currentQuestion={currentQuestion}
+                      onQuestionClick={setCurrentQuestion}
+                    />
                   );
                 })}
               </div>
