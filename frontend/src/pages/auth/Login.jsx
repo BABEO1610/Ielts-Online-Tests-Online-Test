@@ -23,8 +23,11 @@ const Login = () => {
       return <Navigate to="/admin" replace />;
     } else if (user.role === 'tutor') {
       return <Navigate to="/tutor/dashboard" replace />;
+    } else if (user.role === 'student') {
+      return <Navigate to="/dashboard" replace />;
+    } else {
+      return <Navigate to="/" replace />;
     }
-    // Student remains on the login page
   }
 
   return (

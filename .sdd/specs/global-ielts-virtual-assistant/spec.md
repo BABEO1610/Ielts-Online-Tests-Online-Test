@@ -446,6 +446,12 @@ v_active_sessions
 writing_submissions
 ```
 
+Schema reconciliation notes:
+
+> ⚠️ `question_blocks` chưa có trong schema thật tại `.sdd/shared_context.md`. Cần tạo migration nếu muốn dùng cấu trúc block/passage riêng, hoặc dùng bảng thay thế hiện có là `questions` cho question text/options/explanation và `mock_tests` cho test-level metadata.
+
+> ⚠️ `test_passages` chưa có trong schema thật tại `.sdd/shared_context.md`. Cần tạo migration nếu muốn lưu passage/transcript riêng, hoặc dùng bảng thay thế hiện có là `questions.explanation`, `questions.question_text`, `mock_tests`, và `library_resources` tùy use case. Không được giả định bảng này tồn tại trong runtime Context Injection.
+
 Yêu cầu database:
 
 - Ưu tiên dùng `chatbot_sessions` và `chatbot_messages`.

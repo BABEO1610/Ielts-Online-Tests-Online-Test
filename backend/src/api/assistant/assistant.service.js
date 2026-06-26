@@ -17,6 +17,8 @@ const buildErrorResult = (code, message = ERROR_MESSAGES[code]) => ({
   answer: null,
   suggestedLinks: [],
   conversationId: null,
+  messageId: null,
+  intent: null,
   code,
   message,
 });
@@ -27,14 +29,108 @@ const buildSuccessResult = ({
   conversationId = null,
   messageId = null,
   intent = null,
+  fallbackUsed = false,
 }) => ({
   answer,
   suggestedLinks,
   conversationId,
   messageId,
   intent,
+  fallbackUsed,
   code: null,
 });
+
+const isLookupIntent = (intent) =>
+  intent === ASSISTANT_INTENTS.FIND_TEST || intent === ASSISTANT_INTENTS.FIND_LESSON;
+
+const isEmptyLookupContext = (contextInjection) =>
+  isLookupIntent(contextInjection.mode) && contextInjection.databaseResults.length === 0;
+
+const getResultTitle = (item) => item.title || item.name || item.label || 'IELTS content';
+
+const summarizeLookupResults = (items) => {
+  const names = items.slice(0, 3).map(getResultTitle).join(', ');
+  return items.length > 3 ? `${names}...` : names;
+};
+
+const buildLookupFallbackAnswer = (contextInjection) => {
+  const items = contextInjection.databaseResults || [];
+  if (items.length === 0) return MISSING_DATA_MESSAGE;
+
+  if (contextInjection.mode === ASSISTANT_INTENTS.FIND_TEST) {
+    const skill = contextInjection.debug?.skillFilter || 'IELTS';
+    let msg = `Mình tìm thấy ${items.length} đề ${skill} đang được publish trong hệ thống:\n\n`;
+    items.slice(0, 5).forEach((item, index) => {
+      msg += `${index + 1}. ${item.title || 'Untitled'} — ${item.skill || 'Skill'}, ${item.difficulty || 'Difficulty'}\n`;
+    });
+    msg += '\nBạn muốn mở đề nào?';
+    return msg;
+  }
+  
+  if (contextInjection.mode === ASSISTANT_INTENTS.FIND_LESSON) {
+    if (items.length === 1) {
+      const item = items[0];
+      return `Mình tìm thấy tài liệu '${item.title || 'Untitled'}' trong thư viện. Loại tài liệu: ${item.resourceType || 'N/A'}. Category: ${item.category || 'N/A'}.`;
+    }
+    let msg = `Mình tìm thấy ${items.length} tài liệu trong thư viện:\n\n`;
+    items.slice(0, 5).forEach((item, index) => {
+      msg += `${index + 1}. ${item.title || 'Untitled'} — ${item.resourceType || 'N/A'}, ${item.category || 'N/A'}\n`;
+    });
+    msg += '\nBạn có thể mở trang Library ở phần link gợi ý bên dưới.';
+    return msg;
+  }
+  
+  return MISSING_DATA_MESSAGE;
+};
+
+const getFallbackAnswer = (contextInjection) => {
+  if (isLookupIntent(contextInjection.mode)) return buildLookupFallbackAnswer(contextInjection);
+  if (contextInjection.mode === ASSISTANT_INTENTS.POST_TEST_REVIEW) {
+    return ERROR_MESSAGES[ERROR_CODES.MISSING_EXPLANATION];
+  }
+  return 'Mình có thể hỗ trợ nội dung IELTS trên website như tìm test, lesson, study tips, navigation hoặc review đáp án sau khi nộp bài.';
+};
+
+const isGenericAssistantAnswer = (answer) => {
+  const text = String(answer || '').toLowerCase();
+  return text.includes('mình có thể hỗ trợ nội dung ielts') ||
+    text.includes('tim test, lesson') ||
+    text.includes('tìm test, lesson') ||
+    text.includes('review đáp án');
+};
+
+const emitAssistantDebug = (data) => {
+  if (process.env.ASSISTANT_DEBUG === 'false') return;
+  console.info('[AssistantDebug]', {
+    message: data.message || null,
+    route: data.route || null,
+    pageType: data.pageType || null,
+    ruleIntent: data.ruleIntent || null,
+    classifierUsed: Boolean(data.classifierUsed),
+    classifierIntent: data.classifierIntent || null,
+    classifierConfidence: data.classifierConfidence || 0,
+    classifierError: data.classifierError || null,
+    finalIntent: data.finalIntent || null,
+    queryTable: data.queryTable || null,
+    selectedColumns: data.selectedColumns || null,
+    publishFilter: data.publishFilter || null,
+    searchTerms: data.searchTerms || [],
+    exactTitleMatch: Boolean(data.exactTitleMatch),
+    fuzzyTitleMatch: Boolean(data.fuzzyTitleMatch),
+    skillFilter: data.skillFilter || null,
+    resourceTypeFilter: data.resourceTypeFilter || null,
+    rowCount: data.rowCount || 0,
+    resultTitles: data.resultTitles || [],
+    fallbackUsed: Boolean(data.fallbackUsed),
+    fallbackReason: data.fallbackReason || null,
+    classifierProviderCalled: Boolean(data.classifierProviderCalled),
+    answerProviderCalled: Boolean(data.answerProviderCalled),
+    totalAiCalls: data.totalAiCalls || 0,
+    finalResponseMode: data.finalResponseMode || 'safe_missing_data',
+    'dbError.message': data.dbError?.message || null,
+    'dbError.code': data.dbError?.code || null,
+  });
+};
 
 const safeCreateSession = async (userId) => {
   try {
@@ -63,84 +159,178 @@ const safeSaveAssistantMessage = async (sessionId, answer, userId) => {
   }
 };
 
-const immediateResponseForContext = (contextInjection) => {
-  if (contextInjection.errorCode) {
-    return buildErrorResult(contextInjection.errorCode);
-  }
+const {
+  buildGreetingResponse,
+  buildClarificationResponse,
+  buildSafeGradingResponse,
+  buildOutOfScopeResponse,
+} = require('./assistant.responses');
 
-  if (
-    (contextInjection.mode === ASSISTANT_INTENTS.FIND_TEST ||
-      contextInjection.mode === ASSISTANT_INTENTS.FIND_LESSON) &&
-    contextInjection.databaseResults.length === 0
-  ) {
-    return buildSuccessResult({
-      answer: MISSING_DATA_MESSAGE,
-      suggestedLinks: [],
-      intent: contextInjection.mode,
-    });
+const buildImmediateIntentResult = (intent) => {
+  if (intent === ASSISTANT_INTENTS.OUT_OF_SCOPE) {
+    return buildSuccessResult({ answer: buildOutOfScopeResponse(), intent });
   }
-
-  if (contextInjection.mode === ASSISTANT_INTENTS.OUT_OF_SCOPE) {
-    return buildErrorResult(ERROR_CODES.OUT_OF_SCOPE);
+  if (intent === ASSISTANT_INTENTS.GREETING) {
+    return buildSuccessResult({ answer: buildGreetingResponse(), intent });
   }
-
+  if (intent === ASSISTANT_INTENTS.CLARIFICATION) {
+    return buildSuccessResult({ answer: buildClarificationResponse(), intent });
+  }
+  if (intent === ASSISTANT_INTENTS.GRADING_REQUEST_SAFE_FEEDBACK) {
+    return buildSuccessResult({ answer: buildSafeGradingResponse(), intent });
+  }
   return null;
 };
 
-const buildFallbackAnswer = (contextInjection) => {
-  if (contextInjection.mode === ASSISTANT_INTENTS.FIND_TEST || contextInjection.mode === ASSISTANT_INTENTS.FIND_LESSON) {
-    return MISSING_DATA_MESSAGE;
+const buildGuardrailResult = ({ message, context }) => {
+  const guardrail = evaluateGuardrails({ message, context });
+  if (guardrail.blocked) return buildErrorResult(guardrail.code, guardrail.message);
+  if (context.pageType === 'active-test') {
+    return buildErrorResult(ERROR_CODES.ASSISTANT_DISABLED_DURING_TEST);
   }
-
-  if (contextInjection.mode === ASSISTANT_INTENTS.POST_TEST_REVIEW) {
-    return ERROR_MESSAGES[ERROR_CODES.MISSING_EXPLANATION];
-  }
-
-  if (contextInjection.mode === ASSISTANT_INTENTS.GREETING) {
-    return 'Chào bạn! Mình có thể hỗ trợ tìm test, lesson, study tips, navigation hoặc giải thích đáp án sau khi bạn nộp bài.';
-  }
-
-  return 'Mình có thể hỗ trợ nội dung IELTS trên website như tìm test, lesson, study tips, navigation hoặc review đáp án sau khi nộp bài.';
+  return null;
 };
 
-const finalizeAiResponse = ({ rawAnswer, contextInjection, allowPlainText = false }) => {
+const buildImmediateContextResult = (contextInjection) => {
+  if (contextInjection.directAnswer) {
+    return buildSuccessResult({
+      answer: contextInjection.directAnswer,
+      suggestedLinks: contextInjection.suggestedLinks || [],
+      intent: contextInjection.mode,
+    });
+  }
+  if (contextInjection.errorCode) return buildErrorResult(contextInjection.errorCode);
+  if (isEmptyLookupContext(contextInjection)) {
+    return buildSuccessResult({ answer: MISSING_DATA_MESSAGE, intent: contextInjection.mode });
+  }
+  return null;
+};
+
+const normalizeAndSelfCheck = ({ rawAnswer, contextInjection, allowPlainText = false }) => {
   const normalized = normalizeAssistantResponse({
     rawText: rawAnswer,
     mode: contextInjection.mode,
-    fallbackAnswer: buildFallbackAnswer(contextInjection),
+    fallbackAnswer: getFallbackAnswer(contextInjection),
     fallbackLinks: contextInjection.suggestedLinks,
     allowPlainText,
   });
+  const checked = selfCheckResponse({ response: normalized, contextInjection });
+  if (isLookupIntent(contextInjection.mode) && contextInjection.databaseResults?.length && isGenericAssistantAnswer(checked.answer)) {
+    return {
+      ...checked,
+      answer: buildLookupFallbackAnswer(contextInjection),
+      suggestedLinks: contextInjection.suggestedLinks || [],
+      usedDatabase: true,
+      needsMoreContext: false,
+      fallbackUsed: true,
+      finalResponseMode: 'deterministic_fallback'
+    };
+  }
+  if (contextInjection.suggestedLinks?.length) {
+    return {
+      ...checked,
+      suggestedLinks: contextInjection.suggestedLinks,
+      finalResponseMode: 'ai'
+    };
+  }
+  return { ...checked, finalResponseMode: 'ai' };
+};
 
-  return selfCheckResponse({
-    response: normalized,
+const generateCheckedAnswer = async ({ payload, contextInjection }) => {
+  const prompt = buildPrompt({ message: payload.message, contextInjection });
+  const rawAnswer = await aiService.generateAssistantAnswer({
+    mode: contextInjection.mode,
+    message: payload.message,
+    systemPrompt: prompt.systemPrompt,
+    userPrompt: prompt.userPrompt,
+  });
+  return normalizeAndSelfCheck({ rawAnswer, contextInjection });
+};
+
+const generateCheckedStreamAnswer = async ({ payload, contextInjection }) => {
+  const prompt = buildPrompt({ message: payload.message, contextInjection });
+  let streamedText = '';
+  const rawAnswer = await aiService.streamAssistantAnswer({
+    mode: contextInjection.mode,
+    message: payload.message,
+    systemPrompt: `${prompt.systemPrompt}\nReturn only final answer text for streaming.`,
+    userPrompt: `${prompt.userPrompt}\n\nReturn only answer text. Do not wrap it in JSON.`,
+    onDelta: (delta) => {
+      streamedText += delta;
+    },
+  });
+  return normalizeAndSelfCheck({
+    rawAnswer: rawAnswer || streamedText,
     contextInjection,
+    allowPlainText: true,
   });
 };
 
-const buildPipelineContext = async ({ user, payload, sessionId }) => {
-  const intent = detectIntent({
-    message: payload.message,
-    context: payload.context,
-  });
+const buildAiResult = async ({ payload, contextInjection, useStream }) => {
+  const response = useStream
+    ? await generateCheckedStreamAnswer({ payload, contextInjection })
+    : await generateCheckedAnswer({ payload, contextInjection });
+  return {
+    ...buildSuccessResult({
+      answer: response.answer,
+      suggestedLinks: response.suggestedLinks,
+      intent: contextInjection.mode,
+      fallbackUsed: response.fallbackUsed,
+    }),
+    finalResponseMode: response.finalResponseMode
+  };
+};
 
-  const guardrail = evaluateGuardrails({
+const tracePipeline = ({ payload, ruleIntent, classifierUsed, classifierResult, contextInjection, answerProviderCalled, fallbackUsed, finalResponseMode }) => {
+  const classifierProviderCalled = Boolean(classifierUsed);
+  emitAssistantDebug({
     message: payload.message,
-    context: payload.context,
+    route: payload.context.route,
+    pageType: payload.context.pageType,
+    ruleIntent,
+    classifierUsed,
+    classifierIntent: classifierResult?.intent || null,
+    classifierConfidence: classifierResult?.confidence || 0,
+    classifierError: classifierResult?.error || null,
+    finalIntent: classifierResult?.intent || ruleIntent,
+    ...(contextInjection?.debug || {}),
+    classifierProviderCalled,
+    answerProviderCalled: Boolean(answerProviderCalled),
+    totalAiCalls: (classifierProviderCalled ? 1 : 0) + (answerProviderCalled ? 1 : 0),
+    fallbackUsed,
+    finalResponseMode,
   });
+};
 
-  if (guardrail.blocked) {
-    return {
-      blockedResult: buildErrorResult(guardrail.code, guardrail.message),
-      intent,
-    };
+const runAssistantPipeline = async ({ user, payload, useStream = false }) => {
+  const originalIntent = detectIntent({ message: payload.message, context: payload.context });
+  let intent = originalIntent;
+  let classifierUsed = false;
+  let classifierResult = null;
+
+  if (intent === ASSISTANT_INTENTS.UNKNOWN) {
+    const { classifyScope } = require('./assistant.scope-classifier');
+    classifierResult = await classifyScope(payload.message);
+    classifierUsed = true;
+    intent = classifierResult.intent;
+    
+    if (classifierResult.error) {
+      const intentResult = buildImmediateIntentResult(ASSISTANT_INTENTS.CLARIFICATION);
+      tracePipeline({ payload, ruleIntent: originalIntent, classifierUsed, classifierResult, answerProviderCalled: false, finalResponseMode: 'classifier_error_clarification' });
+      return intentResult;
+    }
   }
 
-  if (payload.context.pageType === 'active-test') {
-    return {
-      blockedResult: buildErrorResult(ERROR_CODES.ASSISTANT_DISABLED_DURING_TEST),
-      intent,
-    };
+  const intentResult = buildImmediateIntentResult(intent);
+  if (intentResult) {
+    tracePipeline({ payload, ruleIntent: originalIntent, classifierUsed, classifierResult, answerProviderCalled: false, finalResponseMode: 'immediate' });
+    return intentResult;
+  }
+
+  const guardrailResult = buildGuardrailResult({ message: payload.message, context: payload.context });
+  if (guardrailResult) {
+    tracePipeline({ payload, ruleIntent: originalIntent, classifierUsed, classifierResult, answerProviderCalled: false, finalResponseMode: 'guardrail_blocked' });
+    return { ...guardrailResult, intent };
   }
 
   const contextInjection = await buildContextInjection({
@@ -148,136 +338,72 @@ const buildPipelineContext = async ({ user, payload, sessionId }) => {
     message: payload.message,
     context: payload.context,
     user,
-    sessionId,
+    sessionId: null,
   });
+  const contextResult = buildImmediateContextResult(contextInjection);
+  if (contextResult) {
+    tracePipeline({ payload, ruleIntent: originalIntent, classifierUsed, classifierResult, contextInjection, answerProviderCalled: false, finalResponseMode: 'safe_missing_data' });
+    return contextResult;
+  }
 
-  return {
-    intent,
+  const result = await buildAiResult({ payload, contextInjection, useStream });
+  tracePipeline({
+    payload,
+    ruleIntent: originalIntent,
+    classifierUsed,
+    classifierResult,
     contextInjection,
-    blockedResult: immediateResponseForContext(contextInjection),
-  };
+    answerProviderCalled: true,
+    fallbackUsed: result.fallbackUsed,
+    finalResponseMode: result.finalResponseMode || 'ai'
+  });
+  return result;
 };
 
-const generateResponse = async ({ payload, contextInjection }) => {
-  const prompt = buildPrompt({
-    message: payload.message,
-    contextInjection,
-  });
-
-  const rawAnswer = await aiService.generateAssistantAnswer({
-    mode: contextInjection.mode,
-    message: payload.message,
-    systemPrompt: prompt.systemPrompt,
-    userPrompt: prompt.userPrompt,
-  });
-
-  return finalizeAiResponse({ rawAnswer, contextInjection });
+const persistSuccessfulResult = async ({ user, payload, result }) => {
+  if (result.code || !result.answer) return result;
+  const sessionId = await safeCreateSession(user.id);
+  await safeSaveUserMessage(sessionId, payload.message, user.id);
+  const saved = await safeSaveAssistantMessage(sessionId, result.answer, user.id);
+  return { ...result, conversationId: sessionId, messageId: saved?.id || null };
 };
 
 const handleChat = async ({ user, payload }) => {
-  const sessionId = await safeCreateSession(user.id);
-  await safeSaveUserMessage(sessionId, payload.message, user.id);
-
   try {
-    const pipeline = await buildPipelineContext({ user, payload, sessionId });
-    if (pipeline.blockedResult) {
-      if (!pipeline.blockedResult.code && pipeline.blockedResult.answer) {
-        const saved = await safeSaveAssistantMessage(sessionId, pipeline.blockedResult.answer, user.id);
-        return {
-          ...pipeline.blockedResult,
-          conversationId: sessionId,
-          messageId: saved?.id || null,
-          intent: pipeline.intent,
-        };
-      }
-      return pipeline.blockedResult;
-    }
-
-    const response = await generateResponse({
-      payload,
-      contextInjection: pipeline.contextInjection,
-    });
-    const saved = await safeSaveAssistantMessage(sessionId, response.answer, user.id);
-
-    return buildSuccessResult({
-      answer: response.answer,
-      suggestedLinks: response.suggestedLinks,
-      conversationId: sessionId,
-      messageId: saved?.id || null,
-      intent: pipeline.intent,
-    });
+    const result = await runAssistantPipeline({ user, payload });
+    return persistSuccessfulResult({ user, payload, result });
   } catch (error) {
     if (error.code && ERROR_MESSAGES[error.code]) {
       return buildErrorResult(error.code, error.message);
     }
-
     throw createAssistantError(ERROR_CODES.INTERNAL_ERROR);
   }
 };
 
 const handleChatStream = async ({ user, payload, onEvent }) => {
-  const sessionId = await safeCreateSession(user.id);
-  await safeSaveUserMessage(sessionId, payload.message, user.id);
-
-  const pipeline = await buildPipelineContext({ user, payload, sessionId });
-  if (pipeline.blockedResult) {
-    if (pipeline.blockedResult.code) {
-      onEvent('assistant.error', pipeline.blockedResult);
-      return pipeline.blockedResult;
-    }
-
-    const saved = await safeSaveAssistantMessage(sessionId, pipeline.blockedResult.answer, user.id);
-    const result = {
-      ...pipeline.blockedResult,
-      conversationId: sessionId,
-      messageId: saved?.id || null,
-      intent: pipeline.intent,
-    };
-    onEvent('assistant.start', { conversationId: sessionId, intent: pipeline.intent });
-    onEvent('assistant.delta', { delta: result.answer });
-    onEvent('assistant.done', result);
+  try {
+    const result = await runAssistantPipeline({ user, payload, useStream: true });
+    const savedResult = await persistSuccessfulResult({ user, payload, result });
+    emitStreamResult({ onEvent, result: savedResult });
+    return savedResult;
+  } catch (error) {
+    const result = buildErrorResult(error.code || ERROR_CODES.INTERNAL_ERROR, error.message);
+    onEvent('assistant.error', result);
     return result;
   }
+};
 
-  const prompt = buildPrompt({
-    message: payload.message,
-    contextInjection: pipeline.contextInjection,
-  });
-
+const emitStreamResult = ({ onEvent, result }) => {
+  if (result.code) {
+    onEvent('assistant.error', result);
+    return;
+  }
   onEvent('assistant.start', {
-    conversationId: sessionId,
-    intent: pipeline.intent,
+    conversationId: result.conversationId,
+    intent: result.intent,
   });
-
-  let streamedText = '';
-  const rawAnswer = await aiService.streamAssistantAnswer({
-    mode: pipeline.contextInjection.mode,
-    message: payload.message,
-    systemPrompt: `${prompt.systemPrompt}\nFor this streaming response, return only the final answer text, not JSON.`,
-    userPrompt: `${prompt.userPrompt}\n\nStreaming output rule: return only answer text. Do not wrap it in JSON.`,
-    onDelta: (delta) => {
-      streamedText += delta;
-      onEvent('assistant.delta', { delta });
-    },
-  });
-
-  const response = finalizeAiResponse({
-    rawAnswer: rawAnswer || streamedText,
-    contextInjection: pipeline.contextInjection,
-    allowPlainText: true,
-  });
-  const saved = await safeSaveAssistantMessage(sessionId, response.answer, user.id);
-
-  const result = buildSuccessResult({
-    answer: response.answer,
-    suggestedLinks: response.suggestedLinks,
-    conversationId: sessionId,
-    messageId: saved?.id || null,
-    intent: pipeline.intent,
-  });
-
+  onEvent('assistant.delta', { delta: result.answer });
   onEvent('assistant.done', result);
-  return result;
 };
 
 const getHistory = async (userId) => {
@@ -291,31 +417,14 @@ const getHistory = async (userId) => {
 };
 
 const rateMessage = async ({ userId, messageId, rating, reason }) => {
-  const result = await repository.rateAssistantMessage({
-    userId,
+  const result = await repository.rateAssistantMessage({ userId, messageId, rating, reason });
+  if (result.saved) return { success: true, messageId: result.messageId, rating, code: null };
+  return {
+    success: false,
     messageId,
     rating,
-    reason,
-  });
-
-  if (!result.saved) {
-    return {
-      success: false,
-      messageId,
-      rating,
-      code: result.reason === 'message_not_found_or_forbidden' ? ERROR_CODES.FORBIDDEN : ERROR_CODES.MISSING_CONTEXT,
-      message:
-        result.reason === 'rating_column_missing'
-          ? 'Schema hiện tại chưa có cột rating cho chatbot_messages. Cần thêm migration nhỏ sau khi inspect Supabase schema.'
-          : ERROR_MESSAGES[ERROR_CODES.MISSING_CONTEXT],
-    };
-  }
-
-  return {
-    success: true,
-    messageId: result.messageId,
-    rating,
-    code: null,
+    code: result.reason === 'message_not_found_or_forbidden' ? ERROR_CODES.FORBIDDEN : ERROR_CODES.MISSING_CONTEXT,
+    message: ERROR_MESSAGES[ERROR_CODES.MISSING_CONTEXT],
   };
 };
 
@@ -326,4 +435,5 @@ module.exports = {
   rateMessage,
   buildErrorResult,
   buildSuccessResult,
+  runAssistantPipeline,
 };

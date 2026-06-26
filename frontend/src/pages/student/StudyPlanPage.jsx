@@ -1,33 +1,46 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer,
   RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, Legend
 } from 'recharts';
-
-const SKILL_SCORES = [
-  { skill: 'Listening', score: 7.5, target: 7.0 },
-  { skill: 'Reading', score: 6.5, target: 7.0 },
-  { skill: 'Writing', score: 6.0, target: 6.5 },
-  { skill: 'Speaking', score: 6.5, target: 7.0 },
-];
-
-const HISTORY_DATA = [
-  { date: 'Tuần 1', score: 5.5 },
-  { date: 'Tuần 2', score: 6.0 },
-  { date: 'Tuần 3', score: 6.0 },
-  { date: 'Tuần 4', score: 6.5 },
-  { date: 'Tuần 5', score: 6.5 },
-  { date: 'Tuần 6', score: 7.0 },
-];
-
-const STATS = [
-  { label: 'Tổng số bài thi', value: '24' },
-  { label: 'Thời gian luyện tập', value: '45 giờ' },
-  { label: 'Kỹ năng mạnh nhất', value: 'Listening' },
-  { label: 'Mục tiêu (Overall)', value: '7.0' },
-];
+import api from '../services/api';
 
 const StudyPlanPage = () => {
+  const [data, setData] = useState({
+    stats: [],
+    historyData: [],
+    skillScores: []
+  });
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const response = await api.get('/tracking/process');
+        if (response.data.success) {
+          setData(response.data.data);
+        }
+      } catch (error) {
+        console.error("Failed to fetch tracking data:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchData();
+  }, []);
+
+  if (isLoading) {
+    return (
+      <div className="py-4 px-3 px-md-4 d-flex justify-content-center align-items-center" style={{ minHeight: '400px' }}>
+        <div className="spinner-border text-dark" role="status">
+          <span className="visually-hidden">Loading...</span>
+        </div>
+      </div>
+    );
+  }
+
+  const { stats: STATS, historyData: HISTORY_DATA, skillScores: SKILL_SCORES } = data;
+
   return (
     <div className="py-4 px-3 px-md-4" style={{ fontFamily: 'UberMoveText, system-ui, sans-serif' }}>
       <div className="mb-4">

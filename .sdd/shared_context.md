@@ -249,17 +249,18 @@ CREATE TABLE writing_submissions (
 -- 13. SPEAKING SUBMISSIONS
 -- ─────────────────────────────────────────────
 CREATE TABLE speaking_submissions (
-    id           UUID              PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id      UUID              NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    test_id      UUID              REFERENCES mock_tests(id) ON DELETE SET NULL,
-    part_number  SMALLINT          CHECK (part_number IN (1, 2, 3)),
-    prompt_text  TEXT,
-    audio_url    TEXT              NOT NULL,
-    transcript   TEXT,
-    grader       grader_type,
-    status       submission_status NOT NULL DEFAULT 'pending',
-    submitted_at TIMESTAMPTZ       NOT NULL DEFAULT NOW(),
-    created_at   TIMESTAMPTZ       NOT NULL DEFAULT NOW()
+    id                UUID              PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id           UUID              NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    test_id           UUID              REFERENCES mock_tests(id) ON DELETE SET NULL,
+    part_number       SMALLINT          CHECK (part_number IN (1, 2, 3)),
+    prompt_text       TEXT,
+    audio_url         TEXT              NOT NULL,
+    transcript        TEXT,
+    grader            grader_type,
+    status            submission_status NOT NULL DEFAULT 'pending',
+    speaking_group_id UUID,
+    submitted_at      TIMESTAMPTZ       NOT NULL DEFAULT NOW(),
+    created_at        TIMESTAMPTZ       NOT NULL DEFAULT NOW()
 );
 
 -- ─────────────────────────────────────────────
@@ -432,6 +433,8 @@ CREATE INDEX idx_writing_status          ON writing_submissions(status);
 
 CREATE INDEX idx_speaking_user           ON speaking_submissions(user_id);
 CREATE INDEX idx_speaking_status         ON speaking_submissions(status);
+CREATE INDEX idx_speaking_submissions_group ON speaking_submissions(speaking_group_id);
+CREATE UNIQUE INDEX uq_speaking_group_part ON speaking_submissions(speaking_group_id, part_number) WHERE speaking_group_id IS NOT NULL;
 
 CREATE INDEX idx_audit_actor             ON audit_logs(actor_id);
 CREATE INDEX idx_audit_action            ON audit_logs(action);
@@ -527,23 +530,33 @@ SELECT 'writing' AS submission_type,
        ws.id     AS submission_id,
        ws.user_id AS student_id,
        u.full_name AS student_name,
+       mt.title   AS test_title,
        ws.submitted_at,
        ws.status,
-       ws.grader
+       ws.grader,
+       NULL::uuid AS speaking_group_id,
+       NULL::smallint AS parts_count
 FROM writing_submissions ws
 JOIN users u ON u.id = ws.user_id
+LEFT JOIN mock_tests mt ON mt.id = ws.test_id
 WHERE ws.status = 'pending' AND ws.grader = 'tutor'
 UNION ALL
 SELECT 'speaking',
-       ss.id,
+       MIN(ss.id),
        ss.user_id,
        u.full_name,
-       ss.submitted_at,
-       ss.status,
-       ss.grader
+       mt.title,
+       MIN(ss.submitted_at),
+       'pending'::submission_status,
+       ss.grader,
+       ss.speaking_group_id,
+       COUNT(ss.id)::smallint
 FROM speaking_submissions ss
 JOIN users u ON u.id = ss.user_id
-WHERE ss.status = 'pending' AND ss.grader = 'tutor'
+LEFT JOIN mock_tests mt ON mt.id = ss.test_id
+WHERE ss.status = 'pending' AND ss.grader = 'tutor' AND ss.speaking_group_id IS NOT NULL
+GROUP BY ss.speaking_group_id, ss.user_id, u.full_name, mt.title, ss.grader
+HAVING COUNT(ss.id) = 3
 ORDER BY submitted_at ASC;
 
 -- Admin usage report (ADM-05)
@@ -579,3 +592,24 @@ WHERE s.revoked_at IS NULL
   AND s.expires_at > NOW();
 
 ```
+
+## Feature-to-Table Mapping
+
+| Feature | Bảng chính | Bảng phụ | View nếu có |
+|---|---|---|---|
+| Auth & Sessions | `users`, `user_sessions` | `oauth_accounts`, `password_history`, `audit_logs` | `v_active_sessions` |
+| Email Verification | `email_verification_tokens` | `users`, `audit_logs` | - |
+| Password Reset | `password_reset_tokens` | `users`, `password_history`, `audit_logs` | - |
+| Objective Testing | `mock_tests`, `questions`, `test_attempts`, `question_answers` | `users` | `v_student_dashboard` |
+| Writing Grading | `writing_submissions`, `ai_feedback_reports`, `tutor_feedback_reports` | `users`, `mock_tests`, `tutor_student_notes` | `v_tutor_grading_queue` |
+| Speaking Grading | `speaking_submissions`, `ai_feedback_reports`, `tutor_feedback_reports` | `users`, `mock_tests`, `tutor_student_notes` | `v_tutor_grading_queue` |
+| Content Library | `library_resources` | `users`, `audit_logs` | - |
+| AI Chatbot | `chatbot_sessions`, `chatbot_messages` | `users`, `platform_metrics_snapshots` | `v_admin_usage_report` |
+| AI Explain | `ai_explain_requests` | `users`, `questions` | - |
+| Admin Audit | `audit_logs`, `platform_metrics_snapshots` | `users` | `v_admin_usage_report` |
+| Global Assistant (General) | `chatbot_sessions`, `chatbot_messages` | `mock_tests`, `library_resources`, `questions`, `users` | `v_active_sessions` |
+| Global Assistant (Post-test Review) | `test_attempts`, `questions`, `question_answers` | `users`, `chatbot_sessions`, `chatbot_messages`, `ai_explain_requests` | `v_student_dashboard` |
+
+## Extended Architectures
+
+- **Assistant Database Grounding**: Read [.sdd/context/assistant-db-grounding-architecture.md](file:///d:/Workspace/SWP391_PROJECT/Ielts-Online-Tests-Online-Test/.sdd/context/assistant-db-grounding-architecture.md) for details on how the Global IELTS Assistant accesses and grounds itself on DB schema and rows.

@@ -4,7 +4,9 @@ const normalize = (text) =>
   String(text || '')
     .toLowerCase()
     .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '');
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/g, 'd')
+    .replace(/Ä‘/g, 'd');
 
 const containsAny = (value, patterns) => patterns.some((pattern) => pattern.test(value));
 

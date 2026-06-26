@@ -216,16 +216,16 @@ class SubmissionService {
   }
 
   /**
-   * Submit speaking record.
-   * The audio is already uploaded to Supabase by /speaking/upload; this method
-   * records the Supabase object path/public URL against the submission.
+   * Submit full speaking test.
+   * Receives an array of parts and saves them within one transaction, generating a group UUID.
    */
-  static async submitSpeaking(userId, testId, partNumber, tempS3Key, grader) {
-    if (testId) {
+  static async submitFullSpeaking(userId, testId, grader, parts) {
+    const normalizedTestId = normalizeOptionalUuid(testId);
+    if (normalizedTestId) {
       try {
-        const testRes = await pool.query('SELECT id FROM mock_tests WHERE id = $1', [testId]);
+        const testRes = await pool.query('SELECT id FROM mock_tests WHERE id = $1', [normalizedTestId]);
         if (testRes.rows.length === 0) {
-          throw new AppError('Test not found', 404, 'TEST_NOT_FOUND');
+          throw new AppError('Speaking test not found', 404, 'TEST_NOT_FOUND');
         }
       } catch (err) {
         if (err instanceof AppError) throw err;
@@ -233,29 +233,36 @@ class SubmissionService {
       }
     }
 
-    // 2. Validate the uploaded Supabase object belongs to this user.
-    const storagePath = String(tempS3Key || '').replace(/^\/+/, '');
-    const expectedPrefix = `speaking/${userId}/`;
-    if (!storagePath.startsWith(expectedPrefix) || storagePath.includes('..')) {
-      throw new AppError('Invalid speaking audio path', 400, 'INVALID_AUDIO_PATH');
-    }
-
-    const audioUrl = toPublicSpeakingAudioUrl(storagePath);
+    const { randomUUID } = require('crypto');
+    const speakingGroupId = randomUUID();
 
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
-      // 3. Insert into speaking_submissions
-      const insertRes = await client.query(
-        `INSERT INTO speaking_submissions (user_id, test_id, part_number, audio_url, grader, status)
-         VALUES ($1, $2, $3, $4, $5, 'pending') RETURNING *`,
-        [userId, testId, partNumber, audioUrl, grader]
-      );
+      
+      const insertedParts = [];
+      for (const part of parts) {
+        // Validate the uploaded Supabase object belongs to this user.
+        const storagePath = String(part.temp_s3_key || '').replace(/^\/+/, '');
+        const expectedPrefix = `speaking/${userId}/`;
+        if (!storagePath.startsWith(expectedPrefix) || storagePath.includes('..')) {
+          throw new AppError('Invalid speaking audio path', 400, 'INVALID_AUDIO_PATH');
+        }
+        const audioUrl = toPublicSpeakingAudioUrl(storagePath);
+        
+        const insertRes = await client.query(
+          `INSERT INTO speaking_submissions (user_id, test_id, part_number, prompt_text, audio_url, grader, status, speaking_group_id)
+           VALUES ($1, $2, $3, $4, $5, $6, 'pending', $7) RETURNING *`,
+          [userId, normalizedTestId, part.part_number, part.prompt_text, audioUrl, grader, speakingGroupId]
+        );
+        insertedParts.push(insertRes.rows[0]);
+      }
+
       await client.query('COMMIT');
-      return insertRes.rows[0];
-    } catch (error) {
+      return { speaking_group_id: speakingGroupId, parts: insertedParts };
+    } catch (err) {
       await client.query('ROLLBACK');
-      throw mapSpeakingDbError(error);
+      throw mapSpeakingDbError(err);
     } finally {
       client.release();
     }
@@ -270,6 +277,47 @@ class SubmissionService {
     `;
     const result = await pool.query(query, [userId, test_id, task_number, prompt_text, response_text, grader]);
     return result.rows[0];
+  }
+
+  static async submitFullWriting(userId, testId, grader, tasks) {
+    const normalizedTestId = normalizeOptionalUuid(testId);
+    if (normalizedTestId) {
+      try {
+        const testRes = await pool.query('SELECT id FROM mock_tests WHERE id = $1', [normalizedTestId]);
+        if (testRes.rows.length === 0) {
+          throw new AppError('Writing test not found', 404, 'TEST_NOT_FOUND');
+        }
+      } catch (err) {
+        if (err instanceof AppError) throw err;
+        throw new AppError('Invalid test ID format', 400, 'INVALID_TEST_ID');
+      }
+    }
+
+    const { v4: uuidv4 } = require('uuid');
+    const writingGroupId = uuidv4();
+    const client = await pool.connect();
+
+    try {
+      await client.query('BEGIN');
+      
+      const insertedTasks = [];
+      for (const task of tasks) {
+        const insertRes = await client.query(
+          `INSERT INTO writing_submissions (user_id, test_id, task_number, prompt_text, response_text, grader, status, writing_group_id)
+           VALUES ($1, $2, $3, $4, $5, $6, 'pending', $7) RETURNING *`,
+          [userId, normalizedTestId, task.task_number, task.prompt_text, task.response_text, grader, writingGroupId]
+        );
+        insertedTasks.push(insertRes.rows[0]);
+      }
+
+      await client.query('COMMIT');
+      return { writing_group_id: writingGroupId, tasks: insertedTasks };
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw new AppError('Database error while submitting writing', 500, 'DB_ERROR');
+    } finally {
+      client.release();
+    }
   }
 
   static async getSpeakingAudioUrl(submissionId, user) {
@@ -296,35 +344,60 @@ class SubmissionService {
     return audioUrl;
   }
 
-  static async createAttempt(userId, testId) {
-    const normalizedTestId = normalizeOptionalUuid(testId);
-    if (normalizedTestId) {
-      try {
-        const testRes = await pool.query('SELECT id FROM mock_tests WHERE id = $1', [normalizedTestId]);
-        if (testRes.rows.length === 0) {
-          throw new AppError('Speaking test not found', 404, 'TEST_NOT_FOUND');
-        }
-      } catch (err) {
-        if (err instanceof AppError) throw err;
-        throw new AppError('Invalid test ID format', 400, 'INVALID_TEST_ID');
-      }
-    }
 
-    const client = await pool.connect();
-    try {
-      await client.query('BEGIN');
-      const insertRes = await client.query(
-        `INSERT INTO speaking_attempts (user_id, test_id, status) VALUES ($1, $2, 'in_progress') RETURNING id, status`,
-        [userId, normalizedTestId]
-      );
-      await client.query('COMMIT');
-      return insertRes.rows[0];
-    } catch (err) {
-      await client.query('ROLLBACK');
-      throw mapSpeakingDbError(err);
-    } finally {
-      client.release();
-    }
+
+  /**
+   * Get student submission history
+   * @param {string} userId
+   * @returns {Promise<Array>}
+   */
+  static async getHistory(userId) {
+    const query = `
+      SELECT 
+        ws.writing_group_id::text AS id,
+        'writing' AS type,
+        NULL::int AS task_number,
+        NULL::int AS part_number,
+        MIN(ws.submitted_at) AS submitted_at,
+        MIN(ws.status::text) AS status,
+        MIN(ws.grader::text) AS grader,
+        MAX(COALESCE(tfr.band_score, agr.band_score)) AS band_score
+      FROM writing_submissions ws
+      LEFT JOIN tutor_feedback_reports tfr ON ws.id = tfr.writing_submission_id
+      LEFT JOIN ai_grading_reports agr ON ws.id = agr.submission_id AND agr.submission_type = 'writing'
+      WHERE ws.user_id = $1
+      GROUP BY ws.writing_group_id
+
+      UNION ALL
+
+      SELECT 
+        ss.speaking_group_id::text AS id,
+        'speaking' AS type,
+        NULL::int AS task_number,
+        NULL::int AS part_number,
+        MIN(ss.submitted_at) AS submitted_at,
+        MIN(ss.status::text) AS status,
+        MIN(ss.grader::text) AS grader,
+        MAX(COALESCE(tfr.band_score, agr.band_score)) AS band_score
+      FROM speaking_submissions ss
+      LEFT JOIN tutor_feedback_reports tfr ON ss.id = tfr.speaking_submission_id
+      LEFT JOIN ai_grading_reports agr ON ss.id = agr.submission_id AND agr.submission_type = 'speaking'
+      WHERE ss.user_id = $1
+      GROUP BY ss.speaking_group_id
+
+      ORDER BY submitted_at DESC
+    `;
+    const result = await pool.query(query, [userId]);
+    return result.rows.map(row => ({
+      id: row.id,
+      type: row.type,
+      task_number: row.task_number,
+      part_number: row.part_number,
+      submitted_at: row.submitted_at,
+      status: row.status,
+      grader: row.grader,
+      band_score: row.band_score ? parseFloat(row.band_score) : null
+    }));
   }
 
   static async getFeedback(id, userId, type) {
@@ -332,8 +405,11 @@ class SubmissionService {
       throw new AppError('type must be speaking or writing', 400, 'INVALID_FIELD');
     }
     const submissionTable = type === 'speaking' ? 'speaking_submissions' : 'writing_submissions';
+    const groupCol = type === 'speaking' ? 'speaking_group_id' : 'writing_group_id';
+    
+    // Support either legacy id or new group id
     const subRes = await pool.query(
-      `SELECT * FROM ${submissionTable} WHERE id = $1 AND user_id = $2`,
+      `SELECT * FROM ${submissionTable} WHERE (${groupCol}::text = $1 OR id::text = $1) AND user_id = $2 ORDER BY created_at DESC LIMIT 1`,
       [id, userId]
     );
     if (subRes.rows.length === 0) {
@@ -345,13 +421,15 @@ class SubmissionService {
     }
     let report = {};
     const aiRes = await pool.query(
-      'SELECT * FROM ai_grading_reports WHERE submission_id = $1 AND submission_type = $2',
-      [id, type]
+      `SELECT * FROM ai_grading_reports WHERE submission_id = $1 AND submission_type = $2`,
+      [submission.id, type]
     );
     if (aiRes.rows.length > 0) report.ai_report = aiRes.rows[0];
+    
+    // For tutor reports, check submission_id but fallback to repTaskId if it's stored differently
     const tutorRes = await pool.query(
-      'SELECT * FROM tutor_grading_reports WHERE submission_id = $1 AND submission_type = $2',
-      [id, type]
+      `SELECT * FROM tutor_feedback_reports WHERE ${type === 'speaking' ? 'speaking_submission_id' : 'writing_submission_id'} IN (SELECT id FROM ${submissionTable} WHERE ${groupCol}::text = $1 OR id::text = $1)`,
+      [id]
     );
     if (tutorRes.rows.length > 0) report.tutor_report = tutorRes.rows[0];
     return report;

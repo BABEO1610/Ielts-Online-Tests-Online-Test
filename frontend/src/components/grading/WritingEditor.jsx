@@ -31,58 +31,25 @@ const WritingEditor = forwardRef(({
   };
 
   useImperativeHandle(ref, () => ({
-    submit: () => {
-      handleSubmit(new Event('submit'));
-    }
-  }));
-
-  const handleSubmit = async (e) => {
-    if (e && e.preventDefault) e.preventDefault();
-    
-    if (charCount === 0) {
-      window.alert(`Vui lòng viết câu trả lời cho Writing Task ${taskNumber} trước khi nộp!`);
-      if (onSubmitError) onSubmitError(new Error('Empty response'));
-      return;
-    }
-
-    if (grader === 'ai' && aiQuotaRemaining <= 0) {
-      setToast({ message: 'Bạn đã hết lượt chấm bài bằng AI.', type: 'error' });
-      if (onSubmitError) onSubmitError(new Error('No AI quota'));
-      return;
-    }
-
-    try {
-      setIsLoading(true);
-      setToast(null);
-
-      const payload = {
-        test_id: testId,
+    getTaskData: () => {
+      if (charCount === 0) {
+        throw new Error(`Vui lòng viết câu trả lời cho Writing Task ${taskNumber} trước khi nộp!`);
+      }
+      if (grader === 'ai' && aiQuotaRemaining <= 0) {
+        throw new Error('Bạn đã hết lượt chấm bài bằng AI.');
+      }
+      return {
         task_number: taskNumber,
         prompt_text: promptText,
         response_text: text,
         grader: grader
       };
-
-      const response = await gradingService.submitWriting(payload);
-      
-      setToast({ message: 'Nộp bài thành công!', type: 'success' });
-      if (onSubmitSuccess) {
-        onSubmitSuccess(response);
-      }
-    } catch (error) {
-      const errMsg = error.response?.data?.error?.message || 'Đã xảy ra lỗi khi nộp bài.';
-      setToast({ message: errMsg, type: 'error' });
-      if (onSubmitError) {
-        onSubmitError(error);
-      }
-    } finally {
-      setIsLoading(false);
     }
-  };
+  }));
 
   return (
-    <div className="writing-editor card p-4 shadow-sm mb-4">
-      <h3 className="h5 mb-3">Writing Task {taskNumber}</h3>
+    <div className="writing-editor card p-4 shadow-sm mb-4 border-0 h-100">
+      <h3 className="h5 mb-3 fw-bold">Writing Task {taskNumber}</h3>
       {promptText && (
         <div className="prompt-container bg-light p-3 rounded mb-3">
           <strong>Đề bài:</strong>
@@ -90,73 +57,56 @@ const WritingEditor = forwardRef(({
         </div>
       )}
 
-      <form onSubmit={handleSubmit}>
-        <div className="form-group mb-3">
-          <textarea
-            className="form-control"
-            rows="12"
-            placeholder="Viết câu trả lời của bạn vào đây..."
-            value={text}
-            onChange={handleChange}
-            disabled={isPending || isLoading}
-            aria-label="Writing response"
-          />
-          <div className="d-flex justify-content-between mt-2 text-muted small">
-            <span>Giới hạn: {MAX_CHARS} ký tự</span>
-            <span className={charCount >= MAX_CHARS ? 'text-danger fw-bold' : ''}>
-              {charCount} / {MAX_CHARS}
-            </span>
-          </div>
+      <div className="form-group mb-3 flex-grow-1 d-flex flex-column">
+        <textarea
+          className="form-control flex-grow-1"
+          style={{ minHeight: '300px', resize: 'none' }}
+          placeholder="Viết câu trả lời của bạn vào đây..."
+          value={text}
+          onChange={handleChange}
+          disabled={isPending}
+        />
+        <div className="d-flex justify-content-between mt-2 text-muted small">
+          <span>{charCount}/{MAX_CHARS} ký tự</span>
+          <span>Từ: {text.trim() === '' ? 0 : text.trim().split(/\s+/).length}</span>
         </div>
+      </div>
 
-        <div className="d-flex align-items-center mb-3">
-          <strong className="me-3">Chọn người chấm:</strong>
-          <div className="form-check form-check-inline">
-            <input
-              className="form-check-input"
-              type="radio"
-              name="graderOptions"
-              id="graderTutor"
-              value="tutor"
-              checked={grader === 'tutor'}
+      <div className="grader-selection mb-4">
+        <p className="mb-2 fw-bold text-dark">Chọn người chấm:</p>
+        <div className="d-flex gap-4">
+          <div className="form-check">
+            <input 
+              className="form-check-input" 
+              type="radio" 
+              name={`grader-${taskNumber}`} 
+              id={`graderTutor-${taskNumber}`} 
+              value="tutor" 
+              checked={grader === 'tutor'} 
               onChange={(e) => setGrader(e.target.value)}
-              disabled={isPending || isLoading}
+              disabled={isPending}
             />
-            <label className="form-check-label" htmlFor="graderTutor">
-              Giáo viên (Tutor)
+            <label className="form-check-label" htmlFor={`graderTutor-${taskNumber}`}>
+              Giảng viên chấm
             </label>
           </div>
-          <div className="form-check form-check-inline">
-            <input
-              className="form-check-input"
-              type="radio"
-              name="graderOptions"
-              id="graderAi"
-              value="ai"
-              checked={grader === 'ai'}
+          <div className="form-check">
+            <input 
+              className="form-check-input" 
+              type="radio" 
+              name={`grader-${taskNumber}`} 
+              id={`graderAi-${taskNumber}`} 
+              value="ai" 
+              checked={grader === 'ai'} 
               onChange={(e) => setGrader(e.target.value)}
-              disabled={isPending || isLoading || aiQuotaRemaining <= 0}
+              disabled={isPending}
             />
-            <label className="form-check-label" htmlFor="graderAi">
+            <label className="form-check-label" htmlFor={`graderAi-${taskNumber}`}>
               AI Chấm điểm {aiQuotaRemaining <= 0 ? '(Hết lượt)' : `(Còn ${aiQuotaRemaining} lượt)`}
             </label>
           </div>
         </div>
-
-        <button 
-          type="submit" 
-          className="btn btn-primary"
-          disabled={isPending || isLoading || charCount === 0}
-        >
-          {isLoading ? (
-            <><span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Đang nộp...</>
-          ) : isPending ? (
-            'Bài đang được chấm'
-          ) : (
-            'Nộp bài'
-          )}
-        </button>
-      </form>
+      </div>
 
       {toast && (
         <ToastNotification

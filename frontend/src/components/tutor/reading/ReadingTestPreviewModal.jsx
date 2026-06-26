@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { X, ChevronLeft, ChevronRight } from 'lucide-react';
+import { cleanInstructionText } from '../../../utils/questionParser';
 
 // ─── Preview Question Renderers ─────────────────────────────────────────────
 
@@ -18,21 +19,24 @@ function PreviewMultipleChoice({ question, qNum, answers, onAnswer }) {
     }
   };
 
+  const optionsList = Array.isArray(question.options) ? question.options : (question.options?.choices || []);
+
   return (
     <div className="mb-4">
       <p className="fw-semibold mb-2" style={{ fontSize: '0.95rem' }}>
         <span className="me-2" style={{ background: '#111', color: '#fff', borderRadius: '50%', width: 24, height: 24, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700 }}>{qNum}</span>
-        {question.text}
+        {question.questionText || question.text || question.prompt || question.statement || ''}
       </p>
-      {(question.options || []).map((opt, idx) => {
-        const isSelected = selected.includes(opt.id);
+      {optionsList.map((opt, idx) => {
+        const isSelected = selected.includes(opt.id || opt.label);
+        const optLabel = opt.label || String.fromCharCode(65 + idx);
         return (
-          <div key={opt.id}
+          <div key={opt.id || opt.label}
             className={`option-card ${isSelected ? 'selected' : ''}`}
-            onClick={() => toggle(opt.id)}
+            onClick={() => toggle(opt.id || opt.label)}
             style={{ cursor: 'pointer' }}
           >
-            <span className="fw-bold me-2" style={{ minWidth: 20 }}>{String.fromCharCode(65 + idx)}.</span>
+            <span className="fw-bold me-2" style={{ minWidth: 20 }}>{optLabel}.</span>
             <span>{opt.text}</span>
           </div>
         );
@@ -42,62 +46,72 @@ function PreviewMultipleChoice({ question, qNum, answers, onAnswer }) {
 }
 
 function PreviewTrueFalse({ question, qNum, answers, onAnswer }) {
-  const selected = answers[qNum];
-  const opts = ['True', 'False', 'Not Given'];
+  const selected = answers[qNum] || '';
+  const opts = ['TRUE', 'FALSE', 'NOT GIVEN'];
 
   return (
-    <div className="mb-4">
-      <p className="fw-semibold mb-2" style={{ fontSize: '0.95rem' }}>
-        <span className="me-2" style={{ background: '#111', color: '#fff', borderRadius: '50%', width: 24, height: 24, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700 }}>{qNum}</span>
-        {question.text}
-      </p>
-      <div className="d-flex gap-2">
+    <div className="mb-4 d-flex align-items-start">
+      <span className="me-3 mt-1" style={{ background: '#111', color: '#fff', borderRadius: '50%', width: 24, height: 24, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, flexShrink: 0 }}>{qNum}</span>
+      <select 
+        className="form-select form-select-sm me-3" 
+        style={{ width: '130px', flexShrink: 0 }}
+        value={selected}
+        onChange={(e) => onAnswer(qNum, e.target.value)}
+      >
+        <option value="">-- Select --</option>
         {opts.map(opt => (
-          <button key={opt}
-            className={`btn btn-sm ${selected === opt ? 'btn-dark' : 'btn-outline-secondary'}`}
-            style={{ minWidth: 90, borderRadius: 20 }}
-            onClick={() => onAnswer(qNum, opt)}
-          >
-            {opt}
-          </button>
+          <option key={opt} value={opt}>{opt}</option>
         ))}
+      </select>
+      <div style={{ fontSize: '0.95rem', paddingTop: '2px' }}>
+        {question.questionText || question.text || question.prompt || question.statement || ''}
       </div>
     </div>
   );
 }
 
 function PreviewYesNo({ question, qNum, answers, onAnswer }) {
-  const selected = answers[qNum];
-  const opts = ['Yes', 'No', 'Not Given'];
+  const selected = answers[qNum] || '';
+  const opts = ['YES', 'NO', 'NOT GIVEN'];
 
   return (
-    <div className="mb-4">
-      <p className="fw-semibold mb-2" style={{ fontSize: '0.95rem' }}>
-        <span className="me-2" style={{ background: '#111', color: '#fff', borderRadius: '50%', width: 24, height: 24, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700 }}>{qNum}</span>
-        {question.text}
-      </p>
-      <div className="d-flex gap-2">
+    <div className="mb-4 d-flex align-items-start">
+      <span className="me-3 mt-1" style={{ background: '#111', color: '#fff', borderRadius: '50%', width: 24, height: 24, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, flexShrink: 0 }}>{qNum}</span>
+      <select 
+        className="form-select form-select-sm me-3" 
+        style={{ width: '130px', flexShrink: 0 }}
+        value={selected}
+        onChange={(e) => onAnswer(qNum, e.target.value)}
+      >
+        <option value="">-- Select --</option>
         {opts.map(opt => (
-          <button key={opt}
-            className={`btn btn-sm ${selected === opt ? 'btn-dark' : 'btn-outline-secondary'}`}
-            style={{ minWidth: 80, borderRadius: 20 }}
-            onClick={() => onAnswer(qNum, opt)}
-          >
-            {opt}
-          </button>
+          <option key={opt} value={opt}>{opt}</option>
         ))}
+      </select>
+      <div style={{ fontSize: '0.95rem', paddingTop: '2px' }}>
+        {question.questionText || question.text || question.prompt || question.statement || ''}
       </div>
     </div>
   );
 }
 
-function PreviewMatching({ question, qNum, answers, onAnswer, poolOptions }) {
+function PreviewMatching({ question, qNum, answers, onAnswer, poolOptions, qType }) {
   const selected = answers[qNum] || '';
+  
+  let options = poolOptions || [];
+  if (options.length === 0) {
+    if (qType === 'MATCHING_HEADINGS') {
+      options = ['i', 'ii', 'iii', 'iv', 'v', 'vi', 'vii', 'viii', 'ix', 'x'].map(v => ({ id: v, text: `Heading ${v}` }));
+    } else {
+      options = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'].map(v => ({ id: v, text: `Paragraph/Option ${v}` }));
+    }
+  }
+
   return (
     <div className="mb-4">
       <p className="fw-semibold mb-2" style={{ fontSize: '0.95rem' }}>
         <span className="me-2" style={{ background: '#111', color: '#fff', borderRadius: '50%', width: 24, height: 24, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700 }}>{qNum}</span>
-        {question.text}
+        {question.questionText || question.text || question.prompt || question.statement || ''}
       </p>
       <select
         className="form-select form-select-sm"
@@ -106,9 +120,9 @@ function PreviewMatching({ question, qNum, answers, onAnswer, poolOptions }) {
         onChange={e => onAnswer(qNum, e.target.value)}
       >
         <option value="">-- Select --</option>
-        {(poolOptions || []).map((opt, idx) => (
+        {options.map((opt, idx) => (
           <option key={opt.id || idx} value={opt.id || opt.text}>
-            {String.fromCharCode(65 + idx)}. {opt.text}
+            {poolOptions && poolOptions.length > 0 ? `${String.fromCharCode(65 + idx)}. ` : ''}{opt.text}
           </option>
         ))}
       </select>
@@ -122,7 +136,7 @@ function PreviewCompletion({ question, qNum, answers, onAnswer }) {
     <div className="mb-4">
       <p className="fw-semibold mb-2" style={{ fontSize: '0.95rem' }}>
         <span className="me-2" style={{ background: '#111', color: '#fff', borderRadius: '50%', width: 24, height: 24, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700 }}>{qNum}</span>
-        {question.text || <em>Answer:</em>}
+        {question.questionText || question.text || question.prompt || question.statement || <em>Answer:</em>}
       </p>
       <input
         type="text"
@@ -136,39 +150,122 @@ function PreviewCompletion({ question, qNum, answers, onAnswer }) {
   );
 }
 
+function PreviewMultiSelectMulti({ block, startNum, answers, onAnswer }) {
+  const questions = block.questions || [];
+  const maxSelections = questions[0]?.options?.maxSelections || questions.length;
+  const poolOptions = questions[0]?.options?.choices || [];
+  
+  // Collect answers for this group
+  // To keep backend compatibility, we map them back to individual question orders.
+  // The answer for question 18, 19, etc.
+  const getQNum = (q, idx) => q.questionOrder || (startNum + idx);
+  const selectedAnswers = questions.map((q, idx) => answers[getQNum(q, idx)]).filter(Boolean);
+
+  const handleToggle = (val) => {
+    let newSelected = [...selectedAnswers];
+    if (newSelected.includes(val)) {
+      newSelected = newSelected.filter(v => v !== val);
+    } else {
+      if (newSelected.length < maxSelections) {
+        newSelected.push(val);
+      } else {
+        return; // Max reached
+      }
+    }
+    
+    // Sort selected answers to maintain order
+    newSelected.sort();
+    
+    // Map them back to the individual questions
+    questions.forEach((q, idx) => {
+      onAnswer(getQNum(q, idx), newSelected[idx] || '');
+    });
+  };
+
+  return (
+    <div className="mb-4">
+      <div className="mb-3 ps-3 border-start border-3 p-2 text-sm" style={{ background: '#fafafa', borderColor: '#ccc' }}>
+        {poolOptions.map((choice, cIdx) => (
+          <div key={cIdx} className="form-check mb-2">
+            <input 
+              className="form-check-input" 
+              type="checkbox" 
+              id={`preview_mc_multi_${block.rangeStart}_${choice.label}`}
+              checked={selectedAnswers.includes(choice.label)}
+              onChange={() => handleToggle(choice.label)}
+              disabled={!selectedAnswers.includes(choice.label) && selectedAnswers.length >= maxSelections}
+              style={{ cursor: 'pointer' }}
+            />
+            <label className="form-check-label" htmlFor={`preview_mc_multi_${block.rangeStart}_${choice.label}`} style={{ cursor: 'pointer' }}>
+              <strong>{choice.label}.</strong> {choice.text}
+            </label>
+          </div>
+        ))}
+      </div>
+      <div className="text-muted" style={{ fontSize: '0.8rem' }}>
+        Selected: {selectedAnswers.length} / {maxSelections}
+      </div>
+    </div>
+  );
+}
+
 // ─── Block Renderer ──────────────────────────────────────────────────────────
 
 function PreviewBlock({ block, answers, onAnswer, startNum }) {
   const questions = block.questions || [];
-  const MATCHING_TYPES = ['Matching Headings', 'Matching Information', 'Matching Features', 'Matching Sentence Endings'];
-  const TRUE_FALSE_TYPES = ['True/False/Not Given'];
-  const YES_NO_TYPES = ['Yes/No/Not Given'];
-  const COMPLETION_TYPES = ['Sentence Completion', 'Summary Completion', 'Note/Table/Flow-chart Completion', 'Diagram Label Completion', 'Short-answer Questions'];
+  const qType = block.questionType || block.type;
+
+  const MATCHING_TYPES = ['Matching Headings', 'Matching Information', 'Matching Features', 'Matching Sentence Endings', 'MATCHING_HEADINGS', 'MATCHING_INFORMATION', 'MATCHING_FEATURES', 'MATCHING_SENTENCE_ENDINGS'];
+  const TRUE_FALSE_TYPES = ['True/False/Not Given', 'TRUE_FALSE_NOT_GIVEN'];
+  const YES_NO_TYPES = ['Yes/No/Not Given', 'YES_NO_NOT_GIVEN'];
+  const COMPLETION_TYPES = ['Sentence Completion', 'Summary Completion', 'Note/Table/Flow-chart Completion', 'Diagram Label Completion', 'Short-answer Questions', 'SENTENCE_COMPLETION', 'SUMMARY_COMPLETION', 'NOTE_COMPLETION', 'SHORT_ANSWER_QUESTIONS'];
+
+  const rawInstruction = block.instruction || block.groupInstruction || questions[0]?.options?.groupInstruction || '';
+  const instructionText = cleanInstructionText(rawInstruction, block.rangeStart);
 
   return (
     <div className="mb-5">
-      {block.type && (
+      {qType && (
         <div className="mb-3 p-2 rounded" style={{ background: '#f5f5f5', borderLeft: '3px solid #111' }}>
           <p className="mb-0 fw-semibold" style={{ fontSize: '0.85rem', color: '#333' }}>
-            {block.type} — Questions {block.range || '?'}
+            {qType} — Questions {block.range || '?'}
           </p>
         </div>
       )}
-      {questions.map((q, idx) => {
-        const qNum = startNum + idx;
-        if (TRUE_FALSE_TYPES.includes(block.type)) {
-          return <PreviewTrueFalse key={q.id || idx} question={q} qNum={qNum} answers={answers} onAnswer={onAnswer} />;
-        } else if (YES_NO_TYPES.includes(block.type)) {
-          return <PreviewYesNo key={q.id || idx} question={q} qNum={qNum} answers={answers} onAnswer={onAnswer} />;
-        } else if (MATCHING_TYPES.includes(block.type)) {
-          return <PreviewMatching key={q.id || idx} question={q} qNum={qNum} answers={answers} onAnswer={onAnswer} poolOptions={block.options} />;
-        } else if (COMPLETION_TYPES.includes(block.type)) {
-          return <PreviewCompletion key={q.id || idx} question={q} qNum={qNum} answers={answers} onAnswer={onAnswer} />;
-        } else {
-          // Default: multiple choice
-          return <PreviewMultipleChoice key={q.id || idx} question={q} qNum={qNum} answers={answers} onAnswer={onAnswer} />;
-        }
-      })}
+      {instructionText && (
+        <div className="mb-4" style={{ fontSize: '0.95rem', fontStyle: 'italic', color: '#444', whiteSpace: 'pre-wrap' }}>
+          {instructionText}
+        </div>
+      )}
+      {questions[0]?.options?.tfngLegend && (
+        <div className="mb-4 p-3 bg-light border rounded">
+          {questions[0].options.tfngLegend.map((leg, i) => (
+            <div key={i} className="d-flex mb-1" style={{ fontSize: '0.9rem' }}>
+              <div className="fw-bold" style={{ width: '100px' }}>{leg.label}</div>
+              <div>{leg.text}</div>
+            </div>
+          ))}
+        </div>
+      )}
+      {qType === 'MULTIPLE_CHOICE_MULTI' ? (
+        <PreviewMultiSelectMulti block={block} startNum={startNum} answers={answers} onAnswer={onAnswer} />
+      ) : (
+        questions.map((q, idx) => {
+          const qNum = q.questionOrder || (startNum + idx);
+          if (TRUE_FALSE_TYPES.includes(qType)) {
+            return <PreviewTrueFalse key={q.id || idx} question={q} qNum={qNum} answers={answers} onAnswer={onAnswer} />;
+          } else if (YES_NO_TYPES.includes(qType)) {
+            return <PreviewYesNo key={q.id || idx} question={q} qNum={qNum} answers={answers} onAnswer={onAnswer} />;
+          } else if (MATCHING_TYPES.includes(qType)) {
+            return <PreviewMatching key={q.id || idx} question={q} qNum={qNum} answers={answers} onAnswer={onAnswer} poolOptions={q.options?.choices || block.options?.choices || block.options} qType={qType} />;
+          } else if (COMPLETION_TYPES.includes(qType)) {
+            return <PreviewCompletion key={q.id || idx} question={q} qNum={qNum} answers={answers} onAnswer={onAnswer} />;
+          } else {
+            // Default: multiple choice
+            return <PreviewMultipleChoice key={q.id || idx} question={q} qNum={qNum} answers={answers} onAnswer={onAnswer} />;
+          }
+        })
+      )}
     </div>
   );
 }

@@ -5,8 +5,16 @@ const {
 } = require('./assistant.constants');
 
 const columnCache = new Map();
+const FRONTEND_BASE_URL = (process.env.FRONTEND_URL || process.env.CLIENT_URL || 'http://localhost:5173').replace(/\/+$/, '');
+const SKILL_ROUTES = {
+  reading: '/reading',
+  writing: '/writing',
+  speaking: '/speaking',
+};
 
 const quoteIdent = (identifier) => `"${String(identifier).replace(/"/g, '""')}"`;
+const toFrontendUrl = (path) => `${FRONTEND_BASE_URL}${path}`;
+const getSkillRoute = (skill) => SKILL_ROUTES[String(skill || '').toLowerCase()] || '/reading';
 
 const getTableColumns = async (tableName) => {
   if (columnCache.has(tableName)) {
@@ -54,7 +62,8 @@ const normalize = (value) =>
   String(value || '')
     .toLowerCase()
     .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '');
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/g, 'd');
 
 const extractTerms = (message) => {
   const stopWords = new Set([
@@ -367,11 +376,8 @@ const findMockTests = async (message) => {
   const conditions = [];
   const values = [];
 
-  if (columns.has('is_published')) {
-    conditions.push('is_published = TRUE');
-  }
   if (columns.has('review_status')) {
-    conditions.push("review_status = 'approved'");
+    conditions.push("(review_status = 'approved' OR review_status IS NULL OR review_status = 'pending')");
   }
   if (skill && columns.has('skill')) {
     values.push(skill);
@@ -415,7 +421,7 @@ const findMockTests = async (message) => {
       skill: row.skill,
       difficulty: row.difficulty,
       durationMinutes: row.duration_minutes,
-      link: row.id ? `/tests/${row.id}` : '/tests',
+      link: toFrontendUrl(getSkillRoute(row.skill)),
     }));
   } catch (error) {
     console.warn('[AssistantRepository] Test search skipped:', error.message);
@@ -455,7 +461,7 @@ const findLibraryResources = async (message) => {
   }
 
   const whereClause = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
-  const selectColumns = ['id', 'title', 'description', 'category', 'resource_type', 'file_url']
+  const selectColumns = ['id', 'title', 'description', 'category', 'resource_type']
     .filter((column) => columns.has(column))
     .map(quoteIdent)
     .join(', ');
@@ -476,8 +482,7 @@ const findLibraryResources = async (message) => {
       description: row.description,
       category: row.category,
       resourceType: row.resource_type,
-      fileUrl: row.file_url,
-      link: '/library',
+      link: toFrontendUrl('/library'),
     }));
   } catch (error) {
     console.warn('[AssistantRepository] Library search skipped:', error.message);
@@ -528,7 +533,7 @@ const findQuestionSnippets = async (message) => {
       title: `Question ${row.question_order} - ${row.test_title || 'IELTS test'}`,
       description: row.question_text,
       explanation: row.explanation,
-      link: row.test_id ? `/tests/${row.test_id}` : '/tests',
+      link: toFrontendUrl('/reading'),
     }));
   } catch (error) {
     console.warn('[AssistantRepository] Question search skipped:', error.message);

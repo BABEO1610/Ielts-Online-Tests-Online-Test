@@ -148,9 +148,14 @@ export async function fetchContacts() {
     return ok([]);
   }
 }
-export async function resolveContact(id) {
-  try { await api.put(`/admin/contacts/${id}/resolve`); return true; }
-  catch { return true; }
+export async function updateContactStatus(id, payload) {
+  try { 
+    await api.put(`/admin/contacts/${id}/status`, payload); 
+    return true; 
+  } catch (error) { 
+    const msg = error?.response?.data?.error?.message || 'Không thể cập nhật liên hệ. Vui lòng thử lại.';
+    throw new Error(msg);
+  }
 }
 
 // ── Reports ─────────────────────────────────────────────────────────────────────

@@ -11,6 +11,9 @@ router.use(authenticate);
 // Submit a writing task response
 router.post('/writing', SubmissionController.submitWriting);
 
+// Submit full writing test
+router.post('/writing/full', SubmissionController.submitFullWriting);
+
 // Upload audio temp (speaking)
 router.post(
   '/speaking/upload',
@@ -18,16 +21,17 @@ router.post(
   SubmissionController.uploadSpeakingAudio
 );
 
-// Submit speaking (legacy - per part)
+// Submit full speaking test (must be BEFORE generic /speaking to avoid Express match issue)
+router.post('/speaking/full', SubmissionController.submitFullSpeaking);
+
+// Submit speaking (legacy - per part, deprecated)
 router.post(
   '/speaking',
   SubmissionController.submitSpeaking
 );
 
-
-
-// Create speaking test attempt
-router.post('/speaking/attempt', SubmissionController.createSpeakingAttempt);
+// Get submission history for a student
+router.get('/history', SubmissionController.getHistory);
 
 // Get feedback for a submission
 router.get('/:id/feedback', SubmissionController.getFeedback);

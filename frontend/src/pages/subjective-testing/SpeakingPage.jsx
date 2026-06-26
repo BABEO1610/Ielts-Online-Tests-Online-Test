@@ -175,7 +175,7 @@ const SpeakingPage = () => {
     const fetchExams = async () => {
       try {
         setLoading(true);
-        const res = await testService.getTests('speaking');
+        const res = await testService.getTests({ skill: 'speaking' });
         if (res.success && Array.isArray(res.data)) {
           setExams(res.data);
         } else {

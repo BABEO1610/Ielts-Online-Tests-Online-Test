@@ -140,7 +140,15 @@ const SpeakingTestScreen = ({ exam, practiceMode, customTimeLimit }) => {
   };
 
   const saveAnswerAndAdvance = (partNumber, tempS3Key, durationSeconds) => {
-    setAnswers(prev => [...prev, { part_number: partNumber, temp_s3_key: tempS3Key }]);
+    const activePart = exam.parts[partNumber - 1];
+    let promptText = '';
+    if (partNumber === 2) {
+      promptText = activePart.prompt ? `${activePart.prompt}\n${activePart.bulletPoints}` : activePart.bulletPoints;
+    } else {
+      promptText = activePart.questions ? activePart.questions.map(q => q.text).join('\n') : '';
+    }
+
+    setAnswers(prev => [...prev, { part_number: partNumber, temp_s3_key: tempS3Key, prompt_text: promptText }]);
     
     if (partNumber === 1) {
       setPhase('part2');
@@ -153,15 +161,11 @@ const SpeakingTestScreen = ({ exam, practiceMode, customTimeLimit }) => {
 
   const handleFinalSubmit = async (grader) => {
     try {
-      // Gọi submit cho từng file đã lưu (3 parts)
-      for (const ans of answers) {
-        await gradingService.submitSpeaking({
-          test_id: exam.id.toString(),
-          part_number: ans.part_number,
-          temp_s3_key: ans.temp_s3_key,
-          grader
-        });
-      }
+      await gradingService.submitFullSpeaking({
+        test_id: exam.id.toString(),
+        grader,
+        parts: answers
+      });
       setPhase('result');
     } catch (err) {
       alert('Nộp bài thất bại. Vui lòng thử lại.');

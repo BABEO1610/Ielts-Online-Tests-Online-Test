@@ -48,11 +48,15 @@ const HTTP_STATUS_BY_CODE = {
 
 const PAGE_TYPES = new Set([
   'home',
+  'test',
   'test-list',
+  'library',
   'lesson',
+  'profile',
   'result',
   'review',
   'active-test',
+  'unknown',
 ]);
 
 const SUBMITTED_ATTEMPT_STATUSES = new Set([
@@ -69,6 +73,85 @@ const ASSISTANT_ROLE = {
   ASSISTANT: 'assistant',
 };
 
+const INTENT_CONTEXT_MAP = {
+  GREETING: {
+    tables: [],
+    filters: [],
+    requires: [],
+    allowedActions: ['greet_student', 'suggest_supported_questions'],
+    forbiddenActions: ['query_database', 'invent_tests', 'invent_lessons', 'generate_band_score'],
+  },
+  NAVIGATION: {
+    tables: [],
+    filters: [],
+    requires: [],
+    allowedActions: ['recommend_static_routes', 'explain_site_navigation'],
+    forbiddenActions: ['invent_routes', 'query_private_data', 'generate_band_score'],
+  },
+  GENERAL_STUDY_TIPS: {
+    tables: [],
+    filters: [],
+    requires: [],
+    allowedActions: ['give_general_ielts_study_tips', 'ask_clarifying_question'],
+    forbiddenActions: ['grade_writing', 'grade_speaking', 'generate_band_score', 'invent_website_data'],
+  },
+  IELTS_KNOWLEDGE: {
+    tables: [],
+    filters: [],
+    requires: [],
+    allowedActions: [
+      'explain_ielts_concepts',
+      'explain_grammar_vocabulary',
+      'give_skill_strategy',
+      'paraphrase_user_text',
+      'ask_clarifying_question',
+    ],
+    forbiddenActions: [
+      'grade_writing',
+      'grade_speaking',
+      'predict_band_score',
+      'invent_tests',
+      'invent_answer_keys',
+      'invent_website_data',
+    ],
+  },
+  FIND_TEST: {
+    tables: ['mock_tests'],
+    filters: ['is_published = TRUE', 'title', 'description', 'skill', 'difficulty'],
+    requires: [],
+    allowedActions: ['recommend_existing_tests', 'say_missing_data'],
+    forbiddenActions: ['invent_tests', 'invent_links', 'generate_band_score'],
+  },
+  FIND_LESSON: {
+    tables: ['library_resources'],
+    filters: ['is_published = TRUE', 'title', 'description', 'resource_type', 'category'],
+    requires: [],
+    allowedActions: ['recommend_existing_lessons', 'say_missing_data'],
+    forbiddenActions: ['invent_lessons', 'invent_links', 'generate_band_score'],
+  },
+  POST_TEST_REVIEW: {
+    tables: ['test_attempts', 'questions', 'question_answers'],
+    filters: ['attempt.user_id = current_user', 'submitted_at IS NOT NULL'],
+    requires: ['attempt_owner_check', 'submitted_check'],
+    allowedActions: ['explain_from_official_data', 'say_missing_explanation'],
+    forbiddenActions: ['answer_before_submit', 'invent_explanation', 'generate_band_score'],
+  },
+  OUT_OF_SCOPE: {
+    tables: [],
+    filters: [],
+    requires: [],
+    allowedActions: ['refuse_politely'],
+    forbiddenActions: ['query_database', 'answer_out_of_scope', 'generate_band_score'],
+  },
+  UNKNOWN: {
+    tables: [],
+    filters: [],
+    requires: [],
+    allowedActions: ['ask_clarifying_question', 'give_safe_scope_summary'],
+    forbiddenActions: ['invent_data', 'invent_links', 'generate_band_score'],
+  },
+};
+
 const createAssistantError = (code, message = ERROR_MESSAGES[code]) => {
   const error = new Error(message || ERROR_MESSAGES.INTERNAL_ERROR);
   error.code = code;
@@ -83,5 +166,6 @@ module.exports = {
   PAGE_TYPES,
   SUBMITTED_ATTEMPT_STATUSES,
   ASSISTANT_ROLE,
+  INTENT_CONTEXT_MAP,
   createAssistantError,
 };

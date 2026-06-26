@@ -37,6 +37,7 @@ export const testService = {
         params.skill = options;
       } else {
         if (options.skill) params.skill = options.skill;
+        if (options.isPublished !== undefined) params.isPublished = options.isPublished;
         if (options.tutor) params.tutor = true;
         if (options.all) params.all = true;
       }

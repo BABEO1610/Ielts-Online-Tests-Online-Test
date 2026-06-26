@@ -178,6 +178,84 @@ const generateGeminiAnswer = async ({ model, apiKey, mode, message, officialCont
   return answer;
 };
 
+const generateScopeClassification = async ({ message }) => {
+  const { provider, model, openaiApiKey, geminiApiKey } = getAiConfig();
+  const systemPrompt = `You are a strict JSON scope classifier for an IELTS learning platform.
+Evaluate the student's message and classify its intent.
+Return ONLY valid JSON matching this schema exactly:
+{
+  "intent": "IELTS_KNOWLEDGE" | "WEBSITE_HELP" | "CLARIFICATION" | "OUT_OF_SCOPE" | "FIND_TEST" | "FIND_LESSON",
+  "allowed": boolean,
+  "confidence": number (0.0 to 1.0),
+  "reason": "short explanation",
+  "skill": "reading" | "listening" | "writing" | "speaking" | "vocabulary" | "grammar" | null,
+  "needsUserInput": boolean,
+  "missingInput": null
+}
+
+ALLOWED SCOPES:
+- If user wants to find, search, or asks about availability of mock tests, exams, practice tests -> intent is FIND_TEST.
+- If user wants to find, search, or asks about availability of lessons, library resources, documents, audio, video -> intent is FIND_LESSON.
+- IELTS Reading, Listening, Writing, Speaking
+- IELTS grammar, vocabulary, paraphrase, sentence improvement
+- IELTS test strategy, study tips, question types
+- IELTS Writing Task 1/Task 2, Speaking Part 1/2/3
+- Website help/navigation/features
+- If user wants to paraphrase but didn't provide text, intent is CLARIFICATION, needsUserInput is true.
+- If user wants to paraphrase a specific text, intent is IELTS_KNOWLEDGE, allowed is true.
+- If user asks website features, intent is WEBSITE_HELP, allowed is true.
+
+BLOCKED SCOPES (set intent to OUT_OF_SCOPE, allowed to false):
+- Coding/programming (React, JS, Python, etc.)
+- Medical, financial, legal, political advice
+- Non-IELTS Math/Physics/Chemistry
+- Personal life advice unrelated to IELTS
+- Grading/band score requests for Writing/Speaking directly in chat
+- Requests to invent fake official tests`;
+
+  if (provider === 'gemini' || provider === 'google' || provider === 'google-ai-studio') {
+    if (!geminiApiKey) throw createAssistantError(ERROR_CODES.AI_NOT_CONFIGURED);
+    const geminiModel = normalizeGeminiModel(model);
+    const response = await fetch(
+      `${GEMINI_GENERATE_CONTENT_URL}/${encodeURIComponent(geminiModel)}:generateContent?key=${encodeURIComponent(geminiApiKey)}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          systemInstruction: { parts: [{ text: systemPrompt }] },
+          generationConfig: { temperature: 0.1, responseMimeType: 'application/json' },
+          contents: [{ role: 'user', parts: [{ text: message }] }],
+        }),
+      }
+    );
+    if (!response.ok) throw buildProviderError({ provider: 'Gemini', status: response.status, model: geminiModel, body: await response.text() });
+    const data = await response.json();
+    return data?.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
+  }
+
+  if (provider === 'openai') {
+    if (!openaiApiKey) throw createAssistantError(ERROR_CODES.AI_NOT_CONFIGURED);
+    const response = await fetch(OPENAI_CHAT_COMPLETIONS_URL, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${openaiApiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model,
+        temperature: 0.1,
+        response_format: { type: 'json_object' },
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: message },
+        ],
+      }),
+    });
+    if (!response.ok) throw buildProviderError({ provider: 'OpenAI', status: response.status, model, body: await response.text() });
+    const data = await response.json();
+    return data?.choices?.[0]?.message?.content || '{}';
+  }
+
+  throw createAssistantError(ERROR_CODES.AI_NOT_CONFIGURED, `Unsupported provider: ${provider}`);
+};
+
 const generateAssistantAnswer = async ({ mode, message, officialContext, systemPrompt, userPrompt }) => {
   const { provider, model, openaiApiKey, geminiApiKey } = getAiConfig();
 
@@ -386,9 +464,101 @@ const streamAssistantAnswer = async ({ mode, message, officialContext, systemPro
   );
 };
 
+const generateTranscript = async (audioUrl) => {
+  const { openaiApiKey, geminiApiKey } = getAiConfig();
+  
+  if (!openaiApiKey && !geminiApiKey) {
+    throw createAssistantError(ERROR_CODES.AI_NOT_CONFIGURED, "Không tìm thấy OPENAI_API_KEY hay GEMINI_API_KEY.");
+  }
+
+  const response = await fetch(audioUrl);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch audio from URL: ${response.statusText}`);
+  }
+  const arrayBuffer = await response.arrayBuffer();
+  const contentType = response.headers.get('content-type') || 'audio/webm';
+
+  // If OpenAI is configured, prefer Whisper
+  if (openaiApiKey) {
+    let ext = 'webm';
+    if (contentType.includes('mp3') || contentType.includes('mpeg')) ext = 'mp3';
+    if (contentType.includes('wav')) ext = 'wav';
+    if (contentType.includes('mp4')) ext = 'mp4';
+    
+    const blob = new Blob([arrayBuffer], { type: contentType });
+    const formData = new FormData();
+    formData.append('file', blob, `audio.${ext}`);
+    formData.append('model', 'whisper-1');
+
+    const whisperResponse = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${openaiApiKey}`
+      },
+      body: formData
+    });
+
+    if (!whisperResponse.ok) {
+      const errorText = await whisperResponse.text();
+      throw buildProviderError({
+        provider: 'OpenAI Whisper',
+        status: whisperResponse.status,
+        model: 'whisper-1',
+        body: errorText,
+      });
+    }
+
+    const data = await whisperResponse.json();
+    return data.text;
+  }
+
+  // Fallback to Gemini
+  const base64Audio = Buffer.from(arrayBuffer).toString('base64');
+  const geminiModel = 'gemini-flash-lite-latest';
+  
+  const geminiResponse = await fetch(
+    `${GEMINI_GENERATE_CONTENT_URL}/${geminiModel}:generateContent?key=${geminiApiKey}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{
+          parts: [
+            { text: "Please transcribe the following audio into text exactly as it is spoken. Do not add any extra commentary, translations, or formatting. Just output the pure transcription of what you hear." },
+            {
+              inlineData: {
+                mimeType: contentType,
+                data: base64Audio
+              }
+            }
+          ]
+        }]
+      })
+    }
+  );
+
+  if (!geminiResponse.ok) {
+    const errorText = await geminiResponse.text();
+    throw buildProviderError({
+      provider: 'Gemini',
+      status: geminiResponse.status,
+      model: geminiModel,
+      body: errorText,
+    });
+  }
+
+  const data = await geminiResponse.json();
+  const transcript = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+  if (!transcript) {
+    throw new Error('Gemini returned empty transcription');
+  }
+  return transcript.trim();
+};
+
 module.exports = {
   generateAssistantAnswer,
   streamAssistantAnswer,
+  generateTranscript,
   getAiConfig,
   normalizeGeminiModel,
 };

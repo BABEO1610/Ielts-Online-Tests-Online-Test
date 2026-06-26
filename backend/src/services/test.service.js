@@ -83,6 +83,39 @@ class TestService {
     const reviewStatus = isDraft ? 'pending' : 'pending'; // Drafts also stay pending for now (or we could use 'draft' if DB allowed, but enum only has pending, approved, rejected)
     const submittedAt = isDraft ? null : new Date().toISOString();
 
+    let missingAnswer = false;
+    for (const passage of passages) {
+      if (passage.blocks && Array.isArray(passage.blocks)) {
+        for (const block of passage.blocks) {
+          if (block.questions && Array.isArray(block.questions)) {
+            for (const q of block.questions) {
+              let requiresManualAnswer = false;
+              try {
+                const opts = typeof q.options === 'string' ? JSON.parse(q.options) : (q.options || block.options || {});
+                requiresManualAnswer = opts.requiresManualAnswer === true;
+              } catch(e) {}
+              
+              // For MCQ single vs multi
+              const hasCorrectStr = typeof q.correctAnswer === 'string' && q.correctAnswer.trim() !== '';
+              const hasCorrectArr = Array.isArray(q.correctAnswers) && q.correctAnswers.length > 0;
+              
+              if (requiresManualAnswer || (!hasCorrectStr && !hasCorrectArr)) {
+                missingAnswer = true;
+                break;
+              }
+            }
+          }
+          if (missingAnswer) break;
+        }
+      }
+      if (missingAnswer) break;
+    }
+    if (missingAnswer && !isDraft) {
+      const error = new Error('Không thể publish đề thi: Vẫn còn câu hỏi chưa có đáp án đúng.');
+      error.statusCode = 400; // Will be handled by errorHandler
+      throw error;
+    }
+
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
@@ -190,7 +223,17 @@ class TestService {
         mt.review_status,
         mt.submitted_at,
         mt.created_at,
-        COUNT(q.id) as questions
+        COALESCE(SUM(
+          GREATEST(
+            COALESCE(jsonb_array_length(
+              CASE 
+                WHEN jsonb_typeof(q.correct_answers) = 'array' THEN q.correct_answers 
+                ELSE '[]'::jsonb 
+              END
+            ), 0),
+            1
+          )
+        ), 0) as questions
       FROM mock_tests mt
       LEFT JOIN questions q ON mt.id = q.test_id
       ${whereClause}
@@ -448,6 +491,38 @@ class TestService {
     const isDraft = !publishAt;
     const reviewStatus = 'pending';
     const submittedAt = isDraft ? null : new Date().toISOString();
+
+    let missingAnswer = false;
+    for (const passage of passages) {
+      if (passage.blocks && Array.isArray(passage.blocks)) {
+        for (const block of passage.blocks) {
+          if (block.questions && Array.isArray(block.questions)) {
+            for (const q of block.questions) {
+              let requiresManualAnswer = false;
+              try {
+                const opts = typeof q.options === 'string' ? JSON.parse(q.options) : (q.options || block.options || {});
+                requiresManualAnswer = opts.requiresManualAnswer === true;
+              } catch(e) {}
+              
+              const hasCorrectStr = typeof q.correctAnswer === 'string' && q.correctAnswer.trim() !== '';
+              const hasCorrectArr = Array.isArray(q.correctAnswers) && q.correctAnswers.length > 0;
+              
+              if (requiresManualAnswer || (!hasCorrectStr && !hasCorrectArr)) {
+                missingAnswer = true;
+                break;
+              }
+            }
+          }
+          if (missingAnswer) break;
+        }
+      }
+      if (missingAnswer) break;
+    }
+    if (missingAnswer) {
+      const error = new Error('Không thể publish đề thi: Vẫn còn câu hỏi chưa có đáp án đúng.');
+      error.statusCode = 400;
+      throw error;
+    }
 
     const client = await pool.connect();
     try {

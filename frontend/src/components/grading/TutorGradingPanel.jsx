@@ -1,19 +1,20 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import gradingService from '../../services/grading.service';
 import TutorContextSidebar from './TutorContextSidebar';
 
 const IELTS_CRITERIA = {
   writing: [
-    { key: 'task_achievement_score', label: 'Task Achievement / Response' },
-    { key: 'coherence_score', label: 'Coherence & Cohesion' },
-    { key: 'lexical_score', label: 'Lexical Resource' },
-    { key: 'grammar_score', label: 'Grammatical Range & Accuracy' }
+    { key: 'taskAchievementScore', label: 'Task Achievement / Response' },
+    { key: 'coherenceScore', label: 'Coherence & Cohesion' },
+    { key: 'lexicalScore', label: 'Lexical Resource' },
+    { key: 'grammarScore', label: 'Grammatical Range & Accuracy' }
   ],
   speaking: [
-    { key: 'fluency_score', label: 'Fluency & Coherence' },
-    { key: 'pronunciation_score', label: 'Pronunciation' },
-    { key: 'lexical_score', label: 'Lexical Resource' },
-    { key: 'grammar_score', label: 'Grammatical Range & Accuracy' }
+    { key: 'fluencyScore', label: 'Fluency & Coherence' },
+    { key: 'pronunciationScore', label: 'Pronunciation' },
+    { key: 'lexicalScore', label: 'Lexical Resource' },
+    { key: 'grammarScore', label: 'Grammatical Range & Accuracy' }
   ]
 };
 
@@ -40,48 +41,26 @@ const calculatePreviewBand = (scores) => {
   return intPart;
 };
 
-const TutorGradingPanel = ({ submissionId, type, studentId, onGradingComplete, tasks, activeTaskId }) => {
-  const [audioUrl, setAudioUrl] = useState(null);
-  
+const TutorGradingPanel = ({ submissionId, type, studentId, onGradingComplete, tasks, activeTaskId, audioUrl }) => {
+  const navigate = useNavigate();
   const [taskScores, setTaskScores] = useState({});
   const [taskFeedbacks, setTaskFeedbacks] = useState({});
   const [showNotesModal, setShowNotesModal] = useState(false);
   const [highlights, setHighlights] = useState(null);
   
-  const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [prelimLoading, setPrelimLoading] = useState(false);
   const [error, setError] = useState(null);
 
   const currentScores = taskScores[activeTaskId] || {
-    task_achievement_score: '',
-    coherence_score: '',
-    lexical_score: '',
-    grammar_score: '',
-    fluency_score: '',
-    pronunciation_score: ''
+    taskAchievementScore: '',
+    coherenceScore: '',
+    lexicalScore: '',
+    grammarScore: '',
+    fluencyScore: '',
+    pronunciationScore: ''
   };
   const currentFeedback = taskFeedbacks[activeTaskId] || '';
-
-  useEffect(() => {
-    // EARS[Event]: WHEN component mounts and type is speaking THEN fetch audio url
-    if (type === 'speaking' && submissionId) {
-      const fetchAudioUrl = async () => {
-        try {
-          setLoading(true);
-          const response = await gradingService.getAudioUrl(submissionId, type);
-          if (response.success) {
-            setAudioUrl(response.data.presigned_url);
-          }
-        } catch (err) {
-          setError(err.response?.data?.error?.message || 'Failed to load audio URL.');
-        } finally {
-          setLoading(false);
-        }
-      };
-      fetchAudioUrl();
-    }
-  }, [submissionId, type]);
 
   const handleScoreChange = (key, value) => {
     setTaskScores(prev => ({ 
@@ -136,21 +115,20 @@ const TutorGradingPanel = ({ submissionId, type, studentId, onGradingComplete, t
       
       const criteria = getCriteriaList();
       const payload = {
-        type,
-        written_feedback: currentFeedback,
-        // band_score sent as reference according to Tech Lead instruction
-        band_score: previewBandScore() || 0 
+        writtenFeedback: currentFeedback,
+        bandScore: previewBandScore() || 0 
       };
       
       criteria.forEach(c => {
         payload[c.key] = parseFloat(currentScores[c.key]);
       });
 
-      const response = await gradingService.gradeSubmission(submissionId, payload);
+      const response = await gradingService.gradeSubmission(type, submissionId, payload);
       if (response.success) {
         if (onGradingComplete) {
-          onGradingComplete(response.data.report_id);
+          onGradingComplete();
         }
+        navigate('/grading/tutor/queue');
       }
     } catch (err) {
       setError(err.response?.data?.error?.message || 'Failed to submit grades.');
@@ -194,16 +172,10 @@ const TutorGradingPanel = ({ submissionId, type, studentId, onGradingComplete, t
             </div>
           )}
 
-          {type === 'speaking' && (
+          {type === 'speaking' && audioUrl && (
             <div className="mb-4">
               <h5 className="text-ink fw-bold">Student Audio</h5>
-              {loading ? (
-                <div className="text-body fw-medium py-2">Loading audio...</div>
-              ) : audioUrl ? (
-                <audio src={audioUrl} controls className="w-100" data-testid="audio-player" />
-              ) : (
-                <p className="text-body">No audio available.</p>
-              )}
+              <audio src={audioUrl} controls className="w-100" data-testid="audio-player" />
             </div>
           )}
 
