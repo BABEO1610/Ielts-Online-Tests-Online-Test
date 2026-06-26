@@ -390,6 +390,48 @@ Frontend:
 
 ## 11. Test Strategy
 
+## 11A. IELTS Knowledge Upgrade
+
+Theo RFC `.sdd/rfcs/rfc-2026-06-24-assistant-ielts-knowledge-upgrade.md`, assistant không được coi mọi câu hỏi là database lookup.
+
+Pipeline mới cần phân tách:
+
+```text
+FIND_TEST / FIND_LESSON
+-> query DB trước
+-> có dữ liệu thì inject context và gọi AI
+-> không có dữ liệu thì trả missing-data, không bịa test/lesson
+
+POST_TEST_REVIEW
+-> bắt buộc query DB
+-> bắt buộc check ownership và submitted_at
+-> chỉ giải thích dựa trên official context
+
+IELTS_KNOWLEDGE
+-> không cần DB
+-> gọi AI với IELTS expert system prompt
+-> cho phép giải thích grammar, vocabulary, criteria, strategy, paraphrase
+-> không được chấm bài thật, không dự đoán band score, không bịa đề/đáp án
+
+OUT_OF_SCOPE
+-> từ chối, không gọi AI
+```
+
+Intent `IELTS_KNOWLEDGE` dùng cho các câu như:
+
+- "Cohesion và coherence khác nhau thế nào?"
+- "Paraphrase câu này: people are living longer."
+- "Task 2 nên viết bao nhiêu từ?"
+- "Band 7 Writing cần gì?"
+- "Làm sao cải thiện True/False/Not Given?"
+
+Guardrail quan trọng:
+
+- Được phép giải thích tiêu chí band nói chung.
+- Không được nói "bài của bạn là band 7.0".
+- Không được chấm Writing/Speaking thật.
+- Không được tạo fake official test hoặc answer key.
+
 Add unit tests:
 
 ```text

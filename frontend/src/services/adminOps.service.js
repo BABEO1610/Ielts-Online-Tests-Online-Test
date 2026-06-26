@@ -73,9 +73,9 @@ const SAMPLE_TUTORS = [
 ];
 
 const SAMPLE_ASSIGNMENTS = [
-  { student_id: 'st1', student: 'Not Hướng Dương', email: 'nothuongduong@gmail.com', tutor_id: 'tu1', target_band: 7.0 },
-  { student_id: 'st2', student: 'Đạt Nguyễn Văn', email: 'thuyk2444@gmail.com', tutor_id: null, target_band: 6.5 },
-  { student_id: 'st3', student: 'wed201c', email: 'wed201c@gmail.com', tutor_id: 'tu2', target_band: 8.0 },
+  { id: 'w1', student: 'Not Hướng Dương', email: 'nothuongduong@gmail.com', type: 'writing', task_or_part: 2, target_band: 7.0, tutor_id: 'tu1', submitted_at: iso(0, -1) },
+  { id: 's1', student: 'Đạt Nguyễn Văn', email: 'thuyk2444@gmail.com', type: 'speaking', task_or_part: 1, target_band: 6.5, tutor_id: null, submitted_at: iso(0, -2) },
+  { id: 'w2', student: 'wed201c', email: 'wed201c@gmail.com', type: 'writing', task_or_part: 1, target_band: 8.0, tutor_id: 'tu2', submitted_at: iso(0, -3) },
 ];
 
 // ── Content review ───────────────────────────────────────────────────────────
@@ -148,9 +148,14 @@ export async function fetchContacts() {
     return ok([]);
   }
 }
-export async function resolveContact(id) {
-  try { await api.put(`/admin/contacts/${id}/resolve`); return true; }
-  catch { return true; }
+export async function updateContactStatus(id, payload) {
+  try { 
+    await api.put(`/admin/contacts/${id}/status`, payload); 
+    return true; 
+  } catch (error) { 
+    const msg = error?.response?.data?.error?.message || 'Không thể cập nhật liên hệ. Vui lòng thử lại.';
+    throw new Error(msg);
+  }
 }
 
 // ── Reports ─────────────────────────────────────────────────────────────────────
@@ -168,8 +173,8 @@ export async function fetchTutorAssignments() {
     return sample({ tutors: SAMPLE_TUTORS, assignments: SAMPLE_ASSIGNMENTS });
   }
 }
-export async function assignTutor(studentId, tutorId) {
-  try { await api.put(`/admin/tutor-assignments/${studentId}`, { tutor_id: tutorId }); return true; }
+export async function assignTutor(submissionId, type, tutorId) {
+  try { await api.put(`/admin/tutor-assignments/${submissionId}`, { tutor_id: tutorId, type }); return true; }
   catch { return true; }
 }
 
