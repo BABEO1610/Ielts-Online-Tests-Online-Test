@@ -63,4 +63,15 @@ const adminTutorController = require('../../../controllers/adminTutor.controller
 router.get('/tutor-assignments', authenticate, authorize('admin'), adminTutorController.getTutorAssignments);
 router.put('/tutor-assignments/:submissionId', authenticate, authorize('admin'), adminTutorController.assignTutor);
 
+// -------------------------------------------------------------
+// T041: API Giám sát chấm bài (Grading Oversight - IELTS-06)
+// -------------------------------------------------------------
+const adminGradingController = require('../../../controllers/adminGrading.controller');
+
+// GET  /api/v1/admin/submissions          — List all writing + speaking submissions
+router.get('/submissions', authenticate, authorize('admin'), adminGradingController.listSubmissions);
+
+// POST /api/v1/admin/submissions/:type/:id/retry — Reset to pending for AI re-grading
+router.post('/submissions/:type/:id/retry', authenticate, authorize('admin'), adminGradingController.retryGrading);
+
 module.exports = router;
