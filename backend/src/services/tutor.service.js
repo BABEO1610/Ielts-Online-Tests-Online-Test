@@ -98,6 +98,29 @@ class TutorService {
    * @param {string} submissionId 
    */
   static async getSubmissionDetail(type, submissionId) {
+    // TEMPORARY FIX: ensure parts consistency before fetching detail
+    try {
+      if (type === 'speaking') {
+        await pool.query(`
+          UPDATE speaking_submissions 
+          SET status = 'pending' 
+          WHERE speaking_group_id IN (
+            SELECT speaking_group_id FROM speaking_submissions WHERE status = 'pending'
+          ) AND status = 'tutor_graded'
+        `);
+      } else {
+        await pool.query(`
+          UPDATE writing_submissions 
+          SET status = 'pending' 
+          WHERE writing_group_id IN (
+            SELECT writing_group_id FROM writing_submissions WHERE status = 'pending'
+          ) AND status = 'tutor_graded'
+        `);
+      }
+    } catch (err) {
+      console.error('Error applying temporary fix:', err);
+    }
+
     if (type === 'writing') {
       const query = `
         WITH base AS (
@@ -774,6 +797,36 @@ class TutorService {
   static async getActivityLogStats(tutorId) {
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
+
+    // TEMPORARY FIX: Apply missing migration 018
+    try {
+      await pool.query(`
+        ALTER TYPE log_action ADD VALUE IF NOT EXISTS 'submission_graded';
+        ALTER TYPE log_action ADD VALUE IF NOT EXISTS 'submission_drafted';
+        ALTER TYPE log_action ADD VALUE IF NOT EXISTS 'private_note_added';
+      `);
+      
+      // BACKFILL missing logs
+      await pool.query(`
+        INSERT INTO audit_logs (actor_id, action, target_table, target_id, new_value, ip_address)
+        SELECT 
+          tutor_id, 
+          'submission_graded', 
+          CASE WHEN writing_submission_id IS NOT NULL THEN 'writing_submissions' ELSE 'speaking_submissions' END,
+          COALESCE(writing_submission_id, speaking_submission_id),
+          jsonb_build_object('reason', 'Band ' || band_score, 'band_score', band_score),
+          NULL
+        FROM tutor_feedback_reports tfr
+        WHERE NOT EXISTS (
+          SELECT 1 FROM audit_logs al 
+          WHERE al.actor_id = tfr.tutor_id 
+          AND al.action = 'submission_graded' 
+          AND al.target_id = COALESCE(tfr.writing_submission_id, tfr.speaking_submission_id)
+        )
+      `);
+    } catch (err) {
+      console.error('Error applying migration 018:', err);
+    }
 
     const query = `
       SELECT 
