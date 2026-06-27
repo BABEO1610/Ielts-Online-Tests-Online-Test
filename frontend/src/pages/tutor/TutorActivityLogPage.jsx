@@ -242,6 +242,7 @@ const TutorActivityLogPage = () => {
                       color: '#fff',
                       fontSize: '13px',
                       fontWeight: 500,
+                      whiteSpace: 'nowrap',
                       fontFamily: 'UberMoveText, system-ui, sans-serif'
                     }}>
                       {log.action_label || actionLabel(log.action)}

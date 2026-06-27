@@ -240,15 +240,17 @@ class TutorService {
     try {
       await client.query('BEGIN');
 
-      let submission;
       let studentId;
+      let submission;
+      let studentName = 'N/A';
 
       if (type === 'writing') {
         // 1. SELECT FOR UPDATE
         const checkQuery = `
-          SELECT id, writing_group_id, status, grader, user_id 
-          FROM writing_submissions 
-          WHERE id = $1 FOR UPDATE
+          SELECT ws.id, ws.writing_group_id, ws.status, ws.grader, ws.user_id, u.full_name as student_name
+          FROM writing_submissions ws
+          LEFT JOIN users u ON u.id = ws.user_id
+          WHERE ws.id = $1 FOR UPDATE
         `;
         const checkResult = await client.query(checkQuery, [submissionId]);
         if (checkResult.rowCount === 0) {
@@ -256,6 +258,7 @@ class TutorService {
         }
         submission = checkResult.rows[0];
         studentId = submission.user_id;
+        studentName = submission.student_name;
 
         if (!submission.writing_group_id) {
           throw new AppError('Legacy submission without group ID cannot be graded via grouped API.', 400);
@@ -300,9 +303,10 @@ class TutorService {
       } else if (type === 'speaking') {
         // 1. SELECT FOR UPDATE
         const checkQuery = `
-          SELECT id, speaking_group_id, status, grader, user_id 
-          FROM speaking_submissions 
-          WHERE id = $1 FOR UPDATE
+          SELECT ss.id, ss.speaking_group_id, ss.status, ss.grader, ss.user_id, u.full_name as student_name
+          FROM speaking_submissions ss
+          LEFT JOIN users u ON u.id = ss.user_id
+          WHERE ss.id = $1 FOR UPDATE
         `;
         const checkResult = await client.query(checkQuery, [submissionId]);
         if (checkResult.rowCount === 0) {
@@ -310,6 +314,7 @@ class TutorService {
         }
         submission = checkResult.rows[0];
         studentId = submission.user_id;
+        studentName = submission.student_name;
 
         if (!submission.speaking_group_id) {
           throw new AppError('Legacy submission without group ID cannot be graded via grouped API.', 400);
@@ -367,7 +372,8 @@ class TutorService {
           null, // old_value
           { 
             reason: `Band ${payload.bandScore}`, 
-            band_score: payload.bandScore 
+            band_score: payload.bandScore,
+            student_name: studentName
           }, // new_value
           ipAddress
         );
@@ -698,9 +704,12 @@ class TutorService {
       await client.query('BEGIN');
 
       const checkQuery = `
-        SELECT id, writing_submission_id, speaking_submission_id 
-        FROM tutor_feedback_reports 
-        WHERE tutor_id = $1 AND (writing_submission_id = $2 OR speaking_submission_id = $2)
+        SELECT tfr.id, tfr.writing_submission_id, tfr.speaking_submission_id, u.full_name as student_name
+        FROM tutor_feedback_reports tfr
+        LEFT JOIN writing_submissions ws ON tfr.writing_submission_id = ws.id
+        LEFT JOIN speaking_submissions ss ON tfr.speaking_submission_id = ss.id
+        LEFT JOIN users u ON u.id = COALESCE(ws.user_id, ss.user_id)
+        WHERE tfr.tutor_id = $1 AND (tfr.writing_submission_id = $2 OR tfr.speaking_submission_id = $2)
       `;
       const checkResult = await client.query(checkQuery, [tutorId, submissionId]);
       if (checkResult.rows.length === 0) {
@@ -736,7 +745,8 @@ class TutorService {
           { 
             reason: `Thu hồi bài chấm`, 
             submission_id: submissionId,
-            skill: report.writing_submission_id ? 'writing' : 'speaking'
+            skill: report.writing_submission_id ? 'writing' : 'speaking',
+            student_name: report.student_name
           },
           null
         );
@@ -763,9 +773,12 @@ class TutorService {
       await client.query('BEGIN');
 
       const checkQuery = `
-        SELECT id, writing_submission_id, speaking_submission_id 
-        FROM tutor_feedback_reports 
-        WHERE tutor_id = $1 AND (writing_submission_id = $2 OR speaking_submission_id = $2)
+        SELECT tfr.id, tfr.writing_submission_id, tfr.speaking_submission_id, u.full_name as student_name
+        FROM tutor_feedback_reports tfr
+        LEFT JOIN writing_submissions ws ON tfr.writing_submission_id = ws.id
+        LEFT JOIN speaking_submissions ss ON tfr.speaking_submission_id = ss.id
+        LEFT JOIN users u ON u.id = COALESCE(ws.user_id, ss.user_id)
+        WHERE tfr.tutor_id = $1 AND (tfr.writing_submission_id = $2 OR tfr.speaking_submission_id = $2)
       `;
       const checkResult = await client.query(checkQuery, [tutorId, submissionId]);
       if (checkResult.rows.length === 0) {
@@ -814,7 +827,8 @@ class TutorService {
             reason: `Band ${payload.bandScore}`, 
             band_score: payload.bandScore,
             submission_id: submissionId,
-            skill: report.writing_submission_id ? 'writing' : 'speaking'
+            skill: report.writing_submission_id ? 'writing' : 'speaking',
+            student_name: report.student_name
           },
           null
         );

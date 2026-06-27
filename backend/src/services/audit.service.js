@@ -289,6 +289,8 @@ const formatActor = (log) => ({
 const getTargetLabel = (log) => {
     if (log.target_user_email) return log.target_user_email;
     if (log.target_user_name) return log.target_user_name;
+    if (log.new_value && log.new_value.student_name) return `Học sinh: ${log.new_value.student_name}`;
+    if (log.old_value && log.old_value.student_name) return `Học sinh: ${log.old_value.student_name}`;
     if (log.new_value && log.new_value.email) return log.new_value.email;
     if (log.new_value && log.new_value.title) return log.new_value.title;
     if (log.new_value && log.new_value.file_name) return log.new_value.file_name;
