@@ -78,10 +78,18 @@ const TutorGradingPage = () => {
   if (error) return <div className="p-4 text-center text-danger mt-5" style={{fontFamily: 'UberMoveText, system-ui, sans-serif'}}>{error}</div>;
   if (!submissionData) return <div className="p-4 text-center mt-5" style={{fontFamily: 'UberMoveText, system-ui, sans-serif'}}>Không có dữ liệu</div>;
 
+  const isGradable = submissionData.status === 'pending' && submissionData.grader === 'tutor';
+  const effectiveMode = isGradable ? mode : 'view';
+
   // activeTask is already defined above
 
   return (
     <div className="container-fluid px-0" style={{ height: 'calc(100vh - 56px)', backgroundColor: '#f7f7f7' }}>
+      {!isGradable && mode === 'grade' && (
+        <div className="alert alert-warning text-center rounded-0 mb-0 fw-medium border-0 border-bottom" style={{fontFamily: 'UberMoveText, system-ui, sans-serif'}}>
+          Bài thi này đã được chấm hoặc không nằm trong danh sách cần chấm của bạn. Bạn chỉ có thể xem nội dung.
+        </div>
+      )}
       <div className="row g-0 h-100">
         {/* Cột Trái: Nội dung bài thi */}
         <div className="col-lg-6 col-xl-5 h-100 border-end border-light d-flex flex-column" style={{ overflowY: 'auto' }}>
@@ -170,8 +178,8 @@ const TutorGradingPage = () => {
               studentId={submissionData.student?.id}
               activeTaskId="overall"
               tasks={submissionData.tasks}
-              readOnly={mode === 'view'}
-              editMode={mode === 'edit'}
+              readOnly={effectiveMode === 'view'}
+              editMode={effectiveMode === 'edit'}
               initialData={gradedData}
             />
           </div>

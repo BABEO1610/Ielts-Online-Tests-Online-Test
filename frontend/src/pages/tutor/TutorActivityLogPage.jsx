@@ -260,7 +260,7 @@ const TutorActivityLogPage = () => {
                     </div>
                   </td>
                   <td style={{ padding: '16px 20px', fontSize: '14px', color: '#333', whiteSpace: 'pre-wrap', fontFamily: 'UberMoveText, system-ui, sans-serif' }}>
-                    {log.reason || '—'}
+                    {log.reason || (log.action === 'login' ? 'Đăng nhập hệ thống thành công' : log.action === 'logout' ? 'Đăng xuất khỏi hệ thống' : '—')}
                   </td>
                   <td style={{ padding: '16px 20px' }}>
                     <span style={{
