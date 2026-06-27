@@ -758,7 +758,7 @@ class TutorService {
   static async getActivityLogStats(tutorId) {
     const query = `
       SELECT 
-        (SELECT COUNT(*)::int FROM audit_logs WHERE actor_id = $1 AND created_at::date = CURRENT_DATE) as today_actions,
+        (SELECT COUNT(*)::int FROM audit_logs WHERE actor_id = $1 AND timezone('Asia/Ho_Chi_Minh', created_at)::date = timezone('Asia/Ho_Chi_Minh', now())::date) as today_actions,
         (SELECT COUNT(*)::int FROM audit_logs WHERE actor_id = $1 AND action = 'submission_graded' AND created_at >= NOW() - INTERVAL '7 days') as graded_week,
         (SELECT COUNT(*)::int FROM audit_logs WHERE actor_id = $1 AND action IN ('test_updated', 'resource_uploaded', 'resource_reviewed', 'test_reviewed')) as content_updates
     `;
