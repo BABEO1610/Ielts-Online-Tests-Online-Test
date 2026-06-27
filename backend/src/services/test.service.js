@@ -1,4 +1,5 @@
 const { pool } = require('../db/pool');
+const AuditLogService = require('./audit.service');
 
 /**
  * Service to handle tests.
@@ -595,6 +596,24 @@ class TestService {
       }
 
       await client.query('COMMIT');
+      
+      // Log action for update
+      try {
+        if (userId) {
+          await AuditLogService.logAction(
+            userId,
+            'test_updated',
+            'mock_tests',
+            testId,
+            null,
+            { title, skill },
+            null
+          );
+        }
+      } catch (err) {
+        console.warn('[TestService] Failed to insert audit log for test update:', err.message);
+      }
+      
     } catch (error) {
       await client.query('ROLLBACK');
       throw error;

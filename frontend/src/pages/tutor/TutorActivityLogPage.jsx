@@ -99,7 +99,7 @@ const TutorActivityLogPage = () => {
       try {
         let actionParam = '';
         if (activeFilter === 'Chấm bài') actionParam = 'submission_graded';
-        else if (activeFilter === 'Nội dung') actionParam = 'test_updated';
+        else if (activeFilter === 'Nội dung') actionParam = 'content';
         else if (activeFilter === 'Hệ thống') actionParam = 'login';
 
         const res = await api.get('/tutors/activity-logs', {
@@ -231,7 +231,7 @@ const TutorActivityLogPage = () => {
               return (
                 <tr key={log.id} style={{ borderBottom: idx < logs.length - 1 ? '1px solid #f0f0f0' : 'none' }}>
                   <td style={{ padding: '16px 20px', fontSize: '14px', color: '#333', fontFamily: 'UberMoveText, system-ui, sans-serif' }}>
-                    {formatDateTime(log.time)}
+                    {formatDateTime(log.created_at)}
                   </td>
                   <td style={{ padding: '16px 20px' }}>
                     <span style={{
