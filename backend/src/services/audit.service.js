@@ -76,6 +76,9 @@ class AuditLogService {
                     'role_changed', 'password_changed_by_admin', 'permission_denied'
                 ];
             }
+        } else if (filters.action === 'content') {
+            enrichedFilters.action = null; // Xóa action đơn
+            enrichedFilters.severityActions = ['test_updated', 'resource_uploaded', 'resource_reviewed', 'test_reviewed'];
         }
 
         const result = await listAuditLogs(pool, enrichedFilters);

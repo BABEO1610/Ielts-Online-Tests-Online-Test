@@ -824,6 +824,26 @@ class TutorService {
           AND al.target_id = COALESCE(tfr.writing_submission_id, tfr.speaking_submission_id)
         )
       `);
+      
+      // BACKFILL missing test_updated logs based on mock_tests updated_at > created_at
+      await pool.query(`
+        INSERT INTO audit_logs (actor_id, action, target_table, target_id, new_value, ip_address, created_at)
+        SELECT 
+          created_by, 
+          'test_updated', 
+          'mock_tests',
+          id,
+          jsonb_build_object('title', title, 'skill', skill),
+          NULL,
+          updated_at
+        FROM mock_tests mt
+        WHERE updated_at > created_at
+        AND NOT EXISTS (
+          SELECT 1 FROM audit_logs al 
+          WHERE al.target_id = mt.id 
+          AND al.action = 'test_updated'
+        )
+      `);
     } catch (err) {
       console.error('Error applying migration 018:', err);
     }
