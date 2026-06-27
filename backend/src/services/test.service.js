@@ -184,6 +184,24 @@ class TestService {
       }
 
       await client.query('COMMIT');
+
+      // Log action for creation
+      try {
+        if (userId) {
+          await AuditLogService.logAction(
+            userId,
+            'test_created',
+            'mock_tests',
+            testId,
+            null,
+            { title, skill },
+            null
+          );
+        }
+      } catch (err) {
+        console.warn('[TestService] Failed to insert audit log for test creation:', err.message);
+      }
+
       return { id: testId };
     } catch (error) {
       await client.query('ROLLBACK');
@@ -532,7 +550,7 @@ class TestService {
       // 1. Update Test (including audio_url for listening tests)
       await client.query(
         `UPDATE mock_tests 
-         SET title = $1, description = $2, skill = $3, difficulty = $4, duration_minutes = $5, is_published = $6, publish_at = $7, audio_url = $8 
+         SET title = $1, description = $2, skill = $3, difficulty = $4, duration_minutes = $5, is_published = $6, publish_at = $7, audio_url = $8, updated_at = NOW() 
          WHERE id = $9`,
         [title, description, skill, difficulty, duration, isPublished, publishAt || null, audioUrl || null, testId]
       );
@@ -625,9 +643,45 @@ class TestService {
   /**
    * Delete a test by ID
    */
-  static async deleteTest(testId) {
-    // ON DELETE CASCADE will handle child records in test_passages, question_blocks, questions
-    await pool.query(`DELETE FROM mock_tests WHERE id = $1`, [testId]);
+  static async deleteTest(testId, userId) {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      
+      // Get test details before deletion for logging
+      const res = await client.query('SELECT title, skill FROM mock_tests WHERE id = $1', [testId]);
+      if (res.rows.length === 0) {
+        throw new Error('Test not found');
+      }
+      const test = res.rows[0];
+
+      // ON DELETE CASCADE will handle child records in test_passages, question_blocks, questions
+      await client.query(`DELETE FROM mock_tests WHERE id = $1`, [testId]);
+      
+      await client.query('COMMIT');
+      
+      // Log deletion
+      try {
+        if (userId) {
+          await AuditLogService.logAction(
+            userId,
+            'test_deleted',
+            'mock_tests',
+            testId,
+            { title: test.title, skill: test.skill },
+            null,
+            null
+          );
+        }
+      } catch (err) {
+        console.warn('[TestService] Failed to insert audit log for test deletion:', err.message);
+      }
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 }
 

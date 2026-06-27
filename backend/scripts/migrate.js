@@ -1,7 +1,5 @@
 const fs = require('node:fs');
 const path = require('node:path');
-
-// Load .env from project root
 require('dotenv').config({ path: path.resolve(__dirname, '../../.env') });
 
 const { pool } = require('../src/db/pool');

@@ -725,6 +725,25 @@ class TutorService {
 
       await client.query(`DELETE FROM tutor_feedback_reports WHERE id = $1`, [report.id]);
 
+      const AuditLogService = require('./audit.service');
+      try {
+        await AuditLogService.logAction(
+          tutorId,
+          'submission_revoked',
+          'tutor_feedback_reports',
+          report.id,
+          null,
+          { 
+            reason: `Thu hồi bài chấm`, 
+            submission_id: submissionId,
+            skill: report.writing_submission_id ? 'writing' : 'speaking'
+          },
+          null
+        );
+      } catch (logErr) {
+        console.warn('Failed to log submission_revoked:', logErr.message);
+      }
+
       await client.query('COMMIT');
       return { success: true };
     } catch (error) {
@@ -782,6 +801,26 @@ class TutorService {
       ]);
 
       await client.query('COMMIT');
+
+      const AuditLogService = require('./audit.service');
+      try {
+        await AuditLogService.logAction(
+          tutorId,
+          'submission_regraded',
+          'tutor_feedback_reports',
+          report.id,
+          null,
+          { 
+            reason: `Band ${payload.bandScore}`, 
+            band_score: payload.bandScore,
+            submission_id: submissionId,
+            skill: report.writing_submission_id ? 'writing' : 'speaking'
+          },
+          null
+        );
+      } catch (logErr) {
+        console.warn('Failed to log submission_regraded:', logErr.message);
+      }
       return { success: true };
     } catch (error) {
       await client.query('ROLLBACK');
@@ -852,7 +891,7 @@ class TutorService {
       SELECT 
         (SELECT COUNT(*)::int FROM audit_logs WHERE actor_id = $1 AND created_at >= $2) as today_actions,
         (SELECT COUNT(*)::int FROM audit_logs WHERE actor_id = $1 AND action = 'submission_graded' AND created_at >= NOW() - INTERVAL '7 days') as graded_week,
-        (SELECT COUNT(*)::int FROM audit_logs WHERE actor_id = $1 AND action IN ('test_updated', 'resource_uploaded', 'resource_reviewed', 'test_reviewed')) as content_updates
+        (SELECT COUNT(*)::int FROM audit_logs WHERE actor_id = $1 AND action IN ('test_created', 'test_updated', 'test_deleted', 'resource_uploaded', 'resource_reviewed', 'test_reviewed')) as content_updates
     `;
     const result = await pool.query(query, [tutorId, todayStart.toISOString()]);
     return result.rows[0] || { today_actions: 0, graded_week: 0, content_updates: 0 };

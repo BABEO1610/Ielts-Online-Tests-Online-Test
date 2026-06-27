@@ -54,6 +54,8 @@ const ACTION_LABELS = {
   submission_graded: 'Công bố điểm',
   submission_drafted: 'Lưu nháp',
   private_note_added: 'Ghi chú riêng',
+  submission_revoked: 'Thu hồi kết quả',
+  submission_regraded: 'Sửa kết quả chấm'
 };
 
 export const actionLabel = (action) => ACTION_LABELS[action] || action;
