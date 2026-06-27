@@ -79,7 +79,7 @@ const TutorGradingPage = () => {
   if (!submissionData) return <div className="p-4 text-center mt-5" style={{fontFamily: 'UberMoveText, system-ui, sans-serif'}}>Không có dữ liệu</div>;
 
   const isGradable = submissionData.status === 'pending' && submissionData.grader === 'tutor';
-  const effectiveMode = isGradable ? mode : 'view';
+  const effectiveMode = (isGradable || mode === 'edit') ? mode : 'view';
 
   // activeTask is already defined above
 
