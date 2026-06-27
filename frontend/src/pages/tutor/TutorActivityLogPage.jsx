@@ -98,7 +98,7 @@ const TutorActivityLogPage = () => {
       setIsLoading(true);
       try {
         let actionParam = '';
-        if (activeFilter === 'Chấm bài') actionParam = 'submission_graded';
+        if (activeFilter === 'Chấm bài') actionParam = 'grading';
         else if (activeFilter === 'Nội dung') actionParam = 'content';
         else if (activeFilter === 'Hệ thống') actionParam = 'login';
 
