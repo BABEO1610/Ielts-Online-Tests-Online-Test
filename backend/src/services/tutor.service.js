@@ -111,6 +111,8 @@ class TutorService {
             u.full_name AS student_name,
             mt.title AS test_title,
             MIN(ws.submitted_at) AS submitted_at,
+            MIN(ws.status) AS status,
+            MIN(ws.grader) AS grader,
             json_agg(
                 json_build_object(
                     'submissionId', ws.id,
@@ -143,6 +145,8 @@ class TutorService {
         },
         testTitle: row.test_title,
         submittedAt: row.submitted_at,
+        status: row.status,
+        grader: row.grader,
         parts: row.parts
       };
     } else if (type === 'speaking') {
@@ -158,6 +162,8 @@ class TutorService {
             u.full_name AS student_name,
             mt.title AS test_title,
             MIN(ss.submitted_at) AS submitted_at,
+            MIN(ss.status) AS status,
+            MIN(ss.grader) AS grader,
             json_agg(
                 json_build_object(
                     'submissionId', ss.id,
@@ -190,6 +196,8 @@ class TutorService {
         },
         testTitle: row.test_title,
         submittedAt: row.submitted_at,
+        status: row.status,
+        grader: row.grader,
         parts: row.parts
       };
     }
@@ -679,9 +687,17 @@ class TutorService {
       const report = checkResult.rows[0];
 
       if (report.writing_submission_id) {
-        await client.query(`UPDATE writing_submissions SET status = 'pending' WHERE id = $1`, [submissionId]);
+        await client.query(`
+          UPDATE writing_submissions 
+          SET status = 'pending' 
+          WHERE writing_group_id = (SELECT writing_group_id FROM writing_submissions WHERE id = $1)
+        `, [submissionId]);
       } else if (report.speaking_submission_id) {
-        await client.query(`UPDATE speaking_submissions SET status = 'pending' WHERE id = $1`, [submissionId]);
+        await client.query(`
+          UPDATE speaking_submissions 
+          SET status = 'pending' 
+          WHERE speaking_group_id = (SELECT speaking_group_id FROM speaking_submissions WHERE id = $1)
+        `, [submissionId]);
       }
 
       await client.query(`DELETE FROM tutor_feedback_reports WHERE id = $1`, [report.id]);
@@ -756,13 +772,16 @@ class TutorService {
    * Get Activity Log Stats for Tutor
    */
   static async getActivityLogStats(tutorId) {
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+
     const query = `
       SELECT 
-        (SELECT COUNT(*)::int FROM audit_logs WHERE actor_id = $1 AND timezone('Asia/Ho_Chi_Minh', created_at)::date = timezone('Asia/Ho_Chi_Minh', now())::date) as today_actions,
+        (SELECT COUNT(*)::int FROM audit_logs WHERE actor_id = $1 AND created_at >= $2) as today_actions,
         (SELECT COUNT(*)::int FROM audit_logs WHERE actor_id = $1 AND action = 'submission_graded' AND created_at >= NOW() - INTERVAL '7 days') as graded_week,
         (SELECT COUNT(*)::int FROM audit_logs WHERE actor_id = $1 AND action IN ('test_updated', 'resource_uploaded', 'resource_reviewed', 'test_reviewed')) as content_updates
     `;
-    const result = await pool.query(query, [tutorId]);
+    const result = await pool.query(query, [tutorId, todayStart.toISOString()]);
     return result.rows[0] || { today_actions: 0, graded_week: 0, content_updates: 0 };
   }
 }
