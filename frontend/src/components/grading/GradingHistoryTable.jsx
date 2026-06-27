@@ -40,27 +40,18 @@ const getAvatarColor = (name = '') => {
   return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
 };
 
-// Cấu hình cột — sortKey null = không sortable
+// Cấu hình cột
 const COLUMNS = [
-  { label: 'Thời gian',         sortKey: 'rawDate', width: '140px' },
-  { label: 'Học sinh',          sortKey: null,       width: 'auto' },
-  { label: 'Bài thi / Kỹ năng', sortKey: null,       width: 'auto' },
-  { label: 'Điểm Band',         sortKey: 'band',     width: '110px' },
-  { label: 'Chi tiết feedback', sortKey: null,       width: 'auto' },
-  { label: 'Trạng thái',        sortKey: null,       width: 'auto' },
-  { label: 'Hành động',         sortKey: null,       width: '120px' },
+  { label: 'Thời gian',         width: '140px' },
+  { label: 'Học sinh',          width: 'auto' },
+  { label: 'Bài thi / Kỹ năng', width: 'auto' },
+  { label: 'Điểm Band',         width: '110px' },
+  { label: 'Chi tiết feedback', width: 'auto' },
+  { label: 'Trạng thái',        width: 'auto' },
+  { label: 'Hành động',         width: '120px' },
 ];
 
-const SortIcon = ({ active, dir }) => {
-  if (!active) return <span style={{ opacity: 0.3, fontSize: '11px', marginLeft: '4px' }}>↕</span>;
-  return (
-    <span style={{ fontSize: '11px', marginLeft: '4px', color: '#000' }}>
-      {dir === 'asc' ? '↑' : '↓'}
-    </span>
-  );
-};
-
-const IconBtn = ({ title, emoji, onClick, danger = false }) => (
+const IconBtn = ({ title, iconClass, onClick, danger = false }) => (
   <button
     title={title}
     onClick={onClick}
@@ -71,12 +62,18 @@ const IconBtn = ({ title, emoji, onClick, danger = false }) => (
       alignItems: 'center', justifyContent: 'center',
       fontSize: '15px', cursor: 'pointer',
       color: danger ? '#c62828' : '#333',
-      transition: 'background 0.15s', flexShrink: 0,
+      transition: 'all 0.15s', flexShrink: 0,
     }}
-    onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = danger ? '#ffebee' : '#e8e8e8'; }}
-    onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#f5f5f5'; }}
+    onMouseEnter={(e) => { 
+      e.currentTarget.style.backgroundColor = danger ? '#ffebee' : '#e8e8e8';
+      e.currentTarget.style.color = danger ? '#b71c1c' : '#000';
+    }}
+    onMouseLeave={(e) => { 
+      e.currentTarget.style.backgroundColor = '#f5f5f5';
+      e.currentTarget.style.color = danger ? '#c62828' : '#333';
+    }}
   >
-    {emoji}
+    <i className={iconClass}></i>
   </button>
 );
 
@@ -142,8 +139,8 @@ const SkeletonRow = () => {
 
 
 const GradingHistoryTable = ({
-  rows, statusMap, skillMap, onView, onRevoke,
-  sortKey, sortDir, onSort, loading = false,
+  rows, statusMap, skillMap, onView, onRevoke, onEdit,
+  loading = false,
 }) => (
   <>
     <style>{SHIMMER_STYLE}</style>
@@ -157,24 +154,17 @@ const GradingHistoryTable = ({
           {COLUMNS.map((col) => (
             <th
               key={col.label}
-              onClick={col.sortKey ? () => onSort(col.sortKey) : undefined}
               style={{
                 padding: '14px 16px',
                 fontSize: '11px', fontWeight: 700, letterSpacing: '0.6px',
                 textTransform: 'uppercase', color: '#888',
                 fontFamily: 'UberMoveText, system-ui, sans-serif',
                 whiteSpace: 'nowrap', width: col.width,
-                cursor: col.sortKey ? 'pointer' : 'default',
+                cursor: 'default',
                 userSelect: 'none',
-                transition: 'color 0.15s',
               }}
-              onMouseEnter={(e) => { if (col.sortKey) e.currentTarget.style.color = '#333'; }}
-              onMouseLeave={(e) => { if (col.sortKey) e.currentTarget.style.color = '#888'; }}
             >
               {col.label}
-              {col.sortKey && (
-                <SortIcon active={sortKey === col.sortKey} dir={sortDir} />
-              )}
             </th>
           ))}
         </tr>
@@ -280,10 +270,10 @@ const GradingHistoryTable = ({
               {/* Hành động */}
               <td style={{ padding: '16px' }}>
                 <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                  <IconBtn title="Xem chi tiết"         emoji="👁"  onClick={() => onView(r)} />
-                  <IconBtn title="Chỉnh sửa / Cập nhật" emoji="✏️" onClick={() => {}} />
+                  <IconBtn title="Xem chi tiết"         iconClass="bi bi-eye"  onClick={() => onView(r)} />
+                  <IconBtn title="Chỉnh sửa / Cập nhật" iconClass="bi bi-pencil-square" onClick={() => onEdit && onEdit(r)} />
                   {r.status !== 'disputed' && (
-                    <IconBtn title="Thu hồi kết quả" emoji="↩" onClick={() => onRevoke(r)} danger />
+                    <IconBtn title="Thu hồi kết quả" iconClass="bi bi-arrow-counterclockwise" onClick={() => onRevoke(r)} danger />
                   )}
                 </div>
               </td>

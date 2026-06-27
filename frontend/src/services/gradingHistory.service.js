@@ -14,95 +14,22 @@
  *   { success: true, data: {...}, error: null, meta: { page, total } }
  */
 
-import axios from 'axios';
+import api from './api';
 
-const BASE = '/api/v1/grading/history';
+const BASE = '/tutors/grading-history';
 
-// ─── Mock data (dùng tạm đến khi backend sẵn sàng) ──────────────────────────
-export const MOCK_HISTORY = [
-  {
-    id: 'sub-w-001',
-    time: '14:30', date: '10/06/2026',
-    rawDate: new Date('2026-06-10T14:30:00'),
-    studentName: 'Nguyễn Văn A', studentCode: 'HS001',
-    testName: 'Mock Test Tháng 6 - Writing',
-    skill: 'writing', band: 6.5,
-    feedbackTypes: ['Text', 'Audio feedback'],
-    status: 'graded',
-  },
-  {
-    id: 'sub-s-002',
-    time: '11:15', date: '10/06/2026',
-    rawDate: new Date('2026-06-10T11:15:00'),
-    studentName: 'Trần Thị B', studentCode: 'HS002',
-    testName: 'Cambridge IELTS 18 - Listening',
-    skill: 'speaking', band: 7.0,
-    feedbackTypes: ['Audio feedback'],
-    status: 'edited',
-  },
-  {
-    id: 'sub-w-003',
-    time: '09:00', date: '10/06/2026',
-    rawDate: new Date('2026-06-10T09:00:00'),
-    studentName: 'Lê Văn C', studentCode: 'HS003',
-    testName: 'Mock Test T5 - Writing',
-    skill: 'writing', band: 5.5,
-    feedbackTypes: ['Private note', 'Text'],
-    status: 'disputed',
-  },
-  {
-    id: 'sub-s-004',
-    time: '16:45', date: '09/06/2026',
-    rawDate: new Date('2026-06-09T16:45:00'),
-    studentName: 'Phạm Thị D', studentCode: 'HS004',
-    testName: 'Cambridge IELTS 17 - Speaking',
-    skill: 'speaking', band: 6.0,
-    feedbackTypes: ['Text', 'Audio feedback'],
-    status: 'graded',
-  },
-  {
-    id: 'sub-w-005',
-    time: '13:20', date: '09/06/2026',
-    rawDate: new Date('2026-06-09T13:20:00'),
-    studentName: 'Dương Dũng', studentCode: 'HS005',
-    testName: 'Cam 18 - Reading',
-    skill: 'writing', band: 7.5,
-    feedbackTypes: ['Text', 'Audio feedback'],
-    status: 'graded',
-  },
-  {
-    id: 'sub-s-006',
-    time: '10:05', date: '09/06/2026',
-    rawDate: new Date('2026-06-09T10:05:00'),
-    studentName: 'Em En', studentCode: 'HS006',
-    testName: 'Mock Test T6 - Listening',
-    skill: 'speaking', band: 6.5,
-    feedbackTypes: ['Private note'],
-    status: 'graded',
-  },
-  {
-    id: 'sub-w-007',
-    time: '08:45', date: '08/06/2026',
-    rawDate: new Date('2026-06-08T08:45:00'),
-    studentName: 'Phạm Quỳnh', studentCode: 'HS007',
-    testName: 'Cambridge IELTS 17 - Writing Task 1',
-    skill: 'writing', band: 5.0,
-    feedbackTypes: ['Text'],
-    status: 'edited',
-  },
-  {
-    id: 'sub-s-008',
-    time: '15:30', date: '07/06/2026',
-    rawDate: new Date('2026-06-07T15:30:00'),
-    studentName: 'Hoàng Minh', studentCode: 'HS008',
-    testName: 'Mock Test T4 - Speaking Part 2',
-    skill: 'speaking', band: 8.0,
-    feedbackTypes: ['Text', 'Private note'],
-    status: 'graded',
-  },
-];
+
 
 // ─── API Functions ───────────────────────────────────────────────────────────
+
+/**
+ * Lấy danh sách thống kê chấm bài tháng này.
+ * @returns {Promise<{ success, data, error, meta }>}
+ */
+export async function getGradingHistoryStats() {
+  const { data } = await api.get(`${BASE}/stats`);
+  return data;
+}
 
 /**
  * Lấy danh sách lịch sử chấm bài (có filter + phân trang).
@@ -118,17 +45,8 @@ export const MOCK_HISTORY = [
  * @returns {Promise<{ success, data, error, meta }>}
  */
 export async function getGradingHistory(params = {}) {
-  // TODO: bỏ comment khi backend sẵn sàng, xóa phần mock phía dưới
-  // const { data } = await axios.get(BASE, { params });
-  // return data;
-
-  // Mock response theo format { success, data, error, meta }
-  return {
-    success: true,
-    data: MOCK_HISTORY,
-    error: null,
-    meta: { page: params.page ?? 1, total: MOCK_HISTORY.length },
-  };
+  const { data } = await api.get(BASE, { params });
+  return data;
 }
 
 /**
@@ -138,14 +56,8 @@ export async function getGradingHistory(params = {}) {
  * @returns {Promise<{ success, data, error, meta }>}
  */
 export async function getGradingHistoryById(id) {
-  // TODO: bỏ comment khi backend sẵn sàng
-  // const { data } = await axios.get(`${BASE}/${id}`);
-  // return data;
-
-  const record = MOCK_HISTORY.find((r) => r.id === id);
-  return record
-    ? { success: true, data: record, error: null, meta: {} }
-    : { success: false, data: null, error: { code: 'NOT_FOUND', message: 'Không tìm thấy bài chấm' }, meta: {} };
+  const { data } = await api.get(`${BASE}/${id}`);
+  return data;
 }
 
 /**
@@ -155,11 +67,20 @@ export async function getGradingHistoryById(id) {
  * @returns {Promise<{ success, data, error, meta }>}
  */
 export async function revokeGradingResult(id) {
-  // TODO: bỏ comment khi backend sẵn sàng
-  // const { data } = await axios.patch(`${BASE}/${id}/revoke`);
-  // return data;
+  const { data } = await api.patch(`${BASE}/${id}/revoke`);
+  return data;
+}
 
-  return { success: true, data: { id, status: 'revoked' }, error: null, meta: {} };
+/**
+ * Cập nhật điểm và nhận xét của một bài chấm.
+ *
+ * @param {string} id — submission id
+ * @param {object} payload — data cập nhật (bandScore, feedback...)
+ * @returns {Promise<{ success, data, error, meta }>}
+ */
+export async function updateGradingResult(id, payload) {
+  const { data } = await api.patch(`${BASE}/${id}/score`, payload);
+  return data;
 }
 
 /**

@@ -56,6 +56,46 @@ class TutorController {
   }
 
   /**
+   * GET /api/v1/tutors/grading-history
+   */
+  static async getGradingHistory(req, res, next) {
+    try {
+      const tutorId = req.user.id;
+      const { page, limit, export: isExport } = req.query;
+
+      const result = await TutorService.getGradingHistory(tutorId, { page, limit, export: isExport });
+
+      res.status(200).json({
+        success: true,
+        data: result.history,
+        error: null,
+        meta: result.meta
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  /**
+   * GET /api/v1/tutors/grading-history/stats
+   */
+  static async getGradingHistoryStats(req, res, next) {
+    try {
+      const tutorId = req.user.id;
+      const stats = await TutorService.getGradingHistoryStats(tutorId);
+
+      res.status(200).json({
+        success: true,
+        data: stats,
+        error: null,
+        meta: null
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  /**
    * GET /api/v1/tutors/submissions/:type/:submissionId
    */
   static async getSubmissionDetail(req, res, next) {
@@ -139,6 +179,51 @@ class TutorController {
       next(error);
     }
   }
+  /**
+   * GET /api/v1/tutors/grading-history/:submissionId
+   */
+  static async getGradingHistoryById(req, res, next) {
+    try {
+      const data = await TutorService.getGradingHistoryById(req.user.id, req.params.submissionId);
+      res.status(200).json({ success: true, data, error: null, meta: null });
+    } catch (err) {
+      if (err.message.includes('Không tìm thấy')) {
+        return res.status(404).json({ success: false, data: null, error: { code: 'NOT_FOUND', message: err.message }, meta: null });
+      }
+      next(err);
+    }
+  }
+
+  /**
+   * PATCH /api/v1/tutors/grading-history/:submissionId/revoke
+   */
+  static async revokeGradingResult(req, res, next) {
+    try {
+      await TutorService.revokeGradingResult(req.user.id, req.params.submissionId);
+      res.status(200).json({ success: true, data: { message: 'Thu hồi thành công' }, error: null, meta: null });
+    } catch (err) {
+      if (err.message.includes('Không tìm thấy') || err.message.includes('không có quyền')) {
+        return res.status(403).json({ success: false, data: null, error: { code: 'FORBIDDEN', message: err.message }, meta: null });
+      }
+      next(err);
+    }
+  }
+
+  /**
+   * PATCH /api/v1/tutors/grading-history/:submissionId/score
+   */
+  static async updateGradingResult(req, res, next) {
+    try {
+      await TutorService.updateGradingResult(req.user.id, req.params.submissionId, req.body);
+      res.status(200).json({ success: true, data: { message: 'Cập nhật thành công' }, error: null, meta: null });
+    } catch (err) {
+      if (err.message.includes('Không tìm thấy') || err.message.includes('không có quyền')) {
+        return res.status(403).json({ success: false, data: null, error: { code: 'FORBIDDEN', message: err.message }, meta: null });
+      }
+      next(err);
+    }
+  }
+
   /**
    * GET /api/v1/tutors/activity-logs
    */
