@@ -234,7 +234,7 @@ class TutorController {
       const filters = {
         page: parseInt(page, 10) || 1,
         limit: parseInt(limit, 10) || 20,
-        actorId: req.user.id, // Only tutor's own logs
+        actor_id: req.user.id, // Only tutor's own logs
         action: action || null,
         targetTable: target || null,
         severity: severity || null,

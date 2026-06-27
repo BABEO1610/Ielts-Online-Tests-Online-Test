@@ -225,7 +225,7 @@ const TutorActivityLogPage = () => {
               </tr>
             ) : logs.map((log, idx) => {
               const actionColor = log.severity === 'suspicious' ? '#d32f2f' : '#333';
-              const targetName = log.target_label || log.target_id || 'Hệ thống';
+              const targetName = log.target || 'Hệ thống';
               const targetAvatar = targetName !== 'Hệ thống' ? `https://ui-avatars.com/api/?name=${encodeURIComponent(targetName)}&background=random` : null;
 
               return (
@@ -260,7 +260,7 @@ const TutorActivityLogPage = () => {
                     </div>
                   </td>
                   <td style={{ padding: '16px 20px', fontSize: '14px', color: '#333', whiteSpace: 'pre-wrap', fontFamily: 'UberMoveText, system-ui, sans-serif' }}>
-                    {log.action_label || 'Hệ thống ghi nhận'}
+                    {log.reason || '—'}
                   </td>
                   <td style={{ padding: '16px 20px' }}>
                     <span style={{
