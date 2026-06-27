@@ -37,11 +37,47 @@ const FilterPill = ({ label, active, onClick }) => (
   </button>
 );
 
+const Pagination = ({ page, totalPages, total, onPageChange }) => (
+  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '20px', flexWrap: 'wrap', gap: '12px' }}>
+    <span style={{ fontSize: '13px', color: '#888' }}>Trang {page} / {totalPages} — {total} hoạt động</span>
+    <div style={{ display: 'flex', gap: '6px' }}>
+      <button onClick={() => onPageChange(Math.max(1, page - 1))} disabled={page === 1}
+        style={{ padding: '8px 18px', borderRadius: '999px', border: '1px solid #ddd', backgroundColor: page === 1 ? '#f5f5f5' : '#fff', color: page === 1 ? '#bbb' : '#000', fontSize: '14px', cursor: page === 1 ? 'default' : 'pointer', fontFamily: 'UberMoveText, system-ui, sans-serif', fontWeight: 500 }}>
+        ← Trước
+      </button>
+      {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
+        <button key={p} onClick={() => onPageChange(p)}
+          style={{ width: '36px', height: '36px', borderRadius: '999px', border: p === page ? 'none' : '1px solid #ddd', backgroundColor: p === page ? '#000' : '#fff', color: p === page ? '#fff' : '#000', fontSize: '14px', fontWeight: p === page ? 700 : 400, cursor: 'pointer', fontFamily: 'UberMoveText, system-ui, sans-serif' }}>
+          {p}
+        </button>
+      ))}
+      <button onClick={() => onPageChange(Math.min(totalPages, page + 1))} disabled={page === totalPages || totalPages === 0}
+        style={{ padding: '8px 18px', borderRadius: '999px', border: '1px solid #ddd', backgroundColor: (page === totalPages || totalPages === 0) ? '#f5f5f5' : '#fff', color: (page === totalPages || totalPages === 0) ? '#bbb' : '#000', fontSize: '14px', cursor: (page === totalPages || totalPages === 0) ? 'default' : 'pointer', fontFamily: 'UberMoveText, system-ui, sans-serif', fontWeight: 500 }}>
+        Tiếp →
+      </button>
+    </div>
+  </div>
+);
+
 const TutorActivityLogPage = () => {
   const [activeFilter, setActiveFilter] = useState('Tất cả');
+  const [dateRange, setDateRange] = useState('7_days');
+  const [isDateDropdownOpen, setIsDateDropdownOpen] = useState(false);
   const [logs, setLogs] = useState([]);
   const [stats, setStats] = useState({ today_actions: 0, graded_week: 0, content_updates: 0 });
   const [isLoading, setIsLoading] = useState(true);
+  
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+  const limit = 20;
+
+  const dateRangeOptions = {
+    'today': 'Hôm nay',
+    '7_days': '7 ngày qua',
+    '30_days': '30 ngày qua',
+    'all': 'Tất cả'
+  };
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -69,12 +105,17 @@ const TutorActivityLogPage = () => {
         const res = await api.get('/tutors/activity-logs', {
           params: {
             action: actionParam || undefined,
-            limit: 50,
-            dateRange: '7_days'
+            page: page,
+            limit: limit,
+            dateRange: dateRange !== 'all' ? dateRange : undefined
           }
         });
         if (res.data.success) {
           setLogs(res.data.data);
+          if (res.data.meta) {
+            setTotal(res.data.meta.total);
+            setTotalPages(Math.ceil(res.data.meta.total / limit));
+          }
         }
       } catch (e) {
         console.error('Failed to fetch logs', e);
@@ -83,7 +124,12 @@ const TutorActivityLogPage = () => {
       }
     };
     fetchLogs();
-  }, [activeFilter]);
+  }, [activeFilter, dateRange, page]);
+
+  // Reset page to 1 when filters change
+  useEffect(() => {
+    setPage(1);
+  }, [activeFilter, dateRange]);
 
   return (
     <div style={{ padding: '32px 48px', maxWidth: '1400px', margin: '0 auto', fontFamily: 'UberMoveText, system-ui, sans-serif' }}>
@@ -109,15 +155,46 @@ const TutorActivityLogPage = () => {
             <FilterPill key={f} label={f} active={activeFilter === f} onClick={() => setActiveFilter(f)} />
           ))}
         </div>
-        <div>
-          <button style={{
+        <div style={{ position: 'relative' }}>
+          <button 
+            onClick={() => setIsDateDropdownOpen(!isDateDropdownOpen)}
+            style={{
             display: 'flex', alignItems: 'center', gap: '8px',
             padding: '8px 16px', backgroundColor: '#fff', border: '1px solid #ddd',
             borderRadius: '8px', fontSize: '14px', fontWeight: 500, cursor: 'pointer',
             fontFamily: 'UberMoveText, system-ui, sans-serif'
           }}>
-            <i className="bi bi-calendar"></i> 7 ngày qua <i className="bi bi-chevron-down" style={{ fontSize: '12px', marginLeft: '4px' }}></i>
+            <i className="bi bi-calendar"></i> {dateRangeOptions[dateRange]} <i className="bi bi-chevron-down" style={{ fontSize: '12px', marginLeft: '4px' }}></i>
           </button>
+          
+          {isDateDropdownOpen && (
+            <div style={{
+              position: 'absolute', top: '100%', right: 0, marginTop: '8px',
+              backgroundColor: '#fff', border: '1px solid #ddd', borderRadius: '8px',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.1)', zIndex: 10, minWidth: '150px',
+              overflow: 'hidden'
+            }}>
+              {Object.entries(dateRangeOptions).map(([key, label]) => (
+                <div 
+                  key={key} 
+                  onClick={() => {
+                    setDateRange(key);
+                    setIsDateDropdownOpen(false);
+                  }}
+                  style={{
+                    padding: '10px 16px', fontSize: '14px', cursor: 'pointer',
+                    backgroundColor: dateRange === key ? '#f5f5f5' : '#fff',
+                    fontFamily: 'UberMoveText, system-ui, sans-serif',
+                    color: '#333'
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f5f5f5'}
+                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = dateRange === key ? '#f5f5f5' : '#fff'}
+                >
+                  {label}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
@@ -154,7 +231,7 @@ const TutorActivityLogPage = () => {
               return (
                 <tr key={log.id} style={{ borderBottom: idx < logs.length - 1 ? '1px solid #f0f0f0' : 'none' }}>
                   <td style={{ padding: '16px 20px', fontSize: '14px', color: '#333', fontFamily: 'UberMoveText, system-ui, sans-serif' }}>
-                    {formatDateTime(log.created_at)}
+                    {formatDateTime(log.time)}
                   </td>
                   <td style={{ padding: '16px 20px' }}>
                     <span style={{
@@ -167,7 +244,7 @@ const TutorActivityLogPage = () => {
                       fontWeight: 500,
                       fontFamily: 'UberMoveText, system-ui, sans-serif'
                     }}>
-                      {actionLabel(log.action)}
+                      {log.action_label || actionLabel(log.action)}
                     </span>
                   </td>
                   <td style={{ padding: '16px 20px' }}>
@@ -176,14 +253,14 @@ const TutorActivityLogPage = () => {
                         <img src={targetAvatar} alt="" style={{ width: '28px', height: '28px', borderRadius: '50%', backgroundColor: '#eee', objectFit: 'cover' }} />
                       ) : (
                         <div style={{ width: '28px', height: '28px', borderRadius: '50%', backgroundColor: '#1a237e', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: 600 }}>
-                          {targetName.charAt(0)}
+                          {targetName.charAt(0).toUpperCase()}
                         </div>
                       )}
                       <span style={{ fontSize: '14px', fontWeight: 500, color: '#333', fontFamily: 'UberMoveText, system-ui, sans-serif' }}>{targetName}</span>
                     </div>
                   </td>
                   <td style={{ padding: '16px 20px', fontSize: '14px', color: '#333', whiteSpace: 'pre-wrap', fontFamily: 'UberMoveText, system-ui, sans-serif' }}>
-                    {log.note || '—'}
+                    {log.action_label || 'Hệ thống ghi nhận'}
                   </td>
                   <td style={{ padding: '16px 20px' }}>
                     <span style={{
@@ -205,6 +282,8 @@ const TutorActivityLogPage = () => {
           </tbody>
         </table>
       </div>
+
+      <Pagination page={page} totalPages={totalPages} total={total} onPageChange={setPage} />
 
     </div>
   );
