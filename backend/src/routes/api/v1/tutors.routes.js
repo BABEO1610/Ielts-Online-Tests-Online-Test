@@ -25,6 +25,41 @@ router.get(
   TutorController.getDashboardStats
 );
 
+// GET /api/v1/tutors/grading-history/stats
+router.get(
+  '/grading-history/stats',
+  authorize(['tutor', 'admin']),
+  TutorController.getGradingHistoryStats
+);
+
+// GET /api/v1/tutors/grading-history
+router.get(
+  '/grading-history',
+  authorize(['tutor', 'admin']),
+  TutorController.getGradingHistory
+);
+
+// GET /api/v1/tutors/grading-history/:submissionId
+router.get(
+  '/grading-history/:submissionId',
+  authorize(['tutor', 'admin']),
+  TutorController.getGradingHistoryById
+);
+
+// PATCH /api/v1/tutors/grading-history/:submissionId/revoke
+router.patch(
+  '/grading-history/:submissionId/revoke',
+  authorize(['tutor', 'admin']),
+  TutorController.revokeGradingResult
+);
+
+// PATCH /api/v1/tutors/grading-history/:submissionId/score
+router.patch(
+  '/grading-history/:submissionId/score',
+  authorize(['tutor', 'admin']),
+  TutorController.updateGradingResult
+);
+
 // GET /api/v1/tutors/submissions/:type/:submissionId
 router.get(
   '/submissions/:type/:submissionId',

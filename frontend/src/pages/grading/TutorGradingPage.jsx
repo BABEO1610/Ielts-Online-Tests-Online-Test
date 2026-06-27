@@ -3,6 +3,7 @@ import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
 import TutorGradingPanel from '../../components/grading/TutorGradingPanel';
 import SubmissionViewer from '../../components/grading/SubmissionViewer';
 import gradingService from '../../services/grading.service';
+import { getGradingHistoryById } from '../../services/gradingHistory.service';
 
 const TutorGradingPage = () => {
   const { type, submissionId } = useParams();
@@ -13,6 +14,8 @@ const TutorGradingPage = () => {
   const [error, setError] = useState(null);
   const [activeTaskIndex, setActiveTaskIndex] = useState(0);
   const [isGeneratingTranscript, setIsGeneratingTranscript] = useState(false);
+  const [gradedData, setGradedData] = useState(null);
+  const mode = searchParams.get('mode');
 
   // Safely define activeTask first so it can be used in the handler
   const activeTask = submissionData?.tasks?.[activeTaskIndex] || {};
@@ -54,6 +57,13 @@ const TutorGradingPage = () => {
           setSubmissionData({ ...item, tasks });
         } else {
           setError('Không tìm thấy bài nộp');
+        }
+
+        if (mode === 'view' || mode === 'edit') {
+          const gradedRes = await getGradingHistoryById(submissionId);
+          if (gradedRes.success && gradedRes.data) {
+            setGradedData(gradedRes.data);
+          }
         }
       } catch (err) {
         setError(err.response?.data?.error?.message || 'Có lỗi xảy ra khi tải dữ liệu');
@@ -160,6 +170,9 @@ const TutorGradingPage = () => {
               studentId={submissionData.student?.id}
               activeTaskId="overall"
               tasks={submissionData.tasks}
+              readOnly={mode === 'view'}
+              editMode={mode === 'edit'}
+              initialData={gradedData}
             />
           </div>
         </div>

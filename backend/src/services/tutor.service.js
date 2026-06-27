@@ -483,6 +483,276 @@ class TutorService {
   }
 
   /**
+   * Get grading history statistics for the current month
+   * @param {string} tutorId 
+   */
+  static async getGradingHistoryStats(tutorId) {
+    const query = `
+      SELECT 
+        COUNT(tfr.id)::int AS total_graded_month,
+        ROUND(AVG(tfr.band_score), 1)::numeric AS avg_band_score_month,
+        (
+          SELECT COUNT(id)::int
+          FROM (
+            SELECT ws.id FROM writing_submissions ws
+            JOIN tutor_feedback_reports t ON t.writing_submission_id = ws.id
+            WHERE t.tutor_id = $1 AND ws.status = 'reviewed'
+            UNION ALL
+            SELECT ss.id FROM speaking_submissions ss
+            JOIN tutor_feedback_reports t ON t.speaking_submission_id = ss.id
+            WHERE t.tutor_id = $1 AND ss.status = 'reviewed'
+          ) AS complaints
+        ) AS pending_complaints
+      FROM tutor_feedback_reports tfr
+      WHERE tfr.tutor_id = $1
+        AND DATE_TRUNC('month', tfr.created_at) = DATE_TRUNC('month', CURRENT_DATE)
+    `;
+    const result = await pool.query(query, [tutorId]);
+    return result.rows[0] || { total_graded_month: 0, avg_band_score_month: null, pending_complaints: 0 };
+  }
+
+  /**
+   * Get graded submissions history with pagination
+   * @param {string} tutorId 
+   * @param {Object} options 
+   */
+  static async getGradingHistory(tutorId, options = {}) {
+    const page = Math.max(1, parseInt(options.page, 10) || 1);
+    const limit = Math.max(1, parseInt(options.limit, 10) || 20);
+    const offset = (page - 1) * limit;
+    const isExport = options.export === 'true';
+
+    let query = `
+      SELECT
+          tfr.id AS report_id,
+          COALESCE(ws.id, ss.id) AS submission_id,
+          COALESCE(ws.writing_group_id, ss.speaking_group_id) AS group_id,
+          CASE WHEN ws.id IS NOT NULL THEN 'writing' ELSE 'speaking' END AS skill,
+          tfr.created_at AS graded_at,
+          u.id AS student_id,
+          u.full_name AS student_name,
+          mt.title AS test_title,
+          tfr.band_score,
+          tfr.written_feedback,
+          tfr.audio_feedback_url,
+          COALESCE(ws.status, ss.status) AS status
+      FROM tutor_feedback_reports tfr
+      LEFT JOIN writing_submissions ws ON tfr.writing_submission_id = ws.id
+      LEFT JOIN speaking_submissions ss ON tfr.speaking_submission_id = ss.id
+      LEFT JOIN mock_tests mt ON mt.id = COALESCE(ws.test_id, ss.test_id)
+      LEFT JOIN users u ON u.id = COALESCE(ws.user_id, ss.user_id)
+      WHERE tfr.tutor_id = $1
+      ORDER BY tfr.created_at DESC
+    `;
+
+    const countQuery = `SELECT COUNT(*)::int FROM tutor_feedback_reports WHERE tutor_id = $1`;
+    const countResult = await pool.query(countQuery, [tutorId]);
+    const total = countResult.rows[0].count;
+
+    if (!isExport) {
+      query += ` LIMIT $2 OFFSET $3`;
+    }
+
+    const params = isExport ? [tutorId] : [tutorId, limit, offset];
+    const result = await pool.query(query, params);
+
+    const history = result.rows.map(row => {
+      const feedbackTypes = [];
+      if (row.written_feedback) feedbackTypes.push('Text');
+      if (row.audio_feedback_url) feedbackTypes.push('Audio feedback');
+
+      let displayStatus = 'Đã trả điểm';
+      if (row.status === 'reviewed') {
+        displayStatus = 'Đang khiếu nại';
+      }
+
+      return {
+        reportId: row.report_id,
+        submissionId: row.submission_id,
+        groupId: row.group_id,
+        skill: row.skill,
+        gradedAt: row.graded_at,
+        studentId: row.student_id,
+        studentName: row.student_name,
+        testTitle: row.test_title,
+        bandScore: row.band_score ? parseFloat(row.band_score) : null,
+        feedbackTypes,
+        status: displayStatus,
+        rawStatus: row.status
+      };
+    });
+
+    return {
+      history,
+      meta: {
+        total,
+        page: isExport ? 1 : page,
+        limit: isExport ? total : limit,
+        totalPages: isExport ? 1 : Math.ceil(total / limit)
+      }
+    };
+  }
+
+  /**
+   * Get specific grading history detail
+   */
+  static async getGradingHistoryById(tutorId, submissionId) {
+    const query = `
+      SELECT
+          tfr.id AS report_id,
+          COALESCE(ws.id, ss.id) AS submission_id,
+          CASE WHEN ws.id IS NOT NULL THEN 'writing' ELSE 'speaking' END AS skill,
+          tfr.created_at AS graded_at,
+          u.id AS student_id,
+          u.full_name AS student_name,
+          u.email AS student_email,
+          mt.title AS test_title,
+          tfr.band_score,
+          tfr.task_achievement_score,
+          tfr.coherence_score,
+          tfr.lexical_score,
+          tfr.grammar_score,
+          tfr.fluency_score,
+          tfr.pronunciation_score,
+          tfr.written_feedback,
+          tfr.audio_feedback_url,
+          COALESCE(ws.status, ss.status) AS status
+      FROM tutor_feedback_reports tfr
+      LEFT JOIN writing_submissions ws ON tfr.writing_submission_id = ws.id
+      LEFT JOIN speaking_submissions ss ON tfr.speaking_submission_id = ss.id
+      LEFT JOIN mock_tests mt ON mt.id = COALESCE(ws.test_id, ss.test_id)
+      LEFT JOIN users u ON u.id = COALESCE(ws.user_id, ss.user_id)
+      WHERE tfr.tutor_id = $1 AND (ws.id = $2 OR ss.id = $2)
+    `;
+    const result = await pool.query(query, [tutorId, submissionId]);
+    if (!result.rows[0]) throw new Error('Không tìm thấy bài chấm');
+
+    const row = result.rows[0];
+    const feedbackTypes = [];
+    if (row.written_feedback) feedbackTypes.push('Text');
+    if (row.audio_feedback_url) feedbackTypes.push('Audio feedback');
+
+    return {
+      reportId: row.report_id,
+      submissionId: row.submission_id,
+      skill: row.skill,
+      time: new Date(row.graded_at).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
+      date: new Date(row.graded_at).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' }),
+      studentId: row.student_id,
+      studentName: row.student_name || 'N/A',
+      studentCode: row.student_id ? row.student_id.substring(0, 8) : 'N/A',
+      testName: row.test_title || 'N/A',
+      band: row.band_score ? parseFloat(row.band_score) : null,
+      scores: {
+        taskAchievement: row.task_achievement_score,
+        coherence: row.coherence_score,
+        lexical: row.lexical_score,
+        grammar: row.grammar_score,
+        fluency: row.fluency_score,
+        pronunciation: row.pronunciation_score
+      },
+      feedbackTypes,
+      writtenFeedback: row.written_feedback,
+      audioFeedbackUrl: row.audio_feedback_url,
+      status: row.status === 'reviewed' ? 'disputed' : 'graded'
+    };
+  }
+
+  /**
+   * Revoke grading result
+   */
+  static async revokeGradingResult(tutorId, submissionId) {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+
+      const checkQuery = `
+        SELECT id, writing_submission_id, speaking_submission_id 
+        FROM tutor_feedback_reports 
+        WHERE tutor_id = $1 AND (writing_submission_id = $2 OR speaking_submission_id = $2)
+      `;
+      const checkResult = await client.query(checkQuery, [tutorId, submissionId]);
+      if (checkResult.rows.length === 0) {
+        throw new Error('Không tìm thấy bài chấm hoặc không có quyền thu hồi');
+      }
+
+      const report = checkResult.rows[0];
+
+      if (report.writing_submission_id) {
+        await client.query(`UPDATE writing_submissions SET status = 'pending' WHERE id = $1`, [submissionId]);
+      } else if (report.speaking_submission_id) {
+        await client.query(`UPDATE speaking_submissions SET status = 'pending' WHERE id = $1`, [submissionId]);
+      }
+
+      await client.query(`DELETE FROM tutor_feedback_reports WHERE id = $1`, [report.id]);
+
+      await client.query('COMMIT');
+      return { success: true };
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+    
+  /**
+   * Update grading result
+   */
+  static async updateGradingResult(tutorId, submissionId, payload) {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+
+      const checkQuery = `
+        SELECT id, writing_submission_id, speaking_submission_id 
+        FROM tutor_feedback_reports 
+        WHERE tutor_id = $1 AND (writing_submission_id = $2 OR speaking_submission_id = $2)
+      `;
+      const checkResult = await client.query(checkQuery, [tutorId, submissionId]);
+      if (checkResult.rows.length === 0) {
+        throw new Error('Không tìm thấy bài chấm hoặc không có quyền cập nhật');
+      }
+
+      const report = checkResult.rows[0];
+
+      const updateQuery = `
+        UPDATE tutor_feedback_reports 
+        SET 
+          band_score = $1,
+          task_achievement_score = COALESCE($2, task_achievement_score),
+          coherence_score = COALESCE($3, coherence_score),
+          lexical_score = COALESCE($4, lexical_score),
+          grammar_score = COALESCE($5, grammar_score),
+          fluency_score = COALESCE($6, fluency_score),
+          pronunciation_score = COALESCE($7, pronunciation_score),
+          written_feedback = COALESCE($8, written_feedback),
+          updated_at = NOW()
+        WHERE id = $9
+      `;
+      await client.query(updateQuery, [
+        payload.bandScore,
+        payload.taskAchievementScore,
+        payload.coherenceScore,
+        payload.lexicalScore,
+        payload.grammarScore,
+        payload.fluencyScore,
+        payload.pronunciationScore,
+        payload.writtenFeedback,
+        report.id
+      ]);
+
+      await client.query('COMMIT');
+      return { success: true };
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
    * Get Activity Log Stats for Tutor
    */
   static async getActivityLogStats(tutorId) {
