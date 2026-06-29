@@ -40,7 +40,6 @@ const StudyPlanPage = () => {
   }
 
   const { stats: STATS, historyData: HISTORY_DATA, skillScores: SKILL_SCORES } = data;
-
   return (
     <div className="py-4 px-3 px-md-4" style={{ fontFamily: 'UberMoveText, system-ui, sans-serif' }}>
       <div className="mb-4">

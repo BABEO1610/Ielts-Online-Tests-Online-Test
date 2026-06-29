@@ -5,7 +5,7 @@ const AttemptController = require('../../../controllers/attempt.controller');
 const authenticate = require('../../../middleware/authenticate');
 
 // Define route for creating tests
-router.post('/', TestController.createTest);
+router.post('/', authenticate, TestController.createTest);
 
 // Define route for fetching tests list
 router.get('/', TestController.getTests);
@@ -19,10 +19,10 @@ router.get('/:id', TestController.getTestById);
 router.get('/:id/take', TestController.getTestForStudent);
 
 // Define route for updating a test
-router.put('/:id', TestController.updateTest);
+router.put('/:id', authenticate, TestController.updateTest);
 
 // Define route for deleting a test
-router.delete('/:id', TestController.deleteTest);
+router.delete('/:id', authenticate, TestController.deleteTest);
 
 // POST /api/v1/tests/:id/attempts — Nộp bài thi (yêu cầu đăng nhập)
 router.post('/:id/attempts', authenticate, AttemptController.submitAttempt);

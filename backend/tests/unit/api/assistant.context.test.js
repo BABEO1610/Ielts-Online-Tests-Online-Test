@@ -10,13 +10,17 @@ jest.mock('../../../src/api/assistant/assistant.repository', () => ({
 
 const { pool } = require('../../../src/db/pool');
 const { ASSISTANT_INTENTS } = require('../../../src/api/assistant/assistant.intent');
-const { buildContextInjection } = require('../../../src/api/assistant/assistant.context');
+const {
+  buildContextInjection,
+  clearColumnCacheForTests,
+} = require('../../../src/api/assistant/assistant.context');
 
 const user = { id: 'user-1' };
 
 describe('Assistant context builder', () => {
   beforeEach(() => {
     pool.query.mockReset();
+    clearColumnCacheForTests();
   });
 
   it('queries mock_tests for FIND_TEST', async () => {
@@ -47,7 +51,7 @@ describe('Assistant context builder', () => {
       id: 'test-1',
       title: 'Cambridge 18 Reading',
       skill: 'reading',
-      route: expect.stringContaining('/reading'),
+      route: expect.stringContaining('/tests/test-1/reading'),
     });
   });
 
@@ -80,7 +84,7 @@ describe('Assistant context builder', () => {
       title: 'tam',
       resourceType: 'audio',
       category: 'IELTS Academic',
-      route: expect.stringContaining('/library'),
+      route: expect.stringContaining('/library?resourceId=res-1'),
     });
   });
 
@@ -95,5 +99,208 @@ describe('Assistant context builder', () => {
 
     expect(pool.query).not.toHaveBeenCalled();
     expect(result.databaseResults).toEqual([]);
+  });
+
+  it('limits lookup context to 10 rows and exposes debug counts', async () => {
+    const rows = Array.from({ length: 12 }, (_, index) => ({
+      id: `test-${index + 1}`,
+      title: `IELTSZone Reading Mock Test ${index + 1}`,
+      description: 'Academic reading test',
+      skill: 'reading',
+      difficulty: 'intermediate',
+      duration_minutes: 60,
+    }));
+
+    pool.query
+      .mockResolvedValueOnce({ rows: [{ column_name: 'is_published' }, { column_name: 'review_status' }] })
+      .mockResolvedValueOnce({ rows });
+
+    const result = await buildContextInjection({
+      intent: ASSISTANT_INTENTS.FIND_TEST,
+      message: 'co de reading nao khong',
+      context: { pageType: 'home', route: '/', visibleItems: [] },
+      user,
+      sessionId: null,
+    });
+
+    expect(pool.query.mock.calls[1][0]).toContain("review_status = 'approved'");
+    expect(result.databaseResults).toHaveLength(10);
+    expect(result.debug.dbRowCount).toBe(12);
+    expect(result.debug.contextRowCount).toBe(10);
+    expect(result.debug.contextLimitApplied).toBe(true);
+  });
+
+  it('uses fallback suggestions when a filtered test lookup has no rows', async () => {
+    pool.query
+      .mockResolvedValueOnce({ rows: [{ column_name: 'is_published' }, { column_name: 'review_status' }] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({
+        rows: [{
+          id: 'test-1',
+          title: 'IELTSZone Reading Mock Test 1',
+          description: 'Academic reading test',
+          skill: 'reading',
+          difficulty: 'intermediate',
+          duration_minutes: 60,
+        }],
+      });
+
+    const result = await buildContextInjection({
+      intent: ASSISTANT_INTENTS.FIND_TEST,
+      message: 'co de speaking nao khong',
+      context: { pageType: 'home', route: '/', visibleItems: [] },
+      user,
+      sessionId: null,
+    });
+
+    expect(result.databaseResults).toHaveLength(1);
+    expect(result.debug.lookupMissing).toBe(true);
+    expect(result.debug.fallbackReason).toBe('no_published_match_for_filter');
+    expect(result.debug.skillFilter).toBe('speaking');
+  });
+
+  it('builds listening suggested links with the listening route', async () => {
+    pool.query
+      .mockResolvedValueOnce({ rows: [{ column_name: 'is_published' }, { column_name: 'review_status' }] })
+      .mockResolvedValueOnce({
+        rows: [{
+          id: 'listen-1',
+          title: 'IELTSZone Listening Mock Test 1',
+          description: 'Listening test',
+          skill: 'listening',
+          difficulty: 'intermediate',
+          duration_minutes: 30,
+        }],
+      });
+
+    const result = await buildContextInjection({
+      intent: ASSISTANT_INTENTS.FIND_TEST,
+      message: 'co de listening nao khong',
+      context: { pageType: 'home', route: '/', visibleItems: [] },
+      user,
+      sessionId: null,
+    });
+
+    expect(result.suggestedLinks[0].href).toContain('/tests/listen-1/listening');
+    expect(result.suggestedLinks[0].href).not.toContain('/reading');
+  });
+
+  it('builds a specific test link for mock test number navigation', async () => {
+    pool.query
+      .mockResolvedValueOnce({ rows: [{ column_name: 'is_published' }, { column_name: 'review_status' }] })
+      .mockResolvedValueOnce({
+        rows: [{
+          id: 'writing-10',
+          title: 'IELTSZone Writing Mock Test 10',
+          description: 'Writing test 10',
+          skill: 'writing',
+          difficulty: 'intermediate',
+          duration_minutes: 60,
+        }],
+      });
+
+    const result = await buildContextInjection({
+      intent: ASSISTANT_INTENTS.FIND_TEST,
+      message: 'mock test 10 writing',
+      context: { pageType: 'home', route: '/', visibleItems: [] },
+      user,
+      sessionId: null,
+    });
+
+    expect(pool.query.mock.calls[1][1]).toEqual(expect.arrayContaining(['writing']));
+    expect(pool.query.mock.calls[1][1]).toEqual(expect.arrayContaining(['%mock test 10%']));
+    expect(result.databaseResults).toHaveLength(1);
+    expect(result.debug.testNumber).toBe(10);
+    expect(result.suggestedLinks[0].href).toContain('/tests/writing-10/writing');
+  });
+
+  it('returns review clarification when attemptId is missing', async () => {
+    const result = await buildContextInjection({
+      intent: ASSISTANT_INTENTS.POST_TEST_REVIEW,
+      message: 'review bài vừa rồi',
+      context: { pageType: 'home', route: '/', visibleItems: [] },
+      user,
+      sessionId: null,
+    });
+
+    expect(pool.query).not.toHaveBeenCalled();
+    expect(result.directAnswer).toContain('Mình chưa biết bạn muốn review bài nào');
+    expect(result.debug.reviewFallbackReason).toBe('missing_attempt_id');
+  });
+
+  it('builds navigation links for practice history', async () => {
+    const result = await buildContextInjection({
+      intent: ASSISTANT_INTENTS.NAVIGATION,
+      message: 'xem lịch sử làm bài',
+      context: { pageType: 'home', route: '/', visibleItems: [] },
+      user,
+      sessionId: null,
+    });
+
+    expect(pool.query).not.toHaveBeenCalled();
+    expect(result.suggestedLinks).toHaveLength(1);
+    expect(result.suggestedLinks[0].href).toContain('/practice-history');
+  });
+
+  it('parses quantity and oldest sort for reading lookup without fallback', async () => {
+    pool.query
+      .mockResolvedValueOnce({ rows: [{ column_name: 'is_published' }, { column_name: 'review_status' }] })
+      .mockResolvedValueOnce({
+        rows: [{
+          id: 'old-reading-1',
+          title: 'IELTSZone Reading Mock Test 1',
+          description: 'Oldest reading test',
+          skill: 'reading',
+          difficulty: 'intermediate',
+          duration_minutes: 60,
+        }],
+      });
+
+    const result = await buildContextInjection({
+      intent: ASSISTANT_INTENTS.FIND_TEST,
+      message: 'tìm cho tôi 1 đề reading cũ nhất',
+      context: { pageType: 'home', route: '/', visibleItems: [] },
+      user,
+      sessionId: null,
+    });
+
+    expect(pool.query.mock.calls[1][0]).toContain('ORDER BY created_at ASC');
+    expect(pool.query.mock.calls[1][0]).toContain('LIMIT 1');
+    expect(result.databaseResults).toHaveLength(1);
+    expect(result.debug.skillFilter).toBe('reading');
+    expect(result.debug.requestedQuantity).toBe(1);
+    expect(result.debug.sortOrder).toBe('ASC');
+    expect(result.debug.sortField).toBe('created_at');
+    expect(result.debug.searchTerms).toEqual([]);
+    expect(result.debug.lookupMissing).toBe(false);
+    expect(result.debug.fallbackReason).toBeNull();
+  });
+
+  it('parses title number lookup without forcing fallback', async () => {
+    pool.query
+      .mockResolvedValueOnce({ rows: [{ column_name: 'is_published' }, { column_name: 'review_status' }] })
+      .mockResolvedValueOnce({
+        rows: [{
+          id: 'reading-1',
+          title: 'IELTSZone Reading Mock Test 1',
+          description: 'Reading test 1',
+          skill: 'reading',
+          difficulty: 'intermediate',
+          duration_minutes: 60,
+        }],
+      });
+
+    const result = await buildContextInjection({
+      intent: ASSISTANT_INTENTS.FIND_TEST,
+      message: 'đề reading số 1',
+      context: { pageType: 'home', route: '/', visibleItems: [] },
+      user,
+      sessionId: null,
+    });
+
+    expect(pool.query.mock.calls[1][1]).toEqual(expect.arrayContaining(['reading']));
+    expect(result.databaseResults).toHaveLength(1);
+    expect(result.debug.titleNumber).toBe(1);
+    expect(result.debug.lookupMissing).toBe(false);
   });
 });

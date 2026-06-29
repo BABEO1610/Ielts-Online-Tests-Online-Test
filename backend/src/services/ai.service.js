@@ -44,6 +44,13 @@ const buildProviderError = ({ provider, status, model, body }) => {
     );
   }
 
+  if (status === 400 && sanitized.includes('User location is not supported')) {
+    return createAssistantError(
+      ERROR_CODES.INTERNAL_ERROR,
+      `Google đã chặn truy cập Gemini API từ khu vực của bạn (Việt Nam). Vui lòng bật phần mềm VPN (như 1.1.1.1 WARP hoặc ProtonVPN) trên máy tính của bạn và thử lại.`
+    );
+  }
+
   return createAssistantError(
     ERROR_CODES.INTERNAL_ERROR,
     `${provider} API lỗi ${status} khi gọi model "${model}". ${sanitized || 'Không có response body.'}`

@@ -118,9 +118,10 @@ class TestController {
 
   static async deleteTest(req, res, next) {
     try {
+      const userId = req.user ? req.user.id : null;
       const testId = req.params.id;
-      // You might want to pass userId to check permissions, but skipping for Sprint 1 demo
-      await TestService.deleteTest(testId);
+      // Pass userId to log the deletion action
+      await TestService.deleteTest(testId, userId);
       
       res.status(200).json({
         success: true,

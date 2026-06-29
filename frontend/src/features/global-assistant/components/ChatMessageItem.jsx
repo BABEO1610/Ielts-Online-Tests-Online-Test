@@ -1,13 +1,26 @@
 import { ThumbsDown, ThumbsUp } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+
+const AssistantMarkdown = ({ content }) => (
+  <div className="assistant-message__markdown">
+    <ReactMarkdown remarkPlugins={[remarkGfm]}>
+      {content || ''}
+    </ReactMarkdown>
+  </div>
+);
 
 const ChatMessageItem = ({ message, onRate }) => {
   const role = message.role === 'user' ? 'user' : 'assistant';
   const canRate = role === 'assistant' && message.messageId && !message.isStreaming;
+  const content = role === 'assistant'
+    ? <AssistantMarkdown content={message.content} />
+    : message.content;
 
   return (
     <div className={`assistant-message assistant-message--${role}`}>
       <div className="assistant-message__bubble">
-        {message.content}
+        {content}
         {canRate && (
           <div className="assistant-message__rating" aria-label="Đánh giá câu trả lời">
             <button

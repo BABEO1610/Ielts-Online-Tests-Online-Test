@@ -28,6 +28,7 @@ const sendAssistantResult = (res, result) => {
   return res.status(200).json({
     answer: result.answer,
     suggestedLinks: result.suggestedLinks || [],
+    linkMeta: result.linkMeta || null,
     conversationId: result.conversationId || null,
     messageId: result.messageId || null,
     intent: result.intent || null,

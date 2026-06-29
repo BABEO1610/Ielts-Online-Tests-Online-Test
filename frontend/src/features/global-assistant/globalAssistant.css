@@ -150,6 +150,7 @@
 
 .assistant-message-list {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
   padding: 16px;
   display: flex;
@@ -190,6 +191,58 @@
   background: #ffffff;
   color: #111111;
   border: 1px solid #e5e7eb;
+}
+
+.assistant-message__markdown {
+  white-space: normal;
+}
+
+.assistant-message__markdown > :first-child {
+  margin-top: 0;
+}
+
+.assistant-message__markdown > :last-child {
+  margin-bottom: 0;
+}
+
+.assistant-message__markdown p {
+  margin: 0 0 8px;
+}
+
+.assistant-message__markdown h1,
+.assistant-message__markdown h2,
+.assistant-message__markdown h3,
+.assistant-message__markdown h4 {
+  margin: 10px 0 6px;
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 700;
+}
+
+.assistant-message__markdown h1 {
+  font-size: 15px;
+  line-height: 21px;
+}
+
+.assistant-message__markdown ul,
+.assistant-message__markdown ol {
+  margin: 6px 0 8px;
+  padding-left: 18px;
+}
+
+.assistant-message__markdown li {
+  margin: 3px 0;
+}
+
+.assistant-message__markdown strong {
+  font-weight: 700;
+}
+
+.assistant-message__markdown code {
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: #f3f4f6;
+  font-size: 12px;
 }
 
 .assistant-message__rating {
@@ -234,6 +287,7 @@
 }
 
 .assistant-input {
+  flex: 0 0 auto;
   border-top: 1px solid #e5e7eb;
   padding: 12px;
   display: grid;
@@ -307,25 +361,47 @@
 }
 
 .assistant-links {
+  flex: 0 0 auto;
   border-top: 1px solid #e5e7eb;
-  padding: 10px 12px;
+  padding: 8px 12px;
   display: grid;
-  gap: 8px;
+  gap: 6px;
   background: #ffffff;
+  max-height: 188px;
+  overflow-y: auto;
 }
 
 .assistant-links a {
   color: #111111;
   text-decoration: none;
-  font-size: 13px;
-  line-height: 18px;
+  font-size: 12px;
+  line-height: 16px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  padding: 8px 10px;
+  min-height: 40px;
+  padding: 7px 10px;
   border-radius: 8px;
   background: #f3f4f6;
+}
+
+.assistant-links a span {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.assistant-links a svg {
+  flex: 0 0 auto;
+}
+
+.assistant-links .assistant-links__more {
+  min-height: 34px;
+  background: #111111;
+  color: #ffffff;
+  font-weight: 700;
 }
 
 @keyframes assistant-spin {
