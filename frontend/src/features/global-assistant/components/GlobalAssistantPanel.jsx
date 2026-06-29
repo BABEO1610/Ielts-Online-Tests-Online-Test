@@ -41,6 +41,7 @@ const GlobalAssistantPanel = ({ availability, onClose }) => {
   const [historyLoaded, setHistoryLoaded] = useState(false);
   const [error, setError] = useState(null);
   const [suggestedLinks, setSuggestedLinks] = useState([]);
+  const [linkMeta, setLinkMeta] = useState(null);
   const [requiresLogin, setRequiresLogin] = useState(false);
   const messageListRef = useRef(null);
 
@@ -130,6 +131,7 @@ const GlobalAssistantPanel = ({ availability, onClose }) => {
     setIsLoading(true);
     setError(null);
     setSuggestedLinks([]);
+    setLinkMeta(null);
     const requestContext = { ...context, visibleItems: collectVisibleItems() };
 
     const streamed = await assistantApi.streamChat({
@@ -171,6 +173,7 @@ const GlobalAssistantPanel = ({ availability, onClose }) => {
           )
         );
         setSuggestedLinks(response.suggestedLinks || []);
+        setLinkMeta(response.linkMeta || null);
       },
       onError: (response) => {
         handleSendError(response);
@@ -191,6 +194,7 @@ const GlobalAssistantPanel = ({ availability, onClose }) => {
         },
       ]);
       setSuggestedLinks(fallback.suggestedLinks || []);
+      setLinkMeta(fallback.linkMeta || null);
     }
 
     setIsLoading(false);
@@ -262,6 +266,12 @@ const GlobalAssistantPanel = ({ availability, onClose }) => {
                   <ExternalLink size={14} aria-hidden="true" />
                 </a>
               ))}
+              {linkMeta?.hasMore && (
+                <a className="assistant-links__more" href={linkMeta.allUrl || suggestedLinks[0]?.href || '#'}>
+                  <span>Xem tất cả {linkMeta.totalMatched} kết quả</span>
+                  <ExternalLink size={14} aria-hidden="true" />
+                </a>
+              )}
             </div>
           )}
 

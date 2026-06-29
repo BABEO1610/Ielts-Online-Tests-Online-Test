@@ -56,6 +56,8 @@ const PAGE_TYPES = new Set([
   'result',
   'review',
   'active-test',
+  'practice_history',
+  'post_test_review',
   'unknown',
 ]);
 
@@ -72,6 +74,10 @@ const ASSISTANT_ROLE = {
   USER: 'user',
   ASSISTANT: 'assistant',
 };
+
+const ASSISTANT_CONTEXT_RESULT_LIMIT = Number(process.env.ASSISTANT_CONTEXT_RESULT_LIMIT || 10);
+const ASSISTANT_DB_LOOKUP_LIMIT = Number(process.env.ASSISTANT_DB_LOOKUP_LIMIT || 50);
+const ASSISTANT_DISPLAY_RESULT_LIMIT = Number(process.env.ASSISTANT_DISPLAY_RESULT_LIMIT || 3);
 
 const INTENT_CONTEXT_MAP = {
   GREETING: {
@@ -166,6 +172,9 @@ module.exports = {
   PAGE_TYPES,
   SUBMITTED_ATTEMPT_STATUSES,
   ASSISTANT_ROLE,
+  ASSISTANT_CONTEXT_RESULT_LIMIT,
+  ASSISTANT_DB_LOOKUP_LIMIT,
+  ASSISTANT_DISPLAY_RESULT_LIMIT,
   INTENT_CONTEXT_MAP,
   createAssistantError,
 };

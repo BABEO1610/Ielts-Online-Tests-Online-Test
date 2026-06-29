@@ -41,4 +41,40 @@ describe('Assistant response normalization', () => {
 
     expect(result.answer).toBe('Bạn có thể thử Test A.');
   });
+  it('accepts plain text for IELTS_KNOWLEDGE', () => {
+    const result = normalizeAssistantResponse({
+      rawText: 'Bạn nên học IELTS theo từng kỹ năng và luyện đề đều đặn.',
+      mode: ASSISTANT_INTENTS.IELTS_KNOWLEDGE,
+      fallbackAnswer: 'capability message',
+    });
+
+    expect(result.answer).toContain('IELTS');
+    expect(result.aiResponseValid).toBe(true);
+    expect(result.aiResponseFormat).toBe('plain_text');
+  });
+
+  it('marks empty JSON as invalid for IELTS_KNOWLEDGE without using fallback answer', () => {
+    const result = normalizeAssistantResponse({
+      rawText: '{}',
+      mode: ASSISTANT_INTENTS.IELTS_KNOWLEDGE,
+      fallbackAnswer: 'capability message',
+    });
+
+    expect(result.answer).toBe('');
+    expect(result.aiResponseValid).toBe(false);
+    expect(result.aiResponseFormat).toBe('json');
+    expect(result.invalidReason).toBe('missing_answer');
+  });
+
+  it('marks empty answer as invalid for IELTS_KNOWLEDGE', () => {
+    const result = normalizeAssistantResponse({
+      rawText: JSON.stringify({ answer: '' }),
+      mode: ASSISTANT_INTENTS.IELTS_KNOWLEDGE,
+      fallbackAnswer: 'capability message',
+    });
+
+    expect(result.answer).toBe('');
+    expect(result.aiResponseValid).toBe(false);
+    expect(result.invalidReason).toBe('missing_answer');
+  });
 });
