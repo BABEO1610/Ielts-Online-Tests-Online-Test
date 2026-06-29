@@ -1,9 +1,10 @@
-import React, { useState, useMemo, useEffect } from 'react';
-import FilterDropdown from '../../components/common/FilterDropdown';
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+
 import GradingHistoryTable from '../../components/grading/GradingHistoryTable';
 import GradingDetailModal from '../../components/grading/GradingDetailModal';
 import GradingRevokeModal from '../../components/grading/GradingRevokeModal';
-import { MOCK_HISTORY } from '../../services/gradingHistory.service';
+import { getGradingHistory, getGradingHistoryStats, revokeGradingResult } from '../../services/gradingHistory.service';
 import { exportToCsv } from '../../utils/exportCsv';
 import { useToast, ToastContainer } from '../../components/common/Toast';
 
@@ -19,23 +20,7 @@ export const SKILL_MAP = {
   speaking: { label: 'Speaking', bg: '#efefef', color: '#333' },
 };
 
-// Tất cả band IELTS hợp lệ: 1.0 → 9.0, bước 0.5 (17 giá trị)
-const BAND_RANGES = [
-  { label: 'Tất cả band', test: () => true },
-  ...Array.from({ length: 17 }, (_, i) => {
-    const score = parseFloat((1 + i * 0.5).toFixed(1));
-    const display = score.toFixed(1);
-    return {
-      label: `Band ${display}`,
-      test: (b) => parseFloat(b.toFixed(1)) === score,
-    };
-  }),
-];
-
-const TIME_RANGES   = ['Tất cả thời gian', 'Tháng này', '7 ngày qua', '30 ngày qua'];
-const SKILL_FILTERS = ['Tất cả', 'Writing', 'Speaking'];
 const PAGE_SIZE     = 5;
-const NOW           = new Date('2026-06-10T23:59:59');
 
 // Cột export CSV
 const CSV_COLUMNS = [
@@ -50,8 +35,10 @@ const CSV_COLUMNS = [
   { key: 'feedbackStr', label: 'Loại feedback' },
 ];
 
-// ─── Mock data từ service ──────────────────────────────────────────────────────
-// Khi backend sẵn sàng, thay bằng useEffect + getGradingHistory()
+const mapRawStatus = (rawStatus) => {
+  if (rawStatus === 'reviewed') return 'disputed';
+  return 'graded';
+};
 
 // ─── StatCard ──────────────────────────────────────────────────────────────────
 const StatCard = ({ label, value, sub, dark = false }) => (
@@ -87,8 +74,8 @@ const Pagination = ({ page, totalPages, total, onPageChange }) => (
           {p}
         </button>
       ))}
-      <button onClick={() => onPageChange(Math.min(totalPages, page + 1))} disabled={page === totalPages}
-        style={{ padding: '8px 18px', borderRadius: '999px', border: '1px solid #ddd', backgroundColor: page === totalPages ? '#f5f5f5' : '#fff', color: page === totalPages ? '#bbb' : '#000', fontSize: '14px', cursor: page === totalPages ? 'default' : 'pointer', fontFamily: 'UberMoveText, system-ui, sans-serif', fontWeight: 500 }}>
+      <button onClick={() => onPageChange(Math.min(totalPages, page + 1))} disabled={page === totalPages || totalPages === 0}
+        style={{ padding: '8px 18px', borderRadius: '999px', border: '1px solid #ddd', backgroundColor: (page === totalPages || totalPages === 0) ? '#f5f5f5' : '#fff', color: (page === totalPages || totalPages === 0) ? '#bbb' : '#000', fontSize: '14px', cursor: (page === totalPages || totalPages === 0) ? 'default' : 'pointer', fontFamily: 'UberMoveText, system-ui, sans-serif', fontWeight: 500 }}>
         Tiếp →
       </button>
     </div>
@@ -97,75 +84,88 @@ const Pagination = ({ page, totalPages, total, onPageChange }) => (
 
 // ─── Main Page ─────────────────────────────────────────────────────────────────
 const TutorGradingHistoryPage = () => {
-  const [search, setSearch]           = useState('');
-  const [timeFilter, setTimeFilter]   = useState(TIME_RANGES[0]);
-  const [skillFilter, setSkillFilter] = useState(SKILL_FILTERS[0]);
-  const [bandFilter, setBandFilter]   = useState(BAND_RANGES[0]);
-  const [page, setPage]               = useState(1);
-  const [sortKey, setSortKey]         = useState('rawDate');
-  const [sortDir, setSortDir]         = useState('desc');
+  const navigate = useNavigate();
+  const [historyList, setHistoryList]   = useState([]);
+  const [stats, setStats]               = useState({ total_graded_month: 0, avg_band_score_month: 0, pending_complaints: 0 });
+  const [total, setTotal]               = useState(0);
+
+  const [page, setPage]                 = useState(1);
+  const [refreshKey, setRefreshKey]     = useState(0);
   const [detailRecord, setDetailRecord] = useState(null);
   const [revokeRecord, setRevokeRecord] = useState(null);
   const [loading, setLoading]           = useState(true);
   const { toasts, showToast, dismissToast } = useToast();
 
-  // Simulate initial data fetch (replace với useEffect + getGradingHistory() khi có API)
   useEffect(() => {
-    const t = setTimeout(() => setLoading(false), 800);
-    return () => clearTimeout(t);
-  }, []);
+    const fetchData = async () => {
+      setLoading(true);
+      try {
+        const [statsRes, historyRes] = await Promise.all([
+          getGradingHistoryStats(),
+          getGradingHistory({ page, limit: PAGE_SIZE })
+        ]);
+        
+        if (statsRes && statsRes.success) {
+          setStats(statsRes.data);
+        }
+        
+        if (historyRes && historyRes.success) {
+          const mappedHistory = historyRes.data.map(item => {
+            const dateObj = new Date(item.gradedAt);
+            return {
+              id: item.submissionId,
+              time: dateObj.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
+              date: dateObj.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' }),
+              rawDate: dateObj,
+              studentName: item.studentName || 'N/A',
+              studentCode: item.studentId ? item.studentId.substring(0, 8) : 'N/A',
+              testName: item.testTitle || 'N/A',
+              skill: item.skill,
+              band: item.bandScore,
+              feedbackTypes: item.feedbackTypes,
+              status: mapRawStatus(item.rawStatus)
+            };
+          });
+          setHistoryList(mappedHistory);
+          setTotal(historyRes.meta.total);
+        }
+      } catch (error) {
+        console.error('Error fetching grading history:', error);
+        showToast('Lỗi khi tải dữ liệu lịch sử', 'error');
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, [page, showToast, refreshKey]);
 
-  const resetPage = (fn) => (...args) => { fn(...args); setPage(1); };
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
-  // Toggle sort — cùng key thì đổi chiều, khác key thì reset về desc
-  const handleSort = (key) => {
-    if (key === sortKey) setSortDir((d) => (d === 'desc' ? 'asc' : 'desc'));
-    else { setSortKey(key); setSortDir('desc'); }
-    setPage(1);
-  };
-
-  // Filter + sort
-  const filtered = useMemo(() => {
-    const result = MOCK_HISTORY.filter((r) => {
-      const q = search.toLowerCase();
-      if (q && !r.studentName.toLowerCase().includes(q) && !r.testName.toLowerCase().includes(q)) return false;
-      if (timeFilter === 'Tháng này' && (r.rawDate.getMonth() !== NOW.getMonth() || r.rawDate.getFullYear() !== NOW.getFullYear())) return false;
-      if (timeFilter === '7 ngày qua'  && (NOW - r.rawDate) / 86400000 > 7)  return false;
-      if (timeFilter === '30 ngày qua' && (NOW - r.rawDate) / 86400000 > 30) return false;
-      if (skillFilter === 'Writing'  && r.skill !== 'writing')  return false;
-      if (skillFilter === 'Speaking' && r.skill !== 'speaking') return false;
-      if (!bandFilter.test(r.band)) return false;
-      return true;
-    });
-
-    // Sort
-    result.sort((a, b) => {
-      const va = a[sortKey];
-      const vb = b[sortKey];
-      if (va < vb) return sortDir === 'asc' ? -1 : 1;
-      if (va > vb) return sortDir === 'asc' ? 1 : -1;
-      return 0;
-    });
-
-    return result;
-  }, [search, timeFilter, skillFilter, bandFilter, sortKey, sortDir]);
-
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const paginated  = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
-
-  const totalGraded = MOCK_HISTORY.length;
-  const avgBand     = (MOCK_HISTORY.reduce((s, r) => s + r.band, 0) / MOCK_HISTORY.length).toFixed(1);
-  const disputed    = MOCK_HISTORY.filter((r) => r.status === 'disputed').length;
-
-  // Export toàn bộ danh sách đang filter (không giới hạn trang)
-  const handleExportCsv = () => {
-    const rows = filtered.map((r) => ({
-      ...r,
-      status:      STATUS_MAP[r.status]?.label ?? r.status,
-      skill:       SKILL_MAP[r.skill]?.label   ?? r.skill,
-      feedbackStr: r.feedbackTypes?.join('; ')  ?? '',
-    }));
-    exportToCsv(`lich-su-cham-bai-${Date.now()}.csv`, CSV_COLUMNS, rows);
+  const handleExportCsv = async () => {
+    try {
+      const res = await getGradingHistory({ export: true });
+      if (res && res.success) {
+        const rows = res.data.map(item => {
+          const dateObj = new Date(item.gradedAt);
+          const mappedStatus = mapRawStatus(item.rawStatus);
+          return {
+            date: dateObj.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' }),
+            time: dateObj.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
+            studentName: item.studentName || 'N/A',
+            studentCode: item.studentId ? item.studentId.substring(0, 8) : 'N/A',
+            testName: item.testTitle || 'N/A',
+            skill: SKILL_MAP[item.skill]?.label ?? item.skill,
+            band: item.bandScore,
+            status: STATUS_MAP[mappedStatus]?.label ?? item.rawStatus,
+            feedbackStr: item.feedbackTypes?.join('; ') ?? ''
+          };
+        });
+        exportToCsv(`lich-su-cham-bai-${Date.now()}.csv`, CSV_COLUMNS, rows);
+      }
+    } catch (error) {
+      console.error('Export failed', error);
+      showToast('Lỗi khi xuất CSV', 'error');
+    }
   };
 
   return (
@@ -195,61 +195,59 @@ const TutorGradingHistoryPage = () => {
           onMouseEnter={(e) => { e.currentTarget.style.opacity = '0.8'; }}
           onMouseLeave={(e) => { e.currentTarget.style.opacity = '1'; }}
         >
-          <span>⬇</span> Xuất CSV ({filtered.length})
+          <span>⬇</span> Xuất CSV ({total})
         </button>
       </div>
 
       {/* Stat cards */}
       <div style={{ display: 'flex', gap: '16px', marginBottom: '28px' }}>
-        <StatCard label="Tổng bài đã chấm (Tháng)" value={totalGraded} />
-        <StatCard label="Điểm Band trung bình (Tháng)" value={`Band ${avgBand}`} dark />
-        <StatCard label="Khiếu nại đang xử lý" value={disputed} sub="bài cần xem xét" />
+        <StatCard label="Tổng bài đã chấm (Tháng)" value={stats.total_graded_month || 0} />
+        <StatCard label="Điểm Band trung bình (Tháng)" value={`Band ${stats.avg_band_score_month || '0.0'}`} dark />
+        <StatCard label="Khiếu nại đang xử lý" value={stats.pending_complaints || 0} sub="bài cần xem xét" />
       </div>
 
-      {/* Filters */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px', flexWrap: 'wrap' }}>
-        <div style={{ position: 'relative', flex: '0 0 220px' }}>
-          <span style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', fontSize: '15px', color: '#aaa', pointerEvents: 'none' }}>🔍</span>
-          <input
-            type="text" placeholder="Tìm học sinh, bài thi..."
-            value={search} onChange={(e) => resetPage(setSearch)(e.target.value)}
-            style={{ width: '100%', padding: '9px 14px 9px 38px', borderRadius: '999px', border: '1px solid #ddd', fontSize: '14px', fontFamily: 'UberMoveText, system-ui, sans-serif', outline: 'none', boxSizing: 'border-box', backgroundColor: '#fff' }}
-          />
-        </div>
-        <FilterDropdown label="⏱ Thời gian"  options={TIME_RANGES}   value={timeFilter}  onChange={resetPage(setTimeFilter)} />
-        <FilterDropdown label="📚 Kỹ năng"   options={SKILL_FILTERS} value={skillFilter} onChange={resetPage(setSkillFilter)} />
-        <FilterDropdown label="🎯 Band điểm" options={BAND_RANGES}   value={bandFilter}  onChange={resetPage(setBandFilter)} />
-        <span style={{ marginLeft: 'auto', fontSize: '13px', color: '#888' }}>{filtered.length} kết quả</span>
-      </div>
+
 
       {/* Table */}
       <GradingHistoryTable
-        rows={paginated}
+        rows={historyList}
         statusMap={STATUS_MAP}
         skillMap={SKILL_MAP}
         onView={setDetailRecord}
+        onEdit={(r) => {
+          if (r.skill && r.id) {
+            navigate(`/grading/tutor/grade/${r.skill}/${r.id}?mode=edit`);
+          }
+        }}
         onRevoke={setRevokeRecord}
-        sortKey={sortKey}
-        sortDir={sortDir}
-        onSort={handleSort}
         loading={loading}
       />
 
       {/* Pagination */}
-      <Pagination page={page} totalPages={totalPages} total={filtered.length} onPageChange={setPage} />
+      <Pagination page={page} totalPages={totalPages} total={total} onPageChange={setPage} />
 
       {/* Modals */}
       <GradingDetailModal record={detailRecord} onClose={() => setDetailRecord(null)} statusMap={STATUS_MAP} skillMap={SKILL_MAP} />
       <GradingRevokeModal
         record={revokeRecord}
         onClose={() => setRevokeRecord(null)}
-        onConfirm={(_id) => {
-          // TODO: gọi API PATCH /api/v1/grading/history/:id/revoke khi backend sẵn sàng
-          showToast(
-            `Đã thu hồi kết quả của ${revokeRecord?.studentName ?? 'học sinh'}.`,
-            'success'
-          );
-          setRevokeRecord(null);
+        onConfirm={async (_id) => {
+          try {
+            const res = await revokeGradingResult(revokeRecord.id);
+            if (res && res.success) {
+              showToast(
+                `Đã thu hồi kết quả của ${revokeRecord?.studentName ?? 'học sinh'}.`,
+                'success'
+              );
+              setRevokeRecord(null);
+              setRefreshKey(k => k + 1);
+            } else {
+              showToast('Lỗi khi thu hồi kết quả', 'error');
+            }
+          } catch (err) {
+            console.error(err);
+            showToast('Lỗi khi thu hồi kết quả', 'error');
+          }
         }}
       />
       <ToastContainer toasts={toasts} onDismiss={dismissToast} />

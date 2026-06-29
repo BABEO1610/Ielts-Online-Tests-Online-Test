@@ -76,6 +76,12 @@ class AuditLogService {
                     'role_changed', 'password_changed_by_admin', 'permission_denied'
                 ];
             }
+        } else if (filters.action === 'content') {
+            enrichedFilters.action = null; // Xóa action đơn
+            enrichedFilters.severityActions = ['test_created', 'test_updated', 'test_deleted', 'resource_uploaded', 'resource_reviewed', 'test_reviewed'];
+        } else if (filters.action === 'grading') {
+            enrichedFilters.action = null;
+            enrichedFilters.severityActions = ['submission_graded', 'submission_revoked', 'submission_regraded'];
         }
 
         const result = await listAuditLogs(pool, enrichedFilters);
@@ -221,14 +227,15 @@ class AuditLogService {
 }
 
 const ACTION_LABELS = {
+    test_created: 'Tạo đề thi',
+    test_updated: 'Sửa đề thi',
+    test_deleted: 'Xóa đề thi',
+    resource_uploaded: 'Thêm tài liệu',
     user_created: 'Tạo người dùng',
     user_updated: 'Cập nhật người dùng',
     role_changed: 'Đổi vai trò',
     user_deactivated: 'Vô hiệu hoá tài khoản',
     user_deleted: 'Xoá người dùng',
-    test_created: 'Tạo đề thi',
-    test_updated: 'Sửa đề thi',
-    test_deleted: 'Xoá đề thi',
     answer_key_updated: 'Cập nhật đáp án',
     resource_uploaded: 'Tải tài liệu',
     resource_deleted: 'Xoá tài liệu',
@@ -239,7 +246,9 @@ const ACTION_LABELS = {
     password_reset_requested: 'Yêu cầu đặt lại mật khẩu',
     oauth_linked: 'Liên kết OAuth',
     oauth_unlinked: 'Huỷ liên kết OAuth',
-    change_reverted: 'Hoàn tác thay đổi'
+    change_reverted: 'Hoàn tác thay đổi',
+    submission_revoked: 'Thu hồi kết quả',
+    submission_regraded: 'Sửa kết quả chấm'
 };
 
 const formatAuditLogListItem = (log) => ({
@@ -280,6 +289,8 @@ const formatActor = (log) => ({
 const getTargetLabel = (log) => {
     if (log.target_user_email) return log.target_user_email;
     if (log.target_user_name) return log.target_user_name;
+    if (log.new_value && log.new_value.student_name) return `Học sinh: ${log.new_value.student_name}`;
+    if (log.old_value && log.old_value.student_name) return `Học sinh: ${log.old_value.student_name}`;
     if (log.new_value && log.new_value.email) return log.new_value.email;
     if (log.new_value && log.new_value.title) return log.new_value.title;
     if (log.new_value && log.new_value.file_name) return log.new_value.file_name;
@@ -334,9 +345,18 @@ const getSeverity = (log) => {
 const getNote = (log) => {
     if (log.new_value && log.new_value.reason) return log.new_value.reason;
     if (log.old_value && log.old_value.reason) return log.old_value.reason;
+    
     if (log.action === 'login_failed' && log.old_value && log.old_value.email) {
         return `Đăng nhập thất bại: ${log.old_value.email}`;
     }
+    if (log.action === 'test_created') return 'Tạo đề thi mới';
+    if (log.action === 'test_updated') return 'Cập nhật nội dung đề thi';
+    if (log.action === 'test_deleted') return 'Xoá đề thi khỏi hệ thống';
+    if (log.action === 'resource_uploaded') return 'Tải tài liệu lên thư viện';
+    if (log.action === 'resource_deleted') return 'Xóa tài liệu khỏi thư viện';
+    if (log.action === 'test_reviewed') return 'Cập nhật trạng thái hiển thị đề thi';
+    if (log.action === 'resource_reviewed') return 'Cập nhật trạng thái hiển thị tài liệu';
+
     return null;
 };
 

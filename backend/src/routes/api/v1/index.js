@@ -26,6 +26,16 @@ router.get('/health', (req, res) => {
   });
 });
 
+router.get('/debug-db', async (req, res) => {
+  const { pool } = require('../../../db/pool');
+  try {
+    const r = await pool.query('SELECT * FROM test_attempts');
+    res.json(r.rows);
+  } catch(e) {
+    res.status(500).json({error: e.message});
+  }
+});
+
 router.use('/auth', authRoutes);
 router.use('/users', usersRoutes);
 router.use('/admin', adminRoutes);

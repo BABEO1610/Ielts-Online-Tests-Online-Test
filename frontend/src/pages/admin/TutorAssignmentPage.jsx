@@ -57,7 +57,10 @@ const TutorAssignmentPage = () => {
               ) : (
                 rows.map((r) => (
                   <tr key={r.id} className={!r.tutor_id ? 'row--suspicious' : ''}>
-                    <td className="fw-semibold text-capitalize">{r.type} <span className="text-secondary fw-normal">(Task/Part {r.task_or_part})</span></td>
+                    <td className="fw-semibold text-capitalize">
+                      {r.type} <span className="text-secondary fw-normal">({r.task_or_part} {r.type === 'writing' ? 'tasks' : 'parts'})</span>
+                      {r.test_title && <div className="caption text-secondary mt-1">{r.test_title}</div>}
+                    </td>
                     <td className="text-secondary">{r.student}</td>
                     <td><span className="pill pill--info">{r.target_band ? r.target_band.toFixed(1) : '—'}</span></td>
                     <td style={{ maxWidth: 260 }}>

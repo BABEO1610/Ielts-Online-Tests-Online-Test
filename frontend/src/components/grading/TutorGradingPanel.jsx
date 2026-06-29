@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import gradingService from '../../services/grading.service';
+import { updateGradingResult } from '../../services/gradingHistory.service';
 import TutorContextSidebar from './TutorContextSidebar';
 
 const IELTS_CRITERIA = {
@@ -41,7 +42,7 @@ const calculatePreviewBand = (scores) => {
   return intPart;
 };
 
-const TutorGradingPanel = ({ submissionId, type, studentId, onGradingComplete, tasks, activeTaskId, audioUrl }) => {
+const TutorGradingPanel = ({ submissionId, type, studentId, onGradingComplete, tasks, activeTaskId, audioUrl, readOnly, editMode, initialData }) => {
   const navigate = useNavigate();
   const [taskScores, setTaskScores] = useState({});
   const [taskFeedbacks, setTaskFeedbacks] = useState({});
@@ -51,6 +52,21 @@ const TutorGradingPanel = ({ submissionId, type, studentId, onGradingComplete, t
   const [submitting, setSubmitting] = useState(false);
   const [prelimLoading, setPrelimLoading] = useState(false);
   const [error, setError] = useState(null);
+
+  useEffect(() => {
+    if (initialData && (readOnly || editMode)) {
+      const initScores = {
+        taskAchievementScore: initialData.scores?.taskAchievement || '',
+        coherenceScore: initialData.scores?.coherence || '',
+        lexicalScore: initialData.scores?.lexical || '',
+        grammarScore: initialData.scores?.grammar || '',
+        fluencyScore: initialData.scores?.fluency || '',
+        pronunciationScore: initialData.scores?.pronunciation || ''
+      };
+      setTaskScores({ [activeTaskId]: initScores });
+      setTaskFeedbacks({ [activeTaskId]: initialData.writtenFeedback || '' });
+    }
+  }, [initialData, readOnly, activeTaskId]);
 
   const currentScores = taskScores[activeTaskId] || {
     taskAchievementScore: '',
@@ -123,12 +139,18 @@ const TutorGradingPanel = ({ submissionId, type, studentId, onGradingComplete, t
         payload[c.key] = parseFloat(currentScores[c.key]);
       });
 
-      const response = await gradingService.gradeSubmission(type, submissionId, payload);
+      let response;
+      if (editMode) {
+        response = await updateGradingResult(submissionId, payload);
+      } else {
+        response = await gradingService.gradeSubmission(type, submissionId, payload);
+      }
+
       if (response.success) {
         if (onGradingComplete) {
           onGradingComplete();
         }
-        navigate('/grading/tutor/queue');
+        navigate(editMode ? '/grading/tutor/schedule' : '/grading/tutor/queue');
       }
     } catch (err) {
       setError(err.response?.data?.error?.message || 'Failed to submit grades.');
@@ -141,7 +163,11 @@ const TutorGradingPanel = ({ submissionId, type, studentId, onGradingComplete, t
     <>
       <div className="bg-canvas rounded-4 p-4 h-100 d-flex flex-column">
         <div className="d-flex justify-content-between align-items-center mb-4">
-          <h4 className="text-ink fw-bold mb-0">Grading Panel - {tasks?.find(t => t.id === activeTaskId)?.name || 'Task'}</h4>
+          <h4 className="text-ink fw-bold mb-0">
+            Grading Panel - {tasks?.find(t => t.id === activeTaskId)?.name || 'Task'}
+            {readOnly && <span className="badge bg-secondary ms-2 fs-6">Chỉ đọc</span>}
+            {editMode && <span className="badge bg-warning text-dark ms-2 fs-6">Chỉnh sửa điểm</span>}
+          </h4>
           
           <div className="dropdown">
             <button 
@@ -179,24 +205,26 @@ const TutorGradingPanel = ({ submissionId, type, studentId, onGradingComplete, t
             </div>
           )}
 
-          <div className="mb-4 d-flex justify-content-between align-items-center">
-            <button 
-              type="button"
-              className="btn btn-light rounded-pill px-4 py-2 fw-medium d-flex align-items-center gap-2"
-              onClick={handleRunPrelimCheck}
-              disabled={prelimLoading}
-              style={{ backgroundColor: '#efefef' }}
-            >
-              {prelimLoading ? (
-                <>
-                  <span className="spinner-border spinner-border-sm text-dark" role="status" aria-hidden="true"></span>
-                  Đang phân tích...
-                </>
-              ) : (
-                'Run AI Prelim Check'
-              )}
-            </button>
-          </div>
+          {!readOnly && (
+            <div className="mb-4 d-flex justify-content-between align-items-center">
+              <button 
+                type="button"
+                className="btn btn-light rounded-pill px-4 py-2 fw-medium d-flex align-items-center gap-2"
+                onClick={handleRunPrelimCheck}
+                disabled={prelimLoading}
+                style={{ backgroundColor: '#efefef' }}
+              >
+                {prelimLoading ? (
+                  <>
+                    <span className="spinner-border spinner-border-sm text-dark" role="status" aria-hidden="true"></span>
+                    Đang phân tích...
+                  </>
+                ) : (
+                  'Run AI Prelim Check'
+                )}
+              </button>
+            </div>
+          )}
 
           {highlights && (
             <div className="p-4 rounded-4 mb-4 text-dark" style={{ backgroundColor: '#e3f2fd', border: '1px solid #bbdefb' }}>
@@ -232,6 +260,7 @@ const TutorGradingPanel = ({ submissionId, type, studentId, onGradingComplete, t
                     required
                     value={currentScores[criteria.key]}
                     onChange={(e) => handleScoreChange(criteria.key, e.target.value)}
+                    disabled={readOnly}
                     data-testid={`input-${criteria.key}`}
                     style={{ backgroundColor: '#efefef', borderRadius: '8px' }}
                   >
@@ -262,21 +291,24 @@ const TutorGradingPanel = ({ submissionId, type, studentId, onGradingComplete, t
                 required
                 value={currentFeedback}
                 onChange={(e) => handleFeedbackChange(e.target.value)}
+                disabled={readOnly}
                 placeholder="Provide detailed feedback here..."
                 data-testid="textarea-feedback"
               ></textarea>
             </div>
 
-            <div className="text-end mt-4">
-              <button 
-                type="submit" 
-                className="btn btn-dark rounded-pill px-5 py-3 fw-bold"
-                disabled={submitting}
-                style={{ fontSize: '18px' }}
-              >
-                {submitting ? 'Submitting...' : 'Submit Grade'}
-              </button>
-            </div>
+            {!readOnly && (
+              <div className="text-end mt-4">
+                <button 
+                  type="submit" 
+                  className="btn btn-dark rounded-pill px-5 py-3 fw-bold"
+                  disabled={submitting}
+                  style={{ fontSize: '18px' }}
+                >
+                  {submitting ? 'Submitting...' : 'Submit Grade'}
+                </button>
+              </div>
+            )}
           </form>
         </div>
 
