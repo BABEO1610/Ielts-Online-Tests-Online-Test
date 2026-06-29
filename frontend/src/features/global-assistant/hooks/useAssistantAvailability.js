@@ -4,15 +4,16 @@ import { useAuth } from '../../../context/AuthContext';
 
 const ACTIVE_TEST_PATTERN = /^\/tests\/[^/]+\/(?:reading|listening|writing|speaking)$/i;
 const RESULT_PATTERN = /^\/results\/([^/]+)$/i;
-const REVIEW_PATTERN = /^\/results\/([^/]+)\/detail$/i;
+const REVIEW_PATTERN = /^\/results\/([^/]+)\/review$/i;
 
 const getPageType = (pathname) => {
   if (ACTIVE_TEST_PATTERN.test(pathname)) return 'active-test';
   if (REVIEW_PATTERN.test(pathname)) return 'review';
   if (RESULT_PATTERN.test(pathname)) return 'result';
+  if (pathname === '/practice-history' || pathname.startsWith('/practice-history/')) return 'practice_history';
   if (pathname === '/tests' || pathname.startsWith('/tests/')) return 'test-list';
   if (pathname === '/library' || pathname.includes('library')) return 'library';
-  if (['/reading', '/listening', '/writing', '/speaking'].includes(pathname)) return 'lesson';
+  if (['/reading', '/listening', '/writing', '/speaking'].includes(pathname)) return 'test-list';
   return 'home';
 };
 

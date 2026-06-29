@@ -1,7 +1,10 @@
 const { ERROR_CODES, ERROR_MESSAGES } = require('./assistant.constants');
 
-const buildGreetingResponse = () => {
-  return 'Chào bạn, mình là IELTS Assistant. Mình có thể giúp bạn tìm đề, tài liệu, giải thích kiến thức IELTS, paraphrase câu, hoặc review đáp án sau khi nộp bài. Bạn muốn bắt đầu với phần nào?';
+const buildGreetingResponse = ({ displayName = 'bạn', isGuest = false } = {}) => {
+  if (isGuest) {
+    return 'Chào bạn! Bạn cần đăng nhập để sử dụng IELTS Assistant.';
+  }
+  return `Chào ${displayName}! Mình là IELTS Assistant. Bạn muốn tìm đề thi, tài liệu, mẹo học IELTS hay xem lại kết quả bài làm?`;
 };
 
 const buildClarificationResponse = () => {
