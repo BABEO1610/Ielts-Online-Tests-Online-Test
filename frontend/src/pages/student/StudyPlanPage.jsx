@@ -62,7 +62,7 @@ const StudyPlanPage = () => {
 
       <div className="row g-4">
         {/* Trend Chart */}
-        <div className="col-lg-8">
+        <div className="col-lg-7">
           <div className="bg-white rounded-4 border p-4 h-100" style={{ borderColor: '#e2e2e2' }}>
             <h2 className="fw-bold mb-4" style={{ fontFamily: 'UberMove, system-ui, sans-serif', fontSize: '20px', color: '#000' }}>
               Biểu đồ tăng trưởng (Overall)
@@ -73,7 +73,7 @@ const StudyPlanPage = () => {
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e2e2" />
                   <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#5e5e5e' }} dy={10} />
                   <YAxis domain={[4.0, 9.0]} ticks={[4.0, 5.0, 6.0, 7.0, 8.0, 9.0]} axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#5e5e5e' }} />
-                  <RechartsTooltip 
+                  <RechartsTooltip
                     contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 16px rgba(0,0,0,0.1)' }}
                     itemStyle={{ color: '#000', fontWeight: 'bold' }}
                   />
@@ -85,21 +85,21 @@ const StudyPlanPage = () => {
         </div>
 
         {/* Radar Chart (Skill Balance) */}
-        <div className="col-lg-4">
+        <div className="col-lg-5">
           <div className="bg-white rounded-4 border p-4 h-100" style={{ borderColor: '#e2e2e2' }}>
             <h2 className="fw-bold mb-4" style={{ fontFamily: 'UberMove, system-ui, sans-serif', fontSize: '20px', color: '#000' }}>
               Phân tích kỹ năng
             </h2>
             <div style={{ width: '100%', height: 300 }}>
               <ResponsiveContainer>
-                <RadarChart cx="50%" cy="50%" outerRadius="70%" data={SKILL_SCORES}>
+                <RadarChart cx="50%" cy="50%" outerRadius="65%" margin={{ top: 10, right: 30, bottom: 10, left: 30 }} data={SKILL_SCORES}>
                   <PolarGrid stroke="#e2e2e2" />
-                  <PolarAngleAxis dataKey="skill" tick={{ fill: '#000', fontSize: 12, fontWeight: 500 }} />
+                  <PolarAngleAxis dataKey="skill" tick={{ fill: '#000', fontSize: 13, fontWeight: 500 }} />
                   <PolarRadiusAxis angle={30} domain={[0, 9]} tick={false} axisLine={false} />
                   <Radar name="Hiện tại" dataKey="score" stroke="#000" strokeWidth={2} fill="#000" fillOpacity={0.2} />
                   <Radar name="Mục tiêu" dataKey="target" stroke="#afafaf" strokeWidth={2} strokeDasharray="5 5" fill="none" />
                   <Legend iconType="circle" wrapperStyle={{ fontSize: '12px' }} />
-                  <RechartsTooltip 
+                  <RechartsTooltip
                     contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 16px rgba(0,0,0,0.1)' }}
                   />
                 </RadarChart>
@@ -124,10 +124,10 @@ const StudyPlanPage = () => {
                   </span>
                 </div>
                 <div className="progress rounded-pill mt-3" style={{ height: '6px', backgroundColor: '#efefef' }}>
-                  <div 
-                    className="progress-bar rounded-pill" 
-                    role="progressbar" 
-                    style={{ width: `${Math.min(progress, 100)}%`, backgroundColor: isReached ? '#000' : '#5e5e5e' }} 
+                  <div
+                    className="progress-bar rounded-pill"
+                    role="progressbar"
+                    style={{ width: `${Math.min(progress, 100)}%`, backgroundColor: isReached ? '#000' : '#5e5e5e' }}
                     aria-valuenow={progress} aria-valuemin="0" aria-valuemax="100"
                   ></div>
                 </div>

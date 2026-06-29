@@ -24,7 +24,7 @@ const Login = () => {
     } else if (user.role === 'tutor') {
       return <Navigate to="/tutor/dashboard" replace />;
     } else if (user.role === 'student') {
-      return <Navigate to="/dashboard" replace />;
+      return <Navigate to="/" replace />;
     } else {
       return <Navigate to="/" replace />;
     }

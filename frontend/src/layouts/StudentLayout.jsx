@@ -9,7 +9,7 @@ const NAV_ITEMS = [
   { to: '/profile', label: 'My Profile', icon: 'bi-person', suffix: '+' },
 ];
 
-const WORKSPACE_PATHS = ['/dashboard', '/profile', '/practice-history', '/study-plan'];
+const WORKSPACE_PATHS = ['/profile', '/practice-history', '/study-plan'];
 
 const StudentLayout = () => {
   const { user, logout } = useAuth();
@@ -19,10 +19,9 @@ const StudentLayout = () => {
   const isProfileWorkspace = WORKSPACE_PATHS.includes(location.pathname);
 
   const workspaceTitle =
-    location.pathname === '/dashboard' ? 'My Dashboard'
-      : location.pathname === '/practice-history' ? 'Practice History Workspace'
-        : location.pathname === '/study-plan' ? 'Study Plan Workspace'
-          : 'Profile Workspace';
+    location.pathname === '/practice-history' ? 'Practice History Workspace'
+      : location.pathname === '/study-plan' ? 'Study Plan Workspace'
+        : 'Profile Workspace';
 
   const handleLogout = async () => {
     try {
