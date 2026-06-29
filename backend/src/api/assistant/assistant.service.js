@@ -6,8 +6,11 @@ const { buildContextInjection } = require('./assistant.context');
 const { buildPrompt } = require('./assistant.prompts');
 const { normalizeAssistantResponse } = require('./assistant.response');
 const { MISSING_DATA_MESSAGE, selfCheckResponse } = require('./assistant.selfcheck');
+const { resolveUserDisplayName } = require('./assistant.user-resolver');
 const {
   ASSISTANT_ROLE,
+  ASSISTANT_CONTEXT_RESULT_LIMIT,
+  ASSISTANT_DISPLAY_RESULT_LIMIT,
   ERROR_CODES,
   ERROR_MESSAGES,
   createAssistantError,
@@ -26,17 +29,33 @@ const buildErrorResult = (code, message = ERROR_MESSAGES[code]) => ({
 const buildSuccessResult = ({
   answer,
   suggestedLinks = [],
+  linkMeta = null,
   conversationId = null,
   messageId = null,
   intent = null,
   fallbackUsed = false,
+  finalResponseMode = null,
+  aiResponseValid = null,
+  aiResponseFormat = null,
+  aiRetryUsed = false,
+  fallbackReason = null,
+  fallbackType = null,
+  dbLookupCalled = null,
 }) => ({
   answer,
   suggestedLinks,
+  linkMeta,
   conversationId,
   messageId,
   intent,
   fallbackUsed,
+  finalResponseMode,
+  aiResponseValid,
+  aiResponseFormat,
+  aiRetryUsed,
+  fallbackReason,
+  fallbackType,
+  dbLookupCalled,
   code: null,
 });
 
@@ -45,6 +64,19 @@ const isLookupIntent = (intent) =>
 
 const isEmptyLookupContext = (contextInjection) =>
   isLookupIntent(contextInjection.mode) && contextInjection.databaseResults.length === 0;
+
+const limitDisplayLinks = (links = []) => links.slice(0, ASSISTANT_DISPLAY_RESULT_LIMIT);
+
+const buildLinkMeta = (contextInjection, links = contextInjection.suggestedLinks || []) => {
+  const totalMatched = contextInjection.debug?.contextRowCount ?? links.length;
+  const displayedCount = Math.min(links.length, ASSISTANT_DISPLAY_RESULT_LIMIT);
+  return {
+    totalMatched,
+    displayedCount,
+    hasMore: totalMatched > displayedCount,
+    allUrl: contextInjection.mode === ASSISTANT_INTENTS.FIND_LESSON ? '/library' : null,
+  };
+};
 
 const getResultTitle = (item) => item.title || item.name || item.label || 'IELTS content';
 
@@ -55,12 +87,26 @@ const summarizeLookupResults = (items) => {
 
 const buildLookupFallbackAnswer = (contextInjection) => {
   const items = contextInjection.databaseResults || [];
-  if (items.length === 0) return MISSING_DATA_MESSAGE;
+  const lookupMissing = Boolean(contextInjection.debug?.lookupMissing);
+  if (items.length === 0) {
+    if (contextInjection.mode === ASSISTANT_INTENTS.FIND_TEST && contextInjection.debug?.skillFilter) {
+      return `Mình chưa tìm thấy đề ${contextInjection.debug.skillFilter} nào đang được publish trong hệ thống.`;
+    }
+    return MISSING_DATA_MESSAGE;
+  }
 
   if (contextInjection.mode === ASSISTANT_INTENTS.FIND_TEST) {
     const skill = contextInjection.debug?.skillFilter || 'IELTS';
+    if (lookupMissing) {
+      let msg = `Mình chưa tìm thấy đề ${skill} khớp đúng yêu cầu, nhưng hệ thống đang có ${items.length} đề published/approved khác:\n\n`;
+      items.slice(0, ASSISTANT_DISPLAY_RESULT_LIMIT).forEach((item, index) => {
+        msg += `${index + 1}. ${item.title || 'Untitled'} - ${item.skill || 'Skill'}, ${item.difficulty || 'Difficulty'}\n`;
+      });
+      msg += '\nBạn muốn xem thử đề nào trong danh sách này không?';
+      return msg;
+    }
     let msg = `Mình tìm thấy ${items.length} đề ${skill} đang được publish trong hệ thống:\n\n`;
-    items.slice(0, 5).forEach((item, index) => {
+    items.slice(0, ASSISTANT_DISPLAY_RESULT_LIMIT).forEach((item, index) => {
       msg += `${index + 1}. ${item.title || 'Untitled'} — ${item.skill || 'Skill'}, ${item.difficulty || 'Difficulty'}\n`;
     });
     msg += '\nBạn muốn mở đề nào?';
@@ -68,12 +114,20 @@ const buildLookupFallbackAnswer = (contextInjection) => {
   }
   
   if (contextInjection.mode === ASSISTANT_INTENTS.FIND_LESSON) {
+    if (lookupMissing) {
+      let msg = `Mình chưa tìm thấy tài liệu khớp đúng yêu cầu, nhưng thư viện đang có ${items.length} tài liệu published/approved khác:\n\n`;
+      items.slice(0, ASSISTANT_DISPLAY_RESULT_LIMIT).forEach((item, index) => {
+        msg += `${index + 1}. ${item.title || 'Untitled'} - ${item.resourceType || 'N/A'}, ${item.category || 'N/A'}\n`;
+      });
+      msg += '\nBạn có thể mở trang Library ở phần link gợi ý bên dưới.';
+      return msg;
+    }
     if (items.length === 1) {
       const item = items[0];
       return `Mình tìm thấy tài liệu '${item.title || 'Untitled'}' trong thư viện. Loại tài liệu: ${item.resourceType || 'N/A'}. Category: ${item.category || 'N/A'}.`;
     }
     let msg = `Mình tìm thấy ${items.length} tài liệu trong thư viện:\n\n`;
-    items.slice(0, 5).forEach((item, index) => {
+    items.slice(0, ASSISTANT_DISPLAY_RESULT_LIMIT).forEach((item, index) => {
       msg += `${index + 1}. ${item.title || 'Untitled'} — ${item.resourceType || 'N/A'}, ${item.category || 'N/A'}\n`;
     });
     msg += '\nBạn có thể mở trang Library ở phần link gợi ý bên dưới.';
@@ -88,7 +142,44 @@ const getFallbackAnswer = (contextInjection) => {
   if (contextInjection.mode === ASSISTANT_INTENTS.POST_TEST_REVIEW) {
     return ERROR_MESSAGES[ERROR_CODES.MISSING_EXPLANATION];
   }
+  if (contextInjection.mode === ASSISTANT_INTENTS.IELTS_KNOWLEDGE) {
+    return 'Mình đang gặp lỗi khi tạo câu trả lời IELTS. Bạn thử hỏi lại giúp mình nhé.';
+  }
   return 'Mình có thể hỗ trợ nội dung IELTS trên website như tìm test, lesson, study tips, navigation hoặc review đáp án sau khi nộp bài.';
+};
+
+const buildIeltsKnowledgeFallback = (message) => {
+  return 'Mình đang gặp lỗi khi tạo câu trả lời IELTS. Bạn thử hỏi lại giúp mình nhé.';
+  const text = String(message || '').toLowerCase();
+  const normalized = text.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  if (normalized.includes('overview') || normalized.includes('task 1')) {
+    return [
+      'Mình chưa gọi được AI lúc này, nhưng với IELTS Writing Task 1, overview nên viết như sau:',
+      '1. Viết 1-2 câu sau phần introduction.',
+      '2. Chỉ nêu xu hướng/đặc điểm nổi bật nhất, không đưa số liệu chi tiết.',
+      '3. Với biểu đồ: nêu xu hướng tăng/giảm, nhóm cao/thấp, điểm khác biệt lớn.',
+      '4. Với map/process: nêu thay đổi chính hoặc số bước chính.',
+    ].join('\n');
+  }
+  if (normalized.includes('speaking') || normalized.includes('part 2')) {
+    return [
+      'Mình chưa gọi được AI lúc này, nhưng với IELTS Speaking Part 2:',
+      '1. Bạn có 1 phút chuẩn bị và nên nói khoảng 1-2 phút.',
+      '2. Dùng cue card để chia ý: who/what/when/where/why/how.',
+      '3. Mở rộng bằng ví dụ cá nhân, cảm xúc và lý do.',
+      '4. Đừng dừng quá sớm; nếu bí, hãy mô tả thêm bối cảnh hoặc so sánh.',
+    ].join('\n');
+  }
+  if (text.includes('reading') || normalized.includes('true false not given') || normalized.includes('matching headings')) {
+    return [
+      'Mình chưa gọi được AI lúc này, nhưng đây là mẹo IELTS Reading an toàn để bạn áp dụng:',
+      '1. Đọc câu hỏi trước, gạch keyword chính.',
+      '2. Scan đoạn văn để tìm keyword/paraphrase, đừng đọc từng chữ từ đầu.',
+      '3. Với True/False/Not Given, chỉ chọn True/False khi thông tin được xác nhận hoặc phủ định rõ trong bài.',
+      '4. Với Matching Headings, đọc topic sentence và ý chính cả đoạn, không chọn chỉ vì một từ bị lặp lại.',
+    ].join('\n');
+  }
+  return 'Mình chưa gọi được AI lúc này, nhưng bạn có thể hỏi lại theo kỹ năng cụ thể như Reading, Listening, Writing hoặc Speaking để mình đưa tips IELTS phù hợp.';
 };
 
 const isGenericAssistantAnswer = (answer) => {
@@ -105,6 +196,13 @@ const emitAssistantDebug = (data) => {
     message: data.message || null,
     route: data.route || null,
     pageType: data.pageType || null,
+    userId: data.userId || null,
+    userDisplayName: data.userDisplayName || null,
+    userNameSource: data.userNameSource || null,
+    userNameFallbackUsed: Boolean(data.userNameFallbackUsed),
+    userNameFallbackReason: data.userNameFallbackReason || null,
+    userNameDbErrorCode: data.userNameDbError?.code || null,
+    userNameDbErrorMessage: data.userNameDbError?.message || null,
     ruleIntent: data.ruleIntent || null,
     classifierUsed: Boolean(data.classifierUsed),
     classifierIntent: data.classifierIntent || null,
@@ -118,13 +216,36 @@ const emitAssistantDebug = (data) => {
     exactTitleMatch: Boolean(data.exactTitleMatch),
     fuzzyTitleMatch: Boolean(data.fuzzyTitleMatch),
     skillFilter: data.skillFilter || null,
+    difficultyFilter: data.difficultyFilter || null,
+    requestedQuantity: data.requestedQuantity || null,
+    effectiveLimit: data.effectiveLimit || null,
+    sortOrder: data.sortOrder || null,
+    sortField: data.sortField || null,
+    titleNumber: data.titleNumber || null,
+    testNumber: data.testNumber || null,
+    action: data.action || null,
+    attemptId: data.attemptId || null,
+    reviewMode: data.reviewMode || null,
+    reviewFallbackReason: data.reviewFallbackReason || null,
     resourceTypeFilter: data.resourceTypeFilter || null,
     rowCount: data.rowCount || 0,
+    dbRowCount: data.dbRowCount || 0,
+    contextRowCount: data.contextRowCount || data.rowCount || 0,
+    displayedRowCount: data.displayedRowCount || data.rowCount || 0,
+    contextLimit: data.contextLimit || null,
+    contextLimitApplied: Boolean(data.contextLimitApplied),
+    lookupMissing: Boolean(data.lookupMissing),
     resultTitles: data.resultTitles || [],
     fallbackUsed: Boolean(data.fallbackUsed),
     fallbackReason: data.fallbackReason || null,
     classifierProviderCalled: Boolean(data.classifierProviderCalled),
     answerProviderCalled: Boolean(data.answerProviderCalled),
+    dbLookupCalled: Boolean(data.dbLookupCalled),
+    sessionMemoryCount: data.sessionMemoryCount || 0,
+    aiResponseValid: data.aiResponseValid === null || data.aiResponseValid === undefined ? null : Boolean(data.aiResponseValid),
+    aiResponseFormat: data.aiResponseFormat || null,
+    aiRetryUsed: Boolean(data.aiRetryUsed),
+    fallbackType: data.fallbackType || null,
     totalAiCalls: data.totalAiCalls || 0,
     finalResponseMode: data.finalResponseMode || 'safe_missing_data',
     'dbError.message': data.dbError?.message || null,
@@ -166,12 +287,19 @@ const {
   buildOutOfScopeResponse,
 } = require('./assistant.responses');
 
-const buildImmediateIntentResult = (intent) => {
+const buildImmediateIntentResult = (intent, userNameContext = null, user = null) => {
   if (intent === ASSISTANT_INTENTS.OUT_OF_SCOPE) {
     return buildSuccessResult({ answer: buildOutOfScopeResponse(), intent });
   }
   if (intent === ASSISTANT_INTENTS.GREETING) {
-    return buildSuccessResult({ answer: buildGreetingResponse(), intent });
+    return buildSuccessResult({
+      answer: buildGreetingResponse({
+        displayName: userNameContext?.displayName || 'bạn',
+        isGuest: !user,
+      }),
+      intent,
+      finalResponseMode: 'immediate',
+    });
   }
   if (intent === ASSISTANT_INTENTS.CLARIFICATION) {
     return buildSuccessResult({ answer: buildClarificationResponse(), intent });
@@ -195,13 +323,32 @@ const buildImmediateContextResult = (contextInjection) => {
   if (contextInjection.directAnswer) {
     return buildSuccessResult({
       answer: contextInjection.directAnswer,
-      suggestedLinks: contextInjection.suggestedLinks || [],
+      suggestedLinks: limitDisplayLinks(contextInjection.suggestedLinks || []),
+      linkMeta: buildLinkMeta(contextInjection),
       intent: contextInjection.mode,
+      finalResponseMode: contextInjection.finalResponseMode || 'immediate',
+      dbLookupCalled: Boolean(contextInjection.debug?.queryTable),
     });
   }
   if (contextInjection.errorCode) return buildErrorResult(contextInjection.errorCode);
+  if (isLookupIntent(contextInjection.mode) && contextInjection.debug?.lookupMissing && contextInjection.databaseResults.length > 0) {
+    return buildSuccessResult({
+      answer: buildLookupFallbackAnswer(contextInjection),
+      suggestedLinks: limitDisplayLinks(contextInjection.suggestedLinks || []),
+      linkMeta: buildLinkMeta(contextInjection),
+      intent: contextInjection.mode,
+      fallbackUsed: true,
+      finalResponseMode: 'safe_missing_data_with_suggestions',
+      dbLookupCalled: Boolean(contextInjection.debug?.queryTable),
+    });
+  }
   if (isEmptyLookupContext(contextInjection)) {
-    return buildSuccessResult({ answer: MISSING_DATA_MESSAGE, intent: contextInjection.mode });
+    return buildSuccessResult({
+      answer: buildLookupFallbackAnswer(contextInjection),
+      intent: contextInjection.mode,
+      finalResponseMode: 'safe_missing_data',
+      dbLookupCalled: Boolean(contextInjection.debug?.queryTable),
+    });
   }
   return null;
 };
@@ -219,7 +366,8 @@ const normalizeAndSelfCheck = ({ rawAnswer, contextInjection, allowPlainText = f
     return {
       ...checked,
       answer: buildLookupFallbackAnswer(contextInjection),
-      suggestedLinks: contextInjection.suggestedLinks || [],
+      suggestedLinks: limitDisplayLinks(contextInjection.suggestedLinks || []),
+      linkMeta: buildLinkMeta(contextInjection),
       usedDatabase: true,
       needsMoreContext: false,
       fallbackUsed: true,
@@ -229,12 +377,17 @@ const normalizeAndSelfCheck = ({ rawAnswer, contextInjection, allowPlainText = f
   if (contextInjection.suggestedLinks?.length) {
     return {
       ...checked,
-      suggestedLinks: contextInjection.suggestedLinks,
+      suggestedLinks: limitDisplayLinks(contextInjection.suggestedLinks),
+      linkMeta: buildLinkMeta(contextInjection),
       finalResponseMode: 'ai'
     };
   }
   return { ...checked, finalResponseMode: 'ai' };
 };
+
+const isInvalidKnowledgeResponse = (response, contextInjection) =>
+  contextInjection.mode === ASSISTANT_INTENTS.IELTS_KNOWLEDGE &&
+  response.aiResponseValid === false;
 
 const generateCheckedAnswer = async ({ payload, contextInjection }) => {
   const prompt = buildPrompt({ message: payload.message, contextInjection });
@@ -266,27 +419,133 @@ const generateCheckedStreamAnswer = async ({ payload, contextInjection }) => {
   });
 };
 
+const generateKnowledgeRetryAnswer = async ({ payload, contextInjection }) => {
+  const recentConversation = (contextInjection.sessionMemory || [])
+    .map((item) => `${item.role === 'user' ? 'User' : 'Assistant'}: ${item.content}`)
+    .join('\n') || 'No recent conversation.';
+  const rawAnswer = await aiService.generateAssistantAnswer({
+    mode: contextInjection.mode,
+    message: payload.message,
+    systemPrompt: [
+      'You are an IELTS and English learning assistant.',
+      'Answer directly in Vietnamese. Plain text is allowed; JSON is not required.',
+      'Use recent conversation to understand follow-up questions.',
+      'If the user asks for a Writing Task 2 outline without a concrete topic, ask for the topic instead of inventing an outline.',
+      'If the user asks to translate/correct/paraphrase without providing text, ask them to send the text.',
+      'Do not say generic capability text. Do not invent website data or official tests/answers.',
+      'Bạn là IELTS Expert Assistant.',
+      'Trả lời trực tiếp câu hỏi IELTS của học viên bằng tiếng Việt.',
+      'Chỉ trả lời nội dung liên quan IELTS.',
+      'Không cần JSON. Không nói chung chung kiểu "tôi có thể hỗ trợ".',
+      'Không chấm band số, không bịa dữ liệu website hoặc đề/đáp án chính thức.',
+    ].join('\n'),
+    userPrompt: [
+      'Recent conversation:',
+      recentConversation,
+      '',
+      'Current student question:',
+      payload.message,
+    ].join('\n'),
+  });
+  return normalizeAndSelfCheck({
+    rawAnswer,
+    contextInjection,
+    allowPlainText: true,
+  });
+};
+
 const buildAiResult = async ({ payload, contextInjection, useStream }) => {
-  const response = useStream
-    ? await generateCheckedStreamAnswer({ payload, contextInjection })
-    : await generateCheckedAnswer({ payload, contextInjection });
+  let response;
+  let aiRetryUsed = false;
+  let fallbackReason = null;
+  let fallbackType = null;
+  try {
+    response = useStream
+      ? await generateCheckedStreamAnswer({ payload, contextInjection })
+      : await generateCheckedAnswer({ payload, contextInjection });
+
+    if (isInvalidKnowledgeResponse(response, contextInjection)) {
+      aiRetryUsed = true;
+      fallbackReason = response.invalidReason || 'invalid_ai_response';
+      response = await generateKnowledgeRetryAnswer({ payload, contextInjection });
+      response = {
+        ...response,
+        finalResponseMode: response.aiResponseValid === false ? 'ai_fallback_error' : 'knowledge_answer',
+      };
+    }
+
+    if (isInvalidKnowledgeResponse(response, contextInjection)) {
+      fallbackType = 'ai_error_message';
+      response = {
+        answer: buildIeltsKnowledgeFallback(payload.message),
+        suggestedLinks: [],
+        fallbackUsed: true,
+        finalResponseMode: 'ai_fallback_error',
+        aiResponseValid: false,
+        aiResponseFormat: response.aiResponseFormat,
+        invalidReason: response.invalidReason || fallbackReason,
+      };
+    }
+  } catch (error) {
+    if (contextInjection.mode !== ASSISTANT_INTENTS.IELTS_KNOWLEDGE) throw error;
+    fallbackReason = error.code || error.message || 'ai_provider_error';
+    fallbackType = 'ai_error_message';
+    response = {
+      answer: buildIeltsKnowledgeFallback(payload.message),
+      suggestedLinks: [],
+      fallbackUsed: true,
+      finalResponseMode: 'ai_fallback_error',
+      aiResponseValid: false,
+      aiResponseFormat: 'empty',
+      invalidReason: fallbackReason,
+    };
+  }
   return {
     ...buildSuccessResult({
       answer: response.answer,
-      suggestedLinks: response.suggestedLinks,
+      suggestedLinks: limitDisplayLinks(response.suggestedLinks),
+      linkMeta: response.linkMeta || buildLinkMeta(contextInjection, response.suggestedLinks || []),
       intent: contextInjection.mode,
       fallbackUsed: response.fallbackUsed,
+      aiResponseValid: response.aiResponseValid,
+      aiResponseFormat: response.aiResponseFormat,
+      aiRetryUsed,
+      fallbackReason: response.invalidReason || fallbackReason,
+      fallbackType: fallbackType || (response.fallbackUsed ? 'deterministic_fallback' : null),
+      dbLookupCalled: Boolean(contextInjection.debug?.queryTable),
     }),
     finalResponseMode: response.finalResponseMode
   };
 };
 
-const tracePipeline = ({ payload, ruleIntent, classifierUsed, classifierResult, contextInjection, answerProviderCalled, fallbackUsed, finalResponseMode }) => {
+const tracePipeline = ({
+  payload,
+  user,
+  userNameContext,
+  ruleIntent,
+  classifierUsed,
+  classifierResult,
+  contextInjection,
+  answerProviderCalled,
+  fallbackUsed,
+  finalResponseMode,
+  aiResponseValid = null,
+  aiResponseFormat = null,
+  aiRetryUsed = false,
+  fallbackReason = null,
+  fallbackType = null,
+}) => {
   const classifierProviderCalled = Boolean(classifierUsed);
   emitAssistantDebug({
     message: payload.message,
     route: payload.context.route,
     pageType: payload.context.pageType,
+    userId: user?.id || user?.sub || null,
+    userDisplayName: userNameContext?.displayName || null,
+    userNameSource: userNameContext?.source || null,
+    userNameFallbackUsed: userNameContext?.fallbackUsed,
+    userNameFallbackReason: userNameContext?.fallbackReason,
+    userNameDbError: userNameContext?.dbError,
     ruleIntent,
     classifierUsed,
     classifierIntent: classifierResult?.intent || null,
@@ -296,17 +555,30 @@ const tracePipeline = ({ payload, ruleIntent, classifierUsed, classifierResult, 
     ...(contextInjection?.debug || {}),
     classifierProviderCalled,
     answerProviderCalled: Boolean(answerProviderCalled),
-    totalAiCalls: (classifierProviderCalled ? 1 : 0) + (answerProviderCalled ? 1 : 0),
+    dbLookupCalled: Boolean(contextInjection?.debug?.queryTable),
+    sessionMemoryCount: contextInjection?.sessionMemory?.length || 0,
+    aiResponseValid,
+    aiResponseFormat,
+    aiRetryUsed,
+    fallbackType,
+    totalAiCalls: (classifierProviderCalled ? 1 : 0) + (answerProviderCalled ? 1 : 0) + (aiRetryUsed ? 1 : 0),
     fallbackUsed,
+    fallbackReason: fallbackReason || contextInjection?.debug?.fallbackReason,
     finalResponseMode,
   });
 };
 
 const runAssistantPipeline = async ({ user, payload, useStream = false }) => {
+  const sessionId = payload.sessionId || null;
   const originalIntent = detectIntent({ message: payload.message, context: payload.context });
   let intent = originalIntent;
   let classifierUsed = false;
   let classifierResult = null;
+  let userNameContext = null;
+  const getUserNameContext = async () => {
+    if (!userNameContext) userNameContext = await resolveUserDisplayName(user);
+    return userNameContext;
+  };
 
   if (intent === ASSISTANT_INTENTS.UNKNOWN) {
     const { classifyScope } = require('./assistant.scope-classifier');
@@ -315,21 +587,25 @@ const runAssistantPipeline = async ({ user, payload, useStream = false }) => {
     intent = classifierResult.intent;
     
     if (classifierResult.error) {
-      const intentResult = buildImmediateIntentResult(ASSISTANT_INTENTS.CLARIFICATION);
-      tracePipeline({ payload, ruleIntent: originalIntent, classifierUsed, classifierResult, answerProviderCalled: false, finalResponseMode: 'classifier_error_clarification' });
+      const intentResult = buildImmediateIntentResult(ASSISTANT_INTENTS.CLARIFICATION, userNameContext, user);
+      tracePipeline({ payload, user, userNameContext, ruleIntent: originalIntent, classifierUsed, classifierResult, answerProviderCalled: false, finalResponseMode: 'classifier_error_clarification' });
       return intentResult;
     }
   }
 
-  const intentResult = buildImmediateIntentResult(intent);
+  if (intent === ASSISTANT_INTENTS.GREETING) {
+    userNameContext = await getUserNameContext();
+  }
+
+  const intentResult = buildImmediateIntentResult(intent, userNameContext, user);
   if (intentResult) {
-    tracePipeline({ payload, ruleIntent: originalIntent, classifierUsed, classifierResult, answerProviderCalled: false, finalResponseMode: 'immediate' });
+    tracePipeline({ payload, user, userNameContext, ruleIntent: originalIntent, classifierUsed, classifierResult, answerProviderCalled: false, finalResponseMode: 'immediate' });
     return intentResult;
   }
 
   const guardrailResult = buildGuardrailResult({ message: payload.message, context: payload.context });
   if (guardrailResult) {
-    tracePipeline({ payload, ruleIntent: originalIntent, classifierUsed, classifierResult, answerProviderCalled: false, finalResponseMode: 'guardrail_blocked' });
+    tracePipeline({ payload, user, userNameContext, ruleIntent: originalIntent, classifierUsed, classifierResult, answerProviderCalled: false, finalResponseMode: 'guardrail_blocked' });
     return { ...guardrailResult, intent };
   }
 
@@ -338,31 +614,49 @@ const runAssistantPipeline = async ({ user, payload, useStream = false }) => {
     message: payload.message,
     context: payload.context,
     user,
-    sessionId: null,
+    sessionId,
   });
   const contextResult = buildImmediateContextResult(contextInjection);
   if (contextResult) {
-    tracePipeline({ payload, ruleIntent: originalIntent, classifierUsed, classifierResult, contextInjection, answerProviderCalled: false, finalResponseMode: 'safe_missing_data' });
+    tracePipeline({
+      payload,
+      user,
+      userNameContext,
+      ruleIntent: originalIntent,
+      classifierUsed,
+      classifierResult,
+      contextInjection,
+      answerProviderCalled: false,
+      fallbackUsed: contextResult.fallbackUsed,
+      finalResponseMode: contextResult.finalResponseMode || 'safe_missing_data'
+    });
     return contextResult;
   }
 
   const result = await buildAiResult({ payload, contextInjection, useStream });
   tracePipeline({
     payload,
+    user,
+    userNameContext,
     ruleIntent: originalIntent,
     classifierUsed,
     classifierResult,
     contextInjection,
     answerProviderCalled: true,
     fallbackUsed: result.fallbackUsed,
-    finalResponseMode: result.finalResponseMode || 'ai'
+    finalResponseMode: result.finalResponseMode || 'ai',
+    aiResponseValid: result.aiResponseValid,
+    aiResponseFormat: result.aiResponseFormat,
+    aiRetryUsed: result.aiRetryUsed,
+    fallbackReason: result.fallbackReason,
+    fallbackType: result.fallbackType,
   });
   return result;
 };
 
 const persistSuccessfulResult = async ({ user, payload, result }) => {
   if (result.code || !result.answer) return result;
-  const sessionId = await safeCreateSession(user.id);
+  const sessionId = payload.sessionId || await safeCreateSession(user.id);
   await safeSaveUserMessage(sessionId, payload.message, user.id);
   const saved = await safeSaveAssistantMessage(sessionId, result.answer, user.id);
   return { ...result, conversationId: sessionId, messageId: saved?.id || null };
@@ -370,8 +664,10 @@ const persistSuccessfulResult = async ({ user, payload, result }) => {
 
 const handleChat = async ({ user, payload }) => {
   try {
-    const result = await runAssistantPipeline({ user, payload });
-    return persistSuccessfulResult({ user, payload, result });
+    const sessionId = await safeCreateSession(user.id);
+    const payloadWithSession = { ...payload, sessionId };
+    const result = await runAssistantPipeline({ user, payload: payloadWithSession });
+    return persistSuccessfulResult({ user, payload: payloadWithSession, result });
   } catch (error) {
     if (error.code && ERROR_MESSAGES[error.code]) {
       return buildErrorResult(error.code, error.message);
@@ -382,8 +678,10 @@ const handleChat = async ({ user, payload }) => {
 
 const handleChatStream = async ({ user, payload, onEvent }) => {
   try {
-    const result = await runAssistantPipeline({ user, payload, useStream: true });
-    const savedResult = await persistSuccessfulResult({ user, payload, result });
+    const sessionId = await safeCreateSession(user.id);
+    const payloadWithSession = { ...payload, sessionId };
+    const result = await runAssistantPipeline({ user, payload: payloadWithSession, useStream: true });
+    const savedResult = await persistSuccessfulResult({ user, payload: payloadWithSession, result });
     emitStreamResult({ onEvent, result: savedResult });
     return savedResult;
   } catch (error) {

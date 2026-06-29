@@ -1,4 +1,4 @@
-# RFC: Nâng Cấp Assistant Cho Kiến Thức IELTS
+* [ ] RFC: Nâng Cấp Assistant Cho Kiến Thức IELTS
 
 **Ngày**: 2026-06-24
 **Trạng thái**: PENDING
@@ -27,7 +27,6 @@ Thiết kế chuyên nghiệp nên tách assistant thành hai vai trò rõ ràng
 
 1. **Website Data Assistant**
    Dùng database làm nguồn sự thật cho các dữ liệu thuộc website: đề thi, lesson, tài liệu thư viện, attempt đã nộp, giải thích chính thức, dữ liệu thuộc về user, và điều hướng trang.
-
 2. **IELTS Learning Tutor**
    Dùng AI provider để trả lời các câu hỏi kiến thức IELTS tổng quát: ngữ pháp, từ vựng, chiến lược làm bài, tiêu chí chấm điểm, paraphrase, ví dụ, và mẹo học.
 
@@ -71,7 +70,7 @@ message
       |     -> gọi AI với IELTS expert system prompt
       |     -> self-check: không chấm bài, không dự đoán band, không bịa đề
       |
-      |-- GREETING / NAVIGATION / GENERAL_STUDY_TIPS
+      |-- GREETING / NAVIGATIONnpm / GENERAL_STUDY_TIPS
       |     -> có thể trả lời trực tiếp hoặc gọi AI với prompt nhẹ hơn
       |
       |-- OUT_OF_SCOPE
@@ -80,17 +79,17 @@ message
 
 ## Ví Dụ Phân Loại Intent
 
-| Câu hỏi của user | Rủi ro hiện tại | Intent đề xuất |
-|---|---|---|
-| "Cohesion là gì?" | `UNKNOWN` hoặc fallback chung chung | `IELTS_KNOWLEDGE` |
-| "Coherence khác cohesion thế nào?" | Fallback chung chung | `IELTS_KNOWLEDGE` |
-| "Task 2 nên viết bao nhiêu từ?" | Fallback chung chung | `IELTS_KNOWLEDGE` |
-| "Paraphrase câu này: people are living longer" | Fallback chung chung | `IELTS_KNOWLEDGE` |
-| "Band 7 Writing cần gì?" | Bị gom vào study tips quá rộng | `IELTS_KNOWLEDGE` |
-| "Có đề Reading nào không?" | Cần query DB | `FIND_TEST` |
-| "Cho em xem tài liệu Listening" | Cần query DB | `FIND_LESSON` |
-| "Vì sao câu 5 đáp án là B?" sau khi đã nộp bài | Cần check ownership và attempt | `POST_TEST_REVIEW` |
-| "Chấm bài này band mấy?" | Phải từ chối | `OUT_OF_SCOPE` |
+| Câu hỏi của user                                      | Rủi ro hiện tại                     | Intent đề xuất    |
+| -------------------------------------------------------- | -------------------------------------- | -------------------- |
+| "Cohesion là gì?"                                      | `UNKNOWN` hoặc fallback chung chung | `IELTS_KNOWLEDGE`  |
+| "Coherence khác cohesion thế nào?"                    | Fallback chung chung                   | `IELTS_KNOWLEDGE`  |
+| "Task 2 nên viết bao nhiêu từ?"                      | Fallback chung chung                   | `IELTS_KNOWLEDGE`  |
+| "Paraphrase câu này: people are living longer"         | Fallback chung chung                   | `IELTS_KNOWLEDGE`  |
+| "Band 7 Writing cần gì?"                               | Bị gom vào study tips quá rộng     | `IELTS_KNOWLEDGE`  |
+| "Có đề Reading nào không?"                          | Cần query DB                          | `FIND_TEST`        |
+| "Cho em xem tài liệu Listening"                        | Cần query DB                          | `FIND_LESSON`      |
+| "Vì sao câu 5 đáp án là B?" sau khi đã nộp bài | Cần check ownership và attempt       | `POST_TEST_REVIEW` |
+| "Chấm bài này band mấy?"                             | Phải từ chối                        | `OUT_OF_SCOPE`     |
 
 ## System Prompt Cho `IELTS_KNOWLEDGE`
 
@@ -173,28 +172,28 @@ Ví dụ phải chặn:
 
 ## Các File Cần Thay Đổi
 
-| File | Thay đổi cần làm |
-|---|---|
-| `backend/src/api/assistant/assistant.constants.js` | Thêm `IELTS_KNOWLEDGE` vào intent context map. |
-| `backend/src/api/assistant/assistant.intent.js` | Thêm rule detect cho IELTS concept, criteria, grammar, vocabulary, paraphrase, task strategy, và câu hỏi học theo skill. |
-| `backend/src/api/assistant/assistant.prompts.js` | Thêm IELTS expert prompt riêng cho `IELTS_KNOWLEDGE`. |
-| `backend/src/api/assistant/assistant.context.js` | Trả no-DB context cho `IELTS_KNOWLEDGE`; không ép query database. |
-| `backend/src/api/assistant/assistant.service.js` | Route `IELTS_KNOWLEDGE` qua AI provider kể cả khi DB context rỗng. |
-| `backend/src/api/assistant/assistant.selfcheck.js` | Thêm self-check theo intent cho band prediction, grading, fake tests, unsafe claims. |
-| `.sdd/specs/global-ielts-virtual-assistant/implementation-approach.md` | Cập nhật pipeline và phân tách DB-required vs DB-optional. |
-| `.sdd/specs/global-ielts-virtual-assistant/eval-set.md` | Thêm "Nhóm 6 - IELTS Knowledge" với test cases. |
+| File                                                                     | Thay đổi cần làm                                                                                                          |
+| ------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------- |
+| `backend/src/api/assistant/assistant.constants.js`                     | Thêm`IELTS_KNOWLEDGE` vào intent context map.                                                                             |
+| `backend/src/api/assistant/assistant.intent.js`                        | Thêm rule detect cho IELTS concept, criteria, grammar, vocabulary, paraphrase, task strategy, và câu hỏi học theo skill. |
+| `backend/src/api/assistant/assistant.prompts.js`                       | Thêm IELTS expert prompt riêng cho`IELTS_KNOWLEDGE`.                                                                      |
+| `backend/src/api/assistant/assistant.context.js`                       | Trả no-DB context cho`IELTS_KNOWLEDGE`; không ép query database.                                                         |
+| `backend/src/api/assistant/assistant.service.js`                       | Route`IELTS_KNOWLEDGE` qua AI provider kể cả khi DB context rỗng.                                                        |
+| `backend/src/api/assistant/assistant.selfcheck.js`                     | Thêm self-check theo intent cho band prediction, grading, fake tests, unsafe claims.                                         |
+| `.sdd/specs/global-ielts-virtual-assistant/implementation-approach.md` | Cập nhật pipeline và phân tách DB-required vs DB-optional.                                                               |
+| `.sdd/specs/global-ielts-virtual-assistant/eval-set.md`                | Thêm "Nhóm 6 - IELTS Knowledge" với test cases.                                                                            |
 
 ## Eval Cases Đề Xuất
 
-| Câu hỏi của user | Intent mong muốn | Kết quả chấp nhận |
-|---|---|---|
-| "Cohesion và coherence khác nhau thế nào?" | `IELTS_KNOWLEDGE` | Giải thích khác nhau trong ngữ cảnh IELTS Writing. |
-| "Paraphrase câu này: people are living longer." | `IELTS_KNOWLEDGE` | Đưa vài cách paraphrase, không bịa dữ liệu website. |
-| "Task 2 nên viết bao nhiêu từ?" | `IELTS_KNOWLEDGE` | Nói tối thiểu 250 từ và hướng dẫn ngắn gọn. |
-| "Band 7 Writing cần gì?" | `IELTS_KNOWLEDGE` | Giải thích tiêu chí chung, không chấm bài user. |
-| "Chấm bài này band mấy?" | `OUT_OF_SCOPE` | Từ chối chấm điểm, có thể đề nghị góp ý cải thiện thay thế. |
-| "Có đề Reading nào không?" | `FIND_TEST` | Query DB và trả đề thật hoặc missing-data. |
-| "Có tài liệu Listening không?" | `FIND_LESSON` | Query DB và trả tài nguyên thật hoặc missing-data. |
+| Câu hỏi của user                               | Intent mong muốn   | Kết quả chấp nhận                                                      |
+| ------------------------------------------------- | ------------------- | -------------------------------------------------------------------------- |
+| "Cohesion và coherence khác nhau thế nào?"    | `IELTS_KNOWLEDGE` | Giải thích khác nhau trong ngữ cảnh IELTS Writing.                    |
+| "Paraphrase câu này: people are living longer." | `IELTS_KNOWLEDGE` | Đưa vài cách paraphrase, không bịa dữ liệu website.                |
+| "Task 2 nên viết bao nhiêu từ?"               | `IELTS_KNOWLEDGE` | Nói tối thiểu 250 từ và hướng dẫn ngắn gọn.                      |
+| "Band 7 Writing cần gì?"                        | `IELTS_KNOWLEDGE` | Giải thích tiêu chí chung, không chấm bài user.                     |
+| "Chấm bài này band mấy?"                      | `OUT_OF_SCOPE`    | Từ chối chấm điểm, có thể đề nghị góp ý cải thiện thay thế. |
+| "Có đề Reading nào không?"                   | `FIND_TEST`       | Query DB và trả đề thật hoặc missing-data.                           |
+| "Có tài liệu Listening không?"                | `FIND_LESSON`     | Query DB và trả tài nguyên thật hoặc missing-data.                   |
 
 ## Khuyến Nghị
 

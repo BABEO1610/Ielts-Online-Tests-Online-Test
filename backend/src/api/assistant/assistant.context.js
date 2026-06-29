@@ -1,30 +1,32 @@
 const { pool } = require('../../db/pool');
 const repository = require('./assistant.repository');
 const { ASSISTANT_INTENTS, normalizeText } = require('./assistant.intent');
+const { parseLookupMessage } = require('./assistant.lookup-parser');
+const {
+  STATIC_ROUTES,
+  toFrontendUrl,
+  buildTestRoute,
+  buildLibraryRoute,
+  buildAssistantLink,
+} = require('./assistant.link-builder');
 const {
   ERROR_CODES,
   ERROR_MESSAGES,
   INTENT_CONTEXT_MAP,
+  ASSISTANT_CONTEXT_RESULT_LIMIT,
+  ASSISTANT_DB_LOOKUP_LIMIT,
 } = require('./assistant.constants');
 
-const FRONTEND_BASE_URL = (process.env.FRONTEND_URL || process.env.CLIENT_URL || 'http://localhost:5173').replace(/\/+$/, '');
 const columnCache = new Map();
 
-const toFrontendUrl = (path) => `${FRONTEND_BASE_URL}${path}`;
-
-const SKILL_ROUTES = {
-  reading: '/reading',
-  writing: '/writing',
-  speaking: '/speaking',
-};
-
-const getSkillRoute = (skill) => SKILL_ROUTES[String(skill || '').toLowerCase()] || '/reading';
-
 const WEBSITE_ROUTES = [
-  { label: 'Reading', href: toFrontendUrl('/reading') },
-  { label: 'Writing', href: toFrontendUrl('/writing') },
-  { label: 'Speaking', href: toFrontendUrl('/speaking') },
-  { label: 'Library', href: toFrontendUrl('/library') },
+  { label: 'Listening', href: toFrontendUrl(STATIC_ROUTES.listening) },
+  { label: 'Reading', href: toFrontendUrl(STATIC_ROUTES.reading) },
+  { label: 'Writing', href: toFrontendUrl(STATIC_ROUTES.writing) },
+  { label: 'Speaking', href: toFrontendUrl(STATIC_ROUTES.speaking) },
+  { label: 'Library', href: toFrontendUrl(STATIC_ROUTES.library) },
+  { label: 'Practice History', href: toFrontendUrl(STATIC_ROUTES.practiceHistory) },
+  { label: 'Profile', href: toFrontendUrl(STATIC_ROUTES.profile) },
 ];
 
 const STUDY_TIPS = [
@@ -33,6 +35,21 @@ const STUDY_TIPS = [
   'Writing/Speaking: this assistant only gives study tips in this phase. It does not grade or generate band scores.',
   'After each attempt, review mistakes and record common keywords or paraphrases.',
 ];
+
+const buildNavigationLinks = (message) => {
+  const text = normalizeText(message);
+  const links = [];
+  if (text.includes('listening')) links.push(buildAssistantLink({ type: 'listening', label: 'Listening' }));
+  if (text.includes('reading')) links.push(buildAssistantLink({ type: 'reading', label: 'Reading' }));
+  if (text.includes('writing')) links.push(buildAssistantLink({ type: 'writing', label: 'Writing' }));
+  if (text.includes('speaking')) links.push(buildAssistantLink({ type: 'speaking', label: 'Speaking' }));
+  if (/\b(thu vien|library)\b/.test(text)) links.push(buildAssistantLink({ type: 'library', label: 'Library' }));
+  if (/\b(profile|ho so|tai khoan)\b/.test(text)) links.push(buildAssistantLink({ type: 'profile', label: 'Profile' }));
+  if (/\b(lich su|history|practice history)\b/.test(text)) {
+    links.push(buildAssistantLink({ type: 'practiceHistory', label: 'Practice History' }));
+  }
+  return links.length ? links : WEBSITE_ROUTES;
+};
 
 const SEARCH_STOP_WORDS = new Set([
   'ielts', 'test', 'mock', 'reading', 'listening', 'writing', 'speaking',
@@ -70,7 +87,7 @@ const detectDifficulty = (message) => {
 
 const detectResourceType = (message) => {
   const text = normalizeText(message);
-  if (/\b(pdf|ebook|document|tai lieu)\b/.test(text)) return 'pdf';
+  if (/\b(pdf|ebook|document)\b/.test(text)) return 'pdf';
   if (/\b(audio|listening)\b/.test(text)) return 'audio';
   if (/\b(video|clip)\b/.test(text)) return 'video';
   return null;
@@ -89,11 +106,13 @@ const getTableColumns = async (tableName) => {
   return columns;
 };
 
+const clearColumnCacheForTests = () => columnCache.clear();
+
 const extractSearchTerms = (message) => (
   normalizeText(message)
     .split(/[^a-z0-9]+/g)
     .filter((term) => term.length >= 2 && !SEARCH_STOP_WORDS.has(term))
-    .slice(0, 5)
+    .slice(0, ASSISTANT_CONTEXT_RESULT_LIMIT)
 );
 
 const extractVisibleItemTerms = (context = {}) => (
@@ -101,7 +120,7 @@ const extractVisibleItemTerms = (context = {}) => (
     .flatMap((item) => [item.title, item.type])
     .flatMap((value) => normalizeText(value).split(/[^a-z0-9]+/g))
     .filter((term) => term.length >= 2 && !SEARCH_STOP_WORDS.has(term))
-    .slice(0, 5)
+    .slice(0, ASSISTANT_CONTEXT_RESULT_LIMIT)
 );
 
 const getSearchTerms = ({ message, context }) => {
@@ -136,7 +155,7 @@ const normalizeUuid = (value) => {
 const toTestLinks = (tests) =>
   tests.map((item) => ({
     label: item.title || 'IELTS test',
-    href: item.route || toFrontendUrl(getSkillRoute(item.skill)),
+    href: item.route || toFrontendUrl(buildTestRoute({ id: item.id, skill: item.skill })),
   }));
 
 const toLessonLinks = (resources) =>
@@ -153,7 +172,7 @@ const mapTestRows = (rows) => rows.map((row) => ({
   difficulty: row.difficulty,
   description: row.description,
   durationMinutes: row.duration_minutes,
-  route: toFrontendUrl(getSkillRoute(row.skill)),
+  route: toFrontendUrl(buildTestRoute({ id: row.id, skill: row.skill })),
 }));
 
 const ASSISTANT_TABLE_MAP = {
@@ -166,18 +185,41 @@ const ASSISTANT_TABLE_MAP = {
 
 const getPublishCondition = async (tableName) => {
   const columns = await getTableColumns(tableName);
-  if (columns.has('is_published')) return 'is_published = TRUE';
-  if (columns.has('status')) return "status = 'published'";
-  if (columns.has('is_active')) return 'is_active = TRUE';
-  if (columns.has('published')) return 'published = TRUE';
-  return '1=1';
+  const conditions = [];
+  if (columns.has('is_published')) conditions.push('is_published = TRUE');
+  else if (columns.has('status')) conditions.push("status = 'published'");
+  else if (columns.has('is_active')) conditions.push('is_active = TRUE');
+  else if (columns.has('published')) conditions.push('published = TRUE');
+  if (columns.has('review_status')) conditions.push("review_status = 'approved'");
+  return conditions.length ? conditions.join(' AND ') : '1=1';
 };
 
-const runPublishedTestQuery = async ({ skill, difficulty }) => {
+const limitContextRows = (rows) => rows.slice(0, ASSISTANT_CONTEXT_RESULT_LIMIT);
+const SESSION_MEMORY_LIMIT = 8;
+const SESSION_MEMORY_CONTENT_LIMIT = 700;
+
+const truncateMemoryContent = (value) => {
+  const text = String(value || '').trim();
+  if (text.length <= SESSION_MEMORY_CONTENT_LIMIT) return text;
+  return `${text.slice(0, SESSION_MEMORY_CONTENT_LIMIT).trim()}...`;
+};
+
+const normalizeSessionMemory = (rows = []) =>
+  rows
+    .map((row) => ({
+      role: row.role === 'user' ? 'user' : 'assistant',
+      content: truncateMemoryContent(row.content),
+    }))
+    .filter((row) => row.content)
+    .slice(-SESSION_MEMORY_LIMIT);
+
+const runPublishedTestQuery = async ({ skill, difficulty, titleNumber, sortOrder = 'DESC', limit = ASSISTANT_DB_LOOKUP_LIMIT }) => {
   const tableName = ASSISTANT_TABLE_MAP.mock_tests;
   const publishFilter = await getPublishCondition(tableName);
   const conditions = [publishFilter];
   const values = [];
+  const order = sortOrder === 'ASC' ? 'ASC' : 'DESC';
+  const effectiveLimit = Math.max(1, Math.min(Number(limit) || ASSISTANT_DB_LOOKUP_LIMIT, ASSISTANT_DB_LOOKUP_LIMIT));
 
   if (skill) {
     values.push(skill);
@@ -187,43 +229,115 @@ const runPublishedTestQuery = async ({ skill, difficulty }) => {
     values.push(difficulty);
     conditions.push(`difficulty::text = $${values.length}`);
   }
+  if (titleNumber) {
+    values.push(`%mock test ${titleNumber}%`);
+    const mockParam = `$${values.length}`;
+    values.push(`%test ${titleNumber}%`);
+    const testParam = `$${values.length}`;
+    values.push(`% ${titleNumber}:%`);
+    const colonParam = `$${values.length}`;
+    conditions.push(`(title::text ILIKE ${mockParam} OR title::text ILIKE ${testParam} OR title::text ILIKE ${colonParam})`);
+  }
 
   const selectedColumns = 'id, title, description, skill, difficulty, duration_minutes';
   const result = await pool.query(
     `SELECT ${selectedColumns}
      FROM ${tableName}
      WHERE ${conditions.join(' AND ')}
-     ORDER BY created_at DESC
-     LIMIT 50`,
+     ORDER BY created_at ${order}
+     LIMIT ${effectiveLimit}`,
     values
   );
   return { 
     rows: mapTestRows(result.rows), 
+    dbRowCount: result.rows.length,
     publishFilter, 
-    selectedColumns
+    selectedColumns,
+    effectiveLimit,
+    sortField: 'created_at',
+    sortOrder: order,
   };
 };
 
 const queryPublishedTests = async (message, context = {}) => {
-  const skill = detectSkill(message);
+  const slots = parseLookupMessage(message);
+  const skill = slots.skill || detectSkill(message);
   const difficulty = detectDifficulty(message);
-  const searchTerms = getSearchTerms({ message, context });
+  const searchTerms = slots.searchTerms.length
+    ? slots.searchTerms
+    : slots.isStructuredLookup ? [] : getSearchTerms({ message, context });
+  const requestedQuantity = slots.quantity || (slots.action && slots.sort ? 1 : null);
+  const effectiveLimit = requestedQuantity || slots.titleNumber
+    ? Math.min(requestedQuantity || ASSISTANT_CONTEXT_RESULT_LIMIT, ASSISTANT_CONTEXT_RESULT_LIMIT)
+    : ASSISTANT_DB_LOOKUP_LIMIT;
   
-  const result = await runPublishedTestQuery({ skill, difficulty });
+  const result = await runPublishedTestQuery({
+    skill,
+    difficulty,
+    titleNumber: slots.titleNumber,
+    sortOrder: slots.sortOrder,
+    limit: effectiveLimit,
+  });
+  const fallbackResult = async (fallbackReason) => {
+    const suggestions = await runPublishedTestQuery({});
+    return {
+      ...suggestions,
+      rows: limitContextRows(suggestions.rows),
+      searchTerms,
+      exactTitleMatch: false,
+      fuzzyTitleMatch: false,
+      fallbackReason,
+      lookupMissing: true,
+      skillFilter: skill,
+      difficultyFilter: difficulty,
+      requestedQuantity,
+      effectiveLimit: suggestions.effectiveLimit,
+      sortOrder: suggestions.sortOrder,
+      sortField: suggestions.sortField,
+      titleNumber: slots.titleNumber,
+      testNumber: slots.testNumber,
+      action: slots.action,
+    };
+  };
+
+  if (result.rows.length === 0 && (skill || difficulty)) {
+    return fallbackResult('no_published_match_for_filter');
+  }
+
+  if (slots.isStructuredLookup) {
+    return {
+      ...result,
+      rows: limitContextRows(result.rows),
+      searchTerms,
+      exactTitleMatch: false,
+      fuzzyTitleMatch: false,
+      fallbackReason: null,
+      lookupMissing: false,
+      skillFilter: skill,
+      difficultyFilter: difficulty,
+      requestedQuantity,
+      effectiveLimit: result.effectiveLimit,
+      sortOrder: result.sortOrder,
+      sortField: result.sortField,
+      titleNumber: slots.titleNumber,
+      testNumber: slots.testNumber,
+      action: slots.action,
+    };
+  }
 
   if (searchTerms.length > 0) {
     const termStr = searchTerms.join(' ').toLowerCase();
     
     const exactRows = result.rows.filter(r => normalizeText(r.title) === termStr);
-    if (exactRows.length > 0) return { ...result, rows: exactRows.slice(0, 5), searchTerms, exactTitleMatch: true, fuzzyTitleMatch: false, fallbackReason: null, skillFilter: skill };
+    if (exactRows.length > 0) return { ...result, rows: limitContextRows(exactRows), searchTerms, exactTitleMatch: true, fuzzyTitleMatch: false, fallbackReason: null, lookupMissing: false, skillFilter: skill, difficultyFilter: difficulty, requestedQuantity, effectiveLimit: result.effectiveLimit, sortOrder: result.sortOrder, sortField: result.sortField, titleNumber: slots.titleNumber, testNumber: slots.testNumber, action: slots.action };
 
     const fuzzyRows = result.rows.filter(r => normalizeText(r.title).includes(termStr) || normalizeText(r.description || '').includes(termStr));
-    if (fuzzyRows.length > 0) return { ...result, rows: fuzzyRows.slice(0, 5), searchTerms, exactTitleMatch: false, fuzzyTitleMatch: true, fallbackReason: null, skillFilter: skill };
+    if (fuzzyRows.length > 0) return { ...result, rows: limitContextRows(fuzzyRows), searchTerms, exactTitleMatch: false, fuzzyTitleMatch: true, fallbackReason: null, lookupMissing: false, skillFilter: skill, difficultyFilter: difficulty, requestedQuantity, effectiveLimit: result.effectiveLimit, sortOrder: result.sortOrder, sortField: result.sortField, titleNumber: slots.titleNumber, testNumber: slots.testNumber, action: slots.action };
 
-    return { ...result, rows: result.rows.slice(0, 5), searchTerms, exactTitleMatch: false, fuzzyTitleMatch: false, fallbackReason: 'no_exact_or_fuzzy_match', skillFilter: skill };
+    return { ...result, rows: limitContextRows(result.rows), searchTerms, exactTitleMatch: false, fuzzyTitleMatch: false, fallbackReason: 'no_exact_or_fuzzy_match', lookupMissing: false, skillFilter: skill, difficultyFilter: difficulty, requestedQuantity, effectiveLimit: result.effectiveLimit, sortOrder: result.sortOrder, sortField: result.sortField, titleNumber: slots.titleNumber, testNumber: slots.testNumber, action: slots.action };
   }
 
-  return { ...result, rows: result.rows.slice(0, 5), searchTerms, exactTitleMatch: false, fuzzyTitleMatch: false, fallbackReason: null, skillFilter: skill };
+  return { ...result, rows: limitContextRows(result.rows), searchTerms, exactTitleMatch: false, fuzzyTitleMatch: false, fallbackReason: null, lookupMissing: false, skillFilter: skill, difficultyFilter: difficulty, requestedQuantity, effectiveLimit: result.effectiveLimit, sortOrder: result.sortOrder, sortField: result.sortField, titleNumber: slots.titleNumber, testNumber: slots.testNumber, action: slots.action };
 };
 
 const mapResourceRows = (rows) => rows.map((row) => ({
@@ -233,7 +347,7 @@ const mapResourceRows = (rows) => rows.map((row) => ({
   resourceType: row.resource_type,
   category: row.category || null,
   description: row.description,
-  route: toFrontendUrl('/library'),
+  route: toFrontendUrl(buildLibraryRoute({ id: row.id })),
 }));
 
 const runPublishedResourceQuery = async ({ resourceType }) => {
@@ -258,11 +372,12 @@ const runPublishedResourceQuery = async ({ resourceType }) => {
      FROM ${tableName}
      WHERE ${conditions.join(' AND ')}
      ORDER BY created_at DESC
-     LIMIT 50`,
+     LIMIT ${ASSISTANT_DB_LOOKUP_LIMIT}`,
     values
   );
   return { 
     rows: mapResourceRows(result.rows), 
+    dbRowCount: result.rows.length,
     publishFilter, 
     selectedColumns
   };
@@ -270,23 +385,41 @@ const runPublishedResourceQuery = async ({ resourceType }) => {
 
 const queryPublishedResources = async (message, context = {}) => {
   const resourceType = detectResourceType(message);
-  const searchTerms = getSearchTerms({ message, context });
+  const skillTerm = detectSkill(message);
+  const searchTerms = [...new Set([...getSearchTerms({ message, context }), skillTerm].filter(Boolean))];
   
   const result = await runPublishedResourceQuery({ resourceType });
+  const fallbackResult = async (fallbackReason) => {
+    const suggestions = await runPublishedResourceQuery({});
+    return {
+      ...suggestions,
+      rows: limitContextRows(suggestions.rows),
+      searchTerms,
+      exactTitleMatch: false,
+      fuzzyTitleMatch: false,
+      fallbackReason,
+      lookupMissing: true,
+      resourceTypeFilter: resourceType,
+    };
+  };
+
+  if (result.rows.length === 0 && resourceType) {
+    return fallbackResult('no_published_match_for_filter');
+  }
 
   if (searchTerms.length > 0) {
     const termStr = searchTerms.join(' ').toLowerCase();
     
     const exactRows = result.rows.filter(r => normalizeText(r.title) === termStr);
-    if (exactRows.length > 0) return { ...result, rows: exactRows.slice(0, 5), searchTerms, exactTitleMatch: true, fuzzyTitleMatch: false, fallbackReason: null, resourceTypeFilter: resourceType };
+    if (exactRows.length > 0) return { ...result, rows: limitContextRows(exactRows), searchTerms, exactTitleMatch: true, fuzzyTitleMatch: false, fallbackReason: null, lookupMissing: false, resourceTypeFilter: resourceType };
 
     const fuzzyRows = result.rows.filter(r => normalizeText(r.title).includes(termStr) || normalizeText(r.description || '').includes(termStr) || normalizeText(r.category || '').includes(termStr));
-    if (fuzzyRows.length > 0) return { ...result, rows: fuzzyRows.slice(0, 5), searchTerms, exactTitleMatch: false, fuzzyTitleMatch: true, fallbackReason: null, resourceTypeFilter: resourceType };
+    if (fuzzyRows.length > 0) return { ...result, rows: limitContextRows(fuzzyRows), searchTerms, exactTitleMatch: false, fuzzyTitleMatch: true, fallbackReason: null, lookupMissing: false, resourceTypeFilter: resourceType };
 
-    return { ...result, rows: result.rows.slice(0, 5), searchTerms, exactTitleMatch: false, fuzzyTitleMatch: false, fallbackReason: 'no_exact_or_fuzzy_match', resourceTypeFilter: resourceType };
+    return { ...result, rows: limitContextRows(result.rows), searchTerms, exactTitleMatch: false, fuzzyTitleMatch: false, fallbackReason: 'no_exact_or_fuzzy_match', lookupMissing: true, resourceTypeFilter: resourceType };
   }
   
-  return { ...result, rows: result.rows.slice(0, 5), searchTerms, exactTitleMatch: false, fuzzyTitleMatch: false, fallbackReason: null, resourceTypeFilter: resourceType };
+  return { ...result, rows: limitContextRows(result.rows), searchTerms, exactTitleMatch: false, fuzzyTitleMatch: false, fallbackReason: null, lookupMissing: false, resourceTypeFilter: resourceType };
 };
 
 const queryOwnedAttempt = async ({ attemptId, userId }) => {
@@ -329,19 +462,24 @@ const buildReviewResult = (row) => ({
 });
 
 const getSessionMemory = async ({ user, sessionId }) => {
-  return sessionId ? repository.getRecentMessages(user.id, sessionId, 8) : [];
+  if (!user?.id || !sessionId) return [];
+  const rows = await repository.getRecentMessages(user.id, sessionId, SESSION_MEMORY_LIMIT);
+  return normalizeSessionMemory(rows);
 };
 
 const shouldLoadSessionMemory = (intent) => [
+  ASSISTANT_INTENTS.IELTS_KNOWLEDGE,
+  ASSISTANT_INTENTS.GENERAL_STUDY_TIPS,
   ASSISTANT_INTENTS.FIND_TEST,
   ASSISTANT_INTENTS.FIND_LESSON,
   ASSISTANT_INTENTS.POST_TEST_REVIEW,
 ].includes(intent);
 
-const buildStaticContext = (injection, intent) => {
+const buildStaticContext = (injection, intent, message = '') => {
   if (intent === ASSISTANT_INTENTS.GREETING) return injection;
   if (intent === ASSISTANT_INTENTS.NAVIGATION) {
-    return { ...injection, databaseResults: WEBSITE_ROUTES, suggestedLinks: WEBSITE_ROUTES };
+    const links = buildNavigationLinks(message);
+    return { ...injection, databaseResults: links, suggestedLinks: links };
   }
   return {
     ...injection,
@@ -362,10 +500,24 @@ const buildFindTestContext = async ({ injection, message, context }) => {
         publishFilter: data.publishFilter,
         searchTerms: data.searchTerms,
         skillFilter: data.skillFilter,
+        difficultyFilter: data.difficultyFilter,
+        requestedQuantity: data.requestedQuantity,
+        effectiveLimit: data.effectiveLimit,
+        sortOrder: data.sortOrder,
+        sortField: data.sortField,
+        titleNumber: data.titleNumber,
+        testNumber: data.testNumber,
+        action: data.action,
         exactTitleMatch: data.exactTitleMatch || false,
         fuzzyTitleMatch: data.fuzzyTitleMatch || false,
         fallbackReason: data.fallbackReason,
+        lookupMissing: Boolean(data.lookupMissing),
         resultTitles: data.rows.map(r => r.title),
+        dbRowCount: data.dbRowCount,
+        contextRowCount: data.rows.length,
+        displayedRowCount: data.rows.length,
+        contextLimit: ASSISTANT_CONTEXT_RESULT_LIMIT,
+        contextLimitApplied: (data.dbRowCount || 0) > data.rows.length,
         rowCount: data.rows.length 
       },
     };
@@ -397,7 +549,13 @@ const buildFindLessonContext = async ({ injection, message, context }) => {
         exactTitleMatch: data.exactTitleMatch || false,
         fuzzyTitleMatch: data.fuzzyTitleMatch || false,
         fallbackReason: data.fallbackReason,
+        lookupMissing: Boolean(data.lookupMissing),
         resultTitles: data.rows.map(r => r.title),
+        dbRowCount: data.dbRowCount,
+        contextRowCount: data.rows.length,
+        displayedRowCount: data.rows.length,
+        contextLimit: ASSISTANT_CONTEXT_RESULT_LIMIT,
+        contextLimitApplied: (data.dbRowCount || 0) > data.rows.length,
         rowCount: data.rows.length 
       },
     };
@@ -415,18 +573,54 @@ const buildFindLessonContext = async ({ injection, message, context }) => {
 
 const buildReviewContext = async ({ injection, message, context, user }) => {
   try {
+    if (!context.attemptId) {
+      return {
+        ...injection,
+        directAnswer: 'Mình chưa biết bạn muốn review bài nào. Bạn hãy mở kết quả bài làm hoặc chọn một attempt trong lịch sử luyện tập.',
+        finalResponseMode: 'clarification',
+        debug: {
+          queryTable: `${ASSISTANT_TABLE_MAP.test_attempts}/${ASSISTANT_TABLE_MAP.questions}/${ASSISTANT_TABLE_MAP.question_answers}`,
+          attemptId: null,
+          reviewMode: 'clarification',
+          reviewFallbackReason: 'missing_attempt_id',
+          rowCount: 0,
+        },
+      };
+    }
     const attempt = await queryOwnedAttempt({ attemptId: context.attemptId, userId: user.id });
-    if (!attempt) return { ...injection, errorCode: ERROR_CODES.ATTEMPT_NOT_FOUND };
-    if (!attempt.submitted_at) return { ...injection, errorCode: ERROR_CODES.ATTEMPT_NOT_SUBMITTED };
+    if (!attempt) {
+      return {
+        ...injection,
+        errorCode: ERROR_CODES.ATTEMPT_NOT_FOUND,
+        debug: { attemptId: context.attemptId, reviewMode: 'attempt_lookup', reviewFallbackReason: 'attempt_not_found' },
+      };
+    }
+    if (!attempt.submitted_at) {
+      return {
+        ...injection,
+        errorCode: ERROR_CODES.ATTEMPT_NOT_SUBMITTED,
+        debug: { attemptId: context.attemptId, reviewMode: 'attempt_lookup', reviewFallbackReason: 'attempt_not_submitted' },
+      };
+    }
 
     const rows = await queryAttemptQuestions({
       attemptId: attempt.id,
       questionId: context.questionId,
       message,
     });
-    if (!rows.length) return { ...injection, errorCode: ERROR_CODES.QUESTION_NOT_FOUND };
+    if (!rows.length) {
+      return {
+        ...injection,
+        errorCode: ERROR_CODES.QUESTION_NOT_FOUND,
+        debug: { attemptId: context.attemptId, reviewMode: 'question_lookup', reviewFallbackReason: 'question_not_found' },
+      };
+    }
     if (rows.some((row) => !row.explanation)) {
-      return { ...injection, errorCode: ERROR_CODES.MISSING_EXPLANATION };
+      return {
+        ...injection,
+        errorCode: ERROR_CODES.MISSING_EXPLANATION,
+        debug: { attemptId: context.attemptId, reviewMode: 'question_lookup', reviewFallbackReason: 'missing_explanation' },
+      };
     }
     const results = rows.map(buildReviewResult);
     return {
@@ -435,6 +629,9 @@ const buildReviewContext = async ({ injection, message, context, user }) => {
       debug: { 
         queryTable: `${ASSISTANT_TABLE_MAP.test_attempts}/${ASSISTANT_TABLE_MAP.questions}/${ASSISTANT_TABLE_MAP.question_answers}`, 
         searchTerms: [], 
+        attemptId: context.attemptId,
+        reviewMode: 'question_explanation',
+        reviewFallbackReason: null,
         rowCount: results.length 
       },
     };
@@ -462,7 +659,7 @@ const buildContextInjection = async ({ intent, message, context, user, sessionId
   const injection = createBaseContext({ intent, sessionMemory });
 
   if ([ASSISTANT_INTENTS.NAVIGATION, ASSISTANT_INTENTS.WEBSITE_HELP].includes(intent)) {
-    return { ...injection, databaseResults: WEBSITE_ROUTES, suggestedLinks: WEBSITE_ROUTES };
+    return buildStaticContext(injection, ASSISTANT_INTENTS.NAVIGATION, message);
   }
   if (intent === ASSISTANT_INTENTS.GENERAL_STUDY_TIPS) {
     return {
@@ -483,4 +680,5 @@ module.exports = {
   queryPublishedResources,
   queryOwnedAttempt,
   queryAttemptQuestions,
+  clearColumnCacheForTests,
 };
