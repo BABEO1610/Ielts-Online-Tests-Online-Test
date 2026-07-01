@@ -15,6 +15,7 @@ const QUESTION_TYPES = [
   'SENTENCE_COMPLETION',
   'SUMMARY_COMPLETION',
   'NOTE_COMPLETION',
+  'NOTES_COMPLETION',
   'TRUE_FALSE_NOT_GIVEN',
   'YES_NO_NOT_GIVEN',
   'MULTIPLE_CHOICE_SINGLE',
@@ -49,37 +50,70 @@ function TutorReadingFormPage({ testId }) {
   const normalizeBlockFromDB = (block) => {
     const blockId = Date.now() + Math.random();
 
-    // ── Multiple Choice ──────────────────────────────────────────────────────
+    // ── Multiple Choice (Legacy & Smart) ────────────────────────────────────
     // Per-question options stored in q.options as JSONB
-    if (block.type === 'Multiple Choice') {
+    if (['Multiple Choice', 'MULTIPLE_CHOICE_SINGLE', 'MULTIPLE_CHOICE_MULTI'].includes(block.type)) {
       const questions = (block.questions || []).map((q, qi) => {
         // options: [{label:'A',text:'...'}, ...] or [{id,text},...] or [string,...]
         let rawOpts = q.options;
-        if (typeof rawOpts === 'string') { try { rawOpts = JSON.parse(rawOpts); } catch { rawOpts = []; } }
-        rawOpts = Array.isArray(rawOpts) ? rawOpts : [];
+        if (typeof rawOpts === 'string') { try { rawOpts = JSON.parse(rawOpts); } catch { rawOpts = {}; } }
+        
+        let normalizedOpts = [];
+        let smartOptionsObj = {};
+        
+        if (Array.isArray(rawOpts)) {
+          normalizedOpts = rawOpts.map((opt, oi) => ({
+            id: Date.now() + qi * 100 + oi + 1,
+            label: opt.label || String.fromCharCode(65 + oi),
+            text: typeof opt === 'object' ? (opt.text || opt.label || '') : String(opt),
+          }));
+        } else if (rawOpts && typeof rawOpts === 'object') {
+          smartOptionsObj = rawOpts; // Keeps choices, maxSelections, etc.
+          if (Array.isArray(rawOpts.choices)) {
+            normalizedOpts = rawOpts.choices;
+          }
+        }
 
-        const normalizedOpts = rawOpts.map((opt, oi) => ({
-          id: Date.now() + qi * 100 + oi + 1,
-          text: typeof opt === 'object' ? (opt.text || opt.label || '') : String(opt),
-        }));
-
-        // correctAnswers: stored as JSONB — could be array of option labels/texts or indices
+        // correctAnswers: stored as JSONB
         let rawCA = q.correctAnswers;
         if (typeof rawCA === 'string') { try { rawCA = JSON.parse(rawCA); } catch { rawCA = []; } }
         rawCA = Array.isArray(rawCA) ? rawCA : [];
-        // Map correctAnswers values to matching option ids
+        
+        // Map correctAnswers values
         const correctAnswerIds = rawCA.map(ca => {
           const caStr = String(ca);
-          const match = normalizedOpts.find(o => o.text === caStr || String.fromCharCode(65 + normalizedOpts.indexOf(o)) === caStr);
+          // For smart mode, correctAnswers usually stores the label (e.g. "A", "B") directly.
+          if (['MULTIPLE_CHOICE_SINGLE', 'MULTIPLE_CHOICE_MULTI'].includes(block.type)) {
+             return caStr;
+          }
+          const match = normalizedOpts.find(o => o.text === caStr || String.fromCharCode(65 + normalizedOpts.indexOf(o)) === caStr || o.label === caStr);
           return match ? match.id : normalizedOpts[0]?.id;
         }).filter(Boolean);
 
         return {
+          ...q,
           id: Date.now() + qi * 100,
           text: q.text || '',
           explanation: q.explanation || '',
-          options: normalizedOpts,
+          options: ['MULTIPLE_CHOICE_SINGLE', 'MULTIPLE_CHOICE_MULTI'].includes(block.type) ? smartOptionsObj : normalizedOpts,
           correctAnswers: correctAnswerIds,
+        };
+      });
+      return { id: blockId, type: block.type, range: block.range || '', questions };
+    }
+
+    // ── TRUE_FALSE_NOT_GIVEN & YES_NO_NOT_GIVEN ─────────────────────────────
+    if (['TRUE_FALSE_NOT_GIVEN', 'YES_NO_NOT_GIVEN'].includes(block.type)) {
+      const questions = (block.questions || []).map((q, qi) => {
+        let rawOpts = q.options;
+        if (typeof rawOpts === 'string') { try { rawOpts = JSON.parse(rawOpts); } catch { rawOpts = {}; } }
+        return {
+          ...q,
+          id: Date.now() + qi * 100,
+          text: q.text || '',
+          correctAnswer: q.correctAnswer || '',
+          explanation: q.explanation || '',
+          options: rawOpts || {},
         };
       });
       return { id: blockId, type: block.type, range: block.range || '', questions };
@@ -425,6 +459,7 @@ function TutorReadingFormPage({ testId }) {
       <BulkAddModal
         onClose={() => setShowBulkAdd({ visible: false, targetPassageId: null })}
         onConfirm={handleBulkAddConfirm}
+        testType="reading"
       />
     )}
     </>
