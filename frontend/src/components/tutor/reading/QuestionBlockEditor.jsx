@@ -22,6 +22,7 @@ function QuestionBlockEditor({ block, onChange }) {
       case 'MULTIPLE_CHOICE_MULTI':
       case 'SUMMARY_COMPLETION':
       case 'NOTE_COMPLETION':
+      case 'NOTES_COMPLETION':
       case 'MATCHING_FEATURES':
       case 'MATCHING_SENTENCE_ENDINGS':
       case 'SHORT_ANSWER_QUESTIONS':

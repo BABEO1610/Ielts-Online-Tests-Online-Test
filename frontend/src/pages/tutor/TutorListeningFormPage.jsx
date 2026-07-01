@@ -506,6 +506,7 @@ function TutorListeningFormPage({ testId }) {
         <BulkAddModal
           onClose={() => setShowBulkAdd({ visible: false, targetSectionId: null })}
           onConfirm={handleBulkAddConfirm}
+          testType="listening"
         />
       )}
     </>

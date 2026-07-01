@@ -60,7 +60,7 @@ function SmartModeBlockEditor({ block, onChange }) {
     );
   }
 
-  if (['SENTENCE_COMPLETION', 'SUMMARY_COMPLETION', 'NOTE_COMPLETION', 'SHORT_ANSWER_QUESTIONS'].includes(questionType)) {
+  if (['SENTENCE_COMPLETION', 'SUMMARY_COMPLETION', 'NOTE_COMPLETION', 'NOTES_COMPLETION', 'SHORT_ANSWER_QUESTIONS'].includes(questionType)) {
     return (
       <div className="smart-mode-editor">
         {questions.map((q, idx) => (
@@ -176,10 +176,28 @@ function SmartModeBlockEditor({ block, onChange }) {
 
   if (questionType === 'MULTIPLE_CHOICE_MULTI') {
     const poolOptions = questions[0]?.options?.choices || [];
-    const maxSelections = questions[0]?.options?.maxSelections || questions.length;
     
-    // Aggregate correctAnswers from individual questions
-    const selectedAnswers = questions.map(q => q.correctAnswer).filter(Boolean);
+    // Safely calculate range and max selections
+    const getRangeValues = () => {
+      if (block.rangeStart && block.rangeEnd) return { start: parseInt(block.rangeStart), end: parseInt(block.rangeEnd) };
+      if (block.range) {
+         const m = block.range.match(/(\d+)\s*-\s*(\d+)/);
+         if (m) return { start: parseInt(m[1]), end: parseInt(m[2]) };
+         const s = block.range.match(/(\d+)/);
+         if (s) return { start: parseInt(s[1]), end: parseInt(s[1]) };
+      }
+      return { start: null, end: null };
+    };
+    const rVals = getRangeValues();
+    const calculatedCount = (rVals.start && rVals.end) ? (rVals.end - rVals.start + 1) : 1;
+    
+    const maxSelections = questions[0]?.options?.maxSelections || calculatedCount;
+    
+    // In MULTIPLE_CHOICE_MULTI, there is only ONE question object representing the whole group
+    let selectedAnswers = questions[0]?.correctAnswers || [];
+    if (typeof selectedAnswers === 'string') { try { selectedAnswers = JSON.parse(selectedAnswers); } catch { selectedAnswers = []; } }
+    selectedAnswers = Array.isArray(selectedAnswers) ? selectedAnswers : [];
+    
     const explanation = questions[0]?.explanation || '';
 
     const handleToggle = (val) => {
@@ -194,11 +212,10 @@ function SmartModeBlockEditor({ block, onChange }) {
         }
       }
       
-      // Distribute newSelected back to questions
-      const newQuestions = questions.map((q, i) => ({
-        ...q,
-        correctAnswer: newSelected[i] || ''
-      }));
+      const newQuestions = [{
+        ...questions[0],
+        correctAnswers: newSelected
+      }];
       
       onChange({ ...block, questions: newQuestions });
     };
@@ -213,26 +230,30 @@ function SmartModeBlockEditor({ block, onChange }) {
     return (
       <div className="smart-mode-editor">
         <div className="mb-3 p-3 border rounded bg-white">
-          <div className="fw-bold mb-2">Questions {block.rangeStart}-{block.rangeEnd}</div>
+          <div className="fw-bold mb-2">Questions {block.range || `${block.rangeStart || ''}-${block.rangeEnd || ''}`}</div>
           <div className="mb-3 text-muted">
             Select {maxSelections} correct statements from the list below:
           </div>
           <div className="mb-3 ps-3 border-start border-3 bg-light p-2 text-sm">
-            {poolOptions.map((choice, cIdx) => (
-              <div key={cIdx} className="form-check mb-1">
-                <input 
-                  className="form-check-input" 
-                  type="checkbox" 
-                  id={`mc_multi_${block.rangeStart}_${choice.label}`}
-                  checked={selectedAnswers.includes(choice.label)}
-                  onChange={() => handleToggle(choice.label)}
-                  disabled={!selectedAnswers.includes(choice.label) && selectedAnswers.length >= maxSelections}
-                />
-                <label className="form-check-label" htmlFor={`mc_multi_${block.rangeStart}_${choice.label}`}>
-                  <strong>{choice.label}.</strong> {choice.text}
-                </label>
-              </div>
-            ))}
+            {poolOptions.length > 0 ? (
+              poolOptions.map((choice, cIdx) => (
+                <div key={cIdx} className="form-check mb-1">
+                  <input 
+                    className="form-check-input" 
+                    type="checkbox" 
+                    id={`mc_multi_${block.rangeStart || block.range}_${choice.label}`}
+                    checked={selectedAnswers.includes(choice.label)}
+                    onChange={() => handleToggle(choice.label)}
+                    disabled={!selectedAnswers.includes(choice.label) && selectedAnswers.length >= maxSelections}
+                  />
+                  <label className="form-check-label" htmlFor={`mc_multi_${block.rangeStart || block.range}_${choice.label}`}>
+                    <strong>{choice.label}.</strong> {choice.text}
+                  </label>
+                </div>
+              ))
+            ) : (
+              <span className="text-danger fst-italic">Các lựa chọn bị trống. Vui lòng xoá khối này và dùng "Nhập Nhanh (Bulk Add)" với chế độ Smart Mode để import chính xác nội dung câu hỏi.</span>
+            )}
           </div>
           
           <div className="row g-2">

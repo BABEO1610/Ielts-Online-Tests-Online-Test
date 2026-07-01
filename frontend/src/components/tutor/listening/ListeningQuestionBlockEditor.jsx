@@ -134,18 +134,26 @@ function ListeningQuestionBlockEditor({ block, onChange }) {
     const updateQuestionOption = (qId, optId, text) => {
       onChange({
         ...block,
-        questions: questions.map(q => q.id === qId
-          ? { ...q, options: (Array.isArray(q.options) ? q.options : (q.options?.choices || [])).map(opt => (opt.id || opt.label) === optId ? { ...opt, text } : opt) }
-          : q),
+        questions: questions.map(q => {
+          if (q.id !== qId) return q;
+          const isObj = q.options && !Array.isArray(q.options);
+          const choices = isObj ? (q.options.choices || []) : (q.options || []);
+          const newChoices = choices.map(opt => (opt.id || opt.label) === optId ? { ...opt, text } : opt);
+          return { ...q, options: isObj ? { ...q.options, choices: newChoices } : newChoices };
+        }),
       });
     };
 
     const addQuestionOption = (qId) => {
       onChange({
         ...block,
-        questions: questions.map(q => q.id === qId
-          ? { ...q, options: [...(Array.isArray(q.options) ? q.options : (q.options?.choices || [])), { id: makeId(), text: 'New Option' }] }
-          : q),
+        questions: questions.map(q => {
+          if (q.id !== qId) return q;
+          const isObj = q.options && !Array.isArray(q.options);
+          const choices = isObj ? (q.options.choices || []) : (q.options || []);
+          const newChoices = [...choices, { id: makeId(), text: 'New Option' }];
+          return { ...q, options: isObj ? { ...q.options, choices: newChoices } : newChoices };
+        }),
       });
     };
 
@@ -154,11 +162,13 @@ function ListeningQuestionBlockEditor({ block, onChange }) {
         ...block,
         questions: questions.map(q => {
           if (q.id !== qId) return q;
-          const optsArray = Array.isArray(q.options) ? q.options : (q.options?.choices || []);
-          if (optsArray.length <= 2) return q;
+          const isObj = q.options && !Array.isArray(q.options);
+          const choices = isObj ? (q.options.choices || []) : (q.options || []);
+          if (choices.length <= 2) return q;
+          const newChoices = choices.filter(opt => (opt.id || opt.label) !== optId);
           return {
             ...q,
-            options: optsArray.filter(opt => (opt.id || opt.label) !== optId),
+            options: isObj ? { ...q.options, choices: newChoices } : newChoices,
             correctAnswers: (q.correctAnswers || []).filter(id => id !== optId),
           };
         }),
@@ -201,13 +211,13 @@ function ListeningQuestionBlockEditor({ block, onChange }) {
             </div>
             <div className="card-body p-3">
               <textarea
-                className={`form-control form-control-sm mb-2 ${!String(q.text || q.questionText || '').trim() ? 'is-invalid' : ''}`}
+                className={`form-control form-control-sm mb-2 ${!String(q.text || q.questionText || (q.options?.groupInstruction) || '').trim() ? 'is-invalid' : ''}`}
                 rows="2"
                 placeholder="Question text..."
-                value={q.text || q.questionText || ''}
+                value={q.text || q.questionText || (q.options?.groupInstruction) || ''}
                 onChange={(e) => updateQuestion(q.id, 'text', e.target.value)}
               />
-              {!String(q.text || q.questionText || '').trim() && <div className="invalid-feedback d-block mb-2">Question text is required.</div>}
+              {!String(q.text || q.questionText || (q.options?.groupInstruction) || '').trim() && <div className="invalid-feedback d-block mb-2">Question text is required.</div>}
 
               {(Array.isArray(q.options) ? q.options : (q.options?.choices || [])).map((opt, optIdx) => (
                 <div key={opt.id || opt.label || optIdx} className="d-flex align-items-center gap-2 mb-2" style={{ minWidth: 0 }}>
