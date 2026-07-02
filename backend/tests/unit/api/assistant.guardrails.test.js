@@ -32,6 +32,16 @@ describe('Assistant guardrails', () => {
     expect(result.code).toBe(ERROR_CODES.OUT_OF_SCOPE);
   });
 
+  it('blocks unrelated product buying advice', () => {
+    const result = evaluateGuardrails({
+      message: 'tư vấn mua điện thoại nào',
+      context: { pageType: 'home' },
+    });
+
+    expect(result.blocked).toBe(true);
+    expect(result.code).toBe(ERROR_CODES.OUT_OF_SCOPE);
+  });
+
   it('allows normal IELTS content search questions', () => {
     const result = evaluateGuardrails({
       message: 'Có đề Reading về Environment không?',
