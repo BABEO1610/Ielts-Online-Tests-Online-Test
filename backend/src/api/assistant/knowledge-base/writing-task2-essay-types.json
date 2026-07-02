@@ -1,0 +1,35 @@
+[
+  {
+    "id": "writing_task2_agree_disagree",
+    "title": "Agree Or Disagree Essays",
+    "skill": "writing",
+    "questionType": "agree_disagree",
+    "category": "strategy",
+    "bandRange": "4.0-7.0",
+    "tags": ["writing", "task_2", "agree_disagree", "essay"],
+    "sourceName": "IELTSZone Static Knowledge Base",
+    "content": "In agree/disagree essays, state your position clearly and keep it consistent. A safe structure is introduction, reason 1, reason 2, and conclusion. A common mistake is discussing both sides equally without making your own opinion clear."
+  },
+  {
+    "id": "writing_task2_discuss_both_views",
+    "title": "Discuss Both Views Essays",
+    "skill": "writing",
+    "questionType": "discuss_both_views",
+    "category": "strategy",
+    "bandRange": "4.0-7.0",
+    "tags": ["writing", "task_2", "discuss_both_views", "essay", "dang bai"],
+    "sourceName": "IELTSZone Static Knowledge Base",
+    "content": "Discuss both views essays require a fair explanation of two opinions. Usually body 1 explains the view you support less, and body 2 explains the view you support more. Add your own opinion if the question asks for it."
+  },
+  {
+    "id": "writing_task2_type_difference",
+    "title": "Task 2 Essay Type Difference",
+    "skill": "writing",
+    "questionType": "task2_essay_types",
+    "category": "strategy",
+    "bandRange": "4.0-7.0",
+    "tags": ["writing", "task_2", "essay_types", "agree_disagree", "discuss_both_views"],
+    "sourceName": "IELTSZone Static Knowledge Base",
+    "content": "The key difference is the task demand. Agree/disagree asks for your position on one statement. Discuss both views asks you to explain two views. Problem/solution asks for causes or problems and practical solutions. Match your paragraph plan to the exact instruction."
+  }
+]
