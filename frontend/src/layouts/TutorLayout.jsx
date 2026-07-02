@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Link, NavLink, useNavigate, Outlet } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import ChangePwdModal from '../components/profile/ChangePwdModal';
@@ -109,6 +109,7 @@ const TutorSidebar = () => {
         <SidebarSection title="Chấm bài">
           <SidebarLink to="/grading/tutor/queue" label="Hàng chờ chấm" />
           <SidebarLink to="/grading/tutor/schedule" label="Lịch sử chấm" />
+          <SidebarLink to="/grading/tutor/ai-reference" label="AI tham khảo" />
         </SidebarSection>
 
         {/* TÀI NGUYÊN */}
