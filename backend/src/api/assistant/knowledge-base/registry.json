@@ -1,0 +1,68 @@
+{
+  "version": "2026-07-01",
+  "files": [
+    {
+      "file": "reading-true-false-not-given.json",
+      "skill": "reading",
+      "questionTypes": ["true_false_not_given"],
+      "categories": ["strategy", "common_mistake"],
+      "matchHints": ["true false not given", "tfng", "not given", "false vs not given", "phan biet false not given", "phân biệt false not given", "dung sai khong co thong tin", "đúng sai không có thông tin"]
+    },
+    {
+      "file": "reading-matching-headings.json",
+      "skill": "reading",
+      "questionTypes": ["matching_headings"],
+      "categories": ["strategy", "common_mistake"],
+      "matchHints": ["matching heading", "matching headings", "heading", "headings", "chon tieu de", "chọn tiêu đề", "noi tieu de", "nối tiêu đề", "dang noi tieu de", "dạng nối tiêu đề", "cach lam dang noi tieu de", "cách làm dạng nối tiêu đề", "tim tieu de", "tìm tiêu đề", "y chinh", "ý chính", "main idea"]
+    },
+    {
+      "file": "listening-section-strategies.json",
+      "skill": "listening",
+      "questionTypes": ["listening_sections", "listening_section_3", "listening_section_4"],
+      "categories": ["strategy", "study_plan"],
+      "matchHints": ["listening section", "listening section 3", "section 3 listening", "nghe section 3", "section 3", "section 4", "distractor", "academic discussion", "bay dap an", "bẫy đáp án", "nghe"]
+    },
+    {
+      "file": "writing-task1-overview.json",
+      "skill": "writing",
+      "questionTypes": ["task1_overview"],
+      "categories": ["strategy", "template"],
+      "matchHints": ["task 1 overview", "overview task 1", "overview", "viet overview", "viết overview", "viet tong quan", "viết tổng quan", "tong quan task 1", "tổng quan task 1", "line graph", "bar chart", "map", "process"]
+    },
+    {
+      "file": "writing-task2-essay-types.json",
+      "skill": "writing",
+      "questionTypes": ["task2_essay_types", "agree_disagree", "discuss_both_views"],
+      "categories": ["strategy", "template"],
+      "matchHints": ["task 2", "task 2 essay types", "essay types", "dang bai task 2", "dạng bài task 2", "agree disagree", "discuss both views", "advantages disadvantages", "problem solution", "two part question", "two-part question", "dang bai"]
+    },
+    {
+      "file": "speaking-parts-guide.json",
+      "skill": "speaking",
+      "questionTypes": ["speaking_part_1", "speaking_part_2", "speaking_part_3"],
+      "categories": ["strategy", "fluency"],
+      "matchHints": ["speaking part 1", "speaking part 2", "part 2 speaking", "speaking part 3", "cue card", "noi 2 phut", "nói 2 phút", "tra loi bao lau", "trả lời bao lâu"]
+    },
+    {
+      "file": "band-descriptors-writing.json",
+      "skill": "writing",
+      "questionTypes": ["writing_band_descriptors"],
+      "categories": ["band_descriptor", "criteria"],
+      "matchHints": ["writing criteria", "writing band descriptor", "task response", "task achievement", "coherence cohesion", "lexical resource", "grammar range", "band descriptor", "tieu chi writing", "tiêu chí writing", "tieu chi cham writing", "tiêu chí chấm writing"]
+    },
+    {
+      "file": "band-descriptors-speaking.json",
+      "skill": "speaking",
+      "questionTypes": ["speaking_band_descriptors"],
+      "categories": ["band_descriptor", "criteria"],
+      "matchHints": ["speaking criteria", "speaking band descriptor", "fluency coherence", "lexical resource", "grammatical range", "pronunciation", "band descriptor", "tieu chi speaking", "tiêu chí speaking", "tieu chi cham speaking", "tiêu chí chấm speaking"]
+    },
+    {
+      "file": "common-mistakes.json",
+      "skill": null,
+      "questionTypes": ["common_mistakes"],
+      "categories": ["common_mistake", "fix_strategy"],
+      "matchHints": ["common mistake", "loi sai", "hay sai", "fix mistake", "tranh sai"]
+    }
+  ]
+}
