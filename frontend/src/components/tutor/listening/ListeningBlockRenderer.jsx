@@ -75,13 +75,25 @@ function ListeningBlockRenderer({ block, answers, onAnswer, answeredQuestions = 
 
   const renderMultipleChoiceMulti = () => {
     // Determine max selections
-    const opts = questions[0]?.options || {};
-    const maxSelections = opts.maxSelections || questions.length;
-    const choices = opts.choices || [];
+    const q0 = questions[0];
+    let maxSelections = questions.length;
+    if (q0?.options && !Array.isArray(q0.options) && q0.options.maxSelections) {
+      maxSelections = q0.options.maxSelections;
+    } else if (q0?.questionNumbers && q0.questionNumbers.length > 0) {
+      maxSelections = q0.questionNumbers.length;
+    }
+    const choices = Array.isArray(q0?.options) ? q0.options : (q0?.options?.choices || []);
     
     // Aggregate selected values
     const selectedAnswers = [];
-    const qNums = questions[0].questionNumbers || questions.map(getQNum);
+    let qNums = questions[0].questionNumbers;
+    if (!qNums || qNums.length === 0) {
+      if (maxSelections > 1) {
+        qNums = Array.from({ length: maxSelections }, (_, i) => getQNum(questions[0]) + i);
+      } else {
+        qNums = questions.map(getQNum);
+      }
+    }
     
     qNums.forEach(qNum => {
       const val = answers[qNum];
@@ -417,7 +429,7 @@ function ListeningBlockRenderer({ block, answers, onAnswer, answeredQuestions = 
     <div className="test-block mb-5">
       {renderHeader()}
       {renderInstruction()}
-      {block.content && !isForm && (
+      {block.content && !isForm && (!block.content.trim().startsWith('[') || !block.content.trim().endsWith(']')) && (
         <div className="block-content mb-4 p-3 bg-light rounded shadow-sm">
           {renderHtmlContent(block.content)}
         </div>

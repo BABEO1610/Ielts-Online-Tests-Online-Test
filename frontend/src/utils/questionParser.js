@@ -360,10 +360,14 @@ export const parseSmartText = (rawText) => {
         else if (norm.length === 1 && up.match(/[A-Z]/)) norm = up;
 
         if (answerMap[qNum] !== undefined) {
-           duplicateAnsError = `Lỗi: Có nhiều đáp án cho cùng câu hỏi số ${qNum} (Duplicate answer key)`;
-           break;
+           if (Array.isArray(answerMap[qNum])) {
+               if (!answerMap[qNum].includes(norm)) answerMap[qNum].push(norm);
+           } else {
+               if (answerMap[qNum] !== norm) answerMap[qNum] = [answerMap[qNum], norm];
+           }
+        } else {
+           answerMap[qNum] = norm;
         }
-        answerMap[qNum] = norm;
         if (inlineExplanation) {
           explanationMap[qNum] = inlineExplanation;
         }
@@ -473,7 +477,7 @@ export const parseSmartText = (rawText) => {
     } else if (instrUpper.includes('YES') && instrUpper.includes('NO') && instrUpper.includes('NOT GIVEN')) {
       detectedType = 'YES_NO_NOT_GIVEN';
       answerFormat = 'Y/N/NG';
-    } else if (instrUpper.match(/(?:CHOOSE|MARK)\s+(?:TWO|THREE|FOUR|FIVE|SIX|SEVEN|EIGHT|NINE|TEN|\d+)\s+LETTERS/)) {
+    } else if (instrUpper.match(/(?:CHOOSE|MARK)\s+(?:TWO|THREE|FOUR|FIVE|SIX|SEVEN|EIGHT|NINE|TEN|\d+)\s+LETTER(?:S)?/)) {
       detectedType = 'MULTIPLE_CHOICE_MULTI';
       answerFormat = 'MULTI_SELECT';
     } else if (instrUpper.includes('CHOOSE THE CORRECT LETTER') || instrUpper.includes('CHOOSE THE CORRECT ANSWER') || instrUpper.includes('ONE OF THE CHOICES IS CORRECT')) {
@@ -713,14 +717,20 @@ export const parseSmartText = (rawText) => {
          }
        }
        
-       const maxSelections = rangeEnd - rangeStart + 1;
+       let explicitMax = 0;
+       const matchMax = instruction.toUpperCase().match(/(?:CHOOSE|MARK)\s+(TWO|THREE|FOUR|FIVE|SIX|SEVEN|EIGHT|NINE|TEN|\d+)\s+LETTER(?:S)?/);
+       if (matchMax) {
+           const mapMax = { TWO: 2, THREE: 3, FOUR: 4, FIVE: 5, SIX: 6, SEVEN: 7, EIGHT: 8, NINE: 9, TEN: 10 };
+           explicitMax = mapMax[matchMax[1]] || parseInt(matchMax[1], 10);
+       }
+       const maxSelections = explicitMax || (rangeEnd - rangeStart + 1);
        const extraOptions = { maxSelections, isGrouped: true };
        const questionNumbers = Array.from({length: maxSelections}, (_, i) => rangeStart + i);
        
        questions.push({
          questionOrder: rangeStart,
          questionNumbers: questionNumbers,
-         questionText: questionTextLines.join('\n').trim(),
+         questionText: questionTextLines.length > 0 ? questionTextLines.join('\n').trim() : instruction,
          correctAnswers: [],
          options: buildOptions(choices, extraOptions)
        });
@@ -843,8 +853,13 @@ export const parseSmartText = (rawText) => {
 
     parsedBlock.questions = questions;
     
-    if (questions.length < qCount) {
-      parsedBlock.warnings.push(`Chỉ tìm thấy ${questions.length}/${qCount} câu hỏi trong khoảng ${groupRange}`);
+    let actualCount = questions.length;
+    if (detectedType === 'MULTIPLE_CHOICE_MULTI' && questions.length > 0 && questions[0].questionNumbers) {
+       actualCount = questions[0].questionNumbers.length;
+    }
+
+    if (actualCount < qCount) {
+      parsedBlock.warnings.push(`Chỉ tìm thấy ${actualCount}/${qCount} câu hỏi trong khoảng ${groupRange}`);
     }
     
     // Missing answers are calculated again at the end
@@ -894,7 +909,11 @@ export const parseSmartText = (rawText) => {
          let hasMissing = false;
          for (const n of q.questionNumbers) {
             if (answerMap[n] !== undefined) {
-               q.correctAnswers.push(answerMap[n]);
+               if (Array.isArray(answerMap[n])) {
+                   q.correctAnswers.push(...answerMap[n]);
+               } else {
+                   q.correctAnswers.push(answerMap[n]);
+               }
             } else {
                hasMissing = true;
                missingAnsCount++;
@@ -910,8 +929,9 @@ export const parseSmartText = (rawText) => {
          }
       } else {
         if (answerMap[qNum] !== undefined) {
-          q.correctAnswer = answerMap[qNum];
-          q.correctAnswers = [answerMap[qNum]];
+          const ans = Array.isArray(answerMap[qNum]) ? answerMap[qNum][0] : answerMap[qNum];
+          q.correctAnswer = ans;
+          q.correctAnswers = Array.isArray(answerMap[qNum]) ? answerMap[qNum] : [ans];
           if (q.options) {
             q.options.requiresManualAnswer = false;
           }
