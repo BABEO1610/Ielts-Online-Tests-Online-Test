@@ -2,6 +2,19 @@ const { pool } = require('../db/pool');
 const AppError = require('../utils/AppError');
 const AuditLogService = require('./audit.service');
 
+const countWords = (text) =>
+  String(text || '').trim().split(/\s+/).filter(Boolean).length;
+
+const getAiReportColumns = async () => {
+  const { rows } = await pool.query(
+    `SELECT column_name
+     FROM information_schema.columns
+     WHERE table_schema = 'public'
+       AND table_name = 'ai_grading_reports'`
+  );
+  return new Set(rows.map(row => row.column_name));
+};
+
 class TutorService {
   /**
    * Get pending grading queue for tutors
@@ -102,19 +115,23 @@ class TutorService {
     try {
       if (type === 'speaking') {
         await pool.query(`
-          UPDATE speaking_submissions 
+          UPDATE speaking_submissions ss_target
           SET status = 'pending' 
-          WHERE speaking_group_id IN (
-            SELECT speaking_group_id FROM speaking_submissions WHERE status = 'pending'
-          ) AND status = 'tutor_graded'
+          WHERE ss_target.speaking_group_id IN (
+            SELECT ss_pending.speaking_group_id
+            FROM speaking_submissions ss_pending
+            WHERE ss_pending.status = 'pending'
+          ) AND ss_target.status = 'tutor_graded'
         `);
       } else {
         await pool.query(`
-          UPDATE writing_submissions 
+          UPDATE writing_submissions ws_target
           SET status = 'pending' 
-          WHERE writing_group_id IN (
-            SELECT writing_group_id FROM writing_submissions WHERE status = 'pending'
-          ) AND status = 'tutor_graded'
+          WHERE ws_target.writing_group_id IN (
+            SELECT ws_pending.writing_group_id
+            FROM writing_submissions ws_pending
+            WHERE ws_pending.status = 'pending'
+          ) AND ws_target.status = 'tutor_graded'
         `);
       }
     } catch (err) {
@@ -909,6 +926,125 @@ class TutorService {
     `;
     const result = await pool.query(query, [tutorId, todayStart.toISOString()]);
     return result.rows[0] || { today_actions: 0, graded_week: 0, content_updates: 0 };
+  }
+
+  /**
+   * Get list of AI-graded writing submissions for tutor reference.
+   * Includes both successful and failed AI grading reports.
+   */
+  static async getAiReferenceList(filters = {}) {
+    const params = [];
+    let whereExtra = '';
+    const reportColumns = await getAiReportColumns();
+    const hasReportStatus = reportColumns.has('status');
+    const hasErrorMessage = reportColumns.has('error_message');
+    const reportStatusSelect = hasReportStatus
+      ? 'agr.status AS ai_report_status'
+      : 'NULL::text AS ai_report_status';
+    const errorMessageSelect = hasErrorMessage
+      ? 'agr.error_message'
+      : 'NULL::text AS error_message';
+    const failedPredicates = [
+      hasReportStatus ? "(ws.status = 'pending' AND agr.status = 'failed')" : null,
+      hasErrorMessage ? '(ws.status = \'pending\' AND agr.error_message IS NOT NULL)' : null,
+    ].filter(Boolean);
+    const failedWhere = failedPredicates.length
+      ? `OR ${failedPredicates.join(' OR ')}`
+      : '';
+
+    if (filters.search) {
+      params.push(`%${filters.search}%`);
+      whereExtra += ` AND u.full_name ILIKE $${params.length}`;
+    }
+
+    const query = `
+      SELECT
+        ws.id AS submission_id,
+        ws.user_id AS student_id,
+        u.full_name AS student_name,
+        mt.title AS test_title,
+        ws.task_number,
+        ws.submitted_at,
+        ws.status::text AS submission_status,
+        agr.band_score AS ai_band,
+        ${reportStatusSelect},
+        ${errorMessageSelect},
+        agr.generated_at
+      FROM writing_submissions ws
+      JOIN users u ON u.id = ws.user_id
+      LEFT JOIN mock_tests mt ON mt.id = ws.test_id
+      LEFT JOIN ai_grading_reports agr
+        ON agr.submission_id = ws.id
+        AND agr.submission_type = 'writing'
+      WHERE ws.grader = 'ai'
+        AND (
+          ws.status = 'ai_graded'
+          ${failedWhere}
+        )
+        ${whereExtra}
+      ORDER BY ws.submitted_at DESC`;
+
+    const { rows } = await pool.query(query, params);
+    return rows.map(row => ({
+      submissionId: row.submission_id,
+      studentId: row.student_id,
+      studentName: row.student_name,
+      testTitle: row.test_title,
+      taskNumber: row.task_number,
+      submittedAt: row.submitted_at,
+      submissionStatus: row.submission_status,
+      aiBand: row.ai_band ? parseFloat(row.ai_band) : null,
+      reportStatus: row.ai_report_status,
+      errorMessage: row.error_message,
+      generatedAt: row.generated_at,
+    }));
+  }
+
+  /**
+   * Get detailed AI-graded submission for tutor reference.
+   * Read-only — tutor cannot modify AI feedback.
+   */
+  static async getAiReferenceDetail(submissionId) {
+    const subQuery = `
+      SELECT ws.*, mt.title AS test_title,
+             u.full_name AS student_name
+      FROM writing_submissions ws
+      LEFT JOIN mock_tests mt ON mt.id = ws.test_id
+      JOIN users u ON u.id = ws.user_id
+      WHERE ws.id = $1 AND ws.grader = 'ai'`;
+
+    const { rows: subRows } = await pool.query(subQuery, [submissionId]);
+    if (subRows.length === 0) return null;
+
+    const reportQuery = `
+      SELECT * FROM ai_grading_reports
+      WHERE submission_id = $1
+        AND submission_type = 'writing'
+      ORDER BY generated_at DESC LIMIT 1`;
+
+    const { rows: reportRows } = await pool.query(
+      reportQuery, [submissionId]
+    );
+
+    const submission = subRows[0];
+    const report = reportRows[0] || null;
+
+    return {
+      submission: {
+        id: submission.id,
+        studentId: submission.user_id,
+        studentName: submission.student_name,
+        testTitle: submission.test_title,
+        taskNumber: submission.task_number,
+        promptText: submission.prompt_text,
+        responseText: submission.response_text,
+        wordCount: countWords(submission.response_text),
+        submittedAt: submission.submitted_at,
+        status: submission.status,
+        grader: submission.grader,
+      },
+      aiReport: report,
+    };
   }
 }
 
