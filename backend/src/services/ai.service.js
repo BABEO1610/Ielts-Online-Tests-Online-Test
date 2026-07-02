@@ -185,6 +185,57 @@ const generateGeminiAnswer = async ({ model, apiKey, mode, message, officialCont
   return answer;
 };
 
+const generateGeminiJsonAnswer = async ({
+  model, apiKey, systemPrompt, userPrompt, timeoutMs = 30000,
+}) => {
+  if (!apiKey) {
+    throw createAssistantError(ERROR_CODES.AI_NOT_CONFIGURED);
+  }
+
+  const geminiModel = normalizeGeminiModel(model);
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const response = await fetch(
+      `${GEMINI_GENERATE_CONTENT_URL}/${encodeURIComponent(geminiModel)}:generateContent?key=${encodeURIComponent(apiKey)}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        signal: controller.signal,
+        body: JSON.stringify({
+          systemInstruction: { parts: [{ text: systemPrompt }] },
+          generationConfig: {
+            temperature: 0.15,
+            maxOutputTokens: 4096,
+            responseMimeType: 'application/json',
+          },
+          contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
+        }),
+      }
+    );
+
+    if (!response.ok) {
+      throw buildProviderError({
+        provider: 'Gemini',
+        status: response.status,
+        model: geminiModel,
+        body: await response.text(),
+      });
+    }
+
+    const data = await response.json();
+    const answer = data?.candidates?.[0]?.content?.parts
+      ?.map((part) => part.text || '')
+      .join('')
+      .trim();
+    if (!answer) throw createAssistantError(ERROR_CODES.INTERNAL_ERROR);
+    return { answer, modelName: geminiModel };
+  } finally {
+    clearTimeout(timeout);
+  }
+};
+
 const generateScopeClassification = async ({ message }) => {
   const { provider, model, openaiApiKey, geminiApiKey } = getAiConfig();
   const systemPrompt = `You are a strict JSON scope classifier for an IELTS learning platform.
@@ -566,6 +617,7 @@ module.exports = {
   generateAssistantAnswer,
   streamAssistantAnswer,
   generateTranscript,
+  generateGeminiJsonAnswer,
   getAiConfig,
   normalizeGeminiModel,
 };
