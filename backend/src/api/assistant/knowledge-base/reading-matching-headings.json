@@ -1,0 +1,35 @@
+[
+  {
+    "id": "reading_matching_headings_main_idea",
+    "title": "Matching Headings Means Main Idea",
+    "skill": "reading",
+    "questionType": "matching_headings",
+    "category": "strategy",
+    "bandRange": "4.0-7.0",
+    "tags": ["reading", "matching_headings", "main_idea", "chon tieu de"],
+    "sourceName": "IELTSZone Static Knowledge Base",
+    "content": "Matching Headings tests the main idea of each paragraph, not one repeated word. Read the first and last sentences, then check the middle for contrast or examples. A heading should summarize the whole paragraph, not just a small detail."
+  },
+  {
+    "id": "reading_matching_headings_distractors",
+    "title": "Avoid Keyword Distractors",
+    "skill": "reading",
+    "questionType": "matching_headings",
+    "category": "common_mistake",
+    "bandRange": "4.0-7.0",
+    "tags": ["reading", "matching_headings", "distractor", "keyword"],
+    "sourceName": "IELTSZone Static Knowledge Base",
+    "content": "Do not choose a heading only because it repeats a keyword from the paragraph. IELTS often uses repeated words as distractors. Ask: what is the writer mainly doing here: defining, comparing, explaining a problem, giving a result, or describing a change?"
+  },
+  {
+    "id": "reading_matching_headings_process",
+    "title": "Matching Headings Process",
+    "skill": "reading",
+    "questionType": "matching_headings",
+    "category": "strategy",
+    "bandRange": "4.0-7.0",
+    "tags": ["reading", "matching_headings", "process", "heading"],
+    "sourceName": "IELTSZone Static Knowledge Base",
+    "content": "First skim all headings to understand the options. Then read one paragraph and create your own short heading before checking the list. Eliminate headings that are too narrow, too broad, or focused on a different paragraph function."
+  }
+]
