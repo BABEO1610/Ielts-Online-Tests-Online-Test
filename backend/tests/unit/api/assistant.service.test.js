@@ -72,6 +72,44 @@ describe('Assistant service pipeline', () => {
     expect(aiService.generateAssistantAnswer).not.toHaveBeenCalled();
   });
 
+  it.each([
+    'cản ơn bajn',
+    'cam on b',
+    'thanksss',
+  ])('returns immediate thanks response for typo thanks: %s', async (message) => {
+    const result = await runAssistantPipeline({
+      user: { id: 'user-1' },
+      payload: {
+        message,
+        context: { pageType: 'home', route: '/' },
+      },
+    });
+
+    expect(result.intent).toBe(ASSISTANT_INTENTS.GREETING);
+    expect(result.answer).toContain('Không có gì');
+    expect(result.finalResponseMode).toBe('immediate');
+    expect(result.dbLookupCalled).not.toBe(true);
+    expect(aiService.generateAssistantAnswer).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    'helllo',
+    'chàoo',
+  ])('returns immediate greeting response for typo hello: %s', async (message) => {
+    const result = await runAssistantPipeline({
+      user: { id: 'user-1' },
+      payload: {
+        message,
+        context: { pageType: 'home', route: '/' },
+      },
+    });
+
+    expect(result.intent).toBe(ASSISTANT_INTENTS.GREETING);
+    expect(result.answer).toContain('Chào');
+    expect(result.finalResponseMode).toBe('immediate');
+    expect(aiService.generateAssistantAnswer).not.toHaveBeenCalled();
+  });
+
   it('calls AI for IELTS_KNOWLEDGE without requiring database rows', async () => {
     aiService.generateAssistantAnswer.mockResolvedValue(JSON.stringify({
       answer: 'Cohesion là cách liên kết câu và ý trong bài viết.',
@@ -99,6 +137,8 @@ describe('Assistant service pipeline', () => {
     expect(result.code).toBeNull();
     expect(aiService.generateAssistantAnswer).toHaveBeenCalledTimes(1);
     expect(aiService.generateAssistantAnswer.mock.calls[0][0].systemPrompt).toContain('IELTS and English learning assistant');
+    expect(aiService.generateAssistantAnswer.mock.calls[0][0].userPrompt).toContain('Retrieved IELTS Knowledge:');
+    expect(aiService.generateAssistantAnswer.mock.calls[0][0].userPrompt).toContain('Coherence And Cohesion');
   });
 
   it('returns missing-data suggestions without calling AI when filtered lookup has no rows', async () => {
@@ -157,6 +197,120 @@ describe('Assistant service pipeline', () => {
     expect(result.intent).toBe(ASSISTANT_INTENTS.IELTS_KNOWLEDGE);
     expect(result.finalResponseMode).toBe('ai');
     expect(aiService.generateAssistantAnswer).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    'cách áp dụng phương pháp cho IELTS Reading',
+    'cách làm Reading hiệu quả',
+  ])('routes strategy question to IELTS_KNOWLEDGE without DB lookup: %s', async (message) => {
+    aiService.generateAssistantAnswer.mockResolvedValue(JSON.stringify({
+      answer: 'Bạn nên xác định mục tiêu của kỹ thuật, luyện từng bước và review lỗi sau mỗi bài Reading.',
+      suggestedLinks: [],
+      usedDatabase: false,
+      needsMoreContext: false,
+      safety: {
+        inventedContent: false,
+        outOfScope: false,
+        containsBandScore: false,
+        containsWritingSpeakingGrading: false,
+      },
+    }));
+
+    const result = await runAssistantPipeline({
+      user: { id: 'user-1' },
+      payload: {
+        message,
+        context: { pageType: 'home', route: '/' },
+      },
+    });
+
+    expect(result.intent).toBe(ASSISTANT_INTENTS.IELTS_KNOWLEDGE);
+    expect(result.dbLookupCalled).toBe(false);
+    expect(pool.query).not.toHaveBeenCalled();
+    expect(aiService.generateAssistantAnswer).toHaveBeenCalledTimes(1);
+  });
+
+  it('routes Matching Headings strategy to IELTS_KNOWLEDGE and injects matching chunks', async () => {
+    aiService.generateAssistantAnswer.mockResolvedValue(JSON.stringify({
+      answer: 'Matching Headings cần đọc ý chính toàn đoạn, không chọn chỉ vì lặp keyword.',
+      suggestedLinks: [],
+      usedDatabase: false,
+      needsMoreContext: false,
+      safety: {
+        inventedContent: false,
+        outOfScope: false,
+        containsBandScore: false,
+        containsWritingSpeakingGrading: false,
+      },
+    }));
+
+    const result = await runAssistantPipeline({
+      user: { id: 'user-1' },
+      payload: {
+        message: 'phương pháp làm Matching Headings',
+        context: { pageType: 'home', route: '/' },
+      },
+    });
+
+    expect(result.intent).toBe(ASSISTANT_INTENTS.IELTS_KNOWLEDGE);
+    expect(result.dbLookupCalled).toBe(false);
+    expect(aiService.generateAssistantAnswer.mock.calls[0][0].userPrompt).toContain('Question Type: matching_headings');
+  });
+
+  it('keeps explicit Reading practice lookup on DB path', async () => {
+    pool.query
+      .mockResolvedValueOnce({ rows: [{ column_name: 'is_published' }, { column_name: 'review_status' }] })
+      .mockResolvedValueOnce({
+        rows: [{
+          id: 'reading-latest',
+          title: 'IELTSZone Reading Mock Test Latest',
+          description: 'Latest reading test',
+          skill: 'reading',
+          difficulty: 'intermediate',
+          duration_minutes: 60,
+        }],
+      });
+
+    aiService.generateAssistantAnswer.mockResolvedValue(JSON.stringify({
+      answer: 'Mình tìm thấy 1 đề Reading mới nhất trong hệ thống.',
+      suggestedLinks: [],
+      usedDatabase: true,
+      needsMoreContext: false,
+      safety: {
+        inventedContent: false,
+        outOfScope: false,
+        containsBandScore: false,
+        containsWritingSpeakingGrading: false,
+      },
+    }));
+
+    const result = await runAssistantPipeline({
+      user: { id: 'user-1' },
+      payload: {
+        message: 'cho tôi 1 đề Reading mới nhất',
+        context: { pageType: 'home', route: '/' },
+      },
+    });
+
+    expect(result.intent).toBe(ASSISTANT_INTENTS.FIND_TEST);
+    expect(result.dbLookupCalled).toBe(true);
+    expect(pool.query.mock.calls[1][0]).toContain('FROM mock_tests');
+  });
+
+  it('asks clarification for ambiguous skill-only requests without DB lookup', async () => {
+    const result = await runAssistantPipeline({
+      user: { id: 'user-1' },
+      payload: {
+        message: 'reading đi',
+        context: { pageType: 'home', route: '/' },
+      },
+    });
+
+    expect(result.intent).toBe(ASSISTANT_INTENTS.CLARIFICATION);
+    expect(result.answer).toContain('tìm đề reading');
+    expect(result.dbLookupCalled).not.toBe(true);
+    expect(pool.query).not.toHaveBeenCalled();
+    expect(aiService.generateAssistantAnswer).not.toHaveBeenCalled();
   });
 
   it('keeps lookup context at 10 but displays only 3 links with hasMore metadata', async () => {
@@ -569,6 +723,18 @@ describe('Assistant service pipeline', () => {
     expect(result.intent).toBe(ASSISTANT_INTENTS.OUT_OF_SCOPE);
     expect(aiService.generateAssistantAnswer).not.toHaveBeenCalled();
   });
+  it('keeps unrelated product buying blocked without AI answer call', async () => {
+    const result = await runAssistantPipeline({
+      user: { id: 'user-1' },
+      payload: {
+        message: 'tư vấn mua điện thoại nào',
+        context: { pageType: 'home', route: '/' },
+      },
+    });
+
+    expect(result.intent).toBe(ASSISTANT_INTENTS.OUT_OF_SCOPE);
+    expect(aiService.generateAssistantAnswer).not.toHaveBeenCalled();
+  });
 });
 
 describe('Assistant service multi-turn and English-learning runtime', () => {
@@ -622,6 +788,143 @@ describe('Assistant service multi-turn and English-learning runtime', () => {
     expect(aiService.generateAssistantAnswer.mock.calls[0][0].userPrompt).toContain('tip hoc ielts the nao');
   });
 
+  it('keeps strategy follow-up in IELTS_KNOWLEDGE when recent knowledge context exists', async () => {
+    repository.getRecentMessages.mockResolvedValue([
+      { role: 'user', content: 'Matching Headings làm sao?' },
+      { role: 'assistant', content: 'Đọc topic sentence và tìm ý chính toàn đoạn.' },
+    ]);
+    aiService.generateAssistantAnswer.mockResolvedValue(JSON.stringify({
+      answer: 'Bạn áp dụng bằng cách đọc nhanh đoạn, xác định main idea rồi đối chiếu heading.',
+      suggestedLinks: [],
+      usedDatabase: false,
+      needsMoreContext: false,
+      safety: {
+        inventedContent: false,
+        outOfScope: false,
+        containsBandScore: false,
+        containsWritingSpeakingGrading: false,
+      },
+    }));
+
+    const result = await runAssistantPipeline({
+      user: { id: 'user-1' },
+      payload: {
+        sessionId: 'session-1',
+        message: 'áp dụng phương pháp đó cho Reading',
+        context: { pageType: 'home', route: '/' },
+      },
+    });
+
+    expect(result.intent).toBe(ASSISTANT_INTENTS.IELTS_KNOWLEDGE);
+    expect(result.dbLookupCalled).toBe(false);
+    expect(pool.query).not.toHaveBeenCalled();
+    expect(aiService.generateAssistantAnswer).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps DB lookup follow-up in FIND_TEST and reuses previous Reading skill', async () => {
+    repository.getRecentMessages.mockResolvedValue([
+      { role: 'user', content: 'Cho tôi đề Reading mới nhất' },
+      { role: 'assistant', content: 'Mình tìm thấy đề Reading mới nhất.' },
+    ]);
+    pool.query
+      .mockResolvedValueOnce({ rows: [{ column_name: 'is_published' }, { column_name: 'review_status' }] })
+      .mockResolvedValueOnce({
+        rows: [{
+          id: 'reading-other',
+          title: 'IELTSZone Reading Mock Test Other',
+          description: 'Another reading test',
+          skill: 'reading',
+          difficulty: 'intermediate',
+          duration_minutes: 60,
+        }],
+      });
+    aiService.generateAssistantAnswer.mockResolvedValue(JSON.stringify({
+      answer: 'Mình tìm thấy một đề Reading khác trong hệ thống.',
+      suggestedLinks: [],
+      usedDatabase: true,
+      needsMoreContext: false,
+      safety: {
+        inventedContent: false,
+        outOfScope: false,
+        containsBandScore: false,
+        containsWritingSpeakingGrading: false,
+      },
+    }));
+
+    const result = await runAssistantPipeline({
+      user: { id: 'user-1' },
+      payload: {
+        sessionId: 'session-1',
+        message: 'đề khác đi',
+        context: { pageType: 'home', route: '/' },
+      },
+    });
+
+    expect(result.intent).toBe(ASSISTANT_INTENTS.FIND_TEST);
+    expect(result.dbLookupCalled).toBe(true);
+    expect(pool.query.mock.calls[1][1]).toEqual(expect.arrayContaining(['reading']));
+  });
+
+  it('routes practice follow-up after knowledge context to FIND_TEST', async () => {
+    repository.getRecentMessages.mockResolvedValue([
+      { role: 'user', content: 'Matching Headings làm sao?' },
+      { role: 'assistant', content: 'Đọc ý chính toàn đoạn trước khi chọn heading.' },
+    ]);
+    pool.query
+      .mockResolvedValueOnce({ rows: [{ column_name: 'is_published' }, { column_name: 'review_status' }] })
+      .mockResolvedValueOnce({
+        rows: [{
+          id: 'reading-practice',
+          title: 'IELTSZone Reading Matching Headings Practice',
+          description: 'Reading practice',
+          skill: 'reading',
+          difficulty: 'intermediate',
+          duration_minutes: 60,
+        }],
+      });
+    aiService.generateAssistantAnswer.mockResolvedValue(JSON.stringify({
+      answer: 'Mình tìm thấy một đề Reading để bạn luyện cách này.',
+      suggestedLinks: [],
+      usedDatabase: true,
+      needsMoreContext: false,
+      safety: {
+        inventedContent: false,
+        outOfScope: false,
+        containsBandScore: false,
+        containsWritingSpeakingGrading: false,
+      },
+    }));
+
+    const result = await runAssistantPipeline({
+      user: { id: 'user-1' },
+      payload: {
+        sessionId: 'session-1',
+        message: 'cho tôi bài để luyện cách này',
+        context: { pageType: 'home', route: '/' },
+      },
+    });
+
+    expect(result.intent).toBe(ASSISTANT_INTENTS.FIND_TEST);
+    expect(result.dbLookupCalled).toBe(true);
+    expect(pool.query.mock.calls[1][1]).toEqual(expect.arrayContaining(['reading']));
+  });
+
+  it('asks clarification for context-dependent practice follow-up without recent context', async () => {
+    const result = await runAssistantPipeline({
+      user: { id: 'user-1' },
+      payload: {
+        message: 'cho tôi bài để luyện cách này',
+        context: { pageType: 'home', route: '/' },
+      },
+    });
+
+    expect(result.intent).toBe(ASSISTANT_INTENTS.CLARIFICATION);
+    expect(result.answer).toContain('luyện kỹ năng');
+    expect(result.dbLookupCalled).not.toBe(true);
+    expect(pool.query).not.toHaveBeenCalled();
+    expect(aiService.generateAssistantAnswer).not.toHaveBeenCalled();
+  });
+
   it('answers English meaning requests through the AI provider', async () => {
     aiService.generateAssistantAnswer.mockResolvedValue(JSON.stringify({
       answer: '"What are you doing?" nghia la "Ban dang lam gi?".',
@@ -648,6 +951,66 @@ describe('Assistant service multi-turn and English-learning runtime', () => {
     expect(result.dbLookupCalled).toBe(false);
     expect(aiService.generateAssistantAnswer).toHaveBeenCalledTimes(1);
     expect(result.answer).toContain('Ban dang lam gi');
+  });
+
+  it('answers general English grammar questions without retrieved chunks', async () => {
+    aiService.generateAssistantAnswer.mockResolvedValue(JSON.stringify({
+      answer: 'Although theo sau là mệnh đề; despite theo sau danh từ, V-ing hoặc cụm danh từ.',
+      suggestedLinks: [],
+      usedDatabase: false,
+      needsMoreContext: false,
+      safety: {
+        inventedContent: false,
+        outOfScope: false,
+        containsBandScore: false,
+        containsWritingSpeakingGrading: false,
+      },
+    }));
+
+    const result = await runAssistantPipeline({
+      user: { id: 'user-1' },
+      payload: {
+        message: 'phân biệt although và despite',
+        context: { pageType: 'home', route: '/' },
+      },
+    });
+
+    expect(result.intent).toBe(ASSISTANT_INTENTS.IELTS_KNOWLEDGE);
+    expect(result.dbLookupCalled).toBe(false);
+    expect(result.answer).toContain('Although');
+    expect(aiService.generateAssistantAnswer).toHaveBeenCalledTimes(1);
+    expect(aiService.generateAssistantAnswer.mock.calls[0][0].userPrompt).toContain('No retrieved IELTS knowledge.');
+    expect(aiService.generateAssistantAnswer.mock.calls[0][0].userPrompt).toContain('"detectedTopic": "english_grammar"');
+  });
+
+  it('answers general English vocabulary questions without requiring static chunks', async () => {
+    aiService.generateAssistantAnswer.mockResolvedValue(JSON.stringify({
+      answer: 'Build vocabulary by learning words in phrases, reviewing with spaced repetition, and using new words in sentences.',
+      suggestedLinks: [],
+      usedDatabase: false,
+      needsMoreContext: false,
+      safety: {
+        inventedContent: false,
+        outOfScope: false,
+        containsBandScore: false,
+        containsWritingSpeakingGrading: false,
+      },
+    }));
+
+    const result = await runAssistantPipeline({
+      user: { id: 'user-1' },
+      payload: {
+        message: 'how can I improve my vocabulary?',
+        context: { pageType: 'home', route: '/' },
+      },
+    });
+
+    expect(result.intent).toBe(ASSISTANT_INTENTS.IELTS_KNOWLEDGE);
+    expect(result.dbLookupCalled).toBe(false);
+    expect(result.answer).toContain('vocabulary');
+    expect(aiService.generateAssistantAnswer).toHaveBeenCalledTimes(1);
+    expect(aiService.generateAssistantAnswer.mock.calls[0][0].userPrompt).toContain('No retrieved IELTS knowledge.');
+    expect(aiService.generateAssistantAnswer.mock.calls[0][0].userPrompt).toContain('"detectedTopic": "english_vocabulary"');
   });
 
   it('answers IELTS term explanations through the AI provider', async () => {

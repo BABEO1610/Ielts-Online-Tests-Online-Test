@@ -1,5 +1,5 @@
-import React, { useState, useRef, useCallback } from 'react';
-import { useParams, useLocation, useNavigate } from 'react-router-dom';
+import { useState, useRef, useCallback } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import StudentNavbar from '../../components/layout/StudentNavbar';
 import WritingEditor from '../../components/grading/WritingEditor';
 import FeedbackReport from '../../components/grading/FeedbackReport';
@@ -7,10 +7,44 @@ import TimerBar from '../../components/objective-testing/TimerBar';
 import AutoSubmitModal from '../../components/objective-testing/AutoSubmitModal';
 import gradingService from '../../services/grading.service';
 
+const getErrorMessage = (error) =>
+  error.response?.data?.error?.message
+  || error.message
+  || 'Đã xảy ra lỗi khi nộp bài.';
+
+const collectWritingTasks = (refs) => {
+  const tasksData = refs
+    .filter(ref => ref?.getTaskData)
+    .map(ref => ref.getTaskData());
+
+  if (tasksData.length === 0) {
+    throw new Error('Không có dữ liệu bài làm.');
+  }
+
+  const graders = [...new Set(tasksData.map(task => task.grader || 'tutor'))];
+  if (graders.length > 1) {
+    throw new Error('Vui lòng chọn cùng một hình thức chấm cho cả bài Writing.');
+  }
+
+  return { tasksData, selectedGrader: graders[0] };
+};
+
+const requestAiForSubmittedTasks = async (response) => {
+  const tasks = response?.data?.tasks || [];
+  const gradingRequests = tasks
+    .filter(task => task?.id)
+    .map(task => gradingService.requestAiGrading(task.id));
+  const results = await Promise.allSettled(gradingRequests);
+  const failed = results.find(result => result.status === 'rejected');
+  if (failed) {
+    throw failed.reason;
+  }
+};
+
 /**
  * WritingTestScreen — Component màn hình làm bài
  */
-const WritingTestScreen = ({ exam, onBack, onSubmitSuccess, practiceMode, customTimeLimit }) => {
+const WritingTestScreen = ({ exam, onSubmitSuccess, practiceMode, customTimeLimit }) => {
   const editorRefs = useRef([]);
   const [showAutoSubmit, setShowAutoSubmit] = useState(false);
   const [activeTaskIndex, setActiveTaskIndex] = useState(0);
@@ -21,34 +55,29 @@ const WritingTestScreen = ({ exam, onBack, onSubmitSuccess, practiceMode, custom
   const submitAllTasks = useCallback(async () => {
     setShowAutoSubmit(true);
     try {
-      const tasksData = [];
-      let globalGrader = 'tutor';
-
-      for (const ref of editorRefs.current) {
-        if (ref && ref.getTaskData) {
-          const data = ref.getTaskData();
-          tasksData.push(data);
-          if (data.grader) globalGrader = data.grader;
-        }
-      }
-
-      if (tasksData.length === 0) {
-        throw new Error('Không có dữ liệu bài làm.');
-      }
+      const { tasksData, selectedGrader } = collectWritingTasks(
+        editorRefs.current
+      );
 
       const payload = {
         test_id: exam.id,
-        grader: globalGrader,
+        grader: selectedGrader,
         tasks: tasksData
       };
 
       const response = await gradingService.submitFullWriting(payload);
-      setShowAutoSubmit(false);
+      if (selectedGrader === 'ai') {
+        try {
+          await requestAiForSubmittedTasks(response);
+        } catch (aiError) {
+          window.alert(getErrorMessage(aiError));
+        }
+      }
       if (onSubmitSuccess) onSubmitSuccess(response);
     } catch (error) {
-      console.error(error);
+      window.alert(getErrorMessage(error));
+    } finally {
       setShowAutoSubmit(false);
-      window.alert(error.message || 'Đã xảy ra lỗi khi nộp bài.');
     }
   }, [exam.id, onSubmitSuccess]);
 
@@ -157,7 +186,6 @@ const WritingTestScreen = ({ exam, onBack, onSubmitSuccess, practiceMode, custom
  * WritingTestPage — Route-driven wrapper cho màn hình thi Writing (/tests/:id/writing)
  */
 function WritingTestPage() {
-  const { id } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
   const practiceMode = location.state?.practiceMode || false;
@@ -213,7 +241,6 @@ function WritingTestPage() {
       exam={exam}
       practiceMode={practiceMode}
       customTimeLimit={customTimeLimit}
-      onBack={() => navigate('/writing')}
       onSubmitSuccess={handleSubmitSuccess}
     />
   );

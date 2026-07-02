@@ -1,0 +1,35 @@
+[
+  {
+    "id": "common_mistake_reading_outside_knowledge",
+    "title": "Using Outside Knowledge In Reading",
+    "skill": "reading",
+    "questionType": "common_mistakes",
+    "category": "common_mistake",
+    "bandRange": "4.0-7.0",
+    "tags": ["reading", "common_mistake", "outside_knowledge", "loi sai"],
+    "sourceName": "IELTSZone Static Knowledge Base",
+    "content": "In Reading, answer only from the passage. Outside knowledge can make a statement seem true, but IELTS marks based on textual evidence. Always ask whether the passage explicitly supports, contradicts, or does not mention the claim."
+  },
+  {
+    "id": "common_mistake_writing_template_overuse",
+    "title": "Overusing Memorized Writing Templates",
+    "skill": "writing",
+    "questionType": "common_mistakes",
+    "category": "common_mistake",
+    "bandRange": "4.0-7.0",
+    "tags": ["writing", "template", "common_mistake", "loi sai"],
+    "sourceName": "IELTSZone Static Knowledge Base",
+    "content": "Templates can help structure an answer, but overusing memorized phrases can make ideas sound unnatural or irrelevant. A better approach is to keep a simple paragraph structure and adapt your language to the exact question."
+  },
+  {
+    "id": "common_mistake_listening_first_answer",
+    "title": "Choosing The First Listening Option",
+    "skill": "listening",
+    "questionType": "common_mistakes",
+    "category": "common_mistake",
+    "bandRange": "4.0-7.0",
+    "tags": ["listening", "distractor", "common_mistake", "loi sai"],
+    "sourceName": "IELTSZone Static Knowledge Base",
+    "content": "In Listening, speakers often mention an option and then reject or correct it. Do not write the first answer too quickly. Listen for signals such as actually, no, sorry, instead, or what I mean is."
+  }
+]

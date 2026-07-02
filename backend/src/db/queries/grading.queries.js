@@ -19,11 +19,9 @@ const { pool } = require('../pool');
  */
 const listSubmissionsRaw = async ({ status, limit = 50, offset = 0 } = {}) => {
   const values = [];
-  let statusFilter = '';
 
   if (status) {
     values.push(status);
-    statusFilter = `AND status = $1`;
   }
 
   const limitIdx = values.length + 1;

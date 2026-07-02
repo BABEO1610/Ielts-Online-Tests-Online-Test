@@ -6,6 +6,7 @@ const normalize = (text) =>
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .replace(/đ/g, 'd')
+    .replace(/Đ/g, 'd')
     .replace(/Ä‘/g, 'd');
 
 const containsAny = (value, patterns) => patterns.some((pattern) => pattern.test(value));
@@ -22,10 +23,16 @@ const OUT_OF_SCOPE_PATTERNS = [
   /\bgaming\b/,
   /\bcasino\b/,
   /\bca cuoc\b/,
+  /\b(politics|chinh tri)\b/,
+  /\b(news|tin tuc)\b.*\b(today|hom nay|latest|moi nhat)\b/,
   /\bthoi tiet\b/,
   /\bgia vang\b/,
   /\bgia do la\b/,
   /\bgia bitcoin\b/,
+  /\b(tu van mua|nen mua|mua)\b.*\b(dien thoai|iphone|android|laptop|may tinh|san pham|product)\b/,
+  /\b(dien thoai|iphone|android|laptop|may tinh)\b.*\b(nao|mua|nen chon|tu van)\b/,
+  /\b(hack|cheat|bypass|crack)\b/,
+  /\b(medical advice|legal advice|financial advice|investment advice)\b/,
 ];
 
 const WRITING_SPEAKING_GRADING_PATTERNS = [

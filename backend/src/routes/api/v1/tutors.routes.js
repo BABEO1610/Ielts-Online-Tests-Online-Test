@@ -39,6 +39,20 @@ router.get(
   TutorController.getGradingHistory
 );
 
+// GET /api/v1/tutors/ai-reference
+router.get(
+  '/ai-reference',
+  authorize(['tutor', 'admin']),
+  TutorController.getAiReferenceList
+);
+
+// GET /api/v1/tutors/ai-reference/:submissionId
+router.get(
+  '/ai-reference/:submissionId',
+  authorize(['tutor', 'admin']),
+  TutorController.getAiReferenceDetail
+);
+
 // GET /api/v1/tutors/grading-history/:submissionId
 router.get(
   '/grading-history/:submissionId',

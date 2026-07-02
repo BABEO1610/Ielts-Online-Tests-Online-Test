@@ -1,6 +1,7 @@
 const { pool } = require('../../db/pool');
 const repository = require('./assistant.repository');
 const { ASSISTANT_INTENTS, normalizeText } = require('./assistant.intent');
+const { retrieveKnowledge } = require('./assistant.knowledge-retriever');
 const { parseLookupMessage } = require('./assistant.lookup-parser');
 const {
   STATIC_ROUTES,
@@ -63,6 +64,8 @@ const createBaseContext = ({ intent, sessionMemory = [] }) => {
   return {
     mode: intent,
     databaseResults: [],
+    knowledgeResults: [],
+    knowledgeDebug: null,
     sessionMemory,
     allowedActions: map.allowedActions,
     forbiddenActions: map.forbiddenActions,
@@ -261,7 +264,7 @@ const runPublishedTestQuery = async ({ skill, difficulty, titleNumber, sortOrder
 
 const queryPublishedTests = async (message, context = {}) => {
   const slots = parseLookupMessage(message);
-  const skill = slots.skill || detectSkill(message);
+  const skill = slots.skill || detectSkill(message) || context.previousSkill || null;
   const difficulty = detectDifficulty(message);
   const searchTerms = slots.searchTerms.length
     ? slots.searchTerms
@@ -649,8 +652,46 @@ const buildReviewContext = async ({ injection, message, context, user }) => {
 
 const buildUnknownContext = (injection) => ({
   ...injection,
-  directAnswer: 'Mình chỉ hỗ trợ nội dung IELTS trên website. Bạn có thể hỏi về test, lesson, study tips, navigation hoặc review đáp án sau khi nộp bài.',
+  directAnswer: 'Mình hỗ trợ IELTS, học tiếng Anh và cách sử dụng IELTSZone. Bạn có thể hỏi về test, lesson, study tips, navigation hoặc review đáp án sau khi nộp bài.',
 });
+
+const buildKnowledgeContext = ({ injection, message, intent }) => {
+  try {
+    const { knowledgeResults, knowledgeDebug } = retrieveKnowledge({ message });
+    return {
+      ...injection,
+      knowledgeResults,
+      knowledgeDebug,
+      debug: {
+        detectedIntent: intent,
+        ...knowledgeDebug,
+      },
+    };
+  } catch (error) {
+    return {
+      ...injection,
+      knowledgeResults: [],
+      knowledgeDebug: {
+        strategy: 'static_keyword_metadata',
+        detectedSkill: null,
+        detectedQuestionType: null,
+        detectedTopic: null,
+        selectedKnowledgeChunkIds: [],
+        retrievalScores: [],
+        usedKnowledgeBase: false,
+        noMatch: true,
+        totalInjectedKnowledgeChars: 0,
+        error: error.message,
+      },
+      debug: {
+        detectedIntent: intent,
+        usedKnowledgeBase: false,
+        noMatch: true,
+        knowledgeError: error.message,
+      },
+    };
+  }
+};
 
 const buildContextInjection = async ({ intent, message, context, user, sessionId }) => {
   const sessionMemory = shouldLoadSessionMemory(intent)
@@ -667,7 +708,9 @@ const buildContextInjection = async ({ intent, message, context, user, sessionId
       databaseResults: STUDY_TIPS.map((tip) => ({ type: 'study_tip', content: tip })),
     };
   }
-  if (intent === ASSISTANT_INTENTS.IELTS_KNOWLEDGE) return injection;
+  if (intent === ASSISTANT_INTENTS.IELTS_KNOWLEDGE) {
+    return buildKnowledgeContext({ injection, message, intent });
+  }
   if (intent === ASSISTANT_INTENTS.FIND_TEST) return buildFindTestContext({ injection, message, context });
   if (intent === ASSISTANT_INTENTS.FIND_LESSON) return buildFindLessonContext({ injection, message, context });
   if (intent === ASSISTANT_INTENTS.POST_TEST_REVIEW) return buildReviewContext({ injection, message, context, user });

@@ -354,40 +354,64 @@ class SubmissionService {
   static async getHistory(userId) {
     const query = `
       SELECT 
-        ws.writing_group_id::text AS id,
+        COALESCE(ws.writing_group_id::text, ws.id::text) AS id,
         'writing' AS type,
         NULL::int AS task_number,
         NULL::int AS part_number,
         MIN(ws.submitted_at) AS submitted_at,
-        MIN(ws.status::text) AS status,
+        CASE
+          WHEN BOOL_OR(ws.status = 'reviewed') THEN 'reviewed'
+          WHEN BOOL_OR(ws.status = 'tutor_graded') THEN 'tutor_graded'
+          WHEN BOOL_OR(ws.status = 'ai_graded') AND BOOL_AND(ws.status = 'ai_graded') THEN 'ai_graded'
+          ELSE 'pending'
+        END AS submission_status,
         MIN(ws.grader::text) AS grader,
-        MAX(COALESCE(tfr.band_score, agr.band_score)) AS band_score,
-        MIN(mt.title) AS test_title
+        COALESCE(MAX(tfr.band_score), MAX(agr.band_score)) AS band_score,
+        MAX(tfr.band_score) AS tutor_band_score,
+        MAX(agr.band_score) AS ai_band_score,
+        MIN(mt.title) AS test_title,
+        MIN(ws.id::text)::uuid AS ai_grading_submission_id,
+        json_agg(
+          json_build_object(
+            'submissionId', ws.id,
+            'taskNumber', ws.task_number
+          )
+          ORDER BY ws.task_number
+        ) AS ai_grading_tasks
       FROM writing_submissions ws
       LEFT JOIN tutor_feedback_reports tfr ON ws.id = tfr.writing_submission_id
       LEFT JOIN ai_grading_reports agr ON ws.id = agr.submission_id AND agr.submission_type = 'writing'
       LEFT JOIN mock_tests mt ON mt.id = ws.test_id
       WHERE ws.user_id = $1
-      GROUP BY ws.writing_group_id
+      GROUP BY COALESCE(ws.writing_group_id::text, ws.id::text)
 
       UNION ALL
 
       SELECT 
-        ss.speaking_group_id::text AS id,
+        COALESCE(ss.speaking_group_id::text, ss.id::text) AS id,
         'speaking' AS type,
         NULL::int AS task_number,
         NULL::int AS part_number,
         MIN(ss.submitted_at) AS submitted_at,
-        MIN(ss.status::text) AS status,
+        CASE
+          WHEN BOOL_OR(ss.status = 'reviewed') THEN 'reviewed'
+          WHEN BOOL_OR(ss.status = 'tutor_graded') THEN 'tutor_graded'
+          WHEN BOOL_OR(ss.status = 'ai_graded') AND BOOL_AND(ss.status = 'ai_graded') THEN 'ai_graded'
+          ELSE 'pending'
+        END AS submission_status,
         MIN(ss.grader::text) AS grader,
-        MAX(COALESCE(tfr.band_score, agr.band_score)) AS band_score,
-        MIN(mt.title) AS test_title
+        COALESCE(MAX(tfr.band_score), MAX(agr.band_score)) AS band_score,
+        MAX(tfr.band_score) AS tutor_band_score,
+        MAX(agr.band_score) AS ai_band_score,
+        MIN(mt.title) AS test_title,
+        NULL::uuid AS ai_grading_submission_id,
+        NULL::json AS ai_grading_tasks
       FROM speaking_submissions ss
       LEFT JOIN tutor_feedback_reports tfr ON ss.id = tfr.speaking_submission_id
       LEFT JOIN ai_grading_reports agr ON ss.id = agr.submission_id AND agr.submission_type = 'speaking'
       LEFT JOIN mock_tests mt ON mt.id = ss.test_id
       WHERE ss.user_id = $1
-      GROUP BY ss.speaking_group_id
+      GROUP BY COALESCE(ss.speaking_group_id::text, ss.id::text)
 
       ORDER BY submitted_at DESC
     `;
@@ -398,10 +422,15 @@ class SubmissionService {
       task_number: row.task_number,
       part_number: row.part_number,
       submitted_at: row.submitted_at,
-      status: row.status,
+      status: row.submission_status,
       grader: row.grader,
       band_score: row.band_score ? parseFloat(row.band_score) : null,
-      testTitle: row.test_title
+      tutor_band_score: row.tutor_band_score
+        ? parseFloat(row.tutor_band_score) : null,
+      ai_band_score: row.ai_band_score ? parseFloat(row.ai_band_score) : null,
+      testTitle: row.test_title,
+      aiGradingSubmissionId: row.ai_grading_submission_id,
+      aiGradingTasks: row.ai_grading_tasks || []
     }));
   }
 
@@ -421,12 +450,11 @@ class SubmissionService {
       throw new AppError('Submission not found', 404, 'NOT_FOUND');
     }
     const submission = subRes.rows[0];
-    if (submission.status === 'pending') {
-      return { status: 'pending', message: 'Bai dang duoc cham, vui long cho...' };
-    }
     let report = {};
     const aiRes = await pool.query(
-      `SELECT * FROM ai_grading_reports WHERE submission_id = $1 AND submission_type = $2`,
+      `SELECT * FROM ai_grading_reports
+       WHERE submission_id = $1 AND submission_type = $2
+       ORDER BY generated_at DESC LIMIT 1`,
       [submission.id, type]
     );
     if (aiRes.rows.length > 0) report.ai_report = aiRes.rows[0];
@@ -437,6 +465,14 @@ class SubmissionService {
       [id]
     );
     if (tutorRes.rows.length > 0) report.tutor_report = tutorRes.rows[0];
+    if (submission.status === 'pending' && !report.ai_report) {
+      return { status: 'pending', message: 'Bài đang được chấm, vui lòng chờ...' };
+    }
+    if (submission.status === 'pending' && report.ai_report) {
+      const aiFailed = report.ai_report.status === 'failed'
+        || report.ai_report.error_message;
+      return { status: aiFailed ? 'failed' : 'pending', ...report };
+    }
     return report;
   }
 }

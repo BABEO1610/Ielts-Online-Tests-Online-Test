@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import gradingService from '../../services/grading.service';
 import useGradingSocket from '../../hooks/useGradingSocket';
+import AiFeedbackPanel from './AiFeedbackPanel';
 
 const FeedbackReport = ({ submissionId, type }) => {
   const [reportData, setReportData] = useState(null);
@@ -28,8 +29,10 @@ const FeedbackReport = ({ submissionId, type }) => {
   // EARS[Event]: WHEN component mounts THEN fetch feedback report initially (Fallback mechanism)
   useEffect(() => {
     if (submissionId) {
-      fetchFeedback();
+      const timer = window.setTimeout(fetchFeedback, 0);
+      return () => window.clearTimeout(timer);
     }
+    return undefined;
   }, [fetchFeedback, submissionId]);
 
   // EARS[Event]: WHEN socket emits grading_complete or grading_failed THEN refetch or update state
@@ -37,14 +40,16 @@ const FeedbackReport = ({ submissionId, type }) => {
     if (!socket) return;
 
     const handleGradingComplete = (data) => {
-      if (data.submission_id === submissionId) {
+      const eventSubmissionId = data.submission_id || data.submissionId;
+      if (eventSubmissionId === submissionId) {
         fetchFeedback();
       }
     };
 
     const handleGradingFailed = (data) => {
-      if (data.submission_id === submissionId) {
-        setError('Chấm bài thất bại, quota đã được hoàn trả.');
+      const eventSubmissionId = data.submission_id || data.submissionId;
+      if (eventSubmissionId === submissionId) {
+        setError('AI grading failed. Please check AI configuration or try again.');
         setLoading(false);
       }
     };
@@ -91,6 +96,14 @@ const FeedbackReport = ({ submissionId, type }) => {
 
   const report = reportData.tutor_report || reportData.ai_report;
   const isTutor = !!reportData.tutor_report;
+
+  if (!isTutor && reportData.ai_report) {
+    return (
+      <div className="feedback-report mt-4">
+        <AiFeedbackPanel report={reportData.ai_report} />
+      </div>
+    );
+  }
 
   const formatScore = (score) => {
     if (score === null || score === undefined) return 'N/A';

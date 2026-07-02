@@ -199,6 +199,122 @@ describe('Assistant intent router', () => {
     expect(intent).toBe(ASSISTANT_INTENTS.IELTS_KNOWLEDGE);
   });
 
+  it.each([
+    'cản ơn bajn',
+    'cam on b',
+    'thanksss',
+    'helllo',
+    'chàoo',
+  ])('routes typo greeting/thanks to immediate GREETING: %s', (message) => {
+    const intent = detectIntent({
+      message,
+      context: { pageType: 'home' },
+    });
+
+    expect(intent).toBe(ASSISTANT_INTENTS.GREETING);
+  });
+
+  it.each([
+    'matching heading làm sao',
+    'matching headings làm sao',
+    'cách làm dạng nối tiêu đề',
+    'dạng chọn tiêu đề làm thế nào',
+    'dạng nối heading làm sao',
+    'ý chính paragraph tìm sao',
+    'how do I do matching headings?',
+    'how can I avoid mistakes in matching headings?',
+    'phân biệt although và despite',
+    'how can I improve my vocabulary?',
+    'how do I pronounce difficult English words better?',
+  ])('routes Task A IELTS/English learning query to IELTS_KNOWLEDGE: %s', (message) => {
+    const intent = detectIntent({
+      message,
+      context: { pageType: 'home' },
+    });
+
+    expect(intent).toBe(ASSISTANT_INTENTS.IELTS_KNOWLEDGE);
+  });
+
+  it.each([
+    'cách áp dụng phương pháp cho IELTS Reading',
+    'cách làm Reading hiệu quả',
+    'phương pháp làm bài IELTS Reading',
+    'áp dụng skimming scanning thế nào',
+    'làm sao cải thiện Reading',
+    'mẹo làm bài Reading',
+    'chiến thuật xử lý bài đọc dài',
+    'cách làm bài Reading test hiệu quả',
+    'phương pháp làm Matching Headings',
+    'how to improve IELTS Reading',
+    'how can I apply this strategy to Reading?',
+  ])('routes context-aware strategy query to IELTS_KNOWLEDGE, not DB lookup: %s', (message) => {
+    const intent = detectIntent({
+      message,
+      context: { pageType: 'home' },
+    });
+
+    expect(intent).toBe(ASSISTANT_INTENTS.IELTS_KNOWLEDGE);
+  });
+
+  it.each([
+    'cho tôi 1 đề Reading mới nhất',
+    'có đề nào để luyện Matching Headings không',
+    'cho tôi bài Reading test để luyện phương pháp này',
+  ])('keeps explicit practice/test lookup on FIND_TEST: %s', (message) => {
+    const intent = detectIntent({
+      message,
+      context: { pageType: 'home' },
+    });
+
+    expect(intent).toBe(ASSISTANT_INTENTS.FIND_TEST);
+  });
+
+  it.each([
+    'reading đi',
+    'cho tôi reading',
+    'reading',
+    'bài reading',
+    'áp dụng phương pháp đó cho Reading',
+    'cho tôi bài để luyện cách này',
+  ])('routes ambiguous skill/follow-up query to CLARIFICATION without previous context: %s', (message) => {
+    const intent = detectIntent({
+      message,
+      context: { pageType: 'home' },
+    });
+
+    expect(intent).toBe(ASSISTANT_INTENTS.CLARIFICATION);
+  });
+
+  it('keeps context-dependent strategy follow-up in IELTS_KNOWLEDGE after knowledge context', () => {
+    const intent = detectIntent({
+      message: 'áp dụng phương pháp đó cho Reading',
+      context: { pageType: 'home', previousIntent: ASSISTANT_INTENTS.IELTS_KNOWLEDGE },
+    });
+
+    expect(intent).toBe(ASSISTANT_INTENTS.IELTS_KNOWLEDGE);
+  });
+
+  it('keeps practice follow-up in FIND_TEST after knowledge or DB lookup context', () => {
+    expect(detectIntent({
+      message: 'cho tôi bài để luyện cách này',
+      context: { pageType: 'home', previousIntent: ASSISTANT_INTENTS.IELTS_KNOWLEDGE },
+    })).toBe(ASSISTANT_INTENTS.FIND_TEST);
+
+    expect(detectIntent({
+      message: 'đề khác đi',
+      context: { pageType: 'home', previousIntent: ASSISTANT_INTENTS.FIND_TEST },
+    })).toBe(ASSISTANT_INTENTS.FIND_TEST);
+  });
+
+  it('routes product buying advice to OUT_OF_SCOPE', () => {
+    const intent = detectIntent({
+      message: 'tư vấn mua điện thoại nào',
+      context: { pageType: 'home' },
+    });
+
+    expect(intent).toBe(ASSISTANT_INTENTS.OUT_OF_SCOPE);
+  });
+
   it('routes grading band requests to safe grading feedback', () => {
     const intent = detectIntent({
       message: 'cham bai nay band may',

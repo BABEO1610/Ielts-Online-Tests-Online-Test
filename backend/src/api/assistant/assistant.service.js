@@ -1,7 +1,7 @@
 const aiService = require('../../services/ai.service');
 const repository = require('./assistant.repository');
 const { evaluateGuardrails } = require('./assistant.guardrails');
-const { ASSISTANT_INTENTS, detectIntent } = require('./assistant.intent');
+const { ASSISTANT_INTENTS, detectIntent, normalizeText } = require('./assistant.intent');
 const { buildContextInjection } = require('./assistant.context');
 const { buildPrompt } = require('./assistant.prompts');
 const { normalizeAssistantResponse } = require('./assistant.response');
@@ -61,6 +61,75 @@ const buildSuccessResult = ({
 
 const isLookupIntent = (intent) =>
   intent === ASSISTANT_INTENTS.FIND_TEST || intent === ASSISTANT_INTENTS.FIND_LESSON;
+
+const ROUTING_MEMORY_LIMIT = 8;
+
+const hasRoutingFollowUpCue = (message) => {
+  const text = normalizeText(message);
+  return [
+    /\b(phuong phap|method|strategy|technique|cach)\s+(do|nay|this|that)\b/,
+    /\b(ap dung|apply)\b.*\b(do|nay|this|that)\b/,
+    /\b(de|bai|test)\s+khac\b/,
+    /\b(another|other)\s+(test|one|practice)\b/,
+    /\b(cho toi|cho minh|cho em|give me|show me)\b.*\b(bai|de|test|practice)\b.*\b(luyen|practice)\b.*\b(cach|method|strategy|technique)\s+(nay|do|this|that)\b/,
+  ].some((pattern) => pattern.test(text));
+};
+
+const inferSkillFromMessage = (message) => {
+  const text = normalizeText(message);
+  const directSkill = ['reading', 'listening', 'writing', 'speaking'].find((skill) => text.includes(skill));
+  if (directSkill) return directSkill;
+  if (/\b(matching headings?|heading|headings|true false not given|tfng|skimming|scanning|passage)\b/.test(text)) {
+    return 'reading';
+  }
+  if (/\b(section\s*[1-4]|distractor|nghe)\b/.test(text)) return 'listening';
+  if (/\b(task\s*[12]|overview|essay)\b/.test(text)) return 'writing';
+  if (/\b(part\s*[123]|cue card|fluency)\b/.test(text)) return 'speaking';
+  return null;
+};
+
+const inferPreviousRoutingContext = (recentMessages = [], baseContext = {}) => {
+  const lastUserMessage = [...recentMessages].reverse().find((item) => item.role === 'user' && item.content);
+  if (!lastUserMessage) return {};
+
+  const previousIntent = detectIntent({
+    message: lastUserMessage.content,
+    context: baseContext,
+  });
+
+  if (![
+    ASSISTANT_INTENTS.IELTS_KNOWLEDGE,
+    ASSISTANT_INTENTS.FIND_TEST,
+    ASSISTANT_INTENTS.FIND_LESSON,
+  ].includes(previousIntent)) {
+    return {};
+  }
+
+  return {
+    previousIntent,
+    previousSkill: inferSkillFromMessage(lastUserMessage.content),
+  };
+};
+
+const buildRoutingContext = async ({ user, payload, sessionId }) => {
+  const baseContext = payload.context || {};
+  if (!sessionId || !user?.id || !hasRoutingFollowUpCue(payload.message)) {
+    return baseContext;
+  }
+
+  try {
+    const recentMessages = await repository.getRecentMessages(user.id, sessionId, ROUTING_MEMORY_LIMIT);
+    const previousRouting = inferPreviousRoutingContext(recentMessages, baseContext);
+    return {
+      ...baseContext,
+      ...previousRouting,
+      recentMessages,
+    };
+  } catch (error) {
+    console.warn('[AssistantService] Routing memory read skipped:', error.message);
+    return baseContext;
+  }
+};
 
 const isEmptyLookupContext = (contextInjection) =>
   isLookupIntent(contextInjection.mode) && contextInjection.databaseResults.length === 0;
@@ -209,6 +278,16 @@ const emitAssistantDebug = (data) => {
     classifierConfidence: data.classifierConfidence || 0,
     classifierError: data.classifierError || null,
     finalIntent: data.finalIntent || null,
+    detectedIntent: data.detectedIntent || null,
+    detectedSkill: data.detectedSkill || null,
+    detectedQuestionType: data.detectedQuestionType || null,
+    detectedTopic: data.detectedTopic || null,
+    selectedKnowledgeChunkIds: data.selectedKnowledgeChunkIds || [],
+    retrievalScores: data.retrievalScores || [],
+    usedKnowledgeBase: Boolean(data.usedKnowledgeBase),
+    noMatch: Boolean(data.noMatch),
+    totalInjectedKnowledgeChars: data.totalInjectedKnowledgeChars || 0,
+    knowledgeError: data.knowledgeError || null,
     queryTable: data.queryTable || null,
     selectedColumns: data.selectedColumns || null,
     publishFilter: data.publishFilter || null,
@@ -287,7 +366,7 @@ const {
   buildOutOfScopeResponse,
 } = require('./assistant.responses');
 
-const buildImmediateIntentResult = (intent, userNameContext = null, user = null) => {
+const buildImmediateIntentResult = (intent, userNameContext = null, user = null, message = '') => {
   if (intent === ASSISTANT_INTENTS.OUT_OF_SCOPE) {
     return buildSuccessResult({ answer: buildOutOfScopeResponse(), intent });
   }
@@ -296,13 +375,14 @@ const buildImmediateIntentResult = (intent, userNameContext = null, user = null)
       answer: buildGreetingResponse({
         displayName: userNameContext?.displayName || 'bạn',
         isGuest: !user,
+        message,
       }),
       intent,
       finalResponseMode: 'immediate',
     });
   }
   if (intent === ASSISTANT_INTENTS.CLARIFICATION) {
-    return buildSuccessResult({ answer: buildClarificationResponse(), intent });
+    return buildSuccessResult({ answer: buildClarificationResponse(message), intent });
   }
   if (intent === ASSISTANT_INTENTS.GRADING_REQUEST_SAFE_FEEDBACK) {
     return buildSuccessResult({ answer: buildSafeGradingResponse(), intent });
@@ -570,7 +650,8 @@ const tracePipeline = ({
 
 const runAssistantPipeline = async ({ user, payload, useStream = false }) => {
   const sessionId = payload.sessionId || null;
-  const originalIntent = detectIntent({ message: payload.message, context: payload.context });
+  const routingContext = await buildRoutingContext({ user, payload, sessionId });
+  const originalIntent = detectIntent({ message: payload.message, context: routingContext });
   let intent = originalIntent;
   let classifierUsed = false;
   let classifierResult = null;
@@ -597,7 +678,7 @@ const runAssistantPipeline = async ({ user, payload, useStream = false }) => {
     userNameContext = await getUserNameContext();
   }
 
-  const intentResult = buildImmediateIntentResult(intent, userNameContext, user);
+  const intentResult = buildImmediateIntentResult(intent, userNameContext, user, payload.message);
   if (intentResult) {
     tracePipeline({ payload, user, userNameContext, ruleIntent: originalIntent, classifierUsed, classifierResult, answerProviderCalled: false, finalResponseMode: 'immediate' });
     return intentResult;
@@ -612,7 +693,7 @@ const runAssistantPipeline = async ({ user, payload, useStream = false }) => {
   const contextInjection = await buildContextInjection({
     intent,
     message: payload.message,
-    context: payload.context,
+    context: routingContext,
     user,
     sessionId,
   });
