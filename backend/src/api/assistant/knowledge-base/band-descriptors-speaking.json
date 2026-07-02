@@ -1,0 +1,35 @@
+[
+  {
+    "id": "speaking_band_fluency_coherence",
+    "title": "Speaking Fluency And Coherence",
+    "skill": "speaking",
+    "questionType": "speaking_band_descriptors",
+    "category": "band_descriptor",
+    "bandRange": "4.0-7.0",
+    "tags": ["speaking", "fluency", "coherence", "criteria", "tieu chi speaking"],
+    "sourceName": "IELTSZone Static Knowledge Base",
+    "content": "Fluency and Coherence measure how smoothly and logically you speak. Good answers continue without long pauses and organize ideas clearly. A common mistake is memorizing answers and then sounding unnatural when the question changes."
+  },
+  {
+    "id": "speaking_band_lexical_resource",
+    "title": "Speaking Lexical Resource",
+    "skill": "speaking",
+    "questionType": "speaking_band_descriptors",
+    "category": "band_descriptor",
+    "bandRange": "4.0-7.0",
+    "tags": ["speaking", "lexical_resource", "vocabulary", "criteria"],
+    "sourceName": "IELTSZone Static Knowledge Base",
+    "content": "Lexical Resource in Speaking means using enough vocabulary to discuss familiar and less familiar topics. The goal is precision, not rare words. A useful habit is to explain unknown words with paraphrase instead of stopping."
+  },
+  {
+    "id": "speaking_band_grammar_pronunciation",
+    "title": "Grammar And Pronunciation",
+    "skill": "speaking",
+    "questionType": "speaking_band_descriptors",
+    "category": "band_descriptor",
+    "bandRange": "4.0-7.0",
+    "tags": ["speaking", "grammar", "pronunciation", "criteria"],
+    "sourceName": "IELTSZone Static Knowledge Base",
+    "content": "Grammar is judged by range and accuracy in spoken sentences. Pronunciation is judged by clarity, stress, rhythm, and how easy you are to understand. A common mistake is speaking too fast, which can reduce clarity even if grammar is good."
+  }
+]
