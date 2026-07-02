@@ -99,6 +99,67 @@ describe('Assistant context builder', () => {
 
     expect(pool.query).not.toHaveBeenCalled();
     expect(result.databaseResults).toEqual([]);
+    expect(result.knowledgeResults.length).toBeGreaterThan(0);
+    expect(result.knowledgeDebug.usedKnowledgeBase).toBe(true);
+  });
+
+  it('adds no-match knowledge debug without injecting unrelated chunks', async () => {
+    const result = await buildContextInjection({
+      intent: ASSISTANT_INTENTS.IELTS_KNOWLEDGE,
+      message: 'IELTS vocabulary for food topic',
+      context: { pageType: 'home', route: '/', visibleItems: [] },
+      user,
+      sessionId: null,
+    });
+
+    expect(pool.query).not.toHaveBeenCalled();
+    expect(result.knowledgeResults).toEqual([]);
+    expect(result.knowledgeDebug.noMatch).toBe(true);
+    expect(result.knowledgeDebug.usedKnowledgeBase).toBe(false);
+  });
+
+  it('keeps general English learning in knowledge mode without unrelated chunks', async () => {
+    const result = await buildContextInjection({
+      intent: ASSISTANT_INTENTS.IELTS_KNOWLEDGE,
+      message: 'phân biệt although và despite',
+      context: { pageType: 'home', route: '/', visibleItems: [] },
+      user,
+      sessionId: null,
+    });
+
+    expect(pool.query).not.toHaveBeenCalled();
+    expect(result.databaseResults).toEqual([]);
+    expect(result.knowledgeResults).toEqual([]);
+    expect(result.knowledgeDebug.detectedTopic).toBe('english_grammar');
+    expect(result.knowledgeDebug.noMatch).toBe(true);
+    expect(result.knowledgeDebug.usedKnowledgeBase).toBe(false);
+  });
+
+  it('keeps FIND_TEST on DB context without knowledge retrieval results', async () => {
+    pool.query
+      .mockResolvedValueOnce({ rows: [{ column_name: 'is_published' }] })
+      .mockResolvedValueOnce({
+        rows: [{
+          id: 'test-1',
+          title: 'IELTSZone Reading Mock Test',
+          description: 'Reading test',
+          skill: 'reading',
+          difficulty: 'intermediate',
+          duration_minutes: 60,
+        }],
+      });
+
+    const result = await buildContextInjection({
+      intent: ASSISTANT_INTENTS.FIND_TEST,
+      message: 'co de reading nao khong',
+      context: { pageType: 'home', route: '/', visibleItems: [] },
+      user,
+      sessionId: null,
+    });
+
+    expect(result.databaseResults).toHaveLength(1);
+    expect(result.knowledgeResults).toEqual([]);
+    expect(result.knowledgeDebug).toBeNull();
   });
 
   it('limits lookup context to 10 rows and exposes debug counts', async () => {
