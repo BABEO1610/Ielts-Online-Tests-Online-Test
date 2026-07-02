@@ -242,17 +242,7 @@ class TestService {
         mt.review_status,
         mt.submitted_at,
         mt.created_at,
-        COALESCE(SUM(
-          GREATEST(
-            COALESCE(jsonb_array_length(
-              CASE 
-                WHEN jsonb_typeof(q.correct_answers) = 'array' THEN q.correct_answers 
-                ELSE '[]'::jsonb 
-              END
-            ), 0),
-            1
-          )
-        ), 0) as questions
+        COUNT(q.id) as questions
       FROM mock_tests mt
       LEFT JOIN questions q ON mt.id = q.test_id
       ${whereClause}

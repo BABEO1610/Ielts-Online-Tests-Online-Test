@@ -31,30 +31,32 @@ const listSubmissionsRaw = async ({ status, limit = 50, offset = 0 } = {}) => {
   const query = `
     SELECT * FROM (
       SELECT
-        ws.id,
+        COALESCE(ws.writing_group_id, ws.id)::text AS id,
         'writing'                               AS type,
         u.full_name                             AS student,
-        CONCAT('Writing Task ', ws.task_number) AS skill,
-        ws.grader::text                         AS grader,
-        ws.status::text                         AS status,
-        ws.submitted_at
+        'Writing'                               AS skill,
+        MIN(ws.grader::text)                    AS grader,
+        MIN(ws.status::text)                    AS status,
+        MIN(ws.submitted_at)                    AS submitted_at
       FROM writing_submissions ws
       JOIN users u ON u.id = ws.user_id
       ${status ? `WHERE ws.status::text = $1` : ''}
+      GROUP BY COALESCE(ws.writing_group_id, ws.id), u.full_name
 
       UNION ALL
 
       SELECT
-        ss.id,
+        COALESCE(ss.speaking_group_id, ss.id)::text AS id,
         'speaking'                             AS type,
         u.full_name                            AS student,
-        CONCAT('Speaking Part ', ss.part_number) AS skill,
-        ss.grader::text                        AS grader,
-        ss.status::text                        AS status,
-        ss.submitted_at
+        'Speaking'                             AS skill,
+        MIN(ss.grader::text)                   AS grader,
+        MIN(ss.status::text)                   AS status,
+        MIN(ss.submitted_at)                   AS submitted_at
       FROM speaking_submissions ss
       JOIN users u ON u.id = ss.user_id
       ${status ? `WHERE ss.status::text = $1` : ''}
+      GROUP BY COALESCE(ss.speaking_group_id, ss.id), u.full_name
     ) combined
     ORDER BY submitted_at DESC
     LIMIT $${limitIdx} OFFSET $${offsetIdx};
@@ -71,9 +73,9 @@ const listSubmissionsRaw = async ({ status, limit = 50, offset = 0 } = {}) => {
 const countSubmissionsByStatus = async () => {
   const query = `
     SELECT status::text, COUNT(*)::int AS count FROM (
-      SELECT status FROM writing_submissions
+      SELECT MIN(status) as status FROM writing_submissions GROUP BY COALESCE(writing_group_id, id)
       UNION ALL
-      SELECT status FROM speaking_submissions
+      SELECT MIN(status) as status FROM speaking_submissions GROUP BY COALESCE(speaking_group_id, id)
     ) combined
     GROUP BY status;
   `;
@@ -91,7 +93,7 @@ const resetWritingSubmissionStatus = async (id) => {
   const query = `
     UPDATE writing_submissions
     SET status = 'pending'
-    WHERE id = $1
+    WHERE writing_group_id = $1 OR id = $1
     RETURNING id, status, submitted_at;
   `;
   const { rows } = await pool.query(query, [id]);
@@ -105,7 +107,7 @@ const resetSpeakingSubmissionStatus = async (id) => {
   const query = `
     UPDATE speaking_submissions
     SET status = 'pending'
-    WHERE id = $1
+    WHERE speaking_group_id = $1 OR id = $1
     RETURNING id, status, submitted_at;
   `;
   const { rows } = await pool.query(query, [id]);

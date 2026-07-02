@@ -29,7 +29,7 @@ function TestListPage() {
       try {
         setLoading(true);
         setError(null);
-        const res = await testService.getTests();
+        const res = await testService.getTests({ isPublished: true });
         if (!active) return;
         if (res.success) {
           setTests(res.data || []);
