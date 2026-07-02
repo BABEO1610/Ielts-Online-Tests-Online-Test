@@ -2,11 +2,15 @@ const express = require('express');
 const router = express.Router();
 
 const SubmissionController = require('../../../controllers/submission.controller');
+const AiGradingController = require('../../../controllers/aiGrading.controller');
 const authenticate = require('../../../middleware/authenticate');
 const uploadMiddleware = require('../../../middleware/upload.middleware');
 
 // Apply auth middleware to all submission routes
 router.use(authenticate);
+
+// AI grading for a writing submission (must be before generic routes)
+router.post('/writing/:submissionId/ai-grade', AiGradingController.requestAiGrade);
 
 // Submit a writing task response
 router.post('/writing', SubmissionController.submitWriting);
