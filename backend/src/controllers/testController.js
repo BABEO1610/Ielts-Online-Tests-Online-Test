@@ -22,6 +22,10 @@ class TestController {
 
   static async getTests(req, res, next) {
     try {
+      // Security measure: Only return published tests for public/student requests
+      if (!req.query.tutor && !req.query.all) {
+        req.query.isPublished = true;
+      }
       const tests = await TestService.getTests(req.query);
       
       res.status(200).json({
