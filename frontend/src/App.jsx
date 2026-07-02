@@ -56,6 +56,8 @@ import StudentHistoryPage from './pages/grading/StudentHistoryPage';
 import TutorQueuePage from './pages/grading/TutorQueuePage';
 import TutorGradingPage from './pages/grading/TutorGradingPage';
 import TutorGradingHistoryPage from './pages/grading/TutorGradingHistoryPage';
+import TutorAiReferencePage from './pages/grading/TutorAiReferencePage';
+import TutorAiReferenceDetailPage from './pages/grading/TutorAiReferenceDetailPage';
 import TutorTestManagePage from './pages/tutor/TutorTestManagePage';
 import TutorTestFormPage from './pages/tutor/TutorTestFormPage';
 import TutorReadingFormPage from './pages/tutor/TutorReadingFormPage';
@@ -160,6 +162,12 @@ function App() {
           } />
           <Route path="/grading/tutor/schedule" element={
             <ProtectedRoute role="tutor"><TutorGradingHistoryPage /></ProtectedRoute>
+          } />
+          <Route path="/grading/tutor/ai-reference" element={
+            <ProtectedRoute role="tutor"><TutorAiReferencePage /></ProtectedRoute>
+          } />
+          <Route path="/grading/tutor/ai-reference/:submissionId" element={
+            <ProtectedRoute role="tutor"><TutorAiReferenceDetailPage /></ProtectedRoute>
           } />
           {/* ── Objective Testing — Tutor: Test Management ────────────────────── */}
           <Route path="/tutor/tests" element={
