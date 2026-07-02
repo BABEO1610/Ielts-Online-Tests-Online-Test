@@ -1,0 +1,35 @@
+[
+  {
+    "id": "reading_tfng_core_rule",
+    "title": "True False Not Given Core Rule",
+    "skill": "reading",
+    "questionType": "true_false_not_given",
+    "category": "strategy",
+    "bandRange": "4.0-7.0",
+    "tags": ["reading", "tfng", "strategy", "dung sai khong co thong tin"],
+    "sourceName": "IELTSZone Static Knowledge Base",
+    "content": "True means the passage confirms the statement. False means the passage clearly says the opposite. Not Given means the passage does not provide enough information to decide. A common mistake is using outside knowledge instead of checking the passage."
+  },
+  {
+    "id": "reading_tfng_false_vs_not_given",
+    "title": "False vs Not Given",
+    "skill": "reading",
+    "questionType": "true_false_not_given",
+    "category": "common_mistake",
+    "bandRange": "4.0-7.0",
+    "tags": ["reading", "tfng", "false", "not_given", "common_mistake"],
+    "sourceName": "IELTSZone Static Knowledge Base",
+    "content": "Choose False only when the text directly contradicts the statement. Choose Not Given when the text does not mention the exact relationship, comparison, cause, number, or claim. Example: if the passage says a method is popular, it does not prove it is the most popular."
+  },
+  {
+    "id": "reading_tfng_workflow",
+    "title": "TFNG Three-Step Workflow",
+    "skill": "reading",
+    "questionType": "true_false_not_given",
+    "category": "strategy",
+    "bandRange": "4.0-7.0",
+    "tags": ["reading", "tfng", "workflow", "keyword", "paraphrase"],
+    "sourceName": "IELTSZone Static Knowledge Base",
+    "content": "Use three steps: underline the key claim, find the matching part of the passage, then compare meaning rather than words. Watch for absolutes such as always, only, all, and never. These words often decide whether the answer is False or Not Given."
+  }
+]
