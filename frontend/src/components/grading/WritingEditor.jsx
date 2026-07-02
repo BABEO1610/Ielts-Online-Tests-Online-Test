@@ -1,27 +1,17 @@
-import React, { useState, forwardRef, useImperativeHandle } from 'react';
+import { useState, forwardRef, useImperativeHandle } from 'react';
 import PropTypes from 'prop-types';
-import gradingService from '../../services/grading.service';
-import ToastNotification from '../common/ToastNotification';
-import { useAuth } from '../../context/AuthContext';
 
 const MAX_CHARS = 5000;
 
 // EARS[Event]: WHEN user submits writing THEN send text and grader preference
 // EARS[State-driven]: WHILE bài làm có status = 'pending', THE hệ thống SHALL vô hiệu hóa nút "Nộp lại" hoặc "Chỉnh sửa" của bài thi đó trên giao diện.
 const WritingEditor = forwardRef(({ 
-  testId, 
   taskNumber, 
   promptText, 
-  status = 'new', 
-  onSubmitSuccess,
-  onSubmitError
+  status = 'new'
 }, ref) => {
-  const { user } = useAuth();
-  const aiQuotaRemaining = user?.ai_grading_quota_remaining ?? 0;
   const [text, setText] = useState('');
   const [grader, setGrader] = useState('tutor');
-  const [isLoading, setIsLoading] = useState(false);
-  const [toast, setToast] = useState(null);
 
   const isPending = status === 'pending';
   const charCount = text.length;
@@ -34,9 +24,6 @@ const WritingEditor = forwardRef(({
     getTaskData: () => {
       if (charCount === 0) {
         throw new Error(`Vui lòng viết câu trả lời cho Writing Task ${taskNumber} trước khi nộp!`);
-      }
-      if (grader === 'ai' && aiQuotaRemaining <= 0) {
-        throw new Error('Bạn đã hết lượt chấm bài bằng AI.');
       }
       return {
         task_number: taskNumber,
@@ -102,19 +89,11 @@ const WritingEditor = forwardRef(({
               disabled={isPending}
             />
             <label className="form-check-label" htmlFor={`graderAi-${taskNumber}`}>
-              AI Chấm điểm {aiQuotaRemaining <= 0 ? '(Hết lượt)' : `(Còn ${aiQuotaRemaining} lượt)`}
+              AI chấm điểm - nhận feedback nhanh
             </label>
           </div>
         </div>
       </div>
-
-      {toast && (
-        <ToastNotification
-          message={toast.message}
-          type={toast.type}
-          onClose={() => setToast(null)}
-        />
-      )}
     </div>
   );
 });
