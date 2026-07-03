@@ -176,5 +176,45 @@ npm run dev
 
 ---
 
-[2026-06-24] | [AGENT] | [.sdd/agents_changelog.md] | [Normalized final changelog entry format before assistant quality documentation updates.]
 [2026-06-24] | [AGENT] | [.sdd/agents_changelog.md, .sdd/context/db-schema-snapshot.md, .sdd/shared_context.md, .sdd/specs/global-ielts-virtual-assistant/spec.md, backend/src/api/assistant/assistant.constants.js, .sdd/rfcs/rfc-2026-06-24-assistant-quality-upgrade.md, .sdd/specs/global-ielts-virtual-assistant/eval-set.md] | [Added schema snapshot, feature-table mapping, Global Assistant schema reconciliation, intent context map, RFC, and golden eval set.]
+
+---
+
+## [2026-07-03] | Antigravity Agent | Fix Audit Log – Phân công Giảng viên hiển thị UUID thô
+
+### Vấn đề gốc rễ
+Khi admin phân công giảng viên, trang "Nhật ký duyệt & thay đổi" hiển thị UUID thô (`bccb8d25-...`) thay vì tên giảng viên. Nguyên nhân là chuỗi 5 điểm sai xuyên suốt DB → Backend → Frontend.
+
+### Files thay đổi
+
+**1. `backend/src/db/migrations/020_add_tutor_assigned_log_action.sql` (NEW)**
+- Thêm `'tutor_assigned'` vào enum `log_action` DB
+- Đã chạy và apply thành công
+
+**2. `backend/src/db/queries/tutorAssignment.queries.js` (MODIFY)**
+- `getSubmissionByIdAndType()`: thêm `LEFT JOIN users tutor` và `LEFT JOIN users student` để lấy `tutor_name`, `student_name` cùng với submission data
+- `assignTutorToSubmission()`: đổi sang CTE (`WITH updated AS`) để JOIN và trả về tên tutor mới sau UPDATE, không cần query riêng
+
+**3. `backend/src/services/adminTutor.service.js` (MODIFY)**
+- Đổi `action = 'user_updated'` → `'tutor_assigned'` (đúng semantic)
+- `old_value` và `new_value` giờ lưu `{ tutor_id, tutor_name, tutor_email, student_name, submission_type }` thay vì `{ assigned_tutor_id: UUID }`
+
+**4. `backend/src/services/audit.service.js` (MODIFY)**
+- `ACTION_LABELS`: thêm `tutor_assigned: 'Phân công giảng viên'`, xóa duplicate `resource_uploaded`
+- `getTargetLabel()`: thêm logic lấy tên học sinh từ `new_value.student_name` (khi target_id là submission UUID thay vì user UUID)
+- `getNote()`: thêm case `tutor_assigned` tạo note `Phân công (Writing) cho: Tên Giảng Viên`
+
+**5. `frontend/src/utils/adminFormat.js` (MODIFY)**
+- `ACTION_LABELS`: thêm `tutor_assigned: 'Phân công giảng viên'`
+- `FIELD_LABELS` (mới): map 14 DB column names → nhãn tiếng Việt
+- `diffValues()`: dùng `FIELD_LABELS[field]` để hiển thị `'Giảng viên phụ trách'` thay vì `'tutor_name'` trong modal chi tiết
+
+**6. `backend/scripts/migrate-single.js` (NEW)**
+- Script tiện ích chạy từng migration file riêng lẻ (tránh bị block bởi file cũ có lỗi)
+
+### Security Compliance
+- ✅ SEC-03: Tất cả SQL dùng parameterized query ($1, $2)
+- ✅ ADR-001: Không dùng ORM
+- ✅ ADR-003: Response format `{ success, data, error, meta }` không thay đổi
+- ✅ DATA-03: Migration chỉ ADD VALUE vào enum, không phá schema cũ
+
