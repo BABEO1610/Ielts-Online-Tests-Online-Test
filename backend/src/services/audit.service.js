@@ -230,14 +230,13 @@ const ACTION_LABELS = {
     test_created: 'Tạo đề thi',
     test_updated: 'Sửa đề thi',
     test_deleted: 'Xóa đề thi',
-    resource_uploaded: 'Thêm tài liệu',
+    resource_uploaded: 'Tải tài liệu',
     user_created: 'Tạo người dùng',
     user_updated: 'Cập nhật người dùng',
     role_changed: 'Đổi vai trò',
     user_deactivated: 'Vô hiệu hoá tài khoản',
     user_deleted: 'Xoá người dùng',
     answer_key_updated: 'Cập nhật đáp án',
-    resource_uploaded: 'Tải tài liệu',
     resource_deleted: 'Xoá tài liệu',
     login: 'Đăng nhập',
     logout: 'Đăng xuất',
@@ -248,7 +247,8 @@ const ACTION_LABELS = {
     oauth_unlinked: 'Huỷ liên kết OAuth',
     change_reverted: 'Hoàn tác thay đổi',
     submission_revoked: 'Thu hồi kết quả',
-    submission_regraded: 'Sửa kết quả chấm'
+    submission_regraded: 'Sửa kết quả chấm',
+    tutor_assigned: 'Phân công giảng viên',
 };
 
 const formatAuditLogListItem = (log) => ({
@@ -287,17 +287,24 @@ const formatActor = (log) => ({
 });
 
 const getTargetLabel = (log) => {
+    // Ưu tiên target_user nếu target_id là UUID của user (JOIN đã resolve)
     if (log.target_user_email) return log.target_user_email;
-    if (log.target_user_name) return log.target_user_name;
-    if (log.new_value && log.new_value.student_name) return `Học sinh: ${log.new_value.student_name}`;
-    if (log.old_value && log.old_value.student_name) return `Học sinh: ${log.old_value.student_name}`;
-    if (log.new_value && log.new_value.email) return log.new_value.email;
-    if (log.new_value && log.new_value.title) return log.new_value.title;
+    if (log.target_user_name)  return log.target_user_name;
+
+    // Với log phân công giảng viên, target_id là submission UUID — JOIN users
+    // không match. Lấy tên học sinh từ JSONB new_value/old_value thay thế.
+    const studentName =
+        (log.new_value && log.new_value.student_name) ||
+        (log.old_value && log.old_value.student_name);
+    if (studentName) return `Học sinh: ${studentName}`;
+
+    if (log.new_value && log.new_value.email)     return log.new_value.email;
+    if (log.new_value && log.new_value.title)     return log.new_value.title;
     if (log.new_value && log.new_value.file_name) return log.new_value.file_name;
-    if (log.old_value && log.old_value.email) return log.old_value.email;
-    if (log.old_value && log.old_value.title) return log.old_value.title;
+    if (log.old_value && log.old_value.email)     return log.old_value.email;
+    if (log.old_value && log.old_value.title)     return log.old_value.title;
     if (log.old_value && log.old_value.file_name) return log.old_value.file_name;
-    // Thay vì trả UUID thô, trả dạng ngắn có context (table#id_prefix)
+    // Fallback ngắn gọn có context thay vì UUID thuần
     if (log.target_id) return `${log.target_table ?? 'record'}#${log.target_id.substring(0, 8)}`;
     return '—';
 };
@@ -345,9 +352,16 @@ const getSeverity = (log) => {
 const getNote = (log) => {
     if (log.new_value && log.new_value.reason) return log.new_value.reason;
     if (log.old_value && log.old_value.reason) return log.old_value.reason;
-    
+
     if (log.action === 'login_failed' && log.old_value && log.old_value.email) {
         return `Đăng nhập thất bại: ${log.old_value.email}`;
+    }
+    if (log.action === 'tutor_assigned') {
+        const tutorName = (log.new_value && log.new_value.tutor_name) || null;
+        const submType  = (log.new_value && log.new_value.submission_type) || '';
+        const typeLabel = submType === 'writing' ? 'Writing' : submType === 'speaking' ? 'Speaking' : '';
+        if (tutorName) return `Phân công ${typeLabel ? `(${typeLabel}) ` : ''}cho: ${tutorName}`;
+        return `Bỏ phân công${typeLabel ? ` (${typeLabel})` : ''}`;
     }
     if (log.action === 'test_created') return 'Tạo đề thi mới';
     if (log.action === 'test_updated') return 'Cập nhật nội dung đề thi';
