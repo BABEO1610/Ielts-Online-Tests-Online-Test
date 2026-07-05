@@ -5,6 +5,8 @@ import SubmissionViewer from '../../components/grading/SubmissionViewer';
 import gradingService from '../../services/grading.service';
 import { getGradingHistoryById } from '../../services/gradingHistory.service';
 
+const formatHalfBand = (value) => (Math.round(Number(value) * 2) / 2).toFixed(1);
+
 const TutorGradingPage = () => {
   const { type, submissionId } = useParams();
   const [searchParams] = useSearchParams();
@@ -127,10 +129,10 @@ const TutorGradingPage = () => {
                   Tutor: {submissionData.tutorStatus === 'graded' ? 'Đã chấm' : 'Đang chờ chấm'}
                 </span>
                 {submissionData.overallAiBand !== null && submissionData.overallAiBand !== undefined && (
-                  <span className="badge bg-dark py-2 px-3">AI Overall {Number(submissionData.overallAiBand).toFixed(1)}</span>
+                  <span className="badge bg-dark py-2 px-3">AI Overall {formatHalfBand(submissionData.overallAiBand)}</span>
                 )}
                 {submissionData.overallTutorBand !== null && submissionData.overallTutorBand !== undefined && (
-                  <span className="badge bg-dark py-2 px-3">Tutor Overall {Number(submissionData.overallTutorBand).toFixed(1)}</span>
+                  <span className="badge bg-dark py-2 px-3">Tutor Overall {formatHalfBand(submissionData.overallTutorBand)}</span>
                 )}
               </div>
             )}
