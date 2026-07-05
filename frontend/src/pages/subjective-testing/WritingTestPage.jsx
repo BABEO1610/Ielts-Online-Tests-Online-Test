@@ -17,8 +17,8 @@ const collectWritingTasks = (refs) => {
     .filter(ref => ref?.getTaskData)
     .map(ref => ref.getTaskData());
 
-  if (tasksData.length === 0) {
-    throw new Error('Không có dữ liệu bài làm.');
+  if (tasksData.length !== 2) {
+    throw new Error('Bài Writing phải có đủ Task 1 và Task 2.');
   }
 
   const graders = [...new Set(tasksData.map(task => task.grader || 'tutor'))];
@@ -29,30 +29,25 @@ const collectWritingTasks = (refs) => {
   return { tasksData, selectedGrader: graders[0] };
 };
 
-const requestAiForSubmittedTasks = async (response) => {
-  const tasks = response?.data?.tasks || [];
-  const gradingRequests = tasks
-    .filter(task => task?.id)
-    .map(task => gradingService.requestAiGrading(task.id));
-  const results = await Promise.allSettled(gradingRequests);
-  const failed = results.find(result => result.status === 'rejected');
-  if (failed) {
-    throw failed.reason;
-  }
-};
-
 /**
  * WritingTestScreen — Component màn hình làm bài
  */
 const WritingTestScreen = ({ exam, onSubmitSuccess, practiceMode, customTimeLimit }) => {
   const editorRefs = useRef([]);
+  const submittingRef = useRef(false);
   const [showAutoSubmit, setShowAutoSubmit] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [activeTaskIndex, setActiveTaskIndex] = useState(0);
+  const [taskTexts, setTaskTexts] = useState({});
+  const [completedTasks, setCompletedTasks] = useState({});
 
   // Tính tổng thời gian của cả 2 task (thường là 60 phút)
   const durationMinutes = exam.tasks.reduce((total, task) => total + (parseInt(task.duration) || 0), 0);
 
   const submitAllTasks = useCallback(async () => {
+    if (submittingRef.current) return;
+    submittingRef.current = true;
+    setIsSubmitting(true);
     setShowAutoSubmit(true);
     try {
       const { tasksData, selectedGrader } = collectWritingTasks(
@@ -66,17 +61,14 @@ const WritingTestScreen = ({ exam, onSubmitSuccess, practiceMode, customTimeLimi
       };
 
       const response = await gradingService.submitFullWriting(payload);
-      if (selectedGrader === 'ai') {
-        try {
-          await requestAiForSubmittedTasks(response);
-        } catch (aiError) {
-          window.alert(getErrorMessage(aiError));
-        }
-      }
       if (onSubmitSuccess) onSubmitSuccess(response);
     } catch (error) {
+      console.error('Writing submit failed', error);
+      setShowAutoSubmit(false);
       window.alert(getErrorMessage(error));
     } finally {
+      submittingRef.current = false;
+      setIsSubmitting(false);
       setShowAutoSubmit(false);
     }
   }, [exam.id, onSubmitSuccess]);
@@ -92,6 +84,28 @@ const WritingTestScreen = ({ exam, onSubmitSuccess, practiceMode, customTimeLimi
   }, [submitAllTasks]);
 
   const activeTask = exam.tasks[activeTaskIndex];
+  const activeTaskNumber = activeTask.task_number;
+  const isSubmitDisabled = isSubmitting
+    || exam.tasks.some(task => !String(taskTexts[task.task_number] || '').trim());
+  const handleTaskTextChange = useCallback((taskNumber, value) => {
+    setTaskTexts(prev => ({ ...prev, [taskNumber]: value }));
+    if (!String(value || '').trim()) {
+      setCompletedTasks(prev => ({ ...prev, [taskNumber]: false }));
+    }
+  }, []);
+
+  const handleCompleteTask = useCallback(() => {
+    const currentText = String(taskTexts[activeTaskNumber] || '').trim();
+    if (!currentText) {
+      window.alert(`Vui lòng viết câu trả lời cho Writing Task ${activeTaskNumber} trước khi hoàn thành.`);
+      return;
+    }
+
+    setCompletedTasks(prev => ({ ...prev, [activeTaskNumber]: true }));
+    if (activeTaskIndex < exam.tasks.length - 1) {
+      setActiveTaskIndex(activeTaskIndex + 1);
+    }
+  }, [activeTaskIndex, activeTaskNumber, exam.tasks.length, taskTexts]);
 
   return (
     <div className="bg-white" style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' }}>
@@ -102,6 +116,8 @@ const WritingTestScreen = ({ exam, onSubmitSuccess, practiceMode, customTimeLimi
         onSubmitEarly={handleSubmitEarly} 
         practiceMode={practiceMode} 
         hideReviewButton={true} 
+        submitDisabled={isSubmitDisabled}
+        submitTitle={isSubmitting ? 'Đang nộp...' : (isSubmitDisabled ? 'Hoàn thành Task 1 & 2' : 'Nộp bài')}
       />
       
       <div className="split-view" style={{ flex: 1, height: 'calc(100vh - 60px)', paddingBottom: '70px' }}>
@@ -152,7 +168,18 @@ const WritingTestScreen = ({ exam, onSubmitSuccess, practiceMode, customTimeLimi
                 taskNumber={task.task_number}
                 promptText={task.prompt_text}
                 status="new"
+                onContentChange={handleTaskTextChange}
               />
+              <div className="px-4 pb-4 d-flex justify-content-end">
+                <button
+                  type="button"
+                  className={`btn rounded-pill px-4 fw-bold ${completedTasks[task.task_number] ? 'btn-success' : 'btn-dark'}`}
+                  onClick={handleCompleteTask}
+                  disabled={!String(taskTexts[task.task_number] || '').trim() || isSubmitting}
+                >
+                  {completedTasks[task.task_number] ? `Task ${task.task_number} đã hoàn thành` : `Hoàn thành Task ${task.task_number}`}
+                </button>
+              </div>
             </div>
           ))}
         </div>
@@ -171,6 +198,9 @@ const WritingTestScreen = ({ exam, onSubmitSuccess, practiceMode, customTimeLimi
                 onClick={() => setActiveTaskIndex(idx)}
               >
                 <span className="fw-bold">Task {task.task_number}</span>
+                {completedTasks[task.task_number] && (
+                  <span className="badge bg-success ms-2">Done</span>
+                )}
               </div>
             );
           })}

@@ -161,6 +161,30 @@ class TutorController {
       next(error);
     }
   }
+
+  /**
+   * POST /api/v1/tutors/submissions/:type/:submissionId/ai-prelim
+   */
+  static async runAiPrelimCheck(req, res, next) {
+    try {
+      const { type, submissionId } = req.params;
+      if (!['writing', 'speaking'].includes(type)) {
+        return res.status(400).json({ success: false, error: { message: 'Invalid type' }, data: null, meta: null });
+      }
+
+      const result = await TutorService.runAiPrelimCheck(type, submissionId, req.body);
+
+      res.status(200).json({
+        success: true,
+        data: result,
+        error: null,
+        meta: null
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   /**
    * POST /api/v1/tutors/submissions/speaking/:partId/transcribe
    */

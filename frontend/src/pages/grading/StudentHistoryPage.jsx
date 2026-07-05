@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import StudentNavbar from '../../components/layout/StudentNavbar';
 import FeedbackReport from '../../components/grading/FeedbackReport';
 import gradingService from '../../services/grading.service';
@@ -38,6 +39,7 @@ const StatusBadge = ({ status }) => {
 };
 
 const StudentHistoryPage = () => {
+  const navigate = useNavigate();
   const [selectedSubmission, setSelectedSubmission] = useState(null);
   const [filterType, setFilterType] = useState('all');
 
@@ -90,6 +92,12 @@ const StudentHistoryPage = () => {
     } finally {
       setAiGradingIds(prev => ({ ...prev, [submission.id]: false }));
     }
+  };
+
+  const openDetailPage = (submission) => {
+    navigate(`/student/profile/practice-history/${submission.id}?type=${submission.type}`, {
+      state: { type: submission.type },
+    });
   };
 
   return (
@@ -244,9 +252,9 @@ const StudentHistoryPage = () => {
                         <button
                           className="btn btn-dark rounded-pill px-3 py-1 fw-medium"
                           style={{ fontSize: '13px' }}
-                          onClick={(e) => { e.stopPropagation(); setSelectedSubmission(sub); }}
+                          onClick={(e) => { e.stopPropagation(); openDetailPage(sub); }}
                         >
-                          Xem kết quả
+                          Xem chi tiết
                         </button>
                       )}
                       {sub.status === 'pending' && sub.type === 'writing' && sub.grader === 'ai' && (

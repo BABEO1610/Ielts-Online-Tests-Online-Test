@@ -115,7 +115,9 @@ const AiReferenceRow = ({ item, onView }) => {
         </div>
       </td>
       <td style={styles.td}>{item.testTitle || 'IELTS Writing'}</td>
-      <td style={styles.td}>Task {item.taskNumber || '—'}</td>
+      <td style={styles.td}>
+        {item.taskLabel || (item.taskNumber ? `Task ${item.taskNumber}` : '—')}
+      </td>
       <td style={{ ...styles.td, fontWeight: 700, color: '#000' }}>
         {formatBand(item.aiBand)}
       </td>
@@ -255,7 +257,7 @@ const TutorAiReferencePage = () => {
         <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
           <thead>
             <tr>
-              {['Thời gian nộp', 'Học sinh', 'Đề thi', 'Task', 'AI Band', 'Trạng thái AI', 'Thao tác'].map((column) => (
+              {['Thời gian nộp', 'Học sinh', 'Đề thi', 'Tasks', 'AI Band', 'Trạng thái AI', 'Thao tác'].map((column) => (
                 <th key={column} style={styles.th}>{column}</th>
               ))}
             </tr>

@@ -88,6 +88,13 @@ router.post(
   TutorController.gradeSubmission
 );
 
+// POST /api/v1/tutors/submissions/:type/:submissionId/ai-prelim
+router.post(
+  '/submissions/:type/:submissionId/ai-prelim',
+  authorize(['tutor', 'admin']),
+  TutorController.runAiPrelimCheck
+);
+
 // POST /api/v1/tutors/submissions/speaking/:partId/transcribe
 router.post(
   '/submissions/speaking/:partId/transcribe',
