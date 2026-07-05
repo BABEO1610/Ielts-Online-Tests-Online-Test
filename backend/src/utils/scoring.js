@@ -67,6 +67,9 @@ const getBandScore = (skill, rawScore) => {
   }
 };
 
+const roundToNearestHalf = (value) => Math.round(Number(value) * 2) / 2;
+
 module.exports = {
-  getBandScore
+  getBandScore,
+  roundToNearestHalf
 };
