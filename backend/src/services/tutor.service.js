@@ -1,7 +1,12 @@
 const { pool } = require('../db/pool');
 const AppError = require('../utils/AppError');
 const AuditLogService = require('./audit.service');
-const { roundToNearestHalf } = require('../utils/scoring');
+const {
+  roundToNearestHalf,
+  isValidHalfBandScore,
+  calcBandFromCriteria,
+  calcWeightedWritingOverall,
+} = require('../utils/scoring');
 const { gradeWriting } = require('../ai/grading.service');
 const { REPORT_STATUS } = require('../ai/aiGrading.constants');
 
@@ -24,8 +29,7 @@ const toNumberOrNull = (value) => {
   return Number.isFinite(number) ? number : null;
 };
 
-const calculateWeightedWritingBand = (task1Band, task2Band) =>
-  roundToNearestHalf((Number(task1Band) + Number(task2Band) * 2) / 3);
+const calculateWeightedWritingBand = calcWeightedWritingOverall;
 
 const calculateDisplayWritingBand = (task1Band, task2Band) => {
   if (
@@ -37,15 +41,15 @@ const calculateDisplayWritingBand = (task1Band, task2Band) => {
   const task1 = Number(task1Band);
   const task2 = Number(task2Band);
   if (!Number.isFinite(task1) || !Number.isFinite(task2)) return null;
-  return Number((task1 * 0.33 + task2 * 0.67).toFixed(1));
+  return calculateWeightedWritingBand(roundToNearestHalf(task1), roundToNearestHalf(task2));
 };
 
 const validateBand = (value, fieldName) => {
   const number = Number(value);
-  if (!Number.isFinite(number) || number < 0 || number > 9) {
-    throw new AppError(`${fieldName} must be a number between 0 and 9`, 400);
+  if (!isValidHalfBandScore(number)) {
+    throw new AppError(`${fieldName} must be a number between 0 and 9 in 0.5 steps`, 400);
   }
-  return roundToNearestHalf(number);
+  return number;
 };
 
 const getTableColumns = async (db, tableName) => {
@@ -449,8 +453,12 @@ class TutorService {
           : (aiStatus === 'completed' && row.grader === 'ai' ? 'ai_graded' : 'pending'),
         aiStatus,
         tutorStatus,
-        overallAiBand: row.overall_ai_band ? parseFloat(row.overall_ai_band) : calculatedOverallAiBand,
-        overallTutorBand: row.overall_tutor_band ? parseFloat(row.overall_tutor_band) : calculatedOverallTutorBand,
+        overallAiBand: isValidHalfBandScore(row.overall_ai_band)
+          ? parseFloat(row.overall_ai_band)
+          : calculatedOverallAiBand,
+        overallTutorBand: isValidHalfBandScore(row.overall_tutor_band)
+          ? parseFloat(row.overall_tutor_band)
+          : calculatedOverallTutorBand,
         grader: row.grader,
         parts: tasks.map(task => ({
           submissionId: task.id,
@@ -550,12 +558,12 @@ class TutorService {
           lexicalScore: validateBand(payload.lexicalScore, 'lexicalScore'),
           grammarScore: validateBand(payload.grammarScore, 'grammarScore'),
         };
-        const finalTaskBand = bandScore ?? roundToNearestHalf((
-          criteriaBands.taskAchievementScore
-          + criteriaBands.coherenceScore
-          + criteriaBands.lexicalScore
-          + criteriaBands.grammarScore
-        ) / 4);
+        const finalTaskBand = bandScore ?? calcBandFromCriteria([
+          criteriaBands.taskAchievementScore,
+          criteriaBands.coherenceScore,
+          criteriaBands.lexicalScore,
+          criteriaBands.grammarScore,
+        ]);
 
         const checkQuery = `
           SELECT ws.id, ws.writing_group_id, ws.status, ws.grader, ws.user_id, u.full_name as student_name
@@ -755,12 +763,12 @@ class TutorService {
           throw new AppError('Legacy submission without group ID cannot be graded via grouped API.', 400);
         }
 
-        // 2. Check status and grader for all parts in the group
+        // 2. Check grader for all parts in the group. Re-grading updates the existing report.
         const groupQuery = `SELECT id, status, grader FROM speaking_submissions WHERE speaking_group_id = $1`;
         const groupResult = await client.query(groupQuery, [submission.speaking_group_id]);
         for (const part of groupResult.rows) {
-          if (part.status !== 'pending' || part.grader !== 'tutor') {
-            throw new AppError('Submission has already been graded or is not pending for tutor.', 409);
+          if (part.grader !== 'tutor') {
+            throw new AppError('This Speaking submission is not assigned to tutor grading.', 409);
           }
         }
 
@@ -769,19 +777,65 @@ class TutorService {
         const repPartResult = await client.query(repPartQuery, [submission.speaking_group_id]);
         const repPartId = repPartResult.rows[0].id;
 
-        // 4. Insert tutor_feedback_reports
-        const insertFeedbackQuery = `
-          INSERT INTO tutor_feedback_reports (
-            tutor_id, speaking_submission_id, band_score, 
-            fluency_score, lexical_score, grammar_score, pronunciation_score,
-            written_feedback
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-        `;
-        await client.query(insertFeedbackQuery, [
-          tutorId, repPartId, payload.bandScore,
-          payload.fluencyScore, payload.lexicalScore, payload.grammarScore, payload.pronunciationScore,
-          payload.writtenFeedback
+        const speakingScores = {
+          bandScore: payload.bandScore !== undefined && payload.bandScore !== null && payload.bandScore !== ''
+            ? validateBand(payload.bandScore, 'bandScore')
+            : null,
+          fluencyScore: validateBand(payload.fluencyScore, 'fluencyScore'),
+          lexicalScore: validateBand(payload.lexicalScore, 'lexicalScore'),
+          grammarScore: validateBand(payload.grammarScore, 'grammarScore'),
+          pronunciationScore: validateBand(payload.pronunciationScore, 'pronunciationScore'),
+        };
+        const speakingBandScore = speakingScores.bandScore ?? calcBandFromCriteria([
+          speakingScores.fluencyScore,
+          speakingScores.lexicalScore,
+          speakingScores.grammarScore,
+          speakingScores.pronunciationScore,
         ]);
+
+        const updateFeedbackQuery = `
+          UPDATE tutor_feedback_reports
+          SET tutor_id = $1,
+              band_score = $2,
+              fluency_score = $3,
+              lexical_score = $4,
+              grammar_score = $5,
+              pronunciation_score = $6,
+              written_feedback = $7,
+              updated_at = NOW()
+          WHERE speaking_submission_id = $8
+          RETURNING id
+        `;
+        const updateFeedbackResult = await client.query(updateFeedbackQuery, [
+          tutorId,
+          speakingBandScore,
+          speakingScores.fluencyScore,
+          speakingScores.lexicalScore,
+          speakingScores.grammarScore,
+          speakingScores.pronunciationScore,
+          payload.writtenFeedback || '',
+          repPartId,
+        ]);
+
+        if (updateFeedbackResult.rowCount === 0) {
+          const insertFeedbackQuery = `
+            INSERT INTO tutor_feedback_reports (
+              tutor_id, speaking_submission_id, band_score,
+              fluency_score, lexical_score, grammar_score, pronunciation_score,
+              written_feedback, updated_at
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
+          `;
+          await client.query(insertFeedbackQuery, [
+            tutorId,
+            repPartId,
+            speakingBandScore,
+            speakingScores.fluencyScore,
+            speakingScores.lexicalScore,
+            speakingScores.grammarScore,
+            speakingScores.pronunciationScore,
+            payload.writtenFeedback || '',
+          ]);
+        }
 
         // 5. Update status for all parts in the group
         const updateStatusQuery = `
@@ -790,6 +844,8 @@ class TutorService {
           WHERE speaking_group_id = $1
         `;
         await client.query(updateStatusQuery, [submission.speaking_group_id]);
+        submission.tutorStatus = 'graded';
+        submission.overallTutorBand = speakingBandScore;
 
       } else {
         throw new AppError('Invalid submission type', 400);
@@ -831,8 +887,11 @@ class TutorService {
   }
 
   static async runAiPrelimCheck(type, submissionId, payload = {}) {
+    if (type === 'speaking') {
+      return this.runSpeakingAiPrelimCheck(submissionId, payload);
+    }
     if (type !== 'writing') {
-      throw new AppError('AI prelim check currently supports Writing submissions only.', 400);
+      throw new AppError('AI prelim check supports writing or speaking submissions only.', 400);
     }
 
     const taskNumber = Number(payload.taskNumber ?? payload.task_number);
@@ -895,6 +954,53 @@ class TutorService {
       { testTitle: task.test_title }
     );
     return formatPrelimFromAiResult(taskNumber, result);
+  }
+
+  static async runSpeakingAiPrelimCheck(submissionId, payload = {}) {
+    const partNumber = Number(payload.partNumber ?? payload.taskNumber ?? payload.part_number);
+    const partRes = await pool.query(
+      `SELECT id, part_number, audio_url, transcript
+       FROM speaking_submissions
+       WHERE id::text = $1 OR speaking_group_id::text = $1
+       ORDER BY part_number ASC`,
+      [submissionId]
+    );
+    if (partRes.rows.length === 0) {
+      throw new AppError('Speaking submission not found', 404);
+    }
+
+    const part = partRes.rows.find(row => row.part_number === partNumber) || partRes.rows[0];
+    const noAudioNote = part.audio_url
+      ? 'Audio is available, but the current AI grading provider in this codebase is not wired for reliable Speaking pronunciation scoring.'
+      : 'low-confidence - no audio, Pronunciation cannot be scored.';
+
+    return {
+      partNumber: part.part_number,
+      suggestedOverallBand: null,
+      suggestedCriteria: {
+        fluencyCoherence: null,
+        lexicalResource: null,
+        grammaticalRangeAccuracy: null,
+        pronunciation: null,
+      },
+      feedbackDraft: [
+        'AI reference only. No final Speaking band was generated.',
+        part.transcript ? `Transcript available:\n${part.transcript}` : 'No transcript is available yet.',
+        noAudioNote,
+      ].join('\n\n'),
+      keyProblems: part.transcript ? [] : ['Generate transcript before using text-based AI reference.'],
+      suggestedRewrite: '',
+      tutorNotes: noAudioNote,
+      aiFeedback: {
+        status: 'low_confidence',
+        overallBand: null,
+        summary: noAudioNote,
+        strengths: [],
+        weaknesses: part.transcript ? [] : ['No transcript available.'],
+        actionPlan: ['Tutor should listen to the audio and score Pronunciation manually.'],
+        taskNumber: part.part_number,
+      },
+    };
   }
 
   static async transcribeSpeakingPart(partId) {
@@ -1476,7 +1582,9 @@ class TutorService {
         SELECT DISTINCT ON (submission_id) *
         FROM ai_grading_reports
         WHERE submission_type = 'writing'
-        ORDER BY submission_id, generated_at DESC
+        ORDER BY submission_id,
+                 CASE WHEN band_score IS NOT NULL THEN 0 ELSE 1 END,
+                 generated_at DESC
       ) agr
         ON agr.submission_id = ws.id
       WHERE ws.grader = 'ai'
@@ -1500,7 +1608,7 @@ class TutorService {
           testTitle: row.test_title,
           submittedAt: row.submitted_at,
           submissionStatus: row.submission_status,
-          aiBand: row.overall_ai_band ? parseFloat(row.overall_ai_band) : null,
+          aiBand: isValidHalfBandScore(row.overall_ai_band) ? parseFloat(row.overall_ai_band) : null,
           reportStatus: null,
           errorMessage: null,
           generatedAt: row.generated_at,
@@ -1587,7 +1695,9 @@ class TutorService {
       FROM ai_grading_reports
       WHERE submission_type = 'writing'
         AND submission_id = ANY($1::uuid[])
-      ORDER BY submission_id, generated_at DESC`;
+      ORDER BY submission_id,
+               CASE WHEN band_score IS NOT NULL THEN 0 ELSE 1 END,
+               generated_at DESC`;
 
     const { rows: reportRows } = await pool.query(reportQuery, [taskIds]);
     const reportBySubmission = new Map(reportRows.map(report => [report.submission_id, report]));
@@ -1623,7 +1733,9 @@ class TutorService {
         grader: first.grader,
       },
       tasks,
-      overallAiBand: first.overall_ai_band ? parseFloat(first.overall_ai_band) : calculatedOverall,
+      overallAiBand: isValidHalfBandScore(first.overall_ai_band)
+        ? parseFloat(first.overall_ai_band)
+        : calculatedOverall,
       aiReport: tasks[0]?.aiReport || null,
     };
   }
