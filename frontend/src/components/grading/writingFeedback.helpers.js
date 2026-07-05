@@ -1,7 +1,9 @@
+export const roundToNearestHalf = (value) => Math.round(Number(value) * 2) / 2;
+
 export const formatBand = (value) => {
   if (value === null || value === undefined || value === '') return '—';
   const number = Number(value);
-  return Number.isFinite(number) ? number.toFixed(1) : '—';
+  return Number.isFinite(number) ? roundToNearestHalf(number).toFixed(1) : '—';
 };
 
 export const getWritingCriterionLabel = (taskNumber, criterionKey) => {
@@ -48,5 +50,5 @@ export const calculateOverallWritingBand = (task1Band, task2Band) => {
     return null;
   }
 
-  return Number((task1 * 0.33 + task2 * 0.67).toFixed(1));
+  return roundToNearestHalf((task1 * 0.33) + (task2 * 0.67));
 };

@@ -1,5 +1,5 @@
 const { pool } = require('../db/pool');
-const { getBandScore, roundToNearestHalf } = require('../utils/scoring');
+const { getBandScore, calcWeightedWritingOverall, isValidHalfBandScore } = require('../utils/scoring');
 const TestService = require('./test.service');
 const AppError = require('../utils/AppError');
 const supabase = require('../config/supabase');
@@ -33,8 +33,7 @@ const toNumberOrNull = (value) => {
   return Number.isFinite(number) ? number : null;
 };
 
-const calculateWeightedWritingBand = (task1Band, task2Band) =>
-  roundToNearestHalf((Number(task1Band) + Number(task2Band) * 2) / 3);
+const calculateWeightedWritingBand = calcWeightedWritingOverall;
 
 const getTableColumns = async (db, tableName) => {
   const { rows } = await db.query(
@@ -557,6 +556,9 @@ class SubmissionService {
    * Receives an array of parts and saves them within one transaction, generating a group UUID.
    */
   static async submitFullSpeaking(userId, testId, grader, parts) {
+    if (!['ai', 'tutor'].includes(grader)) {
+      throw new AppError('grader must be ai or tutor', 400, 'INVALID_FIELD');
+    }
     const normalizedTestId = normalizeOptionalUuid(testId);
     if (normalizedTestId) {
       try {
@@ -596,6 +598,25 @@ class SubmissionService {
       }
 
       await client.query('COMMIT');
+      if (grader === 'ai') {
+        for (const part of insertedParts) {
+          await insertAiReport(pool, {
+            submission_id: part.id,
+            submission_type: 'speaking',
+            status: REPORT_STATUS.FAILED,
+            error_message: 'Speaking AI grading requires an audio-capable grading provider. Pronunciation cannot be scored from transcript alone.',
+            raw_ai_response: JSON.stringify({
+              errorCode: 'SPEAKING_AUDIO_GRADING_UNAVAILABLE',
+              message: 'No fake Speaking AI grade was created because Pronunciation requires audio evaluation.',
+            }),
+          });
+        }
+        throw new AppError(
+          'Không thể chấm Speaking bằng AI lúc này vì hệ thống chưa có provider chấm phát âm từ audio. Bài ghi âm đã được lưu.',
+          422,
+          'SPEAKING_AI_UNAVAILABLE'
+        );
+      }
       return { speaking_group_id: speakingGroupId, parts: insertedParts };
     } catch (err) {
       await client.query('ROLLBACK');
@@ -848,6 +869,9 @@ class SubmissionService {
     const tutorGradedExpr = writingColumns.has('tutor_status')
       ? "BOOL_AND(ws.tutor_status = 'graded')"
       : "BOOL_AND(ws.status IN ('tutor_graded', 'reviewed'))";
+    const speakingAiFailedExpr = speakingAiJoin && aiColumns.has('error_message')
+      ? "BOOL_OR(ss.grader = 'ai' AND agr.error_message IS NOT NULL)"
+      : 'FALSE';
 
     const bandCandidates = [];
     if (writingColumns.has('overall_tutor_band')) bandCandidates.push('MAX(ws.overall_tutor_band)');
@@ -919,9 +943,14 @@ class SubmissionService {
           WHEN BOOL_OR(ss.status = 'reviewed') THEN 'reviewed'
           WHEN BOOL_OR(ss.status = 'tutor_graded') THEN 'tutor_graded'
           WHEN BOOL_OR(ss.status = 'ai_graded') AND BOOL_AND(ss.status = 'ai_graded') THEN 'ai_graded'
+          WHEN ${speakingAiFailedExpr} THEN 'failed'
           ELSE 'pending'
         END AS submission_status,
-        NULL::text AS ai_status,
+        CASE
+          WHEN ${speakingAiFailedExpr} THEN 'failed'
+          WHEN BOOL_OR(ss.status = 'ai_graded') AND BOOL_AND(ss.status = 'ai_graded') THEN 'completed'
+          ELSE 'pending'
+        END AS ai_status,
         NULL::text AS tutor_status,
         MIN(ss.grader::text) AS grader,
         ${[
@@ -1059,8 +1088,12 @@ class SubmissionService {
     )
       ? 'graded'
       : 'pending';
-    const overallAiBand = first.overall_ai_band ? parseFloat(first.overall_ai_band) : calculatedOverallAiBand;
-    const overallTutorBand = first.overall_tutor_band ? parseFloat(first.overall_tutor_band) : calculatedOverallTutorBand;
+    const overallAiBand = isValidHalfBandScore(first.overall_ai_band)
+      ? parseFloat(first.overall_ai_band)
+      : calculatedOverallAiBand;
+    const overallTutorBand = isValidHalfBandScore(first.overall_tutor_band)
+      ? parseFloat(first.overall_tutor_band)
+      : calculatedOverallTutorBand;
 
     return {
       submissionId: String(groupId),

@@ -277,7 +277,7 @@ const TutorGradingPanel = ({
             </div>
           )}
 
-          {!readOnly && type === 'writing' && (
+          {!readOnly && ['writing', 'speaking'].includes(type) && (
             <div className="mb-4 d-flex justify-content-between align-items-center">
               <button 
                 type="button"
@@ -322,9 +322,9 @@ const TutorGradingPanel = ({
             </div>
           )}
 
-          {type === 'writing' && (
+          {['writing', 'speaking'].includes(type) && currentAiFeedback && (
             <div className="mb-4">
-              <h5 className="fw-bold text-ink mb-3">AI Estimated Feedback</h5>
+              <h5 className="fw-bold text-ink mb-3">AI Reference</h5>
               <AiFeedbackPanel
                 report={currentAiFeedback ? { ...currentAiFeedback, taskNumber: activeTaskNumber } : null}
                 showDisclaimer={false}
