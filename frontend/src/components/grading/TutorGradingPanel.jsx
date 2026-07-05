@@ -145,21 +145,6 @@ const TutorGradingPanel = ({
             }
           }));
         }
-        if (suggestion?.suggestedCriteria) {
-          setTaskScores(prev => ({
-            ...prev,
-            [activeTaskId]: {
-              ...(prev[activeTaskId] || {}),
-              taskAchievementScore: suggestion.suggestedCriteria.taskAchievementOrResponse ?? '',
-              coherenceScore: suggestion.suggestedCriteria.coherenceCohesion ?? '',
-              lexicalScore: suggestion.suggestedCriteria.lexicalResource ?? '',
-              grammarScore: suggestion.suggestedCriteria.grammaticalRangeAccuracy ?? ''
-            }
-          }));
-        }
-        if (suggestion?.feedbackDraft) {
-          handleFeedbackChange(suggestion.feedbackDraft);
-        }
       }
     } catch (err) {
       setError(err.response?.data?.error?.message || 'Failed to run prelim check.');
@@ -277,7 +262,7 @@ const TutorGradingPanel = ({
             </div>
           )}
 
-          {!readOnly && type === 'writing' && (
+          {!readOnly && ['writing', 'speaking'].includes(type) && (
             <div className="mb-4 d-flex justify-content-between align-items-center">
               <button 
                 type="button"
@@ -322,9 +307,9 @@ const TutorGradingPanel = ({
             </div>
           )}
 
-          {type === 'writing' && (
+          {['writing', 'speaking'].includes(type) && currentAiFeedback && (
             <div className="mb-4">
-              <h5 className="fw-bold text-ink mb-3">AI Estimated Feedback</h5>
+              <h5 className="fw-bold text-ink mb-3">AI Reference</h5>
               <AiFeedbackPanel
                 report={currentAiFeedback ? { ...currentAiFeedback, taskNumber: activeTaskNumber } : null}
                 showDisclaimer={false}
