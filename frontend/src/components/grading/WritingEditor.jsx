@@ -8,7 +8,8 @@ const MAX_CHARS = 5000;
 const WritingEditor = forwardRef(({ 
   taskNumber, 
   promptText, 
-  status = 'new'
+  status = 'new',
+  onContentChange
 }, ref) => {
   const [text, setText] = useState('');
   const [grader, setGrader] = useState('tutor');
@@ -17,18 +18,21 @@ const WritingEditor = forwardRef(({
   const charCount = text.length;
 
   const handleChange = (e) => {
-    setText(e.target.value.slice(0, MAX_CHARS));
+    const nextText = e.target.value.slice(0, MAX_CHARS);
+    setText(nextText);
+    onContentChange?.(taskNumber, nextText);
   };
 
   useImperativeHandle(ref, () => ({
     getTaskData: () => {
-      if (charCount === 0) {
+      const responseText = text.trim();
+      if (!responseText) {
         throw new Error(`Vui lòng viết câu trả lời cho Writing Task ${taskNumber} trước khi nộp!`);
       }
       return {
         task_number: taskNumber,
         prompt_text: promptText,
-        response_text: text,
+        response_text: responseText,
         grader: grader
       };
     }
@@ -104,7 +108,8 @@ WritingEditor.propTypes = {
   promptText: PropTypes.string,
   status: PropTypes.oneOf(['new', 'pending', 'ai_graded', 'tutor_graded', 'reviewed', 'failed']),
   onSubmitSuccess: PropTypes.func,
-  onSubmitError: PropTypes.func
+  onSubmitError: PropTypes.func,
+  onContentChange: PropTypes.func
 };
 
 export default WritingEditor;
