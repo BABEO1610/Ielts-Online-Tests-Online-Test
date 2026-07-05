@@ -333,7 +333,7 @@ const FeedbackReport = ({ submissionId, type }) => {
     const handleGradingFailed = (data) => {
       const eventSubmissionId = data.submission_id || data.submissionId;
       if (eventSubmissionId === submissionId) {
-        setError('Chấm bài thất bại, quota đã được hoàn trả.');
+        setError('Chấm điểm AI thất bại. Vui lòng thử lại.');
         setLoading(false);
       }
     };
