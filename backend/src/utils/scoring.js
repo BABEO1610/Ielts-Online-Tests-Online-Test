@@ -69,7 +69,36 @@ const getBandScore = (skill, rawScore) => {
 
 const roundToNearestHalf = (value) => Math.round(Number(value) * 2) / 2;
 
+const isValidHalfBandScore = (value) => {
+  const number = Number(value);
+  return Number.isFinite(number)
+    && number >= 0
+    && number <= 9
+    && Number.isInteger(number * 2);
+};
+
+const calcBandFromCriteria = (scores) => {
+  if (!Array.isArray(scores) || scores.length !== 4) {
+    throw new Error('Exactly 4 criteria scores are required');
+  }
+  if (!scores.every(isValidHalfBandScore)) {
+    throw new Error('Criteria scores must be between 0 and 9 in 0.5 steps');
+  }
+  const total = scores.reduce((sum, score) => sum + Number(score), 0);
+  return roundToNearestHalf(total / 4);
+};
+
+const calcWeightedWritingOverall = (task1Band, task2Band) => {
+  if (!isValidHalfBandScore(task1Band) || !isValidHalfBandScore(task2Band)) {
+    throw new Error('Task bands must be between 0 and 9 in 0.5 steps');
+  }
+  return roundToNearestHalf((Number(task1Band) * 0.33) + (Number(task2Band) * 0.67));
+};
+
 module.exports = {
   getBandScore,
-  roundToNearestHalf
+  roundToNearestHalf,
+  isValidHalfBandScore,
+  calcBandFromCriteria,
+  calcWeightedWritingOverall
 };
