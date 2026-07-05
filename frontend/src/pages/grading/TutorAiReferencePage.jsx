@@ -17,7 +17,7 @@ const formatDate = (value) => {
 const formatBand = (value) => {
   if (value === null || value === undefined) return '—';
   const number = Number(value);
-  return Number.isNaN(number) ? '—' : number.toFixed(1);
+  return Number.isNaN(number) ? '—' : (Math.round(number * 2) / 2).toFixed(1);
 };
 
 const getStatusConfig = (status, errorMessage) => {
