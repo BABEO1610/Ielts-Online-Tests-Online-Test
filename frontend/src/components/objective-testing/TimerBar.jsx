@@ -5,11 +5,21 @@
  * TimerBar.jsx
  * Thanh trạng thái hiển thị thời gian làm bài ở trên cùng màn hình.
  */
-import React, { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import '../../styles/objective-testing.css';
 
-const TimerBar = ({ durationMinutes = 60, onTimeUp, onSubmitEarly, practiceMode = false, customTimeLimit = null, hideReviewButton = false, hideActions = false }) => {
+const TimerBar = ({
+  durationMinutes = 60,
+  onTimeUp,
+  onSubmitEarly,
+  practiceMode = false,
+  customTimeLimit = null,
+  hideReviewButton = false,
+  hideActions = false,
+  submitDisabled = false,
+  submitTitle = 'Submit',
+}) => {
   const isCountDown = !practiceMode || customTimeLimit !== null;
   const initialTime = isCountDown ? (practiceMode ? customTimeLimit * 60 : durationMinutes * 60) : 0;
 
@@ -95,18 +105,19 @@ const TimerBar = ({ durationMinutes = 60, onTimeUp, onSubmitEarly, practiceMode 
               className="button-primary d-flex align-items-center gap-2"
               id="btn-submit-early"
               onClick={onSubmitEarly}
+              disabled={submitDisabled}
               style={{
                 width: 'auto',
                 padding: '6px 20px',
                 fontSize: '14px',
-                color: '#000',
-                background: '#fff',
+                color: submitDisabled ? '#777' : '#000',
+                background: submitDisabled ? '#d7d7d7' : '#fff',
                 fontWeight: 600,
                 border: 'none',
                 borderRadius: '999px'
               }}
             >
-              Submit
+              {submitTitle}
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <line x1="22" y1="2" x2="11" y2="13"></line>
                 <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
@@ -128,7 +139,9 @@ TimerBar.propTypes = {
   practiceMode: PropTypes.bool,
   customTimeLimit: PropTypes.number,
   hideReviewButton: PropTypes.bool,
-  hideActions: PropTypes.bool
+  hideActions: PropTypes.bool,
+  submitDisabled: PropTypes.bool,
+  submitTitle: PropTypes.string
 };
 
 export default TimerBar;
