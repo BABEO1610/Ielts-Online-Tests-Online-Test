@@ -11,6 +11,7 @@ const {
 } = require('../ai/aiGrading.constants');
 const AppError = require('../utils/AppError');
 const logger = require('../utils/logger');
+const { roundToNearestHalf } = require('../utils/scoring');
 const { v4: uuidv4 } = require('uuid');
 
 /**
@@ -35,6 +36,7 @@ const requestAiGrade = async (req, res, next) => {
     // Idempotency check
     const cached = await findExistingReport(submissionId);
     if (cached) {
+      await updateWritingGroupAiState(pool, submissionId);
       return sendCachedResult(res, cached, requestId);
     }
 
@@ -53,9 +55,7 @@ const requestAiGrade = async (req, res, next) => {
     });
 
     // Save result to DB in transaction
-    const report = await saveGradingResult(
-      submissionId, taskType, result
-    );
+    const report = await saveGradingResult(submissionId, result);
 
     // Emit socket event
     emitGradingCompleted(req, submissionId, userId, result);
@@ -127,6 +127,8 @@ const fetchAndValidateSubmission = async (submissionId, userId) => {
 const AI_REPORT_INSERT_ORDER = [
   'submission_id',
   'submission_type',
+  'task_number',
+  'writing_group_id',
   'band_score',
   'task_achievement_score',
   'coherence_score',
@@ -152,6 +154,17 @@ const getAiReportColumns = async (db = pool) => {
      FROM information_schema.columns
      WHERE table_schema = 'public'
        AND table_name = 'ai_grading_reports'`
+  );
+  return new Set(rows.map(row => row.column_name));
+};
+
+const getTableColumns = async (db, tableName) => {
+  const { rows } = await db.query(
+    `SELECT column_name
+     FROM information_schema.columns
+     WHERE table_schema = 'public'
+       AND table_name = $1`,
+    [tableName]
   );
   return new Set(rows.map(row => row.column_name));
 };
@@ -220,10 +233,18 @@ const formatReportResponse = (report) => ({
   generatedAt: report.generated_at,
 });
 
-const saveGradingResult = async (submissionId, taskType, result) => {
+const saveGradingResult = async (submissionId, result) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
+    const { rows: taskRows } = await client.query(
+      `SELECT id, task_number, writing_group_id
+       FROM writing_submissions
+       WHERE id = $1
+       FOR UPDATE`,
+      [submissionId]
+    );
+    const task = taskRows[0] || {};
 
     const c = result.criteria;
     const feedbackJson = {
@@ -231,6 +252,10 @@ const saveGradingResult = async (submissionId, taskType, result) => {
       strengths: result.strengths,
       weaknesses: result.weaknesses,
       majorErrors: result.majorErrors,
+      detailedFeedback: result.detailedFeedback,
+      vocabularySuggestions: result.vocabularySuggestions,
+      grammarCorrections: result.grammarCorrections,
+      actionPlan: result.actionPlan,
       nextStudyAdvice: result.nextStudyAdvice,
       wordCountFeedback: result.wordCountFeedback,
       disclaimer: result.disclaimer,
@@ -243,6 +268,8 @@ const saveGradingResult = async (submissionId, taskType, result) => {
     const report = await insertAiReport(client, {
       submission_id: submissionId,
       submission_type: 'writing',
+      task_number: task.task_number,
+      writing_group_id: task.writing_group_id,
       band_score: result.overallBand,
       task_achievement_score: c.taskAchievementOrResponse.band,
       coherence_score: c.coherenceCohesion.band,
@@ -261,10 +288,30 @@ const saveGradingResult = async (submissionId, taskType, result) => {
       status: REPORT_STATUS.COMPLETED,
     });
 
+    const writingColumns = await getTableColumns(client, 'writing_submissions');
+    const updateValues = [];
+    const setClauses = [];
+    const addSet = (column, value) => {
+      if (!writingColumns.has(column)) return;
+      updateValues.push(value);
+      setClauses.push(`${column} = $${updateValues.length}`);
+    };
+    addSet('grader', 'ai');
+    if (writingColumns.has('status')) {
+      setClauses.push("status = 'ai_graded'::submission_status");
+    }
+    addSet('ai_status', REPORT_STATUS.COMPLETED);
+    if (writingColumns.has('updated_at')) {
+      setClauses.push('updated_at = NOW()');
+    }
+    updateValues.push(submissionId);
     await client.query(
-      `UPDATE writing_submissions SET grader = 'ai', status = 'ai_graded'
-       WHERE id = $1`, [submissionId]
+      `UPDATE writing_submissions
+       SET ${setClauses.join(', ')}
+       WHERE id = $${updateValues.length}`,
+      updateValues
     );
+    await updateWritingGroupAiState(client, submissionId);
 
     await client.query('COMMIT');
     return report;
@@ -282,6 +329,111 @@ const saveGradingResult = async (submissionId, taskType, result) => {
   }
 };
 
+const calculateWeightedWritingBand = (task1Band, task2Band) =>
+  roundToNearestHalf((Number(task1Band) + Number(task2Band) * 2) / 3);
+
+const updateWritingGroupAiState = async (client, submissionId) => {
+  const [writingColumns, reportColumns] = await Promise.all([
+    getTableColumns(client, 'writing_submissions'),
+    getAiReportColumns(client),
+  ]);
+  const { rows: targetRows } = await client.query(
+    `SELECT id, writing_group_id
+     FROM writing_submissions
+     WHERE id = $1`,
+    [submissionId]
+  );
+  if (targetRows.length === 0) return;
+
+  const target = targetRows[0];
+  const tasksResult = await client.query(
+    `SELECT id, task_number, grader
+     FROM writing_submissions
+     WHERE ($1::uuid IS NOT NULL AND writing_group_id = $1::uuid)
+        OR id = $2::uuid
+     ORDER BY task_number ASC`,
+    [target.writing_group_id, target.id]
+  );
+  const tasks = tasksResult.rows;
+  if (tasks.length === 0) return;
+
+  const reportStatusSelect = reportColumns.has('status')
+    ? 'status'
+    : 'NULL::text AS status';
+  const reportErrorSelect = reportColumns.has('error_message')
+    ? 'error_message'
+    : 'NULL::text AS error_message';
+  const reportsResult = await client.query(
+    `SELECT DISTINCT ON (submission_id)
+        submission_id, band_score, ${reportStatusSelect}, ${reportErrorSelect}
+     FROM ai_grading_reports
+     WHERE submission_type = 'writing'
+       AND submission_id = ANY($1::uuid[])
+     ORDER BY submission_id, generated_at DESC`,
+    [tasks.map(task => task.id)]
+  );
+  const reportBySubmission = new Map(reportsResult.rows.map(row => [row.submission_id, row]));
+  const hasFailed = tasks.some(task => {
+    const report = reportBySubmission.get(task.id);
+    return report?.status === REPORT_STATUS.FAILED || Boolean(report?.error_message);
+  });
+  const hasBothCompleted = tasks.length === 2
+    && tasks.every(task => {
+      const report = reportBySubmission.get(task.id);
+      return report
+        && (report.status || REPORT_STATUS.COMPLETED) === REPORT_STATUS.COMPLETED
+        && report.band_score !== null
+        && report.band_score !== undefined;
+    });
+  let aiStatus = 'pending';
+  let overallAiBand = null;
+
+  if (hasFailed) {
+    aiStatus = REPORT_STATUS.FAILED;
+  } else if (hasBothCompleted) {
+    const task1 = tasks.find(task => task.task_number === 1);
+    const task2 = tasks.find(task => task.task_number === 2);
+    const task1Band = task1 ? reportBySubmission.get(task1.id)?.band_score : null;
+    const task2Band = task2 ? reportBySubmission.get(task2.id)?.band_score : null;
+    if (task1Band !== null && task1Band !== undefined && task2Band !== null && task2Band !== undefined) {
+      aiStatus = REPORT_STATUS.COMPLETED;
+      overallAiBand = calculateWeightedWritingBand(task1Band, task2Band);
+    }
+  }
+
+  const updateValues = [];
+  const setClauses = [];
+  const addSet = (column, value) => {
+    if (!writingColumns.has(column)) return;
+    updateValues.push(value);
+    setClauses.push(`${column} = $${updateValues.length}`);
+  };
+  addSet('ai_status', aiStatus);
+  addSet('overall_ai_band', overallAiBand);
+  if (writingColumns.has('status')) {
+    updateValues.push(aiStatus);
+    const statusParam = updateValues.length;
+    setClauses.push(`status = CASE
+      WHEN grader = 'ai' AND $${statusParam} = 'completed' THEN 'ai_graded'::submission_status
+      WHEN grader = 'ai' AND $${statusParam} = 'failed' THEN 'pending'::submission_status
+      WHEN grader = 'ai' AND $${statusParam} = 'pending' THEN 'pending'::submission_status
+      ELSE status
+    END`);
+  }
+  if (writingColumns.has('updated_at')) {
+    setClauses.push('updated_at = NOW()');
+  }
+  if (setClauses.length === 0) return;
+  updateValues.push(target.writing_group_id, target.id);
+  await client.query(
+    `UPDATE writing_submissions
+     SET ${setClauses.join(', ')}
+     WHERE ($${updateValues.length - 1}::uuid IS NOT NULL AND writing_group_id = $${updateValues.length - 1}::uuid)
+        OR id = $${updateValues.length}::uuid`,
+    updateValues
+  );
+};
+
 const shouldPersistAiFailure = (err, submission) => {
   if (!submission || !(err instanceof AppError)) return false;
   return ['AIGRADE_003', 'AIGRADE_004', 'AIGRADE_008', 'AIGRADE_010']
@@ -292,9 +444,18 @@ const handleGradingError = async (err, submissionId, requestId) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
+    const { rows: taskRows } = await client.query(
+      `SELECT id, task_number, writing_group_id
+       FROM writing_submissions
+       WHERE id = $1`,
+      [submissionId]
+    );
+    const task = taskRows[0] || {};
     await insertAiReport(client, {
       submission_id: submissionId,
       submission_type: 'writing',
+      task_number: task.task_number,
+      writing_group_id: task.writing_group_id,
       status: REPORT_STATUS.FAILED,
       error_message: err.message,
       raw_ai_response: JSON.stringify({
@@ -303,12 +464,31 @@ const handleGradingError = async (err, submissionId, requestId) => {
         message: err.message,
       }),
     });
+    const writingColumns = await getTableColumns(client, 'writing_submissions');
+    const updateValues = [];
+    const setClauses = [];
+    const addSet = (column, value) => {
+      if (!writingColumns.has(column)) return;
+      updateValues.push(value);
+      setClauses.push(`${column} = $${updateValues.length}`);
+    };
+    addSet('grader', 'ai');
+    if (writingColumns.has('status')) {
+      setClauses.push("status = 'pending'::submission_status");
+    }
+    addSet('ai_status', REPORT_STATUS.FAILED);
+    addSet('overall_ai_band', null);
+    if (writingColumns.has('updated_at')) {
+      setClauses.push('updated_at = NOW()');
+    }
+    updateValues.push(submissionId);
     await client.query(
       `UPDATE writing_submissions
-       SET grader = 'ai', status = 'pending'
-       WHERE id = $1`,
-      [submissionId]
+       SET ${setClauses.join(', ')}
+       WHERE id = $${updateValues.length}`,
+      updateValues
     );
+    await updateWritingGroupAiState(client, submissionId);
     await client.query('COMMIT');
   } catch (saveErr) {
     await client.query('ROLLBACK');
