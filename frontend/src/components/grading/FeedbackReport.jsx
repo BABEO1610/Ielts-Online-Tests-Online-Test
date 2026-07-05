@@ -2,6 +2,290 @@ import { useState, useEffect, useCallback } from 'react';
 import gradingService from '../../services/grading.service';
 import useGradingSocket from '../../hooks/useGradingSocket';
 import AiFeedbackPanel from './AiFeedbackPanel';
+import {
+  calculateOverallWritingBand,
+  formatBand,
+  getScoreBadge,
+  getWritingCriterionLabel,
+} from './writingFeedback.helpers';
+
+const STATUS_LABELS = {
+  completed: 'AI đã hoàn thành',
+  pending: 'AI đang chấm',
+  failed: 'AI chấm lỗi',
+  graded: 'Đã chấm',
+  tutor_graded: 'Đã chấm',
+};
+
+const getAiStatusText = (task, submission) => {
+  if (task?.aiFeedback?.status === 'completed') return STATUS_LABELS.completed;
+  if (task?.aiFeedback?.status === 'failed') return STATUS_LABELS.failed;
+  if (task?.aiFeedback?.status === 'pending') return STATUS_LABELS.pending;
+  if (submission?.aiStatus === 'completed') return STATUS_LABELS.completed;
+  if (submission?.aiStatus === 'failed') return STATUS_LABELS.failed;
+  return task?.aiFeedback ? STATUS_LABELS.pending : 'Chưa có AI feedback';
+};
+
+const badgeToneClasses = {
+  good: 'text-success',
+  average: 'text-warning-emphasis',
+  weak: 'text-danger',
+  muted: 'text-secondary',
+};
+
+const badgeToneStyles = {
+  good: { backgroundColor: '#e9f6df', color: '#2f6b14' },
+  average: { backgroundColor: '#fff2dc', color: '#935b00' },
+  weak: { backgroundColor: '#ffe8e6', color: '#b42318' },
+  muted: { backgroundColor: '#f1f1f1', color: '#666' },
+};
+
+const getCriterionValue = (scores, key) => {
+  if (!scores) return null;
+  if (key === 'grammarRangeAccuracy') {
+    return scores.grammarRangeAccuracy ?? scores.grammaticalRangeAccuracy ?? null;
+  }
+  return scores[key] ?? null;
+};
+
+const getTutorCriterionRows = (tutorGrade, taskNumber) => {
+  const scores = tutorGrade?.criterionScores || {};
+  return [
+    {
+      key: 'taskAchievementOrResponse',
+      label: getWritingCriterionLabel(taskNumber, 'taskAchievementOrResponse'),
+      score: getCriterionValue(scores, 'taskAchievementOrResponse'),
+    },
+    {
+      key: 'coherenceCohesion',
+      label: getWritingCriterionLabel(taskNumber, 'coherenceCohesion'),
+      score: getCriterionValue(scores, 'coherenceCohesion'),
+    },
+    {
+      key: 'lexicalResource',
+      label: getWritingCriterionLabel(taskNumber, 'lexicalResource'),
+      score: getCriterionValue(scores, 'lexicalResource'),
+    },
+    {
+      key: 'grammarRangeAccuracy',
+      label: getWritingCriterionLabel(taskNumber, 'grammarRangeAccuracy'),
+      score: getCriterionValue(scores, 'grammarRangeAccuracy'),
+    },
+  ];
+};
+
+const CriterionScoreCards = ({ rows }) => (
+  <div className="row g-3 mb-3">
+    {rows.map(row => {
+      const badge = getScoreBadge(row.score);
+      return (
+        <div className="col-sm-6" key={row.key}>
+          <div className="border rounded-3 p-3 h-100 bg-white">
+            <div className="text-muted fw-medium mb-2">{row.label}</div>
+            <div className="d-flex align-items-center gap-2 flex-wrap">
+              <span className="fs-2 fw-bold text-dark">{formatBand(row.score)}</span>
+              <span
+                className={`badge rounded-pill ${badgeToneClasses[badge.tone] || ''}`}
+                style={badgeToneStyles[badge.tone]}
+              >
+                {badge.label}
+              </span>
+            </div>
+          </div>
+        </div>
+      );
+    })}
+  </div>
+);
+
+const TutorFeedbackBox = ({ tutorGrade, taskNumber }) => {
+  if (!tutorGrade) {
+    return (
+      <div className="alert alert-light border mb-0">
+        Chưa có tutor feedback cho task này.
+      </div>
+    );
+  }
+
+  return (
+    <div className="card border shadow-none">
+      <div className="card-body">
+        <div className="d-flex justify-content-between gap-3 flex-wrap mb-3">
+          <h5 className="fw-bold mb-0">Tutor feedback</h5>
+          <span className="badge bg-dark rounded-pill">Band {formatBand(tutorGrade.overallBand)}</span>
+        </div>
+        <CriterionScoreCards rows={getTutorCriterionRows(tutorGrade, taskNumber)} />
+        <p className="mb-0" style={{ whiteSpace: 'pre-wrap', lineHeight: 1.7 }}>
+          {tutorGrade.writtenFeedback || 'Không có nhận xét.'}
+        </p>
+      </div>
+    </div>
+  );
+};
+
+const getPrimaryGradingSource = (data) => {
+  if (data?.grader === 'tutor') return 'tutor';
+  if (data?.grader === 'ai') return 'ai';
+  if (data?.tutorStatus === 'graded') return 'tutor';
+  return 'ai';
+};
+
+const getTaskBandForSource = (task, source) => {
+  if (source === 'tutor') {
+    return task?.tutorGrade?.overallBand
+      ?? task?.tutorGrade?.bandScore
+      ?? task?.tutorGrade?.band_score
+      ?? null;
+  }
+  return task?.aiFeedback?.overallBand
+    ?? task?.aiFeedback?.bandScore
+    ?? task?.aiFeedback?.band_score
+    ?? null;
+};
+
+const OverallWritingBandCard = ({ tasks, source }) => {
+  const task1 = tasks.find(task => Number(task.taskNumber) === 1);
+  const task2 = tasks.find(task => Number(task.taskNumber) === 2);
+  const task1Band = getTaskBandForSource(task1, source);
+  const task2Band = getTaskBandForSource(task2, source);
+  const overall = calculateOverallWritingBand(task1Band, task2Band);
+  const badge = getScoreBadge(overall);
+
+  return (
+    <div className="card border shadow-none mt-4">
+      <div className="card-body p-4">
+        <div className="d-flex justify-content-between align-items-start gap-3 flex-wrap">
+          <div>
+            <h4 className="fw-bold mb-1">Overall Writing Band</h4>
+            <p className="text-muted mb-0">
+              Task 1 × 33% + Task 2 × 67% — chuẩn IELTS Academic
+            </p>
+          </div>
+          {overall !== null && (
+            <div className="d-flex align-items-center gap-3">
+              <span className="display-5 fw-bold text-dark mb-0">{formatBand(overall)}</span>
+              <span
+                className={`badge rounded-pill px-3 py-2 ${badgeToneClasses[badge.tone] || ''}`}
+                style={badgeToneStyles[badge.tone]}
+              >
+                {badge.label}
+              </span>
+            </div>
+          )}
+        </div>
+
+        {overall === null ? (
+          <div className="alert alert-light border mt-3 mb-0">
+            Chưa đủ dữ liệu để tính Overall Writing Band.
+          </div>
+        ) : (
+          <div className="mt-3 border-top">
+            <div className="d-flex justify-content-between py-3 border-bottom">
+              <span>Task 1 <span className="text-muted fw-semibold">(trọng số 33%)</span></span>
+              <span className="fw-bold">{formatBand(task1Band)}</span>
+            </div>
+            <div className="d-flex justify-content-between pt-3">
+              <span>Task 2 <span className="text-muted fw-semibold">(trọng số 67%)</span></span>
+              <span className="fw-bold">{formatBand(task2Band)}</span>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+const WritingFeedbackDetail = ({ data }) => {
+  const [activeTaskNumber, setActiveTaskNumber] = useState(1);
+  const tasks = data.tasks || [];
+  const activeTask = tasks.find(task => task.taskNumber === activeTaskNumber) || tasks[0];
+  const gradingSource = getPrimaryGradingSource(data);
+  const isTutorContext = gradingSource === 'tutor';
+  const shouldShowAiPanel = gradingSource === 'ai' || Boolean(activeTask?.aiFeedback);
+
+  if (!activeTask) {
+    return <div className="alert alert-info">Chưa có dữ liệu Writing task.</div>;
+  }
+
+  return (
+    <div className="feedback-report mt-4" style={{ fontFamily: 'UberMoveText, system-ui, sans-serif' }}>
+      <div className="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-3">
+        <div>
+          <h3 className="fw-bold mb-1">Writing Feedback Detail</h3>
+          <p className="text-muted mb-0">{data.testTitle || 'IELTS Writing'}</p>
+        </div>
+        <div className="d-flex gap-2 flex-wrap justify-content-end">
+          <span className="badge text-bg-light border">AI: {STATUS_LABELS[data.aiStatus] || data.aiStatus || 'Chưa có AI feedback'}</span>
+          {isTutorContext && (
+            <span className="badge text-bg-light border">
+              Tutor: {data.tutorStatus === 'graded' ? 'Đã chấm' : 'Đang chờ chấm'}
+            </span>
+          )}
+        </div>
+      </div>
+
+      <ul className="nav nav-tabs mb-4">
+        {[1, 2].map(taskNumber => (
+          <li className="nav-item" key={taskNumber}>
+            <button
+              type="button"
+              className={`nav-link ${activeTaskNumber === taskNumber ? 'active' : ''}`}
+              onClick={() => setActiveTaskNumber(taskNumber)}
+            >
+              Task {taskNumber}
+            </button>
+          </li>
+        ))}
+      </ul>
+
+      <div className="row g-4">
+        <div className="col-lg-5">
+          <div className="card border shadow-none mb-4">
+            <div className="card-header bg-white fw-bold">Prompt</div>
+            <div className="card-body">
+              <p className="mb-0" style={{ whiteSpace: 'pre-wrap', lineHeight: 1.7 }}>
+                {activeTask.prompt || 'Không có đề bài.'}
+              </p>
+            </div>
+          </div>
+          <div className="card border shadow-none">
+            <div className="card-header bg-white d-flex justify-content-between">
+              <span className="fw-bold">Student response</span>
+              <span className="text-muted small">{activeTask.wordCount || 0} words</span>
+            </div>
+            <div className="card-body">
+              <p className="mb-0" style={{ whiteSpace: 'pre-wrap', lineHeight: 1.8 }}>
+                {activeTask.studentResponse || 'Không có bài làm.'}
+              </p>
+            </div>
+          </div>
+        </div>
+        <div className="col-lg-7">
+          {shouldShowAiPanel && (
+            <>
+              <div className="mb-3">
+                <span className="badge text-bg-light border">{getAiStatusText(activeTask, data)}</span>
+              </div>
+              <AiFeedbackPanel
+                report={activeTask.aiFeedback ? { ...activeTask.aiFeedback, taskNumber: activeTask.taskNumber } : null}
+              />
+            </>
+          )}
+          {isTutorContext && (
+            <div className={shouldShowAiPanel ? 'mt-4' : ''}>
+              <TutorFeedbackBox
+                tutorGrade={activeTask.tutorGrade}
+                taskNumber={activeTask.taskNumber}
+              />
+            </div>
+          )}
+        </div>
+      </div>
+
+      <OverallWritingBandCard tasks={tasks} source={gradingSource} />
+    </div>
+  );
+};
 
 const FeedbackReport = ({ submissionId, type }) => {
   const [reportData, setReportData] = useState(null);
@@ -49,7 +333,7 @@ const FeedbackReport = ({ submissionId, type }) => {
     const handleGradingFailed = (data) => {
       const eventSubmissionId = data.submission_id || data.submissionId;
       if (eventSubmissionId === submissionId) {
-        setError('AI grading failed. Please check AI configuration or try again.');
+        setError('Chấm bài thất bại, quota đã được hoàn trả.');
         setLoading(false);
       }
     };
@@ -84,6 +368,10 @@ const FeedbackReport = ({ submissionId, type }) => {
         <button className="btn btn-outline-danger mt-2" onClick={fetchFeedback}>Thử lại</button>
       </div>
     );
+  }
+
+  if (type === 'writing' && Array.isArray(reportData?.tasks)) {
+    return <WritingFeedbackDetail data={reportData} />;
   }
 
   if (!reportData || (!reportData.ai_report && !reportData.tutor_report)) {

@@ -51,6 +51,7 @@ import SpeakingTestPage from './pages/subjective-testing/SpeakingTestPage';
 
 // ── Student History (Profile Dropdown → /history) ─────────────────────────────
 import StudentHistoryPage from './pages/grading/StudentHistoryPage';
+import StudentFeedbackDetailPage from './pages/grading/StudentFeedbackDetailPage';
 
 // ── Tutor Workspace — Subjective Grading ──────────────────────────────────────
 import TutorQueuePage from './pages/grading/TutorQueuePage';
@@ -134,6 +135,7 @@ function App() {
           <Route path="/profile" element={<ProtectedRoute><UserProfilePage /></ProtectedRoute>} />
           <Route path="/practice-history" element={<ProtectedRoute><UserProfilePage /></ProtectedRoute>} />
           <Route path="/study-plan" element={<ProtectedRoute><UserProfilePage /></ProtectedRoute>} />
+          <Route path="/student/profile/practice-history/:submissionId" element={<ProtectedRoute><StudentFeedbackDetailPage /></ProtectedRoute>} />
         </Route>
 
         {/* ── Tutor Section ── */}

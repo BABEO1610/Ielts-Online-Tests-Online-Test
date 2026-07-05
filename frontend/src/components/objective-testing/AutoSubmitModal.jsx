@@ -7,7 +7,6 @@
  * 
  * Design: Uber-inspired modal, static backdrop, spinner.
  */
-import React from 'react';
 import '../../styles/objective-testing.css';
 
 function AutoSubmitModal({ isOpen }) {

@@ -170,7 +170,12 @@ class AttemptController {
           timeSpent: null,
           practiceMode: false,
           submittedAt: sub.submitted_at,
-          status: sub.status // useful for UI
+          status: sub.status, // useful for UI
+          aiStatus: sub.aiStatus,
+          tutorStatus: sub.tutorStatus,
+          type: sub.type,
+          aiBandScore: sub.ai_band_score,
+          tutorBandScore: sub.tutor_band_score
         }))
       ];
 

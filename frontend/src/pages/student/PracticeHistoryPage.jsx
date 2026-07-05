@@ -1,4 +1,5 @@
 import { useMemo, useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import api from '../../services/api';
 import '../../styles/admin.css';
 import '../../styles/profile.css';
@@ -76,6 +77,7 @@ function calcSummary(history) {
 }
 
 const PracticeHistoryPage = () => {
+  const navigate = useNavigate();
   const [filter, setFilter] = useState('Tất cả');
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -83,6 +85,7 @@ const PracticeHistoryPage = () => {
 
   useEffect(() => {
     const skillParam = SKILL_QUERY[filter];
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true);
     setError('');
 
@@ -114,6 +117,16 @@ const PracticeHistoryPage = () => {
       return { text: 'Đã nộp', color: 'info' };
     }
     return { text: 'Hoàn thành', color: 'success' };
+  };
+
+  const handleViewDetail = (item) => {
+    if (item.skill === 'writing' || item.skill === 'speaking') {
+      navigate(`/student/profile/practice-history/${item.id}?type=${item.skill}`, {
+        state: { type: item.skill },
+      });
+      return;
+    }
+    navigate(`/results/${item.id}`);
   };
 
   return (
@@ -166,6 +179,7 @@ const PracticeHistoryPage = () => {
             <span>Điểm số</span>
             <span>Ngày</span>
             <span>Trạng thái</span>
+            <span>Chi tiết</span>
           </div>
 
           {loading && (
@@ -194,6 +208,13 @@ const PracticeHistoryPage = () => {
                   <span className={`iot-badge iot-badge--${statusInfo.color}`}>{statusInfo.text}</span>
                 );
               })()}
+              <button
+                type="button"
+                className="btn btn-sm btn-dark rounded-pill"
+                onClick={() => handleViewDetail(item)}
+              >
+                Xem chi tiết
+              </button>
             </div>
           ))}
 

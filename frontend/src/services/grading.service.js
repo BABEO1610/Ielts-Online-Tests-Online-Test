@@ -93,6 +93,13 @@ const gradingService = {
     return response.data;
   },
 
+  runPrelimCheck: async (type, submissionId, taskNumber) => {
+    const response = await api.post(`/tutors/submissions/${type}/${submissionId}/ai-prelim`, {
+      taskNumber,
+    });
+    return response.data;
+  },
+
   // EARS[Event]: WHEN tutor submits grading result THEN call grade endpoint
   gradeSubmission: async (type, submissionId, gradeData) => {
     const response = await api.post(`/tutors/submissions/${type}/${submissionId}/grade`, gradeData);

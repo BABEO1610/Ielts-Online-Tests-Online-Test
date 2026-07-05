@@ -29,6 +29,11 @@ const parseBand = (raw) => {
 const isBandInRange = (band) =>
   typeof band === 'number' && band >= 0 && band <= 9;
 
+const arrayOrEmpty = (value) => (Array.isArray(value) ? value : []);
+
+const stringOrEmpty = (value) =>
+  typeof value === 'string' ? value : '';
+
 /**
  * Normalize a single band score: parse → range check → round to 0.5.
  * Returns { value, wasRounded, error }.
@@ -88,6 +93,12 @@ const validateGradingResponse = (rawText) => {
 
   const errors = [];
   const c = parsed.criteria || {};
+  if (
+    parsed.taskNumber !== undefined
+    && ![1, 2].includes(Number(parsed.taskNumber))
+  ) {
+    errors.push('taskNumber must be 1 or 2');
+  }
 
   // Validate required criteria exist
   const requiredCriteria = [
@@ -145,34 +156,52 @@ const buildNormalizedResult = (parsed, bands) => {
     errors: [],
     data: {
       overallBand: bands.overall.value,
+      taskNumber: parsed.taskNumber ? Number(parsed.taskNumber) : null,
       computedBand,
       bandValidationWarning: bandWarning,
       criteria: {
         taskAchievementOrResponse: {
           band: bands.ta.value,
-          feedback: c.taskAchievementOrResponse?.feedback || '',
+          feedback: stringOrEmpty(c.taskAchievementOrResponse?.feedback),
         },
         coherenceCohesion: {
           band: bands.cc.value,
-          feedback: c.coherenceCohesion?.feedback || '',
+          feedback: stringOrEmpty(c.coherenceCohesion?.feedback),
         },
         lexicalResource: {
           band: bands.lr.value,
-          feedback: c.lexicalResource?.feedback || '',
+          feedback: stringOrEmpty(c.lexicalResource?.feedback),
         },
         grammarRangeAccuracy: {
           band: bands.gra.value,
-          feedback: c.grammarRangeAccuracy?.feedback || '',
+          feedback: stringOrEmpty(c.grammarRangeAccuracy?.feedback),
         },
       },
-      summary: parsed.summary || '',
-      strengths: Array.isArray(parsed.strengths) ? parsed.strengths : [],
-      weaknesses: Array.isArray(parsed.weaknesses) ? parsed.weaknesses : [],
-      majorErrors: Array.isArray(parsed.majorErrors) ? parsed.majorErrors : [],
-      improvedVersion: parsed.improvedVersion || '',
-      nextStudyAdvice: parsed.nextStudyAdvice || '',
+      summary: stringOrEmpty(parsed.summary),
+      strengths: arrayOrEmpty(parsed.strengths),
+      weaknesses: arrayOrEmpty(parsed.weaknesses),
+      majorErrors: arrayOrEmpty(parsed.majorErrors).map(error => ({
+        error: error.quote || error.error || error.original || error.text || '',
+        explanation: error.problem || error.explanation || error.issue || '',
+        correction: error.correction || error.corrected || error.suggestion || '',
+      })),
+      detailedFeedback: {
+        taskAchievementOrResponse: stringOrEmpty(parsed.detailedFeedback?.taskAchievementOrResponse)
+          || stringOrEmpty(c.taskAchievementOrResponse?.feedback),
+        coherenceCohesion: stringOrEmpty(parsed.detailedFeedback?.coherenceCohesion)
+          || stringOrEmpty(c.coherenceCohesion?.feedback),
+        lexicalResource: stringOrEmpty(parsed.detailedFeedback?.lexicalResource)
+          || stringOrEmpty(c.lexicalResource?.feedback),
+        grammarRangeAccuracy: stringOrEmpty(parsed.detailedFeedback?.grammarRangeAccuracy)
+          || stringOrEmpty(c.grammarRangeAccuracy?.feedback),
+      },
+      improvedVersion: stringOrEmpty(parsed.improvedVersion),
+      vocabularySuggestions: arrayOrEmpty(parsed.vocabularySuggestions),
+      grammarCorrections: arrayOrEmpty(parsed.grammarCorrections),
+      actionPlan: arrayOrEmpty(parsed.actionPlan),
+      nextStudyAdvice: stringOrEmpty(parsed.nextStudyAdvice),
       wordCountFeedback: parsed.wordCountFeedback || null,
-      disclaimer: parsed.disclaimer || 'AI score is an estimated IELTS band.',
+      disclaimer: stringOrEmpty(parsed.disclaimer) || 'AI score is an estimated IELTS band.',
     },
   };
 };

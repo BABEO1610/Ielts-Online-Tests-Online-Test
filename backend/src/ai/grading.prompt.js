@@ -26,10 +26,19 @@ const buildSystemPrompt = (taskType) => {
     buildCalibrationRules(),
     '',
     'IMPORTANT RULES:',
-    '- Feedback must be in Vietnamese, clear for band 4-5 students.',
+    '- summary, strengths, weaknesses, explanations, detailedFeedback, vocabulary reasons, grammar explanations, and actionPlan must be in Vietnamese.',
+    '- improvedVersion must be an IELTS-style sample rewrite in English.',
+    '- summary must contain 4 to 6 useful Vietnamese sentences about overall quality and the main problems.',
+    '- Each criterion feedback must contain 2 to 4 Vietnamese sentences explaining why that score was awarded.',
+    '- strengths must contain 2 to 4 concrete strengths when possible.',
+    '- majorErrors must contain at least 3 items when the essay has enough errors.',
+    '- Each majorErrors item must cite an exact short quote from the student answer, explain the problem, and give a correction or improvement.',
+    '- actionPlan must contain 3 to 5 specific next steps the student can practice.',
+    '- Feedback must be detailed, practical, and clear for band 4-6 students.',
     '- Be specific — cite actual errors from the essay.',
     '- Do NOT fabricate information not in the essay.',
     '- Do NOT be overly optimistic.',
+    '- Avoid one-sentence generic feedback sections.',
     '- Do NOT use markdown in output.',
     '- Output ONLY valid JSON matching the schema below.',
     '- Do NOT wrap JSON in code blocks.',
@@ -71,19 +80,45 @@ const buildCalibrationRules = () => [
 ].join('\n');
 
 const buildJsonSchema = () => JSON.stringify({
+  taskNumber: 'number 1 or 2',
   overallBand: 'number 0-9',
   criteria: {
-    taskAchievementOrResponse: { band: 'number', feedback: 'string' },
-    coherenceCohesion: { band: 'number', feedback: 'string' },
-    lexicalResource: { band: 'number', feedback: 'string' },
-    grammarRangeAccuracy: { band: 'number', feedback: 'string' },
+    taskAchievementOrResponse: {
+      band: 'number',
+      feedback: '2-4 Vietnamese sentences explaining the score',
+    },
+    coherenceCohesion: {
+      band: 'number',
+      feedback: '2-4 Vietnamese sentences explaining the score',
+    },
+    lexicalResource: {
+      band: 'number',
+      feedback: '2-4 Vietnamese sentences explaining the score',
+    },
+    grammarRangeAccuracy: {
+      band: 'number',
+      feedback: '2-4 Vietnamese sentences explaining the score',
+    },
   },
-  summary: 'string',
-  strengths: ['string'],
-  weaknesses: ['string'],
-  majorErrors: [{ original: 'string', issue: 'string', suggestion: 'string' }],
-  improvedVersion: 'string',
-  nextStudyAdvice: 'string',
+  summary: '4-6 Vietnamese sentences',
+  strengths: ['2-4 concrete strengths in Vietnamese'],
+  weaknesses: ['2-4 concrete weaknesses in Vietnamese'],
+  majorErrors: [{
+    error: 'exact short quote from the student answer',
+    explanation: 'problem explained in Vietnamese',
+    correction: 'corrected phrase/sentence or improvement suggestion',
+  }],
+  detailedFeedback: {
+    taskAchievementOrResponse: '2-4 Vietnamese sentences',
+    coherenceCohesion: '2-4 Vietnamese sentences',
+    lexicalResource: '2-4 Vietnamese sentences',
+    grammarRangeAccuracy: '2-4 Vietnamese sentences',
+  },
+  improvedVersion: 'string in English',
+  vocabularySuggestions: [{ original: 'string', better: 'string', reason: 'string in Vietnamese' }],
+  grammarCorrections: [{ original: 'string', corrected: 'string', explanation: 'string in Vietnamese' }],
+  actionPlan: ['3-5 specific Vietnamese next steps'],
+  nextStudyAdvice: 'string in Vietnamese',
   wordCountFeedback: 'string or null',
   disclaimer: 'string',
 }, null, 2);
@@ -94,6 +129,7 @@ const buildUserPrompt = ({
 }) => {
   const parts = [
     `Task type: Writing ${taskType === 'task1' ? 'Task 1' : 'Task 2'}`,
+    `taskNumber: ${taskType === 'task1' ? 1 : 2}`,
   ];
   if (testTitle) parts.push(`Test: ${testTitle}`);
   parts.push(`Student word count: ${wordCount}`);

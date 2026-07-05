@@ -65,4 +65,50 @@ describe('grading.validator', () => {
     expect(result.data.computedBand).toBe(5.0);
     expect(result.data.bandValidationWarning).toContain('deviates');
   });
+
+  it('preserves task metadata and expanded feedback sections', () => {
+    const result = validateGradingResponse(JSON.stringify({
+      taskNumber: 2,
+      overallBand: 6.0,
+      criteria: {
+        taskAchievementOrResponse: { band: 6.0, feedback: 'TR feedback' },
+        coherenceCohesion: { band: 6.0, feedback: 'CC feedback' },
+        lexicalResource: { band: 6.0, feedback: 'LR feedback' },
+        grammarRangeAccuracy: { band: 6.0, feedback: 'GRA feedback' },
+      },
+      summary: 'Summary',
+      strengths: ['Clear position'],
+      weaknesses: ['Needs more support'],
+      majorErrors: [
+        { original: 'bad phrase', issue: 'unclear', suggestion: 'clear phrase' },
+      ],
+      detailedFeedback: {
+        taskAchievementOrResponse: 'Detailed TR',
+        coherenceCohesion: 'Detailed CC',
+        lexicalResource: 'Detailed LR',
+        grammarRangeAccuracy: 'Detailed GRA',
+      },
+      improvedVersion: 'Improved essay.',
+      vocabularySuggestions: [
+        { original: 'good', better: 'beneficial', reason: 'More precise' },
+      ],
+      grammarCorrections: [
+        { original: 'he go', corrected: 'he goes', explanation: 'Subject-verb agreement' },
+      ],
+      actionPlan: ['Plan before writing'],
+      nextStudyAdvice: 'Practice outlines.',
+    }));
+
+    expect(result.success).toBe(true);
+    expect(result.data.taskNumber).toBe(2);
+    expect(result.data.majorErrors[0]).toEqual({
+      error: 'bad phrase',
+      explanation: 'unclear',
+      correction: 'clear phrase',
+    });
+    expect(result.data.detailedFeedback.lexicalResource).toBe('Detailed LR');
+    expect(result.data.vocabularySuggestions).toHaveLength(1);
+    expect(result.data.grammarCorrections).toHaveLength(1);
+    expect(result.data.actionPlan).toEqual(['Plan before writing']);
+  });
 });

@@ -4,7 +4,7 @@ const SubmissionViewer = ({ task }) => {
   const [viewMode, setViewMode] = useState('text'); // 'original' or 'text'
 
   const hasOriginalFile = task.fileType === 'image' || task.fileType === 'pdf';
-  const wordCount = task.extractedText ? task.extractedText.trim().split(/\s+/).length : 0;
+  const wordCount = task.wordCount ?? (task.extractedText ? task.extractedText.trim().split(/\s+/).length : 0);
 
   return (
     <div className="d-flex flex-column h-100">
