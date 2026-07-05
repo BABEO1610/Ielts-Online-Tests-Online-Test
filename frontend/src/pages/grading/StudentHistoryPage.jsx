@@ -237,7 +237,7 @@ const StudentHistoryPage = () => {
                       {sub.band_score ? (
                         <div>
                           <span className="fw-bold text-dark" style={{ fontSize: '20px', fontFamily: 'UberMove, system-ui, sans-serif' }}>
-                            {sub.band_score.toFixed(1)}
+                            {(Math.round(Number(sub.band_score) * 2) / 2).toFixed(1)}
                           </span>
                           <div className="text-muted" style={{ fontSize: '12px' }}>
                             {sub.tutor_band_score ? 'Tutor Final' : 'AI Estimated'}
