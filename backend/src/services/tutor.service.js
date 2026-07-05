@@ -1,18 +1,241 @@
 const { pool } = require('../db/pool');
 const AppError = require('../utils/AppError');
 const AuditLogService = require('./audit.service');
+const { roundToNearestHalf } = require('../utils/scoring');
+const { gradeWriting } = require('../ai/grading.service');
+const { REPORT_STATUS } = require('../ai/aiGrading.constants');
 
 const countWords = (text) =>
   String(text || '').trim().split(/\s+/).filter(Boolean).length;
 
-const getAiReportColumns = async () => {
-  const { rows } = await pool.query(
+const parseMaybeJson = (value, fallback = null) => {
+  if (value === null || value === undefined) return fallback;
+  if (typeof value === 'object') return value;
+  try {
+    return JSON.parse(value);
+  } catch {
+    return fallback;
+  }
+};
+
+const toNumberOrNull = (value) => {
+  if (value === null || value === undefined || value === '') return null;
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
+};
+
+const calculateWeightedWritingBand = (task1Band, task2Band) =>
+  roundToNearestHalf((Number(task1Band) + Number(task2Band) * 2) / 3);
+
+const calculateDisplayWritingBand = (task1Band, task2Band) => {
+  if (
+    task1Band === null || task1Band === undefined || task1Band === ''
+    || task2Band === null || task2Band === undefined || task2Band === ''
+  ) {
+    return null;
+  }
+  const task1 = Number(task1Band);
+  const task2 = Number(task2Band);
+  if (!Number.isFinite(task1) || !Number.isFinite(task2)) return null;
+  return Number((task1 * 0.33 + task2 * 0.67).toFixed(1));
+};
+
+const validateBand = (value, fieldName) => {
+  const number = Number(value);
+  if (!Number.isFinite(number) || number < 0 || number > 9) {
+    throw new AppError(`${fieldName} must be a number between 0 and 9`, 400);
+  }
+  return roundToNearestHalf(number);
+};
+
+const getTableColumns = async (db, tableName) => {
+  const { rows } = await db.query(
     `SELECT column_name
      FROM information_schema.columns
      WHERE table_schema = 'public'
-       AND table_name = 'ai_grading_reports'`
+       AND table_name = $1`,
+    [tableName]
   );
   return new Set(rows.map(row => row.column_name));
+};
+
+const buildCriterionScores = (report, parsedCriteria = null) => {
+  const fallback = {
+    taskAchievementOrResponse: toNumberOrNull(report.task_achievement_score),
+    coherenceCohesion: toNumberOrNull(report.coherence_score),
+    lexicalResource: toNumberOrNull(report.lexical_score),
+    grammarRangeAccuracy: toNumberOrNull(report.grammar_score),
+  };
+  if (!parsedCriteria) return fallback;
+  return {
+    ...fallback,
+    ...parsedCriteria,
+  };
+};
+
+const buildDetailedFeedback = (feedback, criteria) => {
+  if (feedback.detailedFeedback && Object.keys(feedback.detailedFeedback).length > 0) {
+    return feedback.detailedFeedback;
+  }
+  return {
+    taskAchievementOrResponse: criteria?.taskAchievementOrResponse?.feedback || '',
+    coherenceCohesion: criteria?.coherenceCohesion?.feedback || '',
+    lexicalResource: criteria?.lexicalResource?.feedback || '',
+    grammarRangeAccuracy: criteria?.grammarRangeAccuracy?.feedback
+      || criteria?.grammaticalRangeAccuracy?.feedback
+      || '',
+  };
+};
+
+const mapAiReport = (report) => {
+  if (!report) return null;
+  const rawAiResponse = parseMaybeJson(report.raw_ai_response, {});
+  const feedback = parseMaybeJson(report.feedback_json, null) || rawAiResponse || {};
+  const parsedCriteria = parseMaybeJson(report.criteria_json, null) || rawAiResponse.criteria || null;
+  const criterionScores = buildCriterionScores(report, parsedCriteria);
+  return {
+    id: report.id,
+    status: report.status || REPORT_STATUS.COMPLETED,
+    errorMessage: report.error_message || null,
+    overallBand: toNumberOrNull(report.band_score),
+    computedBand: toNumberOrNull(report.computed_band),
+    criterionScores,
+    summary: feedback.summary || report.suggestions || '',
+    strengths: Array.isArray(feedback.strengths) ? feedback.strengths : [],
+    weaknesses: Array.isArray(feedback.weaknesses) ? feedback.weaknesses : [],
+    majorErrors: Array.isArray(feedback.majorErrors)
+      ? feedback.majorErrors
+      : parseMaybeJson(report.error_highlights, []),
+    improvedVersion: report.improved_version || feedback.improvedVersion || '',
+    vocabularySuggestions: Array.isArray(feedback.vocabularySuggestions)
+      ? feedback.vocabularySuggestions : [],
+    grammarCorrections: Array.isArray(feedback.grammarCorrections)
+      ? feedback.grammarCorrections : [],
+    actionPlan: Array.isArray(feedback.actionPlan)
+      ? feedback.actionPlan
+      : (feedback.nextStudyAdvice ? [feedback.nextStudyAdvice] : []),
+    detailedFeedback: buildDetailedFeedback(feedback, criterionScores),
+    nextStudyAdvice: feedback.nextStudyAdvice || '',
+    wordCountFeedback: feedback.wordCountFeedback || null,
+    bandWarning: report.band_validation_warning || null,
+    generatedAt: report.generated_at,
+    taskNumber: report.task_number,
+  };
+};
+
+const mapTutorGrade = (report) => {
+  if (!report) return null;
+  return {
+    id: report.id,
+    overallBand: report.band_score ? parseFloat(report.band_score) : null,
+    criterionScores: {
+      taskAchievementOrResponse: report.task_achievement_score
+        ? parseFloat(report.task_achievement_score) : null,
+      coherenceCohesion: report.coherence_score ? parseFloat(report.coherence_score) : null,
+      lexicalResource: report.lexical_score ? parseFloat(report.lexical_score) : null,
+      grammaticalRangeAccuracy: report.grammar_score ? parseFloat(report.grammar_score) : null,
+    },
+    writtenFeedback: report.written_feedback || '',
+    updatedAt: report.updated_at,
+  };
+};
+
+const listSection = (title, items, formatter = item => `- ${item}`) => {
+  if (!Array.isArray(items) || items.length === 0) return '';
+  return `${title}\n${items.map(formatter).join('\n')}`;
+};
+
+const formatErrorItem = (item) => {
+  if (typeof item === 'string') return `- ${item}`;
+  const quote = item.error || item.quote || item.original || item.text || '';
+  const issue = item.explanation || item.problem || item.issue || '';
+  const fix = item.correction || item.corrected || item.suggestion || '';
+  return `- ${[quote && `"${quote}"`, issue, fix && `Gợi ý: ${fix}`].filter(Boolean).join(' — ')}`;
+};
+
+const buildFeedbackDraft = (ai) => [
+  ai?.summary ? `Summary\n${ai.summary}` : '',
+  ai?.detailedFeedback && Object.keys(ai.detailedFeedback).length > 0
+    ? [
+        'Criterion feedback',
+        ai.detailedFeedback.taskAchievementOrResponse && `- Task Achievement/Response: ${ai.detailedFeedback.taskAchievementOrResponse}`,
+        ai.detailedFeedback.coherenceCohesion && `- Coherence & Cohesion: ${ai.detailedFeedback.coherenceCohesion}`,
+        ai.detailedFeedback.lexicalResource && `- Lexical Resource: ${ai.detailedFeedback.lexicalResource}`,
+        ai.detailedFeedback.grammarRangeAccuracy && `- Grammar Range & Accuracy: ${ai.detailedFeedback.grammarRangeAccuracy}`,
+      ].filter(Boolean).join('\n')
+    : '',
+  listSection('Strengths', ai?.strengths),
+  listSection('Major errors', ai?.majorErrors, formatErrorItem),
+  listSection('Next steps', ai?.actionPlan),
+  ai?.nextStudyAdvice ? `Next study advice\n${ai.nextStudyAdvice}` : '',
+].filter(Boolean).join('\n\n');
+
+const formatPrelimFromAiFeedback = (taskNumber, ai) => {
+  const criteria = ai?.criterionScores || ai?.criteria || {};
+  return {
+    taskNumber,
+    suggestedOverallBand: ai?.overallBand || null,
+    suggestedCriteria: {
+      taskAchievementOrResponse: criteria.taskAchievementOrResponse?.band
+        ?? criteria.taskAchievementOrResponse ?? null,
+      coherenceCohesion: criteria.coherenceCohesion?.band
+        ?? criteria.coherenceCohesion ?? null,
+      lexicalResource: criteria.lexicalResource?.band
+        ?? criteria.lexicalResource ?? null,
+      grammaticalRangeAccuracy: criteria.grammarRangeAccuracy?.band
+        ?? criteria.grammaticalRangeAccuracy?.band
+        ?? criteria.grammarRangeAccuracy
+        ?? criteria.grammaticalRangeAccuracy
+        ?? null,
+    },
+    feedbackDraft: buildFeedbackDraft(ai),
+    keyProblems: ai?.weaknesses || [],
+    suggestedRewrite: ai?.improvedVersion || '',
+    tutorNotes: Array.isArray(ai?.actionPlan)
+      ? ai.actionPlan.join('\n')
+      : (ai?.nextStudyAdvice || ''),
+    aiFeedback: {
+      ...ai,
+      taskNumber,
+      status: ai?.status || REPORT_STATUS.COMPLETED,
+    },
+  };
+};
+
+const formatPrelimFromAiResult = (taskNumber, result) => formatPrelimFromAiFeedback(taskNumber, {
+  status: REPORT_STATUS.COMPLETED,
+  overallBand: result.overallBand,
+  computedBand: result.computedBand,
+  criterionScores: result.criteria,
+  summary: result.summary || '',
+  strengths: result.strengths || [],
+  weaknesses: result.weaknesses || [],
+  majorErrors: result.majorErrors || [],
+  detailedFeedback: result.detailedFeedback || {},
+  improvedVersion: result.improvedVersion || '',
+  vocabularySuggestions: result.vocabularySuggestions || [],
+  grammarCorrections: result.grammarCorrections || [],
+  actionPlan: result.actionPlan || [],
+  nextStudyAdvice: result.nextStudyAdvice || '',
+  wordCountFeedback: result.wordCountFeedback || null,
+  bandWarning: result.bandValidationWarning || null,
+});
+
+const formatPrelimFromReport = (report, fallbackTaskNumber = null) => {
+  const ai = mapAiReport(report);
+  return formatPrelimFromAiFeedback(report.task_number || fallbackTaskNumber, {
+    ...ai,
+    criterionScores: ai?.criterionScores || {
+      taskAchievementOrResponse: report.task_achievement_score,
+      coherenceCohesion: report.coherence_score,
+      lexicalResource: report.lexical_score,
+      grammarRangeAccuracy: report.grammar_score,
+    },
+  });
+};
+
+const getAiReportColumns = async () => {
+  return getTableColumns(pool, 'ai_grading_reports');
 };
 
 class TutorService {
@@ -139,55 +362,106 @@ class TutorService {
     }
 
     if (type === 'writing') {
-      const query = `
-        WITH base AS (
-            SELECT writing_group_id
-            FROM writing_submissions
-            WHERE id = $1
-        )
-        SELECT
-            ws.writing_group_id,
-            ws.user_id AS student_id,
-            u.full_name AS student_name,
-            mt.title AS test_title,
-            MIN(ws.submitted_at) AS submitted_at,
-            MIN(ws.status) AS status,
-            MIN(ws.grader) AS grader,
-            json_agg(
-                json_build_object(
-                    'submissionId', ws.id,
-                    'taskNumber', ws.task_number,
-                    'promptText', ws.prompt_text,
-                    'responseText', ws.response_text,
-                    'fileUrl', ws.file_url
-                )
-                ORDER BY ws.task_number
-            ) AS parts
-        FROM writing_submissions ws
-        JOIN base b ON b.writing_group_id = ws.writing_group_id
-        JOIN users u ON u.id = ws.user_id
-        LEFT JOIN mock_tests mt ON mt.id = ws.test_id
-        GROUP BY
-            ws.writing_group_id,
-            ws.user_id,
-            u.full_name,
-            mt.title
-      `;
-      const result = await pool.query(query, [submissionId]);
-      if (result.rows.length === 0) return null;
-      const row = result.rows[0];
+      const targetRes = await pool.query(
+        `SELECT id, writing_group_id
+         FROM writing_submissions
+         WHERE id::text = $1 OR writing_group_id::text = $1
+         ORDER BY task_number ASC NULLS LAST
+         LIMIT 1`,
+        [submissionId]
+      );
+      if (targetRes.rows.length === 0) return null;
+
+      const target = targetRes.rows[0];
+      const tasksRes = await pool.query(
+        `SELECT ws.*, mt.title AS test_title, u.full_name AS student_name
+         FROM writing_submissions ws
+         JOIN users u ON u.id = ws.user_id
+         LEFT JOIN mock_tests mt ON mt.id = ws.test_id
+         WHERE (
+           ($1::uuid IS NOT NULL AND ws.writing_group_id = $1::uuid)
+           OR ws.id = $2::uuid
+         )
+         ORDER BY ws.task_number ASC`,
+        [target.writing_group_id, target.id]
+      );
+      const tasks = tasksRes.rows;
+      if (tasks.length === 0) return null;
+
+      const taskIds = tasks.map(task => task.id);
+      const aiRes = await pool.query(
+        `SELECT DISTINCT ON (submission_id) *
+         FROM ai_grading_reports
+         WHERE submission_type = 'writing'
+           AND submission_id = ANY($1::uuid[])
+         ORDER BY submission_id, generated_at DESC`,
+        [taskIds]
+      );
+      const aiBySubmission = new Map(aiRes.rows.map(report => [report.submission_id, report]));
+
+      const tutorRes = await pool.query(
+        `SELECT DISTINCT ON (writing_submission_id) *
+         FROM tutor_feedback_reports
+         WHERE writing_submission_id = ANY($1::uuid[])
+         ORDER BY writing_submission_id, updated_at DESC, created_at DESC`,
+        [taskIds]
+      );
+      const tutorBySubmission = new Map(tutorRes.rows.map(report => [report.writing_submission_id, report]));
+
+      const row = tasks[0];
+      const aiTaskReports = tasks.map(task => mapAiReport(aiBySubmission.get(task.id)));
+      const tutorTaskGrades = tasks.map(task => mapTutorGrade(tutorBySubmission.get(task.id)));
+      const task1Ai = aiTaskReports.find((report, index) => tasks[index].task_number === 1);
+      const task2Ai = aiTaskReports.find((report, index) => tasks[index].task_number === 2);
+      const task1Tutor = tutorTaskGrades.find((grade, index) => tasks[index].task_number === 1);
+      const task2Tutor = tutorTaskGrades.find((grade, index) => tasks[index].task_number === 2);
+      const calculatedOverallAiBand = calculateDisplayWritingBand(task1Ai?.overallBand, task2Ai?.overallBand);
+      const calculatedOverallTutorBand = task1Tutor?.overallBand !== null
+        && task1Tutor?.overallBand !== undefined
+        && task2Tutor?.overallBand !== null
+        && task2Tutor?.overallBand !== undefined
+        ? calculateWeightedWritingBand(task1Tutor.overallBand, task2Tutor.overallBand)
+        : null;
+      const hasAiFailure = aiTaskReports.some(report => report?.status === REPORT_STATUS.FAILED || report?.errorMessage);
+      const hasCompletedAiReports = tasks.length === 2
+        && aiTaskReports.every(report => report?.overallBand !== null && report?.overallBand !== undefined);
+      const aiStatus = tasks.some(task => task.ai_status === 'failed') || hasAiFailure
+        ? 'failed'
+        : (tasks.length === 2 && (tasks.every(task => task.ai_status === 'completed') || hasCompletedAiReports) ? 'completed' : 'pending');
+      const tutorStatus = tasks.length === 2 && (
+        tasks.every(task => task.tutor_status === 'graded')
+        || tutorTaskGrades.every(grade => grade?.overallBand !== null && grade?.overallBand !== undefined)
+      )
+        ? 'graded'
+        : 'pending';
       return {
         type: 'writing',
         writingGroupId: row.writing_group_id,
+        submissionId: row.writing_group_id || row.id,
         student: {
-          id: row.student_id,
+          id: row.user_id,
           fullName: row.student_name
         },
         testTitle: row.test_title,
         submittedAt: row.submitted_at,
-        status: row.status,
+        status: tutorStatus === 'graded'
+          ? 'tutor_graded'
+          : (aiStatus === 'completed' && row.grader === 'ai' ? 'ai_graded' : 'pending'),
+        aiStatus,
+        tutorStatus,
+        overallAiBand: row.overall_ai_band ? parseFloat(row.overall_ai_band) : calculatedOverallAiBand,
+        overallTutorBand: row.overall_tutor_band ? parseFloat(row.overall_tutor_band) : calculatedOverallTutorBand,
         grader: row.grader,
-        parts: row.parts
+        parts: tasks.map(task => ({
+          submissionId: task.id,
+          taskNumber: task.task_number,
+          promptText: task.prompt_text,
+          responseText: task.response_text,
+          wordCount: task.word_count ?? countWords(task.response_text),
+          fileUrl: task.file_url,
+          aiFeedback: mapAiReport(aiBySubmission.get(task.id)),
+          tutorGrade: mapTutorGrade(tutorBySubmission.get(task.id)),
+        }))
       };
     } else if (type === 'speaking') {
       const query = `
@@ -262,12 +536,35 @@ class TutorService {
       let studentName = 'N/A';
 
       if (type === 'writing') {
-        // 1. SELECT FOR UPDATE
+        const taskNumber = Number(payload.taskNumber ?? payload.task_number);
+        if (![1, 2].includes(taskNumber)) {
+          throw new AppError('taskNumber must be 1 or 2', 400);
+        }
+
+        const bandScore = payload.bandScore !== undefined && payload.bandScore !== null && payload.bandScore !== ''
+          ? validateBand(payload.bandScore, 'bandScore')
+          : null;
+        const criteriaBands = {
+          taskAchievementScore: validateBand(payload.taskAchievementScore, 'taskAchievementScore'),
+          coherenceScore: validateBand(payload.coherenceScore, 'coherenceScore'),
+          lexicalScore: validateBand(payload.lexicalScore, 'lexicalScore'),
+          grammarScore: validateBand(payload.grammarScore, 'grammarScore'),
+        };
+        const finalTaskBand = bandScore ?? roundToNearestHalf((
+          criteriaBands.taskAchievementScore
+          + criteriaBands.coherenceScore
+          + criteriaBands.lexicalScore
+          + criteriaBands.grammarScore
+        ) / 4);
+
         const checkQuery = `
           SELECT ws.id, ws.writing_group_id, ws.status, ws.grader, ws.user_id, u.full_name as student_name
           FROM writing_submissions ws
           LEFT JOIN users u ON u.id = ws.user_id
-          WHERE ws.id = $1 FOR UPDATE
+          WHERE ws.id::text = $1 OR ws.writing_group_id::text = $1
+          ORDER BY ws.task_number ASC NULLS LAST
+          LIMIT 1
+          FOR UPDATE OF ws
         `;
         const checkResult = await client.query(checkQuery, [submissionId]);
         if (checkResult.rowCount === 0) {
@@ -281,41 +578,162 @@ class TutorService {
           throw new AppError('Legacy submission without group ID cannot be graded via grouped API.', 400);
         }
 
-        // 2. Check status and grader for all tasks in the group
-        const groupQuery = `SELECT id, status, grader FROM writing_submissions WHERE writing_group_id = $1`;
+        const groupQuery = `
+          SELECT id, task_number, status, grader
+          FROM writing_submissions
+          WHERE writing_group_id = $1
+          ORDER BY task_number ASC
+          FOR UPDATE`;
         const groupResult = await client.query(groupQuery, [submission.writing_group_id]);
-        for (const task of groupResult.rows) {
-          if (task.status !== 'pending' || task.grader !== 'tutor') {
-            throw new AppError('Submission has already been graded or is not pending for tutor.', 409);
-          }
+        if (groupResult.rows.length !== 2) {
+          throw new AppError('Writing submission must contain both Task 1 and Task 2', 400);
+        }
+        if (groupResult.rows.some(task => task.grader !== 'tutor')) {
+          throw new AppError('This Writing submission is not assigned to tutor grading.', 409);
+        }
+        const targetTask = groupResult.rows.find(task => task.task_number === taskNumber);
+        if (!targetTask) {
+          throw new AppError('taskNumber does not belong to this submission', 400);
         }
 
-        // 3. Select representative task to store the feedback reference (usually task 1)
-        const repTaskQuery = `SELECT id FROM writing_submissions WHERE writing_group_id = $1 ORDER BY task_number ASC LIMIT 1`;
-        const repTaskResult = await client.query(repTaskQuery, [submission.writing_group_id]);
-        const repTaskId = repTaskResult.rows[0].id;
-
-        // 4. Insert tutor_feedback_reports
-        const insertFeedbackQuery = `
-          INSERT INTO tutor_feedback_reports (
-            tutor_id, writing_submission_id, band_score, 
-            task_achievement_score, coherence_score, lexical_score, grammar_score,
-            written_feedback
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-        `;
-        await client.query(insertFeedbackQuery, [
-          tutorId, repTaskId, payload.bandScore,
-          payload.taskAchievementScore, payload.coherenceScore, payload.lexicalScore, payload.grammarScore,
-          payload.writtenFeedback
+        const [feedbackColumns, writingColumns] = await Promise.all([
+          getTableColumns(client, 'tutor_feedback_reports'),
+          getTableColumns(client, 'writing_submissions'),
         ]);
+        const requiredFeedbackColumns = [
+          'tutor_id',
+          'writing_submission_id',
+          'band_score',
+          'task_achievement_score',
+          'coherence_score',
+          'lexical_score',
+          'grammar_score',
+          'written_feedback',
+        ];
+        const missingFeedbackColumns = requiredFeedbackColumns.filter(column => !feedbackColumns.has(column));
+        if (missingFeedbackColumns.length > 0) {
+          throw new AppError('Tutor feedback table is missing required columns.', 500);
+        }
 
-        // 5. Update status for all tasks in the group
-        const updateStatusQuery = `
-          UPDATE writing_submissions 
-          SET status = 'tutor_graded' 
-          WHERE writing_group_id = $1
-        `;
-        await client.query(updateStatusQuery, [submission.writing_group_id]);
+        const feedbackValues = {
+          tutor_id: tutorId,
+          writing_submission_id: targetTask.id,
+          band_score: finalTaskBand,
+          task_achievement_score: criteriaBands.taskAchievementScore,
+          coherence_score: criteriaBands.coherenceScore,
+          lexical_score: criteriaBands.lexicalScore,
+          grammar_score: criteriaBands.grammarScore,
+          written_feedback: payload.writtenFeedback || '',
+          task_number: taskNumber,
+        };
+        const updateValues = [];
+        const setClauses = [];
+        const addFeedbackSet = (column) => {
+          if (!feedbackColumns.has(column)) return;
+          updateValues.push(feedbackValues[column]);
+          setClauses.push(`${column} = $${updateValues.length}`);
+        };
+        [
+          'tutor_id',
+          'band_score',
+          'task_achievement_score',
+          'coherence_score',
+          'lexical_score',
+          'grammar_score',
+          'written_feedback',
+          'task_number',
+        ].forEach(addFeedbackSet);
+        if (feedbackColumns.has('updated_at')) {
+          setClauses.push('updated_at = NOW()');
+        }
+        updateValues.push(targetTask.id);
+        const updateFeedbackResult = await client.query(
+          `UPDATE tutor_feedback_reports
+           SET ${setClauses.join(', ')}
+           WHERE writing_submission_id = $${updateValues.length}
+           RETURNING id`,
+          updateValues
+        );
+
+        if (updateFeedbackResult.rowCount === 0) {
+          const insertOrder = [
+            'tutor_id',
+            'writing_submission_id',
+            'band_score',
+            'task_achievement_score',
+            'coherence_score',
+            'lexical_score',
+            'grammar_score',
+            'written_feedback',
+            'task_number',
+            'updated_at',
+          ];
+          const insertColumns = insertOrder.filter(column =>
+            feedbackColumns.has(column)
+            && (column === 'updated_at' || Object.prototype.hasOwnProperty.call(feedbackValues, column))
+          );
+          const insertValues = [];
+          const placeholders = insertColumns.map((column) => {
+            if (column === 'updated_at') return 'NOW()';
+            insertValues.push(feedbackValues[column]);
+            return `$${insertValues.length}`;
+          });
+          await client.query(
+            `INSERT INTO tutor_feedback_reports (${insertColumns.join(', ')})
+             VALUES (${placeholders.join(', ')})`,
+            insertValues
+          );
+        }
+
+        const gradeOrder = feedbackColumns.has('updated_at')
+          ? 'tfr.updated_at DESC NULLS LAST, tfr.created_at DESC NULLS LAST'
+          : 'tfr.created_at DESC NULLS LAST';
+        const gradesResult = await client.query(
+          `SELECT DISTINCT ON (ws.id) ws.task_number, tfr.band_score
+           FROM writing_submissions ws
+           LEFT JOIN tutor_feedback_reports tfr ON tfr.writing_submission_id = ws.id
+           WHERE ws.writing_group_id = $1
+           ORDER BY ws.id, ${gradeOrder}`,
+          [submission.writing_group_id]
+        );
+        const task1Grade = gradesResult.rows.find(row => row.task_number === 1 && row.band_score !== null);
+        const task2Grade = gradesResult.rows.find(row => row.task_number === 2 && row.band_score !== null);
+        const hasBothGrades = Boolean(task1Grade && task2Grade);
+        const overallTutorBand = hasBothGrades
+          ? calculateWeightedWritingBand(task1Grade.band_score, task2Grade.band_score)
+          : null;
+
+        const writingUpdateValues = [];
+        const writingSetClauses = [];
+        const addWritingSet = (column, value) => {
+          if (!writingColumns.has(column)) return;
+          writingUpdateValues.push(value);
+          writingSetClauses.push(`${column} = $${writingUpdateValues.length}`);
+        };
+        addWritingSet('tutor_status', hasBothGrades ? 'graded' : 'pending');
+        addWritingSet('overall_tutor_band', overallTutorBand);
+        if (writingColumns.has('status')) {
+          writingSetClauses.push(
+            hasBothGrades
+              ? "status = 'tutor_graded'::submission_status"
+              : "status = 'pending'::submission_status"
+          );
+        }
+        if (writingColumns.has('updated_at')) {
+          writingSetClauses.push('updated_at = NOW()');
+        }
+        if (writingSetClauses.length > 0) {
+          writingUpdateValues.push(submission.writing_group_id);
+          await client.query(
+            `UPDATE writing_submissions
+             SET ${writingSetClauses.join(', ')}
+             WHERE writing_group_id = $${writingUpdateValues.length}`,
+            writingUpdateValues
+          );
+        }
+
+        submission.tutorStatus = hasBothGrades ? 'graded' : 'pending';
+        submission.overallTutorBand = overallTutorBand;
 
       } else if (type === 'speaking') {
         // 1. SELECT FOR UPDATE
@@ -398,7 +816,12 @@ class TutorService {
         console.error('[TutorService] Failed to insert audit log for gradeSubmission:', auditErr);
       }
 
-      return { success: true, studentId };
+      return {
+        success: true,
+        studentId,
+        tutorStatus: submission?.tutorStatus,
+        overallTutorBand: submission?.overallTutorBand,
+      };
     } catch (error) {
       await client.query('ROLLBACK');
       throw error;
@@ -406,6 +829,74 @@ class TutorService {
       client.release();
     }
   }
+
+  static async runAiPrelimCheck(type, submissionId, payload = {}) {
+    if (type !== 'writing') {
+      throw new AppError('AI prelim check currently supports Writing submissions only.', 400);
+    }
+
+    const taskNumber = Number(payload.taskNumber ?? payload.task_number);
+    if (![1, 2].includes(taskNumber)) {
+      throw new AppError('taskNumber must be 1 or 2', 400);
+    }
+
+    const targetRes = await pool.query(
+      `SELECT id, writing_group_id
+       FROM writing_submissions
+       WHERE id::text = $1 OR writing_group_id::text = $1
+       ORDER BY task_number ASC NULLS LAST
+       LIMIT 1`,
+      [submissionId]
+    );
+    if (targetRes.rows.length === 0) {
+      throw new AppError('Submission not found', 404);
+    }
+
+    const target = targetRes.rows[0];
+    if (!target.writing_group_id) {
+      throw new AppError('Legacy Writing submission without group ID is not supported for prelim check.', 400);
+    }
+
+    const taskRes = await pool.query(
+      `SELECT ws.*, mt.title AS test_title
+       FROM writing_submissions ws
+       LEFT JOIN mock_tests mt ON mt.id = ws.test_id
+       WHERE ws.writing_group_id = $1
+         AND ws.task_number = $2`,
+      [target.writing_group_id, taskNumber]
+    );
+    if (taskRes.rows.length === 0) {
+      throw new AppError('taskNumber does not belong to this submission', 400);
+    }
+
+    const task = taskRes.rows[0];
+    const reportColumns = await getAiReportColumns();
+    const completedReportPredicate = reportColumns.has('status')
+      ? "AND COALESCE(status, 'completed') = 'completed'"
+      : '';
+    const reportRes = await pool.query(
+      `SELECT *
+       FROM ai_grading_reports
+       WHERE submission_type = 'writing'
+         AND submission_id = $1
+         AND band_score IS NOT NULL
+         ${completedReportPredicate}
+       ORDER BY generated_at DESC
+       LIMIT 1`,
+      [task.id]
+    );
+    if (reportRes.rows.length > 0) {
+      return formatPrelimFromReport(reportRes.rows[0], taskNumber);
+    }
+
+    const result = await gradeWriting(
+      task,
+      taskNumber === 1 ? 'task1' : 'task2',
+      { testTitle: task.test_title }
+    );
+    return formatPrelimFromAiResult(taskNumber, result);
+  }
+
   static async transcribeSpeakingPart(partId) {
     const res = await pool.query('SELECT audio_url, transcript FROM speaking_submissions WHERE id = $1', [partId]);
     if (res.rows.length === 0) {
@@ -935,7 +1426,10 @@ class TutorService {
   static async getAiReferenceList(filters = {}) {
     const params = [];
     let whereExtra = '';
-    const reportColumns = await getAiReportColumns();
+    const [reportColumns, writingColumns] = await Promise.all([
+      getAiReportColumns(),
+      getTableColumns(pool, 'writing_submissions'),
+    ]);
     const hasReportStatus = reportColumns.has('status');
     const hasErrorMessage = reportColumns.has('error_message');
     const reportStatusSelect = hasReportStatus
@@ -951,6 +1445,9 @@ class TutorService {
     const failedWhere = failedPredicates.length
       ? `OR ${failedPredicates.join(' OR ')}`
       : '';
+    const overallAiBandSelect = writingColumns.has('overall_ai_band')
+      ? 'ws.overall_ai_band'
+      : 'NULL::numeric AS overall_ai_band';
 
     if (filters.search) {
       params.push(`%${filters.search}%`);
@@ -960,12 +1457,14 @@ class TutorService {
     const query = `
       SELECT
         ws.id AS submission_id,
+        ws.writing_group_id,
         ws.user_id AS student_id,
         u.full_name AS student_name,
         mt.title AS test_title,
         ws.task_number,
         ws.submitted_at,
         ws.status::text AS submission_status,
+        ${overallAiBandSelect},
         agr.band_score AS ai_band,
         ${reportStatusSelect},
         ${errorMessageSelect},
@@ -973,9 +1472,13 @@ class TutorService {
       FROM writing_submissions ws
       JOIN users u ON u.id = ws.user_id
       LEFT JOIN mock_tests mt ON mt.id = ws.test_id
-      LEFT JOIN ai_grading_reports agr
+      LEFT JOIN (
+        SELECT DISTINCT ON (submission_id) *
+        FROM ai_grading_reports
+        WHERE submission_type = 'writing'
+        ORDER BY submission_id, generated_at DESC
+      ) agr
         ON agr.submission_id = ws.id
-        AND agr.submission_type = 'writing'
       WHERE ws.grader = 'ai'
         AND (
           ws.status = 'ai_graded'
@@ -985,19 +1488,62 @@ class TutorService {
       ORDER BY ws.submitted_at DESC`;
 
     const { rows } = await pool.query(query, params);
-    return rows.map(row => ({
-      submissionId: row.submission_id,
-      studentId: row.student_id,
-      studentName: row.student_name,
-      testTitle: row.test_title,
-      taskNumber: row.task_number,
-      submittedAt: row.submitted_at,
-      submissionStatus: row.submission_status,
-      aiBand: row.ai_band ? parseFloat(row.ai_band) : null,
-      reportStatus: row.ai_report_status,
-      errorMessage: row.error_message,
-      generatedAt: row.generated_at,
-    }));
+    const grouped = new Map();
+
+    for (const row of rows) {
+      const groupId = row.writing_group_id || row.submission_id;
+      if (!grouped.has(groupId)) {
+        grouped.set(groupId, {
+          submissionId: groupId,
+          studentId: row.student_id,
+          studentName: row.student_name,
+          testTitle: row.test_title,
+          submittedAt: row.submitted_at,
+          submissionStatus: row.submission_status,
+          aiBand: row.overall_ai_band ? parseFloat(row.overall_ai_band) : null,
+          reportStatus: null,
+          errorMessage: null,
+          generatedAt: row.generated_at,
+          tasks: [],
+        });
+      }
+
+      const item = grouped.get(groupId);
+      const taskBand = row.ai_band ? parseFloat(row.ai_band) : null;
+      const taskStatus = row.ai_report_status || (taskBand !== null ? REPORT_STATUS.COMPLETED : null);
+      item.tasks.push({
+        submissionId: row.submission_id,
+        taskNumber: row.task_number,
+        aiBand: taskBand,
+        reportStatus: taskStatus,
+        errorMessage: row.error_message,
+      });
+      if (!item.errorMessage && row.error_message) item.errorMessage = row.error_message;
+      if (!item.generatedAt || (row.generated_at && row.generated_at > item.generatedAt)) {
+        item.generatedAt = row.generated_at;
+      }
+    }
+
+    return Array.from(grouped.values()).map((item) => {
+      const task1 = item.tasks.find(task => Number(task.taskNumber) === 1);
+      const task2 = item.tasks.find(task => Number(task.taskNumber) === 2);
+      const calculatedBand = calculateDisplayWritingBand(task1?.aiBand, task2?.aiBand);
+      const hasFailed = item.tasks.some(task => task.reportStatus === REPORT_STATUS.FAILED || task.errorMessage);
+      const hasCompleted = item.tasks.length > 0
+        && item.tasks.every(task => task.reportStatus === REPORT_STATUS.COMPLETED || task.aiBand !== null);
+
+      return {
+        ...item,
+        aiBand: item.aiBand ?? calculatedBand,
+        reportStatus: hasFailed
+          ? REPORT_STATUS.FAILED
+          : (hasCompleted ? REPORT_STATUS.COMPLETED : null),
+        taskLabel: item.tasks
+          .sort((a, b) => Number(a.taskNumber) - Number(b.taskNumber))
+          .map(task => `Task ${task.taskNumber}`)
+          .join(' + '),
+      };
+    });
   }
 
   /**
@@ -1005,45 +1551,80 @@ class TutorService {
    * Read-only — tutor cannot modify AI feedback.
    */
   static async getAiReferenceDetail(submissionId) {
-    const subQuery = `
+    const targetQuery = `
+      SELECT ws.id, ws.writing_group_id
+      FROM writing_submissions ws
+      WHERE (ws.id::text = $1 OR ws.writing_group_id::text = $1)
+        AND ws.grader = 'ai'
+      ORDER BY ws.task_number ASC NULLS LAST
+      LIMIT 1`;
+
+    const { rows: targetRows } = await pool.query(targetQuery, [submissionId]);
+    if (targetRows.length === 0) return null;
+
+    const target = targetRows[0];
+    const tasksQuery = `
       SELECT ws.*, mt.title AS test_title,
              u.full_name AS student_name
       FROM writing_submissions ws
       LEFT JOIN mock_tests mt ON mt.id = ws.test_id
       JOIN users u ON u.id = ws.user_id
-      WHERE ws.id = $1 AND ws.grader = 'ai'`;
+      WHERE ws.grader = 'ai'
+        AND (
+          ($1::uuid IS NOT NULL AND ws.writing_group_id = $1::uuid)
+          OR ws.id = $2::uuid
+        )
+      ORDER BY ws.task_number ASC`;
 
-    const { rows: subRows } = await pool.query(subQuery, [submissionId]);
-    if (subRows.length === 0) return null;
-
-    const reportQuery = `
-      SELECT * FROM ai_grading_reports
-      WHERE submission_id = $1
-        AND submission_type = 'writing'
-      ORDER BY generated_at DESC LIMIT 1`;
-
-    const { rows: reportRows } = await pool.query(
-      reportQuery, [submissionId]
+    const { rows: taskRows } = await pool.query(
+      tasksQuery, [target.writing_group_id, target.id]
     );
+    if (taskRows.length === 0) return null;
 
-    const submission = subRows[0];
-    const report = reportRows[0] || null;
+    const taskIds = taskRows.map(task => task.id);
+    const reportQuery = `
+      SELECT DISTINCT ON (submission_id) *
+      FROM ai_grading_reports
+      WHERE submission_type = 'writing'
+        AND submission_id = ANY($1::uuid[])
+      ORDER BY submission_id, generated_at DESC`;
+
+    const { rows: reportRows } = await pool.query(reportQuery, [taskIds]);
+    const reportBySubmission = new Map(reportRows.map(report => [report.submission_id, report]));
+    const first = taskRows[0];
+    const tasks = taskRows.map(task => ({
+      submissionId: task.id,
+      studentId: task.user_id,
+      studentName: task.student_name,
+      testTitle: task.test_title,
+      taskNumber: task.task_number,
+      promptText: task.prompt_text,
+      responseText: task.response_text,
+      wordCount: task.word_count ?? countWords(task.response_text),
+      submittedAt: task.submitted_at,
+      status: task.status,
+      grader: task.grader,
+      aiReport: reportBySubmission.get(task.id) || null,
+    }));
+    const task1 = tasks.find(task => Number(task.taskNumber) === 1);
+    const task2 = tasks.find(task => Number(task.taskNumber) === 2);
+    const task1Band = task1?.aiReport?.band_score ? parseFloat(task1.aiReport.band_score) : null;
+    const task2Band = task2?.aiReport?.band_score ? parseFloat(task2.aiReport.band_score) : null;
+    const calculatedOverall = calculateDisplayWritingBand(task1Band, task2Band);
 
     return {
       submission: {
-        id: submission.id,
-        studentId: submission.user_id,
-        studentName: submission.student_name,
-        testTitle: submission.test_title,
-        taskNumber: submission.task_number,
-        promptText: submission.prompt_text,
-        responseText: submission.response_text,
-        wordCount: countWords(submission.response_text),
-        submittedAt: submission.submitted_at,
-        status: submission.status,
-        grader: submission.grader,
+        id: first.writing_group_id || first.id,
+        studentId: first.user_id,
+        studentName: first.student_name,
+        testTitle: first.test_title,
+        submittedAt: first.submitted_at,
+        status: first.status,
+        grader: first.grader,
       },
-      aiReport: report,
+      tasks,
+      overallAiBand: first.overall_ai_band ? parseFloat(first.overall_ai_band) : calculatedOverall,
+      aiReport: tasks[0]?.aiReport || null,
     };
   }
 }
