@@ -11,7 +11,7 @@ const {
 } = require('../ai/aiGrading.constants');
 const AppError = require('../utils/AppError');
 const logger = require('../utils/logger');
-const { roundToNearestHalf } = require('../utils/scoring');
+const { calcWeightedWritingOverall } = require('../utils/scoring');
 const { v4: uuidv4 } = require('uuid');
 
 /**
@@ -329,8 +329,7 @@ const saveGradingResult = async (submissionId, result) => {
   }
 };
 
-const calculateWeightedWritingBand = (task1Band, task2Band) =>
-  roundToNearestHalf((Number(task1Band) + Number(task2Band) * 2) / 3);
+const calculateWeightedWritingBand = calcWeightedWritingOverall;
 
 const updateWritingGroupAiState = async (client, submissionId) => {
   const [writingColumns, reportColumns] = await Promise.all([
