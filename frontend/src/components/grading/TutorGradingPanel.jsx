@@ -145,6 +145,21 @@ const TutorGradingPanel = ({
             }
           }));
         }
+        if (suggestion?.suggestedCriteria) {
+          setTaskScores(prev => ({
+            ...prev,
+            [activeTaskId]: {
+              ...(prev[activeTaskId] || {}),
+              taskAchievementScore: suggestion.suggestedCriteria.taskAchievementOrResponse ?? '',
+              coherenceScore: suggestion.suggestedCriteria.coherenceCohesion ?? '',
+              lexicalScore: suggestion.suggestedCriteria.lexicalResource ?? '',
+              grammarScore: suggestion.suggestedCriteria.grammaticalRangeAccuracy ?? ''
+            }
+          }));
+        }
+        if (suggestion?.feedbackDraft) {
+          handleFeedbackChange(suggestion.feedbackDraft);
+        }
       }
     } catch (err) {
       setError(err.response?.data?.error?.message || 'Failed to run prelim check.');

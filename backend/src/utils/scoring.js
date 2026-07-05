@@ -56,7 +56,7 @@ const getBandScore = (skill, rawScore) => {
   if (rawScore < 0 || rawScore > 40) {
     throw new Error('Raw score must be between 0 and 40');
   }
-  
+
   if (skill === 'listening') {
     return calculateListeningBand(rawScore);
   } else if (skill === 'reading') {
@@ -100,5 +100,5 @@ module.exports = {
   roundToNearestHalf,
   isValidHalfBandScore,
   calcBandFromCriteria,
-  calcWeightedWritingOverall
+  calcWeightedWritingOverall,
 };

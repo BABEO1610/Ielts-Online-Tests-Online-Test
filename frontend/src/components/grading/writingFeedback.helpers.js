@@ -50,5 +50,5 @@ export const calculateOverallWritingBand = (task1Band, task2Band) => {
     return null;
   }
 
-  return roundToNearestHalf(task1 * 0.33 + task2 * 0.67);
+  return roundToNearestHalf((task1 * 0.33) + (task2 * 0.67));
 };
