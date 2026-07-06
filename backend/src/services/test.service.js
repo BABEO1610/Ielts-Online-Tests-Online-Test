@@ -242,7 +242,12 @@ class TestService {
         mt.review_status,
         mt.submitted_at,
         mt.created_at,
-        COUNT(q.id) as questions
+        COUNT(q.id) as questions,
+        (
+          COALESCE((SELECT COUNT(DISTINCT user_id) FROM test_attempts WHERE test_id = mt.id), 0) +
+          COALESCE((SELECT COUNT(DISTINCT user_id) FROM writing_submissions WHERE test_id = mt.id), 0) +
+          COALESCE((SELECT COUNT(DISTINCT user_id) FROM speaking_submissions WHERE test_id = mt.id), 0)
+        ) as participant_count
       FROM mock_tests mt
       LEFT JOIN questions q ON mt.id = q.test_id
       ${whereClause}
@@ -274,6 +279,8 @@ class TestService {
         reviewStatus: row.review_status,
         status: statusStr,
         questions: parseInt(row.questions, 10),
+        participantCount: parseInt(row.participant_count || 0, 10),
+        created_at: row.created_at,
         createdAt: new Date(row.created_at).toISOString().split('T')[0]
       };
     });

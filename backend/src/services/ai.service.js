@@ -1,4 +1,8 @@
 const { ERROR_CODES, createAssistantError } = require('../api/assistant/assistant.constants');
+const {
+  normalizeOpenAiUsageMetadata,
+  recordAiUsageLog,
+} = require('./aiUsage.service');
 
 const OPENAI_CHAT_COMPLETIONS_URL = 'https://api.openai.com/v1/chat/completions';
 const GEMINI_GENERATE_CONTENT_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
@@ -86,12 +90,37 @@ const resolvePrompts = ({ mode, message, officialContext, systemPrompt, userProm
   userPrompt: userPrompt || buildUserPrompt({ message, officialContext }),
 });
 
-const generateOpenAiAnswer = async ({ model, apiKey, mode, message, officialContext, systemPrompt, userPrompt }) => {
+const recordProviderUsage = ({
+  usageContext = {},
+  provider,
+  model,
+  data = null,
+  usageMetadata = null,
+  success,
+  error = null,
+  latencyMs,
+}) => recordAiUsageLog({
+  userId: usageContext.userId,
+  feature: usageContext.feature,
+  entityType: usageContext.entityType,
+  entityId: usageContext.entityId,
+  provider,
+  model,
+  responseId: data?.responseId || data?.id || null,
+  usageMetadata,
+  success,
+  errorCode: error?.code || error?.errorCode || null,
+  errorMessage: error?.message || null,
+  latencyMs,
+});
+
+const generateOpenAiAnswer = async ({ model, apiKey, mode, message, officialContext, systemPrompt, userPrompt, usageContext }) => {
   if (!apiKey) {
     throw createAssistantError(ERROR_CODES.AI_NOT_CONFIGURED);
   }
 
   const prompts = resolvePrompts({ mode, message, officialContext, systemPrompt, userPrompt });
+  const startedAt = Date.now();
 
   const response = await fetch(OPENAI_CHAT_COMPLETIONS_URL, {
     method: 'POST',
@@ -112,15 +141,35 @@ const generateOpenAiAnswer = async ({ model, apiKey, mode, message, officialCont
 
   if (!response.ok) {
     const errorText = await response.text();
-    throw buildProviderError({
+    const error = buildProviderError({
       provider: 'OpenAI',
       status: response.status,
       model,
       body: errorText,
     });
+    await recordProviderUsage({
+      usageContext,
+      provider: 'openai',
+      model,
+      success: false,
+      error,
+      latencyMs: Date.now() - startedAt,
+    });
+    throw error;
   }
 
   const data = await response.json();
+  // ponytail: SSE parser does not expose final token usage yet; log the real call with 0 tokens.
+  // Upgrade by parsing provider final usage chunks when the API response includes them.
+  await recordProviderUsage({
+    usageContext,
+    provider: 'openai',
+    model,
+    data,
+    usageMetadata: normalizeOpenAiUsageMetadata(data?.usage),
+    success: true,
+    latencyMs: Date.now() - startedAt,
+  });
   const answer = data?.choices?.[0]?.message?.content?.trim();
 
   if (!answer) {
@@ -130,13 +179,14 @@ const generateOpenAiAnswer = async ({ model, apiKey, mode, message, officialCont
   return answer;
 };
 
-const generateGeminiAnswer = async ({ model, apiKey, mode, message, officialContext, systemPrompt, userPrompt }) => {
+const generateGeminiAnswer = async ({ model, apiKey, mode, message, officialContext, systemPrompt, userPrompt, usageContext }) => {
   if (!apiKey) {
     throw createAssistantError(ERROR_CODES.AI_NOT_CONFIGURED);
   }
 
   const geminiModel = normalizeGeminiModel(model);
   const prompts = resolvePrompts({ mode, message, officialContext, systemPrompt, userPrompt });
+  const startedAt = Date.now();
   const response = await fetch(
     `${GEMINI_GENERATE_CONTENT_URL}/${encodeURIComponent(geminiModel)}:generateContent?key=${encodeURIComponent(apiKey)}`,
     {
@@ -164,15 +214,35 @@ const generateGeminiAnswer = async ({ model, apiKey, mode, message, officialCont
 
   if (!response.ok) {
     const errorText = await response.text();
-    throw buildProviderError({
+    const error = buildProviderError({
       provider: 'Gemini',
       status: response.status,
       model: geminiModel,
       body: errorText,
     });
+    await recordProviderUsage({
+      usageContext,
+      provider: 'gemini',
+      model: geminiModel,
+      success: false,
+      error,
+      latencyMs: Date.now() - startedAt,
+    });
+    throw error;
   }
 
   const data = await response.json();
+  // ponytail: SSE parser does not expose final token usage yet; log the real call with 0 tokens.
+  // Upgrade by parsing provider final usage chunks when the API response includes them.
+  await recordProviderUsage({
+    usageContext,
+    provider: 'gemini',
+    model: geminiModel,
+    data,
+    usageMetadata: data?.usageMetadata,
+    success: true,
+    latencyMs: Date.now() - startedAt,
+  });
   const answer = data?.candidates?.[0]?.content?.parts
     ?.map((part) => part.text || '')
     .join('')
@@ -186,7 +256,7 @@ const generateGeminiAnswer = async ({ model, apiKey, mode, message, officialCont
 };
 
 const generateGeminiJsonAnswer = async ({
-  model, apiKey, systemPrompt, userPrompt, timeoutMs = 30000,
+  model, apiKey, systemPrompt, userPrompt, timeoutMs = 30000, usageContext,
 }) => {
   if (!apiKey) {
     throw createAssistantError(ERROR_CODES.AI_NOT_CONFIGURED);
@@ -195,6 +265,7 @@ const generateGeminiJsonAnswer = async ({
   const geminiModel = normalizeGeminiModel(model);
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  const startedAt = Date.now();
 
   try {
     const response = await fetch(
@@ -216,27 +287,45 @@ const generateGeminiJsonAnswer = async ({
     );
 
     if (!response.ok) {
-      throw buildProviderError({
+      const error = buildProviderError({
         provider: 'Gemini',
         status: response.status,
         model: geminiModel,
         body: await response.text(),
       });
+      await recordProviderUsage({
+        usageContext,
+        provider: 'gemini',
+        model: geminiModel,
+        success: false,
+        error,
+        latencyMs: Date.now() - startedAt,
+      });
+      throw error;
     }
 
     const data = await response.json();
+    await recordProviderUsage({
+      usageContext,
+      provider: 'gemini',
+      model: geminiModel,
+      data,
+      usageMetadata: data?.usageMetadata,
+      success: true,
+      latencyMs: Date.now() - startedAt,
+    });
     const answer = data?.candidates?.[0]?.content?.parts
       ?.map((part) => part.text || '')
       .join('')
       .trim();
     if (!answer) throw createAssistantError(ERROR_CODES.INTERNAL_ERROR);
-    return { answer, modelName: geminiModel };
+    return { answer, modelName: geminiModel, usageMetadata: data?.usageMetadata || null };
   } finally {
     clearTimeout(timeout);
   }
 };
 
-const generateScopeClassification = async ({ message }) => {
+const generateScopeClassification = async ({ message, usageContext }) => {
   const { provider, model, openaiApiKey, geminiApiKey } = getAiConfig();
   const systemPrompt = `You are a strict JSON scope classifier for an IELTS learning platform.
 Evaluate the student's message and classify its intent.
@@ -274,6 +363,7 @@ BLOCKED SCOPES (set intent to OUT_OF_SCOPE, allowed to false):
   if (provider === 'gemini' || provider === 'google' || provider === 'google-ai-studio') {
     if (!geminiApiKey) throw createAssistantError(ERROR_CODES.AI_NOT_CONFIGURED);
     const geminiModel = normalizeGeminiModel(model);
+    const startedAt = Date.now();
     const response = await fetch(
       `${GEMINI_GENERATE_CONTENT_URL}/${encodeURIComponent(geminiModel)}:generateContent?key=${encodeURIComponent(geminiApiKey)}`,
       {
@@ -286,13 +376,34 @@ BLOCKED SCOPES (set intent to OUT_OF_SCOPE, allowed to false):
         }),
       }
     );
-    if (!response.ok) throw buildProviderError({ provider: 'Gemini', status: response.status, model: geminiModel, body: await response.text() });
+    if (!response.ok) {
+      const error = buildProviderError({ provider: 'Gemini', status: response.status, model: geminiModel, body: await response.text() });
+      await recordProviderUsage({
+        usageContext,
+        provider: 'gemini',
+        model: geminiModel,
+        success: false,
+        error,
+        latencyMs: Date.now() - startedAt,
+      });
+      throw error;
+    }
     const data = await response.json();
+    await recordProviderUsage({
+      usageContext,
+      provider: 'gemini',
+      model: geminiModel,
+      data,
+      usageMetadata: data?.usageMetadata,
+      success: true,
+      latencyMs: Date.now() - startedAt,
+    });
     return data?.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
   }
 
   if (provider === 'openai') {
     if (!openaiApiKey) throw createAssistantError(ERROR_CODES.AI_NOT_CONFIGURED);
+    const startedAt = Date.now();
     const response = await fetch(OPENAI_CHAT_COMPLETIONS_URL, {
       method: 'POST',
       headers: { Authorization: `Bearer ${openaiApiKey}`, 'Content-Type': 'application/json' },
@@ -306,15 +417,35 @@ BLOCKED SCOPES (set intent to OUT_OF_SCOPE, allowed to false):
         ],
       }),
     });
-    if (!response.ok) throw buildProviderError({ provider: 'OpenAI', status: response.status, model, body: await response.text() });
+    if (!response.ok) {
+      const error = buildProviderError({ provider: 'OpenAI', status: response.status, model, body: await response.text() });
+      await recordProviderUsage({
+        usageContext,
+        provider: 'openai',
+        model,
+        success: false,
+        error,
+        latencyMs: Date.now() - startedAt,
+      });
+      throw error;
+    }
     const data = await response.json();
+    await recordProviderUsage({
+      usageContext,
+      provider: 'openai',
+      model,
+      data,
+      usageMetadata: normalizeOpenAiUsageMetadata(data?.usage),
+      success: true,
+      latencyMs: Date.now() - startedAt,
+    });
     return data?.choices?.[0]?.message?.content || '{}';
   }
 
   throw createAssistantError(ERROR_CODES.AI_NOT_CONFIGURED, `Unsupported provider: ${provider}`);
 };
 
-const generateAssistantAnswer = async ({ mode, message, officialContext, systemPrompt, userPrompt }) => {
+const generateAssistantAnswer = async ({ mode, message, officialContext, systemPrompt, userPrompt, usageContext }) => {
   const { provider, model, openaiApiKey, geminiApiKey } = getAiConfig();
 
   if (provider === 'gemini' || provider === 'google' || provider === 'google-ai-studio') {
@@ -326,6 +457,7 @@ const generateAssistantAnswer = async ({ mode, message, officialContext, systemP
       officialContext,
       systemPrompt,
       userPrompt,
+      usageContext,
     });
   }
 
@@ -338,6 +470,7 @@ const generateAssistantAnswer = async ({ mode, message, officialContext, systemP
       officialContext,
       systemPrompt,
       userPrompt,
+      usageContext,
     });
   }
 
@@ -385,12 +518,13 @@ const parseSseLines = async ({ response, onJson }) => {
   return fullText;
 };
 
-const streamOpenAiAnswer = async ({ model, apiKey, mode, message, officialContext, systemPrompt, userPrompt, onDelta }) => {
+const streamOpenAiAnswer = async ({ model, apiKey, mode, message, officialContext, systemPrompt, userPrompt, onDelta, usageContext }) => {
   if (!apiKey) {
     throw createAssistantError(ERROR_CODES.AI_NOT_CONFIGURED);
   }
 
   const prompts = resolvePrompts({ mode, message, officialContext, systemPrompt, userPrompt });
+  const startedAt = Date.now();
   const response = await fetch(OPENAI_CHAT_COMPLETIONS_URL, {
     method: 'POST',
     headers: {
@@ -411,12 +545,21 @@ const streamOpenAiAnswer = async ({ model, apiKey, mode, message, officialContex
 
   if (!response.ok) {
     const errorText = await response.text();
-    throw buildProviderError({
+    const error = buildProviderError({
       provider: 'OpenAI',
       status: response.status,
       model,
       body: errorText,
     });
+    await recordProviderUsage({
+      usageContext,
+      provider: 'openai',
+      model,
+      success: false,
+      error,
+      latencyMs: Date.now() - startedAt,
+    });
+    throw error;
   }
 
   const text = await parseSseLines({
@@ -428,16 +571,24 @@ const streamOpenAiAnswer = async ({ model, apiKey, mode, message, officialContex
     },
   });
 
+  await recordProviderUsage({
+    usageContext,
+    provider: 'openai',
+    model,
+    success: true,
+    latencyMs: Date.now() - startedAt,
+  });
   return text.trim();
 };
 
-const streamGeminiAnswer = async ({ model, apiKey, mode, message, officialContext, systemPrompt, userPrompt, onDelta }) => {
+const streamGeminiAnswer = async ({ model, apiKey, mode, message, officialContext, systemPrompt, userPrompt, onDelta, usageContext }) => {
   if (!apiKey) {
     throw createAssistantError(ERROR_CODES.AI_NOT_CONFIGURED);
   }
 
   const geminiModel = normalizeGeminiModel(model);
   const prompts = resolvePrompts({ mode, message, officialContext, systemPrompt, userPrompt });
+  const startedAt = Date.now();
   const response = await fetch(
     `${GEMINI_GENERATE_CONTENT_URL}/${encodeURIComponent(geminiModel)}:streamGenerateContent?alt=sse&key=${encodeURIComponent(apiKey)}`,
     {
@@ -465,12 +616,21 @@ const streamGeminiAnswer = async ({ model, apiKey, mode, message, officialContex
 
   if (!response.ok) {
     const errorText = await response.text();
-    throw buildProviderError({
+    const error = buildProviderError({
       provider: 'Gemini',
       status: response.status,
       model: geminiModel,
       body: errorText,
     });
+    await recordProviderUsage({
+      usageContext,
+      provider: 'gemini',
+      model: geminiModel,
+      success: false,
+      error,
+      latencyMs: Date.now() - startedAt,
+    });
+    throw error;
   }
 
   const text = await parseSseLines({
@@ -484,10 +644,17 @@ const streamGeminiAnswer = async ({ model, apiKey, mode, message, officialContex
     },
   });
 
+  await recordProviderUsage({
+    usageContext,
+    provider: 'gemini',
+    model: geminiModel,
+    success: true,
+    latencyMs: Date.now() - startedAt,
+  });
   return text.trim();
 };
 
-const streamAssistantAnswer = async ({ mode, message, officialContext, systemPrompt, userPrompt, onDelta }) => {
+const streamAssistantAnswer = async ({ mode, message, officialContext, systemPrompt, userPrompt, onDelta, usageContext }) => {
   const { provider, model, openaiApiKey, geminiApiKey } = getAiConfig();
 
   if (provider === 'gemini' || provider === 'google' || provider === 'google-ai-studio') {
@@ -500,6 +667,7 @@ const streamAssistantAnswer = async ({ mode, message, officialContext, systemPro
       systemPrompt,
       userPrompt,
       onDelta,
+      usageContext,
     });
   }
 
@@ -513,6 +681,7 @@ const streamAssistantAnswer = async ({ mode, message, officialContext, systemPro
       systemPrompt,
       userPrompt,
       onDelta,
+      usageContext,
     });
   }
 
@@ -522,7 +691,7 @@ const streamAssistantAnswer = async ({ mode, message, officialContext, systemPro
   );
 };
 
-const generateTranscript = async (audioUrl) => {
+const generateTranscript = async (audioUrl, usageContext = {}) => {
   const { openaiApiKey, geminiApiKey } = getAiConfig();
   
   if (!openaiApiKey && !geminiApiKey) {
@@ -548,6 +717,7 @@ const generateTranscript = async (audioUrl) => {
     formData.append('file', blob, `audio.${ext}`);
     formData.append('model', 'whisper-1');
 
+    const startedAt = Date.now();
     const whisperResponse = await fetch('https://api.openai.com/v1/audio/transcriptions', {
       method: 'POST',
       headers: {
@@ -558,15 +728,32 @@ const generateTranscript = async (audioUrl) => {
 
     if (!whisperResponse.ok) {
       const errorText = await whisperResponse.text();
-      throw buildProviderError({
+      const error = buildProviderError({
         provider: 'OpenAI Whisper',
         status: whisperResponse.status,
         model: 'whisper-1',
         body: errorText,
       });
+      await recordProviderUsage({
+        usageContext,
+        provider: 'openai',
+        model: 'whisper-1',
+        success: false,
+        error,
+        latencyMs: Date.now() - startedAt,
+      });
+      throw error;
     }
 
     const data = await whisperResponse.json();
+    await recordProviderUsage({
+      usageContext,
+      provider: 'openai',
+      model: 'whisper-1',
+      data,
+      success: true,
+      latencyMs: Date.now() - startedAt,
+    });
     return data.text;
   }
 
@@ -574,6 +761,7 @@ const generateTranscript = async (audioUrl) => {
   const base64Audio = Buffer.from(arrayBuffer).toString('base64');
   const geminiModel = 'gemini-flash-lite-latest';
   
+  const startedAt = Date.now();
   const geminiResponse = await fetch(
     `${GEMINI_GENERATE_CONTENT_URL}/${geminiModel}:generateContent?key=${geminiApiKey}`,
     {
@@ -597,15 +785,33 @@ const generateTranscript = async (audioUrl) => {
 
   if (!geminiResponse.ok) {
     const errorText = await geminiResponse.text();
-    throw buildProviderError({
+    const error = buildProviderError({
       provider: 'Gemini',
       status: geminiResponse.status,
       model: geminiModel,
       body: errorText,
     });
+    await recordProviderUsage({
+      usageContext,
+      provider: 'gemini',
+      model: geminiModel,
+      success: false,
+      error,
+      latencyMs: Date.now() - startedAt,
+    });
+    throw error;
   }
 
   const data = await geminiResponse.json();
+  await recordProviderUsage({
+    usageContext,
+    provider: 'gemini',
+    model: geminiModel,
+    data,
+    usageMetadata: data?.usageMetadata,
+    success: true,
+    latencyMs: Date.now() - startedAt,
+  });
   const transcript = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
   if (!transcript) {
     throw new Error('Gemini returned empty transcription');

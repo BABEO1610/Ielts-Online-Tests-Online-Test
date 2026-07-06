@@ -52,6 +52,12 @@ const requestAiGrade = async (req, res, next) => {
     // Call AI grading service
     const result = await gradeWriting(submission, taskType, {
       testTitle: submission.test_title,
+      usageContext: {
+        userId,
+        feature: 'writing_grading',
+        entityType: 'writing_submission',
+        entityId: submissionId,
+      },
     });
 
     // Save result to DB in transaction

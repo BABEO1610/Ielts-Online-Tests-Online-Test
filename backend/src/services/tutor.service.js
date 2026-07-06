@@ -157,6 +157,30 @@ const mapAiReport = (report) => {
 
 const mapTutorGrade = (report) => {
   if (!report) return null;
+  if (report.speaking_submission_id || report.fluency_score !== undefined || report.pronunciation_score !== undefined) {
+    const fluency = report.fluency_score ? parseFloat(report.fluency_score) : null;
+    const lexical = report.lexical_score ? parseFloat(report.lexical_score) : null;
+    const grammar = report.grammar_score ? parseFloat(report.grammar_score) : null;
+    const pronunciation = report.pronunciation_score ? parseFloat(report.pronunciation_score) : null;
+    return {
+      id: report.id,
+      overallBand: report.band_score ? parseFloat(report.band_score) : null,
+      criterionScores: {
+        fluencyCoherence: fluency,
+        lexicalResource: lexical,
+        grammaticalRangeAccuracy: grammar,
+        pronunciation,
+      },
+      scores: {
+        fluency,
+        lexical,
+        grammar,
+        pronunciation,
+      },
+      writtenFeedback: report.written_feedback || '',
+      updatedAt: report.updated_at,
+    };
+  }
   return {
     id: report.id,
     overallBand: report.band_score ? parseFloat(report.band_score) : null,
@@ -189,15 +213,15 @@ const buildFeedbackDraft = (ai) => [
   ai?.summary ? `Summary\n${ai.summary}` : '',
   ai?.detailedFeedback && Object.keys(ai.detailedFeedback).length > 0
     ? [
-        'Criterion feedback',
-        ai.detailedFeedback.fluencyCoherence && `- Fluency & Coherence: ${ai.detailedFeedback.fluencyCoherence}`,
-        ai.detailedFeedback.taskAchievementOrResponse && `- Task Achievement/Response: ${ai.detailedFeedback.taskAchievementOrResponse}`,
-        ai.detailedFeedback.coherenceCohesion && `- Coherence & Cohesion: ${ai.detailedFeedback.coherenceCohesion}`,
-        ai.detailedFeedback.lexicalResource && `- Lexical Resource: ${ai.detailedFeedback.lexicalResource}`,
-        ai.detailedFeedback.grammarRangeAccuracy && `- Grammar Range & Accuracy: ${ai.detailedFeedback.grammarRangeAccuracy}`,
-        ai.detailedFeedback.grammaticalRangeAccuracy && `- Grammatical Range & Accuracy: ${ai.detailedFeedback.grammaticalRangeAccuracy}`,
-        ai.detailedFeedback.pronunciation && `- Pronunciation: ${ai.detailedFeedback.pronunciation}`,
-      ].filter(Boolean).join('\n')
+      'Criterion feedback',
+      ai.detailedFeedback.fluencyCoherence && `- Fluency & Coherence: ${ai.detailedFeedback.fluencyCoherence}`,
+      ai.detailedFeedback.taskAchievementOrResponse && `- Task Achievement/Response: ${ai.detailedFeedback.taskAchievementOrResponse}`,
+      ai.detailedFeedback.coherenceCohesion && `- Coherence & Cohesion: ${ai.detailedFeedback.coherenceCohesion}`,
+      ai.detailedFeedback.lexicalResource && `- Lexical Resource: ${ai.detailedFeedback.lexicalResource}`,
+      ai.detailedFeedback.grammarRangeAccuracy && `- Grammar Range & Accuracy: ${ai.detailedFeedback.grammarRangeAccuracy}`,
+      ai.detailedFeedback.grammaticalRangeAccuracy && `- Grammatical Range & Accuracy: ${ai.detailedFeedback.grammaticalRangeAccuracy}`,
+      ai.detailedFeedback.pronunciation && `- Pronunciation: ${ai.detailedFeedback.pronunciation}`,
+    ].filter(Boolean).join('\n')
     : '',
   listSection('Strengths', ai?.strengths),
   listSection('Major errors', ai?.majorErrors, formatErrorItem),
@@ -557,9 +581,11 @@ class TutorService {
     } else if (type === 'speaking') {
       const query = `
         WITH base AS (
-            SELECT speaking_group_id
+            SELECT COALESCE(speaking_group_id, id) AS group_id
             FROM speaking_submissions
-            WHERE id = $1
+            WHERE id::text = $1 OR speaking_group_id::text = $1
+            ORDER BY part_number ASC NULLS LAST
+            LIMIT 1
         )
         SELECT
             ss.speaking_group_id,
@@ -580,7 +606,7 @@ class TutorService {
                 ORDER BY ss.part_number
             ) AS parts
         FROM speaking_submissions ss
-        JOIN base b ON b.speaking_group_id = ss.speaking_group_id
+        JOIN base b ON COALESCE(ss.speaking_group_id, ss.id) = b.group_id
         JOIN users u ON u.id = ss.user_id
         LEFT JOIN mock_tests mt ON mt.id = ss.test_id
         GROUP BY
@@ -593,7 +619,17 @@ class TutorService {
       if (result.rows.length === 0) return null;
       const row = result.rows[0];
       const parts = row.parts || [];
-      const aiBySubmission = await getLatestCompletedReports(parts.map(part => part.submissionId));
+      const partIds = parts.map(part => part.submissionId);
+      const aiBySubmission = await getLatestCompletedReports(partIds);
+      const tutorRes = await pool.query(
+        `SELECT DISTINCT ON (speaking_submission_id) *
+         FROM tutor_feedback_reports
+         WHERE speaking_submission_id = ANY($1::uuid[])
+         ORDER BY speaking_submission_id, updated_at DESC, created_at DESC`,
+        [partIds]
+      );
+      const tutorBySubmission = new Map(tutorRes.rows.map(report => [report.speaking_submission_id, report]));
+      const latestTutorReport = tutorRes.rows[0] || null;
       return {
         type: 'speaking',
         speakingGroupId: row.speaking_group_id,
@@ -608,6 +644,7 @@ class TutorService {
         parts: parts.map(part => ({
           ...part,
           aiFeedback: mapAiReport(aiBySubmission.get(part.submissionId)),
+          tutorGrade: mapTutorGrade(tutorBySubmission.get(part.submissionId) || latestTutorReport),
         }))
       };
     }
@@ -833,11 +870,15 @@ class TutorService {
 
       } else if (type === 'speaking') {
         // 1. SELECT FOR UPDATE
+        // NOTE: Must use INNER JOIN (not LEFT JOIN) — same reason as writing above.
         const checkQuery = `
           SELECT ss.id, ss.speaking_group_id, ss.status, ss.grader, ss.user_id, u.full_name as student_name
           FROM speaking_submissions ss
           LEFT JOIN users u ON u.id = ss.user_id
-          WHERE ss.id = $1 FOR UPDATE
+          WHERE ss.id::text = $1 OR ss.speaking_group_id::text = $1
+          ORDER BY ss.part_number ASC NULLS LAST
+          LIMIT 1
+          FOR UPDATE OF ss
         `;
         const checkResult = await client.query(checkQuery, [submissionId]);
         if (checkResult.rowCount === 0) {
@@ -940,7 +981,7 @@ class TutorService {
       }
 
       await client.query('COMMIT');
-      
+
       // Ghi audit log sau khi commit thành công
       try {
         await AuditLogService.logAction(
@@ -949,8 +990,8 @@ class TutorService {
           type === 'writing' ? 'writing_submissions' : 'speaking_submissions',
           submissionId,
           null, // old_value
-          { 
-            reason: `Band ${payload.bandScore}`, 
+          {
+            reason: `Band ${payload.bandScore}`,
             band_score: payload.bandScore,
             student_name: studentName
           }, // new_value
@@ -1039,14 +1080,29 @@ class TutorService {
     const result = await gradeWriting(
       task,
       taskNumber === 1 ? 'task1' : 'task2',
-      { testTitle: task.test_title }
+      {
+        testTitle: task.test_title,
+        usageContext: payload.usageContext || {
+          userId: task.user_id,
+          feature: 'tutor_ai_reference',
+          entityType: 'writing_submission',
+          entityId: task.id,
+        },
+      }
     );
     return formatPrelimFromAiResult(taskNumber, result);
   }
 
   static async runSpeakingAiPrelimCheck(submissionId, payload = {}) {
     const partNumber = Number(payload.partNumber ?? payload.taskNumber ?? payload.part_number);
-    const result = await gradeSpeakingGroup(submissionId, { force: true });
+    const result = await gradeSpeakingGroup(submissionId, {
+      force: true,
+      usageContext: payload.usageContext || {
+        feature: 'tutor_ai_reference',
+        entityType: 'speaking_submission',
+        entityId: submissionId,
+      },
+    });
     const report = result.reports.find(row => row.part_number === partNumber) || result.reports[0];
     if (!report || report.status === REPORT_STATUS.FAILED) {
       throw new AppError(report?.error_message || 'Speaking AI prelim check failed.', 422, 'SPEAKING_AI_FAILED');
@@ -1054,7 +1110,7 @@ class TutorService {
     return formatSpeakingPrelimFromReport(report, result.reports);
   }
 
-  static async transcribeSpeakingPart(partId) {
+  static async transcribeSpeakingPart(partId, usageContext = {}) {
     const res = await pool.query('SELECT audio_url, transcript FROM speaking_submissions WHERE id = $1', [partId]);
     if (res.rows.length === 0) {
       throw new AppError('Speaking part not found', 404);
@@ -1063,16 +1119,22 @@ class TutorService {
     if (part.transcript) {
       return part.transcript;
     }
-    
+
     if (!part.audio_url) {
       throw new AppError('No audio URL found for this part', 400);
     }
 
     const { generateTranscript } = require('./ai.service');
-    const transcript = await generateTranscript(part.audio_url);
+    const transcript = await generateTranscript(part.audio_url, {
+      ...usageContext,
+      feature: usageContext.feature || 'tutor_ai_reference',
+      entityType: usageContext.entityType || 'speaking_submission',
+      entityId: usageContext.entityId || partId,
+    });
+
     
     await pool.query('UPDATE speaking_submissions SET transcript = $1 WHERE id = $2', [transcript, partId]);
-    
+
     return transcript;
   }
   /**
@@ -1158,7 +1220,7 @@ class TutorService {
       ORDER BY t.attempts_count DESC, t.id, d.date::date ASC;
     `;
     const recentTestsResult = await pool.query(recentTestsQuery);
-    
+
     const recentTestsMap = {};
     recentTestsResult.rows.forEach(row => {
       if (!recentTestsMap[row.id]) {
@@ -1407,8 +1469,8 @@ class TutorService {
           'tutor_feedback_reports',
           report.id,
           null,
-          { 
-            reason: `Thu hồi bài chấm`, 
+          {
+            reason: `Thu hồi bài chấm`,
             submission_id: submissionId,
             skill: report.writing_submission_id ? 'writing' : 'speaking',
             student_name: report.student_name
@@ -1428,7 +1490,7 @@ class TutorService {
       client.release();
     }
   }
-    
+
   /**
    * Update grading result
    */
@@ -1488,8 +1550,8 @@ class TutorService {
           'tutor_feedback_reports',
           report.id,
           null,
-          { 
-            reason: `Band ${payload.bandScore}`, 
+          {
+            reason: `Band ${payload.bandScore}`,
             band_score: payload.bandScore,
             submission_id: submissionId,
             skill: report.writing_submission_id ? 'writing' : 'speaking',
@@ -1523,7 +1585,7 @@ class TutorService {
         ALTER TYPE log_action ADD VALUE IF NOT EXISTS 'submission_drafted';
         ALTER TYPE log_action ADD VALUE IF NOT EXISTS 'private_note_added';
       `);
-      
+
       // BACKFILL missing logs
       await pool.query(`
         INSERT INTO audit_logs (actor_id, action, target_table, target_id, new_value, ip_address)
@@ -1542,7 +1604,7 @@ class TutorService {
           AND al.target_id = COALESCE(tfr.writing_submission_id, tfr.speaking_submission_id)
         )
       `);
-      
+
       // BACKFILL missing test_updated logs based on mock_tests updated_at > created_at
       await pool.query(`
         INSERT INTO audit_logs (actor_id, action, target_table, target_id, new_value, ip_address, created_at)
@@ -1595,6 +1657,9 @@ class TutorService {
     const errorMessageSelect = hasErrorMessage
       ? 'agr.error_message'
       : 'NULL::text AS error_message';
+    const reportBandExpr = reportColumns.has('computed_band')
+      ? 'COALESCE(agr.band_score, agr.computed_band)'
+      : 'agr.band_score';
     const failedPredicates = [
       hasReportStatus ? "(ws.status = 'pending' AND agr.status = 'failed')" : null,
       hasErrorMessage ? '(ws.status = \'pending\' AND agr.error_message IS NOT NULL)' : null,
@@ -1622,7 +1687,7 @@ class TutorService {
         ws.submitted_at,
         ws.status::text AS submission_status,
         ${overallAiBandSelect},
-        agr.band_score AS ai_band,
+        ${reportBandExpr} AS ai_band,
         ${reportStatusSelect},
         ${errorMessageSelect},
         agr.generated_at
@@ -1634,7 +1699,7 @@ class TutorService {
         FROM ai_grading_reports
         WHERE submission_type = 'writing'
         ORDER BY submission_id,
-                 CASE WHEN band_score IS NOT NULL THEN 0 ELSE 1 END,
+                 CASE WHEN ${reportColumns.has('computed_band') ? 'COALESCE(band_score, computed_band)' : 'band_score'} IS NOT NULL THEN 0 ELSE 1 END,
                  generated_at DESC
       ) agr
         ON agr.submission_id = ws.id
@@ -1652,6 +1717,7 @@ class TutorService {
     for (const row of rows) {
       const groupId = row.writing_group_id || row.submission_id;
       if (!grouped.has(groupId)) {
+        const overallAiBand = toNumberOrNull(row.overall_ai_band);
         grouped.set(groupId, {
           submissionId: groupId,
           studentId: row.student_id,
@@ -1659,7 +1725,7 @@ class TutorService {
           testTitle: row.test_title,
           submittedAt: row.submitted_at,
           submissionStatus: row.submission_status,
-          aiBand: isValidHalfBandScore(row.overall_ai_band) ? parseFloat(row.overall_ai_band) : null,
+          aiBand: isValidHalfBandScore(overallAiBand) ? overallAiBand : null,
           reportStatus: null,
           errorMessage: null,
           generatedAt: row.generated_at,
@@ -1668,7 +1734,7 @@ class TutorService {
       }
 
       const item = grouped.get(groupId);
-      const taskBand = row.ai_band ? parseFloat(row.ai_band) : null;
+      const taskBand = toNumberOrNull(row.ai_band);
       const taskStatus = row.ai_report_status || (taskBand !== null ? REPORT_STATUS.COMPLETED : null);
       item.tasks.push({
         submissionId: row.submission_id,

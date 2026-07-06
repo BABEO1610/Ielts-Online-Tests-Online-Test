@@ -53,6 +53,33 @@ describe('TutorGradingPanel Component', () => {
         'https://cdn.example/audio.mp3'
       );
     });
+
+    it('shows saved tutor speaking grade in read-only mode', () => {
+      renderPanel({
+        type: 'speaking',
+        activeTaskId: 'part-1',
+        activeTaskNumber: 1,
+        tasks: [{ id: 'part-1', name: 'Part 1' }],
+        readOnly: true,
+        existingTutorGrade: {
+          overallBand: 6,
+          criterionScores: {
+            fluencyCoherence: 6,
+            lexicalResource: 6.5,
+            grammaticalRangeAccuracy: 5.5,
+            pronunciation: 6,
+          },
+          writtenFeedback: 'Saved speaking feedback for the student.',
+        },
+      });
+
+      expect(screen.getByTestId('input-fluencyScore')).toHaveValue('6');
+      expect(screen.getByTestId('input-lexicalScore')).toHaveValue('6.5');
+      expect(screen.getByTestId('input-grammarScore')).toHaveValue('5.5');
+      expect(screen.getByTestId('input-pronunciationScore')).toHaveValue('6');
+      expect(screen.getByTestId('preview-band')).toHaveTextContent('6.0');
+      expect(screen.getByTestId('textarea-feedback')).toHaveValue('Saved speaking feedback for the student.');
+    });
   });
 
   describe('Form Submission', () => {
@@ -151,6 +178,68 @@ describe('TutorGradingPanel Component', () => {
         expect(gradingService.runPrelimCheck).toHaveBeenCalledWith('writing', mockSubmissionId, 1);
         expect(screen.getByTestId('textarea-feedback')).toHaveValue('Needs clearer support.');
       });
+    });
+
+    it('keeps speaking prelim feedback shared when switching parts', async () => {
+      gradingService.runPrelimCheck.mockResolvedValueOnce({
+        success: true,
+        data: {
+          suggestedCriteria: {
+            fluencyScore: 6,
+            lexicalScore: 6,
+            grammarScore: 5.5,
+            pronunciationScore: 6,
+          },
+          feedbackDraft: 'Overall speaking feedback for all 3 parts.',
+          keyProblems: ['grammar'],
+          aiFeedback: {
+            submissionType: 'speaking',
+            overallBand: 6,
+            criterionScores: {
+              fluencyCoherence: { band: 6, feedback: 'Mostly coherent.' },
+              lexicalResource: { band: 6, feedback: 'Adequate range.' },
+              grammaticalRangeAccuracy: { band: 5.5, feedback: 'Frequent slips.' },
+              pronunciation: { band: 6, feedback: 'Generally clear.' },
+            },
+          },
+        },
+      });
+
+      const speakingProps = {
+        ...defaultProps,
+        type: 'speaking',
+        activeTaskId: 'part-1',
+        activeTaskNumber: 1,
+        tasks: [
+          { id: 'part-1', name: 'Part 1' },
+          { id: 'part-2', name: 'Part 2' },
+          { id: 'part-3', name: 'Part 3' },
+        ],
+      };
+
+      const { rerender } = render(
+        <MemoryRouter>
+          <TutorGradingPanel {...speakingProps} />
+        </MemoryRouter>
+      );
+
+      fireEvent.click(screen.getByText('Run AI Prelim Check'));
+
+      await waitFor(() => {
+        expect(screen.getByText('Grading Panel - Speaking Session')).toBeInTheDocument();
+        expect(screen.getByTestId('textarea-feedback')).toHaveValue('Overall speaking feedback for all 3 parts.');
+        expect(screen.getByTestId('input-fluencyScore')).toHaveValue('6');
+      });
+
+      rerender(
+        <MemoryRouter>
+          <TutorGradingPanel {...speakingProps} activeTaskId="part-2" activeTaskNumber={2} />
+        </MemoryRouter>
+      );
+
+      expect(screen.getByText('Grading Panel - Speaking Session')).toBeInTheDocument();
+      expect(screen.getByTestId('textarea-feedback')).toHaveValue('Overall speaking feedback for all 3 parts.');
+      expect(screen.getByTestId('input-fluencyScore')).toHaveValue('6');
     });
   });
 });

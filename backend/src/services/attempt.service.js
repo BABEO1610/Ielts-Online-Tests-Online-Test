@@ -296,6 +296,7 @@ class AttemptService {
     const res = await pool.query(
       `SELECT
          ta.id,
+         ta.test_id,
          ta.raw_score,
          ta.total_questions,
          ta.band_score,
@@ -315,6 +316,7 @@ class AttemptService {
 
     return res.rows.map((row) => ({
       id: row.id,
+      testId: row.test_id,
       testTitle: row.test_title,
       skill: row.skill,
       difficulty: row.difficulty,
