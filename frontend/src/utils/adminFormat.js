@@ -55,10 +55,32 @@ const ACTION_LABELS = {
   submission_drafted: 'Lưu nháp',
   private_note_added: 'Ghi chú riêng',
   submission_revoked: 'Thu hồi kết quả',
-  submission_regraded: 'Sửa kết quả chấm'
+  submission_regraded: 'Sửa kết quả chấm',
+  tutor_assigned: 'Phân công giảng viên',
 };
 
 export const actionLabel = (action) => ACTION_LABELS[action] || action;
+
+/**
+ * Map tên cột DB (audit log old_value/new_value keys) sang nhãn tiếng Việt.
+ * Dùng trong diffValues() để hiển thị modal chi tiết có nghĩa.
+ */
+const FIELD_LABELS = {
+  tutor_id:        'ID giảng viên',
+  tutor_name:      'Giảng viên phụ trách',
+  tutor_email:     'Email giảng viên',
+  student_name:    'Học sinh',
+  student_email:   'Email học sinh',
+  submission_type: 'Loại bài',
+  role:            'Vai trò',
+  status:          'Trạng thái',
+  email:           'Email',
+  full_name:       'Họ tên',
+  title:           'Tiêu đề',
+  file_name:       'Tên tệp',
+  reason:          'Lý do',
+  reverted_log_id: 'ID log gốc',
+};
 
 /** Bootstrap/pill modifier for a user role. */
 export const rolePill = (role) =>
@@ -70,6 +92,7 @@ export const statusPill = (status) =>
 
 /**
  * Diff two flat objects (old_value vs new_value from audit_logs).
+ * Sử dụng FIELD_LABELS để đổi tên cột DB thành nhãn tiếng Việt.
  * @returns Array<{ field, before, after, changed }>
  */
 export const diffValues = (oldVal = {}, newVal = {}) => {
@@ -78,8 +101,14 @@ export const diffValues = (oldVal = {}, newVal = {}) => {
   const keys = Array.from(new Set([...Object.keys(o), ...Object.keys(n)]));
   return keys.map((field) => {
     const before = o[field];
-    const after = n[field];
-    return { field, before, after, changed: JSON.stringify(before) !== JSON.stringify(after) };
+    const after  = n[field];
+    return {
+      field:   FIELD_LABELS[field] || field,
+      rawField: field,
+      before,
+      after,
+      changed: JSON.stringify(before) !== JSON.stringify(after),
+    };
   });
 };
 

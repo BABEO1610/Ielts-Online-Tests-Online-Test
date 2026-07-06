@@ -1,0 +1,35 @@
+[
+  {
+    "id": "writing_band_task_response",
+    "title": "Writing Task Response And Task Achievement",
+    "skill": "writing",
+    "questionType": "writing_band_descriptors",
+    "category": "band_descriptor",
+    "bandRange": "4.0-7.0",
+    "tags": ["writing", "task_response", "task_achievement", "criteria", "tieu chi writing"],
+    "sourceName": "IELTSZone Static Knowledge Base",
+    "content": "Task Response or Task Achievement measures whether the answer addresses the task, has a clear position when required, and supports ideas with relevant detail. A common weakness is giving general ideas that do not answer the exact question."
+  },
+  {
+    "id": "writing_band_coherence_cohesion",
+    "title": "Coherence And Cohesion",
+    "skill": "writing",
+    "questionType": "writing_band_descriptors",
+    "category": "band_descriptor",
+    "bandRange": "4.0-7.0",
+    "tags": ["writing", "coherence", "cohesion", "criteria"],
+    "sourceName": "IELTSZone Static Knowledge Base",
+    "content": "Coherence is how logically ideas are organized. Cohesion is how sentences and paragraphs are connected. Good writing uses clear paragraphing and natural linking. A common mistake is using many linking words without a logical idea sequence."
+  },
+  {
+    "id": "writing_band_lr_gra",
+    "title": "Lexical Resource And Grammar Range",
+    "skill": "writing",
+    "questionType": "writing_band_descriptors",
+    "category": "band_descriptor",
+    "bandRange": "4.0-7.0",
+    "tags": ["writing", "lexical_resource", "grammar", "criteria"],
+    "sourceName": "IELTSZone Static Knowledge Base",
+    "content": "Lexical Resource measures range and accuracy of vocabulary. Grammar Range and Accuracy measures sentence control and variety. Strong answers use precise words and mostly accurate complex sentences, not memorized phrases forced into every topic."
+  }
+]

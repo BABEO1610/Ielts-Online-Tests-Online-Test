@@ -161,6 +161,30 @@ class TutorController {
       next(error);
     }
   }
+
+  /**
+   * POST /api/v1/tutors/submissions/:type/:submissionId/ai-prelim
+   */
+  static async runAiPrelimCheck(req, res, next) {
+    try {
+      const { type, submissionId } = req.params;
+      if (!['writing', 'speaking'].includes(type)) {
+        return res.status(400).json({ success: false, error: { message: 'Invalid type' }, data: null, meta: null });
+      }
+
+      const result = await TutorService.runAiPrelimCheck(type, submissionId, req.body);
+
+      res.status(200).json({
+        success: true,
+        data: result,
+        error: null,
+        meta: null
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   /**
    * POST /api/v1/tutors/submissions/speaking/:partId/transcribe
    */
@@ -276,6 +300,59 @@ class TutorController {
         data: stats,
         error: null,
         meta: null
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  /**
+   * GET /api/v1/tutors/ai-reference
+   * List AI-graded writing submissions for tutor reference
+   */
+  static async getAiReferenceList(req, res, next) {
+    try {
+      const { search } = req.query;
+      const filters = { search: search?.trim() };
+
+      const data = await TutorService.getAiReferenceList(filters);
+
+      res.status(200).json({
+        success: true,
+        data,
+        error: null,
+        meta: { total: data.length },
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  /**
+   * GET /api/v1/tutors/ai-reference/:submissionId
+   * View AI-graded submission detail (read-only)
+   */
+  static async getAiReferenceDetail(req, res, next) {
+    try {
+      const { submissionId } = req.params;
+      const detail = await TutorService.getAiReferenceDetail(
+        submissionId
+      );
+
+      if (!detail) {
+        return res.status(404).json({
+          success: false,
+          data: null,
+          error: { code: 'NOT_FOUND', message: 'AI reference not found' },
+          meta: {},
+        });
+      }
+
+      res.status(200).json({
+        success: true,
+        data: detail,
+        error: null,
+        meta: {},
       });
     } catch (err) {
       next(err);

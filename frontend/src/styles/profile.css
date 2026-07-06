@@ -750,7 +750,7 @@
   align-items: center;
   display: grid;
   gap: var(--spacing-md);
-  grid-template-columns: minmax(180px, 1.6fr) 110px 70px 100px 100px;
+  grid-template-columns: minmax(180px, 1.6fr) 110px 70px 100px 100px 110px;
 }
 
 .iot-history-head {

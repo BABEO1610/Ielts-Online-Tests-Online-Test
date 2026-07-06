@@ -1,0 +1,35 @@
+[
+  {
+    "id": "listening_section1_form_completion",
+    "title": "Listening Section 1 Form Completion",
+    "skill": "listening",
+    "questionType": "listening_sections",
+    "category": "strategy",
+    "bandRange": "4.0-7.0",
+    "tags": ["listening", "section_1", "form_completion", "prediction"],
+    "sourceName": "IELTSZone Static Knowledge Base",
+    "content": "In Section 1, predict the type of answer before listening: name, number, date, address, or noun. Check spelling and word limits. A common mistake is hearing the first option and missing the correction that follows."
+  },
+  {
+    "id": "listening_section3_distractors",
+    "title": "Listening Section 3 Distractors",
+    "skill": "listening",
+    "questionType": "listening_section_3",
+    "category": "strategy",
+    "bandRange": "5.0-7.0",
+    "tags": ["listening", "section_3", "distractor", "academic_discussion", "nghe"],
+    "sourceName": "IELTSZone Static Knowledge Base",
+    "content": "Section 3 often has students discussing choices. Listen for changes of opinion: at first, however, actually, on second thought. The correct answer may come after a rejected idea, so track who agrees and what final decision they reach."
+  },
+  {
+    "id": "listening_section4_note_completion",
+    "title": "Listening Section 4 Lecture Notes",
+    "skill": "listening",
+    "questionType": "listening_section_4",
+    "category": "strategy",
+    "bandRange": "5.0-7.0",
+    "tags": ["listening", "section_4", "lecture", "note_completion"],
+    "sourceName": "IELTSZone Static Knowledge Base",
+    "content": "Section 4 is a monologue, so use signposting to follow the structure: first, next, another issue, finally. Predict grammar for each blank. If the blank follows an adjective, the answer is probably a noun; if it follows a verb, it may be an object."
+  }
+]

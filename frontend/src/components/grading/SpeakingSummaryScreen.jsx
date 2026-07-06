@@ -1,12 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { useAuth } from '../../context/AuthContext';
 
 const SpeakingSummaryScreen = ({ exam, answers, onSubmit }) => {
   const [grader, setGrader] = useState('tutor');
   const [autoSubmitTime, setAutoSubmitTime] = useState(60);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const { user } = useAuth();
-  const aiQuotaRemaining = user?.ai_grading_quota_remaining ?? 0;
 
   useEffect(() => {
     if (isSubmitting) return;
@@ -80,7 +77,7 @@ const SpeakingSummaryScreen = ({ exam, answers, onSubmit }) => {
               </div>
             </label>
 
-            <label className={`form-check-label border p-3 rounded-3 d-flex align-items-center cursor-pointer ${grader === 'ai' ? 'border-primary bg-primary bg-opacity-10' : ''} ${aiQuotaRemaining <= 0 ? 'opacity-50' : ''}`} style={{ cursor: 'pointer' }}>
+            <label className={`form-check-label border p-3 rounded-3 d-flex align-items-center cursor-pointer ${grader === 'ai' ? 'border-primary bg-primary bg-opacity-10' : ''}`} style={{ cursor: 'pointer' }}>
               <input 
                 className="form-check-input me-3 fs-5 mt-0" 
                 type="radio" 
@@ -88,12 +85,11 @@ const SpeakingSummaryScreen = ({ exam, answers, onSubmit }) => {
                 value="ai"
                 checked={grader === 'ai'}
                 onChange={() => setGrader('ai')}
-                disabled={isSubmitting || aiQuotaRemaining <= 0}
+                disabled={isSubmitting}
               />
               <div>
                 <div className="fw-bold fs-5">
                   AI Chấm điểm 
-                  <span className="badge bg-info text-dark ms-2">Còn {aiQuotaRemaining} lượt</span>
                 </div>
                 <div className="text-muted small">Nhận kết quả và phân tích ngay lập tức.</div>
               </div>

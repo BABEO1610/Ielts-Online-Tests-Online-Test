@@ -1,12 +1,8 @@
 import React, { useState, useRef, useEffect, forwardRef, useImperativeHandle } from 'react';
 import api from '../../services/api';
 import gradingService from '../../services/grading.service';
-import { useAuth } from '../../context/AuthContext';
 
 const AudioRecorder = forwardRef(({ testId, partNumber, onUploadComplete, onSubmitSuccess, maxDuration = 300, practiceMode = false, examMode = false }, ref) => {
-  const { user } = useAuth();
-  const aiQuotaRemaining = user?.ai_grading_quota_remaining ?? 0;
-
   const [status, setStatus] = useState('idle'); // idle, recording, uploading, done, error
   const [submitStatus, setSubmitStatus] = useState('idle');
   const [grader, setGrader] = useState('tutor');
@@ -126,7 +122,11 @@ const AudioRecorder = forwardRef(({ testId, partNumber, onUploadComplete, onSubm
       // EARS[Event]: WHEN user submits audio, THE system SHALL upload the file
       formData.append('audio_file', blob, 'recording.m4a'); 
 
-      const response = await api.post('/submissions/speaking/upload', formData);
+      const response = await api.post('/submissions/speaking/upload', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
 
       if (response.data?.success && response.data?.data?.temp_s3_key) {
         setStatus('done');
@@ -163,7 +163,6 @@ const AudioRecorder = forwardRef(({ testId, partNumber, onUploadComplete, onSubm
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (grader === 'ai' && aiQuotaRemaining <= 0) return;
 
     try {
       setSubmitStatus('submitting');
@@ -279,19 +278,13 @@ const AudioRecorder = forwardRef(({ testId, partNumber, onUploadComplete, onSubm
                   value="ai"
                   checked={grader === 'ai'}
                   onChange={(e) => setGrader(e.target.value)}
-                  disabled={submitStatus === 'submitting' || submitStatus === 'success' || aiQuotaRemaining <= 0}
+                  disabled={submitStatus === 'submitting' || submitStatus === 'success'}
                 />
                 <label className="form-check-label" htmlFor="graderAi">
-                  AI Chấm điểm <span className="badge bg-info text-dark ms-1">Còn {aiQuotaRemaining} lượt</span>
+                  AI Chấm điểm <span className="badge bg-info text-dark ms-1">Không giới hạn</span>
                 </label>
               </div>
             </div>
-
-            {aiQuotaRemaining <= 0 && (
-              <p className="text-danger small mb-3 fade-in">
-                Bạn đã hết lượt chấm chữa bằng AI. Vui lòng chọn Giảng viên hoặc mua thêm gói.
-              </p>
-            )}
 
             {submitStatus === 'error' && (
               <div className="alert alert-danger py-2 fade-in" role="alert">
@@ -309,7 +302,7 @@ const AudioRecorder = forwardRef(({ testId, partNumber, onUploadComplete, onSubm
               <button 
                 type="submit" 
                 className="btn btn-primary rounded-pill px-5 py-2 fw-bold"
-                disabled={submitStatus === 'submitting' || submitStatus === 'success' || (grader === 'ai' && aiQuotaRemaining <= 0)}
+                disabled={submitStatus === 'submitting' || submitStatus === 'success'}
               >
                 {submitStatus === 'submitting' ? (
                   <><span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Đang nộp...</>

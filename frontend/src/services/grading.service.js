@@ -71,9 +71,32 @@ const gradingService = {
     const response = await api.get('/tutors/queue', { params: filters });
     return response.data;
   },
+
+  requestAiGrading: async (submissionId) => {
+    const response = await api.post(`/submissions/writing/${submissionId}/ai-grade`);
+    return response.data;
+  },
+
+  getAiReferenceList: async (filters) => {
+    const response = await api.get('/tutors/ai-reference', { params: filters });
+    return response.data;
+  },
+
+  getAiReferenceDetail: async (submissionId) => {
+    const response = await api.get(`/tutors/ai-reference/${submissionId}`);
+    return response.data;
+  },
+
   // EARS[State-driven]: WHEN tutor views submission detail THEN fetch detail
   getSubmissionDetail: async (type, submissionId) => {
     const response = await api.get(`/tutors/submissions/${type}/${submissionId}`);
+    return response.data;
+  },
+
+  runPrelimCheck: async (type, submissionId, taskNumber) => {
+    const response = await api.post(`/tutors/submissions/${type}/${submissionId}/ai-prelim`, {
+      taskNumber,
+    });
     return response.data;
   },
 

@@ -39,6 +39,20 @@ router.get(
   TutorController.getGradingHistory
 );
 
+// GET /api/v1/tutors/ai-reference
+router.get(
+  '/ai-reference',
+  authorize(['tutor', 'admin']),
+  TutorController.getAiReferenceList
+);
+
+// GET /api/v1/tutors/ai-reference/:submissionId
+router.get(
+  '/ai-reference/:submissionId',
+  authorize(['tutor', 'admin']),
+  TutorController.getAiReferenceDetail
+);
+
 // GET /api/v1/tutors/grading-history/:submissionId
 router.get(
   '/grading-history/:submissionId',
@@ -72,6 +86,13 @@ router.post(
   '/submissions/:type/:submissionId/grade',
   authorize(['tutor']),
   TutorController.gradeSubmission
+);
+
+// POST /api/v1/tutors/submissions/:type/:submissionId/ai-prelim
+router.post(
+  '/submissions/:type/:submissionId/ai-prelim',
+  authorize(['tutor', 'admin']),
+  TutorController.runAiPrelimCheck
 );
 
 // POST /api/v1/tutors/submissions/speaking/:partId/transcribe

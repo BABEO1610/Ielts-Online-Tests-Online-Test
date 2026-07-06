@@ -47,14 +47,28 @@ const assignSubmission = async (actorId, submissionId, type, tutorId) => {
   const updatedSubmission = await queries.assignTutorToSubmission(submissionId, type, tutorId || null);
   const targetTable = type === 'writing' ? 'writing_submissions' : 'speaking_submissions';
 
-  // Log action
+  // Dùng 'tutor_assigned' để phân biệt rõ hành động phân công giảng viên
+  // khỏi 'user_updated' (dành cho cập nhật profile user). Lưu tên người thay
+  // vì UUID thô để audit log hiển thị có nghĩa với người xem.
   await AuditLogService.logAction(
     actorId,
-    'user_updated', // Could be 'submission_updated' if added to log_action enum
+    'tutor_assigned',
     targetTable,
     submissionId,
-    { assigned_tutor_id: submission.assigned_tutor_id },
-    { assigned_tutor_id: updatedSubmission.assigned_tutor_id },
+    {
+      tutor_id:        submission.assigned_tutor_id || null,
+      tutor_name:      submission.tutor_name        || null,
+      tutor_email:     submission.tutor_email       || null,
+      student_name:    submission.student_name      || null,
+      submission_type: type,
+    },
+    {
+      tutor_id:        updatedSubmission.assigned_tutor_id || null,
+      tutor_name:      updatedSubmission.tutor_name        || null,
+      tutor_email:     updatedSubmission.tutor_email       || null,
+      student_name:    updatedSubmission.student_name      || null,
+      submission_type: type,
+    },
     null,
     true
   );

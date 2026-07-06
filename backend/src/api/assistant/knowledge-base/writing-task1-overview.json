@@ -1,0 +1,35 @@
+[
+  {
+    "id": "writing_task1_overview_purpose",
+    "title": "Task 1 Overview Purpose",
+    "skill": "writing",
+    "questionType": "task1_overview",
+    "category": "strategy",
+    "bandRange": "4.0-7.0",
+    "tags": ["writing", "task_1", "overview", "viet overview"],
+    "sourceName": "IELTSZone Static Knowledge Base",
+    "content": "The overview summarizes the most important features without detailed numbers. It should mention the main trend, highest or lowest items, major contrast, or key stages. A common mistake is listing data instead of summarizing the big picture."
+  },
+  {
+    "id": "writing_task1_overview_charts",
+    "title": "Overview For Charts",
+    "skill": "writing",
+    "questionType": "task1_overview",
+    "category": "template",
+    "bandRange": "4.0-7.0",
+    "tags": ["writing", "task_1", "overview", "line_graph", "bar_chart", "pie_chart"],
+    "sourceName": "IELTSZone Static Knowledge Base",
+    "content": "For line graphs and bar charts, choose two main features: overall increase or decrease, the highest and lowest categories, or a clear comparison between groups. Avoid exact figures in the overview; save numbers for body paragraphs."
+  },
+  {
+    "id": "writing_task1_overview_maps_process",
+    "title": "Overview For Maps And Processes",
+    "skill": "writing",
+    "questionType": "task1_overview",
+    "category": "template",
+    "bandRange": "4.0-7.0",
+    "tags": ["writing", "task_1", "overview", "map", "process"],
+    "sourceName": "IELTSZone Static Knowledge Base",
+    "content": "For maps, summarize the biggest changes such as new buildings, removal of green space, or transport development. For processes, summarize the number of stages and the start and end points. Do not describe every step in the overview."
+  }
+]

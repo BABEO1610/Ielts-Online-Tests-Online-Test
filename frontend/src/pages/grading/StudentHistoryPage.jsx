@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import StudentNavbar from '../../components/layout/StudentNavbar';
-import StudentDashboardWidgets from '../../components/grading/StudentDashboardWidgets';
 import FeedbackReport from '../../components/grading/FeedbackReport';
 import gradingService from '../../services/grading.service';
 
@@ -39,12 +39,15 @@ const StatusBadge = ({ status }) => {
 };
 
 const StudentHistoryPage = () => {
+  const navigate = useNavigate();
   const [selectedSubmission, setSelectedSubmission] = useState(null);
   const [filterType, setFilterType] = useState('all');
 
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [aiGradingIds, setAiGradingIds] = useState({});
 
   useEffect(() => {
     const fetchHistory = async () => {
@@ -63,9 +66,39 @@ const StudentHistoryPage = () => {
       }
     };
     fetchHistory();
-  }, []);
+  }, [refreshKey]);
 
   const filtered = filterType === 'all' ? history : history.filter(s => s.type === filterType);
+
+  const handleAiGrading = async (submission) => {
+    const tasks = submission.aiGradingTasks?.length
+      ? submission.aiGradingTasks
+      : [{ submissionId: submission.aiGradingSubmissionId }];
+    const validTasks = tasks.filter(task => task?.submissionId);
+    if (validTasks.length === 0) return;
+
+    setAiGradingIds(prev => ({ ...prev, [submission.id]: true }));
+    setError(null);
+    try {
+      for (const task of validTasks) {
+        await gradingService.requestAiGrading(task.submissionId);
+      }
+      setRefreshKey(key => key + 1);
+    } catch (err) {
+      const message = err.response?.data?.error?.message
+        || err.message
+        || 'Không thể gửi yêu cầu AI chấm điểm.';
+      setError(message);
+    } finally {
+      setAiGradingIds(prev => ({ ...prev, [submission.id]: false }));
+    }
+  };
+
+  const openDetailPage = (submission) => {
+    navigate(`/student/profile/practice-history/${submission.id}?type=${submission.type}`, {
+      state: { type: submission.type },
+    });
+  };
 
   return (
     <div className="bg-white min-vh-100 pb-5">
@@ -202,9 +235,14 @@ const StudentHistoryPage = () => {
                     </td>
                     <td className="py-3 px-4 border-0 text-center">
                       {sub.band_score ? (
-                        <span className="fw-bold text-dark" style={{ fontSize: '20px', fontFamily: 'UberMove, system-ui, sans-serif' }}>
-                          {sub.band_score.toFixed(1)}
-                        </span>
+                        <div>
+                          <span className="fw-bold text-dark" style={{ fontSize: '20px', fontFamily: 'UberMove, system-ui, sans-serif' }}>
+                            {(Math.round(Number(sub.band_score) * 2) / 2).toFixed(1)}
+                          </span>
+                          <div className="text-muted" style={{ fontSize: '12px' }}>
+                            {sub.tutor_band_score ? 'Tutor Final' : 'AI Estimated'}
+                          </div>
+                        </div>
                       ) : (
                         <span className="text-muted" style={{ fontSize: '14px' }}>—</span>
                       )}
@@ -214,13 +252,29 @@ const StudentHistoryPage = () => {
                         <button
                           className="btn btn-dark rounded-pill px-3 py-1 fw-medium"
                           style={{ fontSize: '13px' }}
-                          onClick={(e) => { e.stopPropagation(); setSelectedSubmission(sub); }}
+                          onClick={(e) => { e.stopPropagation(); openDetailPage(sub); }}
                         >
-                          Xem kết quả
+                          Xem chi tiết
                         </button>
                       )}
-                      {sub.status === 'pending' && (
+                      {sub.status === 'pending' && sub.type === 'writing' && sub.grader === 'ai' && (
+                        <button
+                          className="btn btn-dark rounded-pill px-3 py-1 fw-medium"
+                          style={{ fontSize: '13px' }}
+                          disabled={!!aiGradingIds[sub.id]}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleAiGrading(sub);
+                          }}
+                        >
+                          {aiGradingIds[sub.id] ? 'Đang chấm...' : 'AI Chấm điểm'}
+                        </button>
+                      )}
+                      {sub.status === 'pending' && !(sub.type === 'writing' && sub.grader === 'ai') && (
                         <span className="text-muted fw-medium" style={{ fontSize: '13px' }}>Đang xử lý...</span>
+                      )}
+                      {sub.status === 'failed' && (
+                        <span className="text-muted fw-medium" style={{ fontSize: '13px' }}>AI lỗi</span>
                       )}
                     </td>
                   </tr>

@@ -1,0 +1,35 @@
+[
+  {
+    "id": "speaking_part1_extend_briefly",
+    "title": "Speaking Part 1 Short Extensions",
+    "skill": "speaking",
+    "questionType": "speaking_part_1",
+    "category": "strategy",
+    "bandRange": "4.0-7.0",
+    "tags": ["speaking", "part_1", "fluency", "noi"],
+    "sourceName": "IELTSZone Static Knowledge Base",
+    "content": "Part 1 answers should be natural and not too long. Give a direct answer, then add one reason or example. A common mistake is answering with only yes or no, which gives too little language for the examiner to assess."
+  },
+  {
+    "id": "speaking_part2_cue_card",
+    "title": "Speaking Part 2 Cue Card",
+    "skill": "speaking",
+    "questionType": "speaking_part_2",
+    "category": "strategy",
+    "bandRange": "4.0-7.0",
+    "tags": ["speaking", "part_2", "cue_card", "tra loi bao lau"],
+    "sourceName": "IELTSZone Static Knowledge Base",
+    "content": "In Part 2, use the one-minute preparation time to note people, place, time, reason, and feeling. Aim to speak for about 1 to 2 minutes. If you run out of ideas, add background, a comparison, or a personal reaction."
+  },
+  {
+    "id": "speaking_part3_abstract_answers",
+    "title": "Speaking Part 3 Abstract Answers",
+    "skill": "speaking",
+    "questionType": "speaking_part_3",
+    "category": "strategy",
+    "bandRange": "5.0-7.0",
+    "tags": ["speaking", "part_3", "abstract", "opinion"],
+    "sourceName": "IELTSZone Static Knowledge Base",
+    "content": "Part 3 asks broader questions. Use a clear opinion, explanation, example, and short contrast if useful. Avoid only telling personal stories; connect your answer to society, education, technology, culture, or long-term effects."
+  }
+]

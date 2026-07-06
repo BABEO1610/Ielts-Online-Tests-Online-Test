@@ -78,11 +78,24 @@ const assignTutorToSubmission = async (submissionId, type, tutorId) => {
   else if (type === 'speaking') { table = 'speaking_submissions'; idCol = 'speaking_group_id'; }
   else throw new Error('Invalid submission type');
 
+  // CTE để lấy thêm thông tin tutor mới sau UPDATE,
+  // tránh phải thực hiện query riêng chỉ để resolve UUID → tên người.
   const result = await pool.query(
-    `UPDATE ${table} 
-     SET assigned_tutor_id = $2
-     WHERE ${idCol} = $1
-     RETURNING *`,
+    `WITH updated AS (
+       UPDATE ${table}
+       SET assigned_tutor_id = $2
+       WHERE ${idCol} = $1
+       RETURNING *
+     )
+     SELECT
+       updated.*,
+       tutor.full_name  AS tutor_name,
+       tutor.email      AS tutor_email,
+       student.full_name AS student_name,
+       student.email     AS student_email
+     FROM updated
+     LEFT JOIN users tutor   ON tutor.id   = updated.assigned_tutor_id
+     LEFT JOIN users student ON student.id = updated.user_id`,
     [submissionId, tutorId]
   );
   return result.rows[0];
@@ -101,7 +114,22 @@ const getSubmissionByIdAndType = async (submissionId, type) => {
   else if (type === 'speaking') { table = 'speaking_submissions'; idCol = 'speaking_group_id'; }
   else throw new Error('Invalid submission type');
 
-  const result = await pool.query(`SELECT * FROM ${table} WHERE ${idCol} = $1 LIMIT 1`, [submissionId]);
+  // JOIN users để lấy tên tutor đang được phân công (nếu có) — cần thiết
+  // để ghi old_value có nghĩa vào audit log thay vì lưu UUID thô.
+  const result = await pool.query(
+    `SELECT
+       s.*,
+       tutor.full_name  AS tutor_name,
+       tutor.email      AS tutor_email,
+       student.full_name AS student_name,
+       student.email     AS student_email
+     FROM ${table} s
+     LEFT JOIN users tutor   ON tutor.id   = s.assigned_tutor_id
+     LEFT JOIN users student ON student.id = s.user_id
+     WHERE s.${idCol} = $1
+     LIMIT 1`,
+    [submissionId]
+  );
   return result.rows[0];
 };
 

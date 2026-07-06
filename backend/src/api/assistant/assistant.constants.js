@@ -24,10 +24,10 @@ const ERROR_MESSAGES = {
   [ERROR_CODES.QUESTION_NOT_FOUND]: 'Không tìm thấy câu hỏi cần giải thích.',
   [ERROR_CODES.MISSING_CONTEXT]: 'Hệ thống chưa có đủ ngữ cảnh để trả lời câu hỏi này.',
   [ERROR_CODES.MISSING_EXPLANATION]: 'Hiện tại hệ thống chưa có đủ dữ liệu để giải thích câu này.',
-  [ERROR_CODES.OUT_OF_SCOPE]: 'Mình chỉ hỗ trợ nội dung IELTS trên website.',
   [ERROR_CODES.INTERNAL_ERROR]: 'Trợ lý IELTS đang gặp lỗi. Vui lòng thử lại sau.',
   [ERROR_CODES.AI_NOT_CONFIGURED]: 'AI service chưa được cấu hình. Vui lòng điền GEMINI_API_KEY hoặc OPENAI_API_KEY trong file .env ở root project.',
   [ERROR_CODES.AI_QUOTA_EXCEEDED]: 'Gemini API đã hết quota hoặc chưa được cấp quota. Vui lòng kiểm tra billing/quota trong Google AI Studio.',
+  [ERROR_CODES.OUT_OF_SCOPE]: 'Mình chỉ hỗ trợ IELTS, học tiếng Anh và cách sử dụng IELTSZone.',
 };
 
 const HTTP_STATUS_BY_CODE = {
