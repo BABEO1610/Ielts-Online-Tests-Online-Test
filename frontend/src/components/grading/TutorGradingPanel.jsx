@@ -150,10 +150,17 @@ const TutorGradingPanel = ({
             ...prev,
             [activeTaskId]: {
               ...(prev[activeTaskId] || {}),
-              taskAchievementScore: suggestion.suggestedCriteria.taskAchievementOrResponse ?? '',
-              coherenceScore: suggestion.suggestedCriteria.coherenceCohesion ?? '',
-              lexicalScore: suggestion.suggestedCriteria.lexicalResource ?? '',
-              grammarScore: suggestion.suggestedCriteria.grammaticalRangeAccuracy ?? ''
+              ...(type === 'speaking' ? {
+                fluencyScore: suggestion.suggestedCriteria.fluencyScore ?? '',
+                lexicalScore: suggestion.suggestedCriteria.lexicalScore ?? '',
+                grammarScore: suggestion.suggestedCriteria.grammarScore ?? '',
+                pronunciationScore: suggestion.suggestedCriteria.pronunciationScore ?? ''
+              } : {
+                taskAchievementScore: suggestion.suggestedCriteria.taskAchievementOrResponse ?? '',
+                coherenceScore: suggestion.suggestedCriteria.coherenceCohesion ?? '',
+                lexicalScore: suggestion.suggestedCriteria.lexicalResource ?? '',
+                grammarScore: suggestion.suggestedCriteria.grammaticalRangeAccuracy ?? ''
+              })
             }
           }));
         }

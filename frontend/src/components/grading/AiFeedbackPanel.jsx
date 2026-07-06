@@ -28,6 +28,50 @@ const getCriteria = (report) => {
     || report?.criterionScores
     || raw.criteria
     || {};
+  const isSpeaking = report?.submissionType === 'speaking'
+    || report?.submission_type === 'speaking'
+    || criteria.fluencyCoherence !== undefined
+    || criteria.pronunciation !== undefined;
+  if (isSpeaking) {
+    return [
+      {
+        key: 'fluencyCoherence',
+        label: 'Fluency & Coherence',
+        band: criteria.fluencyCoherence?.band
+          ?? criteria.fluencyCoherence
+          ?? report?.fluency_score
+          ?? report?.fluencyScore,
+        feedback: criteria.fluencyCoherence?.feedback,
+      },
+      {
+        key: 'lexicalResource',
+        label: 'Lexical Resource',
+        band: criteria.lexicalResource?.band
+          ?? criteria.lexicalResource
+          ?? report?.lexical_score
+          ?? report?.lexicalScore,
+        feedback: criteria.lexicalResource?.feedback,
+      },
+      {
+        key: 'grammaticalRangeAccuracy',
+        label: 'Grammatical Range & Accuracy',
+        band: criteria.grammaticalRangeAccuracy?.band
+          ?? criteria.grammaticalRangeAccuracy
+          ?? report?.grammar_score
+          ?? report?.grammarScore,
+        feedback: criteria.grammaticalRangeAccuracy?.feedback,
+      },
+      {
+        key: 'pronunciation',
+        label: 'Pronunciation',
+        band: criteria.pronunciation?.band
+          ?? criteria.pronunciation
+          ?? report?.pronunciation_score
+          ?? report?.pronunciationScore,
+        feedback: criteria.pronunciation?.feedback,
+      },
+    ];
+  }
   const taskNumber = Number(report?.task_number || report?.taskNumber);
   return [
     {
@@ -107,6 +151,8 @@ const normalizeReport = (report) => {
   const feedback = getFeedback(report);
   return {
     taskNumber: report?.task_number ?? report?.taskNumber ?? feedback.taskNumber,
+    partNumber: report?.part_number ?? report?.partNumber ?? feedback.partNumber,
+    submissionType: report?.submission_type ?? report?.submissionType,
     status: report?.status || report?.reportStatus,
     errorMessage: report?.error_message || report?.errorMessage,
     overallBand: report?.band_score ?? report?.bandScore ?? report?.aiBand ?? report?.overallBand,

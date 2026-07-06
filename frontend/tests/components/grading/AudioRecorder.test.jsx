@@ -179,7 +179,7 @@ describe('AudioRecorder Component', () => {
     expect(screen.getByRole('radio', { name: /AI Chấm điểm/i })).toBeInTheDocument();
   });
 
-  it('SPEC §4: Disables AI radio and shows text-danger when AI quota is 0', async () => {
+  it('allows Speaking AI grading when quota is 0', async () => {
     useAuth.mockReturnValue({ user: { ai_grading_quota_remaining: 0 } });
     api.post.mockResolvedValueOnce({ data: { success: true, data: { temp_s3_key: 'temp/123.mp4' } } });
 
@@ -193,9 +193,8 @@ describe('AudioRecorder Component', () => {
     });
 
     const aiRadio = screen.getByRole('radio', { name: /AI Chấm điểm/i });
-    expect(aiRadio).toBeDisabled();
-    expect(screen.getByText(/Bạn đã hết lượt chấm chữa bằng AI/i)).toBeInTheDocument();
-    expect(screen.getByText(/Bạn đã hết lượt chấm chữa bằng AI/i)).toHaveClass('text-danger');
+    expect(aiRadio).not.toBeDisabled();
+    expect(screen.getByText(/Không giới hạn/i)).toBeInTheDocument();
   });
 
   it('does not stop automatically when maxDuration is reached in practice mode', async () => {

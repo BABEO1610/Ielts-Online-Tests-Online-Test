@@ -4,6 +4,7 @@ const TestService = require('./test.service');
 const AppError = require('../utils/AppError');
 const supabase = require('../config/supabase');
 const { gradeWriting, countWords } = require('../ai/grading.service');
+const { gradeSpeakingGroup } = require('./speakingAiGrading.service');
 const { REPORT_STATUS } = require('../ai/aiGrading.constants');
 const logger = require('../utils/logger');
 
@@ -155,6 +156,20 @@ const buildAiFeedbackJson = (result) => ({
 });
 
 const buildCriterionScores = (report, parsedCriteria = null) => {
+  if (report?.submission_type === 'speaking') {
+    const fallback = {
+      fluencyCoherence: toNumberOrNull(report.fluency_score),
+      lexicalResource: toNumberOrNull(report.lexical_score),
+      grammaticalRangeAccuracy: toNumberOrNull(report.grammar_score),
+      pronunciation: toNumberOrNull(report.pronunciation_score),
+    };
+    if (!parsedCriteria) return fallback;
+    return {
+      ...fallback,
+      ...parsedCriteria,
+    };
+  }
+
   const fallback = {
     taskAchievementOrResponse: toNumberOrNull(report.task_achievement_score),
     coherenceCohesion: toNumberOrNull(report.coherence_score),
@@ -171,6 +186,14 @@ const buildCriterionScores = (report, parsedCriteria = null) => {
 const buildDetailedFeedback = (feedback, criteria) => {
   if (feedback.detailedFeedback && Object.keys(feedback.detailedFeedback).length > 0) {
     return feedback.detailedFeedback;
+  }
+  if (criteria?.fluencyCoherence !== undefined || criteria?.pronunciation !== undefined) {
+    return {
+      fluencyCoherence: criteria?.fluencyCoherence?.feedback || '',
+      lexicalResource: criteria?.lexicalResource?.feedback || '',
+      grammaticalRangeAccuracy: criteria?.grammaticalRangeAccuracy?.feedback || '',
+      pronunciation: criteria?.pronunciation?.feedback || '',
+    };
   }
   return {
     taskAchievementOrResponse: criteria?.taskAchievementOrResponse?.feedback || '',
@@ -279,10 +302,14 @@ const mapAiReport = (report) => {
       : (feedback.nextStudyAdvice ? [feedback.nextStudyAdvice] : []),
     nextStudyAdvice: feedback.nextStudyAdvice || '',
     wordCountFeedback: feedback.wordCountFeedback || null,
+    transcriptNotes: feedback.transcriptNotes || '',
+    partFeedback: Array.isArray(feedback.partFeedback) ? feedback.partFeedback : [],
     bandWarning: report.band_validation_warning || null,
     rawAiResponse: parseMaybeJson(report.raw_ai_response, null),
     generatedAt: report.generated_at,
     taskNumber: report.task_number,
+    partNumber: report.part_number,
+    submissionType: report.submission_type,
   };
 };
 
@@ -301,6 +328,83 @@ const mapTutorGrade = (report) => {
     writtenFeedback: report.written_feedback || '',
     createdAt: report.created_at,
     updatedAt: report.updated_at,
+  };
+};
+
+const roundToNearestHalf = (value) => Math.round(Number(value) * 2) / 2;
+
+const averageReportField = (reports, field) => {
+  const values = reports
+    .map(report => toNumberOrNull(report[field]))
+    .filter(value => value !== null);
+  if (values.length === 0) return null;
+  return roundToNearestHalf(values.reduce((sum, value) => sum + value, 0) / values.length);
+};
+
+const buildSpeakingAggregateReport = (reports, parts) => {
+  const completedReports = reports.filter(report =>
+    report && report.status !== REPORT_STATUS.FAILED && report.band_score !== null
+  );
+  if (completedReports.length === 0) return null;
+
+  const fluency = averageReportField(completedReports, 'fluency_score');
+  const lexical = averageReportField(completedReports, 'lexical_score');
+  const grammar = averageReportField(completedReports, 'grammar_score');
+  const pronunciation = averageReportField(completedReports, 'pronunciation_score');
+  const criteriaValues = [fluency, lexical, grammar, pronunciation].filter(value => value !== null);
+  const overall = criteriaValues.length === 4
+    ? roundToNearestHalf(criteriaValues.reduce((sum, value) => sum + value, 0) / 4)
+    : averageReportField(completedReports, 'band_score');
+  const mappedReports = completedReports.map(mapAiReport);
+
+  return {
+    ...completedReports[0],
+    id: completedReports[0].id,
+    submission_id: parts[0]?.id,
+    submission_type: 'speaking',
+    speaking_group_id: parts[0]?.speaking_group_id,
+    part_number: null,
+    band_score: overall,
+    computed_band: overall,
+    fluency_score: fluency,
+    lexical_score: lexical,
+    grammar_score: grammar,
+    pronunciation_score: pronunciation,
+    suggestions: mappedReports.map(report => report?.summary).filter(Boolean).join('\n\n'),
+    criteria_json: JSON.stringify({
+      fluencyCoherence: {
+        band: fluency,
+        feedback: mappedReports.map(report => report?.detailedFeedback?.fluencyCoherence).filter(Boolean).join('\n\n'),
+      },
+      lexicalResource: {
+        band: lexical,
+        feedback: mappedReports.map(report => report?.detailedFeedback?.lexicalResource).filter(Boolean).join('\n\n'),
+      },
+      grammaticalRangeAccuracy: {
+        band: grammar,
+        feedback: mappedReports.map(report => report?.detailedFeedback?.grammaticalRangeAccuracy).filter(Boolean).join('\n\n'),
+      },
+      pronunciation: {
+        band: pronunciation,
+        feedback: mappedReports.map(report => report?.detailedFeedback?.pronunciation).filter(Boolean).join('\n\n'),
+      },
+    }),
+    feedback_json: JSON.stringify({
+      summary: mappedReports.map(report => report?.summary).filter(Boolean).join('\n\n'),
+      strengths: mappedReports.flatMap(report => report?.strengths || []),
+      weaknesses: mappedReports.flatMap(report => report?.weaknesses || []),
+      majorErrors: mappedReports.flatMap(report => report?.majorErrors || []),
+      detailedFeedback: {},
+      actionPlan: mappedReports.flatMap(report => report?.actionPlan || []),
+      nextStudyAdvice: mappedReports.map(report => report?.nextStudyAdvice).filter(Boolean).join('\n\n'),
+      transcriptNotes: 'Aggregated from earlier per-part AI reports.',
+      partFeedback: mappedReports.map((report, index) => ({
+        partNumber: parts[index]?.part_number || report?.partNumber || index + 1,
+        summary: report?.summary || '',
+        strengths: report?.strengths || [],
+        weaknesses: report?.weaknesses || [],
+      })),
+    }),
   };
 };
 
@@ -574,12 +678,12 @@ class SubmissionService {
 
     const { randomUUID } = require('crypto');
     const speakingGroupId = randomUUID();
+    const insertedParts = [];
 
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
       
-      const insertedParts = [];
       for (const part of parts) {
         // Validate the uploaded Supabase object belongs to this user.
         const storagePath = String(part.temp_s3_key || '').replace(/^\/+/, '');
@@ -598,26 +702,37 @@ class SubmissionService {
       }
 
       await client.query('COMMIT');
+      let aiResult = null;
       if (grader === 'ai') {
-        for (const part of insertedParts) {
-          await insertAiReport(pool, {
-            submission_id: part.id,
-            submission_type: 'speaking',
-            status: REPORT_STATUS.FAILED,
-            error_message: 'Speaking AI grading requires an audio-capable grading provider. Pronunciation cannot be scored from transcript alone.',
-            raw_ai_response: JSON.stringify({
-              errorCode: 'SPEAKING_AUDIO_GRADING_UNAVAILABLE',
-              message: 'No fake Speaking AI grade was created because Pronunciation requires audio evaluation.',
-            }),
+        try {
+          aiResult = await gradeSpeakingGroup(speakingGroupId, { force: true });
+          if (aiResult.status === REPORT_STATUS.COMPLETED) {
+            await pool.query(
+              `UPDATE speaking_submissions
+               SET status = 'ai_graded'
+               WHERE speaking_group_id = $1`,
+              [speakingGroupId]
+            );
+          }
+        } catch (error) {
+          logger.warn('Speaking AI grading failed after submission was saved', {
+            speakingGroupId,
+            error: error.message,
           });
+          aiResult = {
+            status: REPORT_STATUS.FAILED,
+            overallBand: null,
+            reports: [],
+          };
         }
-        throw new AppError(
-          'Không thể chấm Speaking bằng AI lúc này vì hệ thống chưa có provider chấm phát âm từ audio. Bài ghi âm đã được lưu.',
-          422,
-          'SPEAKING_AI_UNAVAILABLE'
-        );
       }
-      return { speaking_group_id: speakingGroupId, parts: insertedParts };
+      return {
+        speaking_group_id: speakingGroupId,
+        aiStatus: aiResult?.status || 'pending',
+        overallAiBand: aiResult?.overallBand ?? null,
+        parts: insertedParts,
+        aiReports: aiResult?.reports || [],
+      };
     } catch (err) {
       await client.query('ROLLBACK');
       throw mapSpeakingDbError(err);
@@ -872,6 +987,11 @@ class SubmissionService {
     const speakingAiFailedExpr = speakingAiJoin && aiColumns.has('error_message')
       ? "BOOL_OR(ss.grader = 'ai' AND agr.error_message IS NOT NULL)"
       : 'FALSE';
+    const speakingAiCompletedExpr = speakingAiJoin && aiColumns.has('band_score')
+      ? `BOOL_OR(ss.grader = 'ai'
+          AND agr.band_score IS NOT NULL
+          ${aiColumns.has('status') ? "AND COALESCE(agr.status, 'completed') = 'completed'" : ''})`
+      : 'FALSE';
 
     const bandCandidates = [];
     if (writingColumns.has('overall_tutor_band')) bandCandidates.push('MAX(ws.overall_tutor_band)');
@@ -942,12 +1062,14 @@ class SubmissionService {
         CASE
           WHEN BOOL_OR(ss.status = 'reviewed') THEN 'reviewed'
           WHEN BOOL_OR(ss.status = 'tutor_graded') THEN 'tutor_graded'
+          WHEN ${speakingAiCompletedExpr} THEN 'ai_graded'
           WHEN BOOL_OR(ss.status = 'ai_graded') AND BOOL_AND(ss.status = 'ai_graded') THEN 'ai_graded'
           WHEN ${speakingAiFailedExpr} THEN 'failed'
           ELSE 'pending'
         END AS submission_status,
         CASE
           WHEN ${speakingAiFailedExpr} THEN 'failed'
+          WHEN ${speakingAiCompletedExpr} THEN 'completed'
           WHEN BOOL_OR(ss.status = 'ai_graded') AND BOOL_AND(ss.status = 'ai_graded') THEN 'completed'
           ELSE 'pending'
         END AS ai_status,
@@ -1124,12 +1246,96 @@ class SubmissionService {
     };
   }
 
+  static async getSpeakingFeedbackDetail(id, userId) {
+    const partsRes = await pool.query(
+      `SELECT ss.*, mt.title AS test_title
+       FROM speaking_submissions ss
+       LEFT JOIN mock_tests mt ON mt.id = ss.test_id
+       WHERE (ss.speaking_group_id::text = $1 OR ss.id::text = $1)
+         AND ss.user_id = $2
+       ORDER BY ss.part_number ASC`,
+      [id, userId]
+    );
+    if (partsRes.rows.length === 0) {
+      throw new AppError('Submission not found', 404, 'NOT_FOUND');
+    }
+
+    const parts = partsRes.rows;
+    const partIds = parts.map(part => part.id);
+    const aiColumns = await getAiReportColumns();
+    const aiWhere = ['submission_id = ANY($2::uuid[])'];
+    const aiParams = ['speaking', partIds];
+    if (aiColumns.has('speaking_group_id') && parts[0].speaking_group_id) {
+      aiParams.push(parts[0].speaking_group_id);
+      aiWhere.push(`speaking_group_id = $${aiParams.length}`);
+    }
+    const distinctKey = aiColumns.has('part_number')
+      ? 'submission_id, COALESCE(part_number, 0)'
+      : 'submission_id';
+    const orderKey = aiColumns.has('part_number')
+      ? 'submission_id, COALESCE(part_number, 0),'
+      : 'submission_id,';
+    const aiRes = await pool.query(
+      `SELECT DISTINCT ON (${distinctKey}) *
+       FROM ai_grading_reports
+       WHERE submission_type = $1
+         AND (${aiWhere.join(' OR ')})
+       ORDER BY ${orderKey}
+                CASE WHEN band_score IS NOT NULL THEN 0 ELSE 1 END,
+                generated_at DESC`,
+      aiParams
+    );
+
+    const overallReport = aiRes.rows.find(report => report.part_number === null || report.part_number === undefined)
+      || buildSpeakingAggregateReport(aiRes.rows, parts);
+    const aiFeedback = mapAiReport(overallReport);
+
+    const tutorRes = await pool.query(
+      `SELECT DISTINCT ON (speaking_submission_id) *
+       FROM tutor_feedback_reports
+       WHERE speaking_submission_id = ANY($1::uuid[])
+       ORDER BY speaking_submission_id, updated_at DESC, created_at DESC`,
+      [partIds]
+    );
+    const tutorReport = tutorRes.rows[0] || null;
+
+    return {
+      submissionId: String(parts[0].speaking_group_id || parts[0].id),
+      testTitle: parts[0].test_title || 'IELTS Speaking',
+      skill: 'speaking',
+      submittedAt: parts[0].submitted_at,
+      grader: parts[0].grader,
+      status: parts.every(part => part.status === 'ai_graded') ? 'ai_graded' : parts[0].status,
+      overallSpeakingBand: aiFeedback?.overallBand ?? (tutorReport?.band_score ? parseFloat(tutorReport.band_score) : null),
+      overallAiBand: aiFeedback?.overallBand ?? null,
+      overallTutorBand: tutorReport?.band_score ? parseFloat(tutorReport.band_score) : null,
+      aiStatus: aiFeedback?.status === REPORT_STATUS.FAILED || aiFeedback?.errorMessage
+        ? 'failed'
+        : (aiFeedback ? 'completed' : 'pending'),
+      tutorStatus: tutorReport ? 'graded' : 'pending',
+      aiFeedback,
+      tutorGrade: mapTutorGrade(tutorReport),
+      parts: parts.map(part => ({
+        submissionId: part.id,
+        partNumber: part.part_number,
+        prompt: part.prompt_text || '',
+        promptText: part.prompt_text || '',
+        audioUrl: toPublicSpeakingAudioUrl(part.audio_url) || '',
+        transcript: part.transcript || '',
+        aiPartFeedback: aiFeedback?.partFeedback?.find(item => Number(item.partNumber) === Number(part.part_number)) || null,
+      })),
+    };
+  }
+
   static async getFeedback(id, userId, type) {
     if (type !== 'speaking' && type !== 'writing') {
       throw new AppError('type must be speaking or writing', 400, 'INVALID_FIELD');
     }
     if (type === 'writing') {
       return this.getWritingFeedbackDetail(id, userId);
+    }
+    if (type === 'speaking') {
+      return this.getSpeakingFeedbackDetail(id, userId);
     }
     const submissionTable = type === 'speaking' ? 'speaking_submissions' : 'writing_submissions';
     const groupCol = type === 'speaking' ? 'speaking_group_id' : 'writing_group_id';

@@ -14,6 +14,12 @@ const {
 } = require('../services/ai.service');
 const { buildSystemPrompt, buildUserPrompt } = require('./grading.prompt');
 const { validateGradingResponse } = require('./grading.validator');
+const {
+  buildSpeakingSystemPrompt,
+  buildSpeakingUserPrompt,
+  buildSpeakingSessionUserPrompt,
+} = require('./speakingGrading.prompt');
+const { validateSpeakingGradingResponse } = require('./speakingGrading.validator');
 const { AI_GRADE_ERRORS, PROMPT_VERSION } = require('./aiGrading.constants');
 const AppError = require('../utils/AppError');
 
@@ -127,6 +133,70 @@ const gradeWriting = async (submission, taskType, opts = {}) => {
   };
 };
 
+const gradeSpeakingPart = async (part, opts = {}) => {
+  const systemPrompt = buildSpeakingSystemPrompt();
+  const userPrompt = buildSpeakingUserPrompt({
+    partNumber: part.part_number,
+    promptText: part.prompt_text,
+    transcript: part.transcript,
+    testTitle: opts.testTitle || null,
+  });
+
+  const { rawText, modelName } = await callGeminiGrading(systemPrompt, userPrompt);
+  const result = validateSpeakingGradingResponse(rawText);
+  if (!result.success) {
+    logger.error('AI Speaking grading validation failed', {
+      errors: result.errors,
+    });
+    throw new AppError(
+      AI_GRADE_ERRORS.AIGRADE_004.message,
+      AI_GRADE_ERRORS.AIGRADE_004.status,
+      'AIGRADE_004'
+    );
+  }
+
+  return {
+    ...result.data,
+    rawResponse: rawText,
+    modelName,
+    promptVersion: PROMPT_VERSION,
+    transcriptWordCount: countWords(part.transcript),
+  };
+};
+
+const gradeSpeakingSession = async (parts, opts = {}) => {
+  const systemPrompt = buildSpeakingSystemPrompt();
+  const userPrompt = buildSpeakingSessionUserPrompt({
+    parts: parts.map(part => ({
+      partNumber: part.part_number,
+      promptText: part.prompt_text,
+      transcript: part.transcript,
+    })),
+    testTitle: opts.testTitle || null,
+  });
+
+  const { rawText, modelName } = await callGeminiGrading(systemPrompt, userPrompt);
+  const result = validateSpeakingGradingResponse(rawText);
+  if (!result.success) {
+    logger.error('AI Speaking session grading validation failed', {
+      errors: result.errors,
+    });
+    throw new AppError(
+      AI_GRADE_ERRORS.AIGRADE_004.message,
+      AI_GRADE_ERRORS.AIGRADE_004.status,
+      'AIGRADE_004'
+    );
+  }
+
+  return {
+    ...result.data,
+    rawResponse: rawText,
+    modelName,
+    promptVersion: PROMPT_VERSION,
+    transcriptWordCount: parts.reduce((sum, part) => sum + countWords(part.transcript), 0),
+  };
+};
+
 /**
  * Count words in a text string.
  */
@@ -135,4 +205,4 @@ const countWords = (text) => {
   return String(text).trim().split(/\s+/).filter(Boolean).length;
 };
 
-module.exports = { gradeWriting, countWords };
+module.exports = { gradeWriting, gradeSpeakingPart, gradeSpeakingSession, countWords };
