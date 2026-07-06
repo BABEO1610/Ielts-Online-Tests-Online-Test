@@ -1,8 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import gradingService from '../../services/grading.service';
 import { updateGradingResult } from '../../services/gradingHistory.service';
 import TutorContextSidebar from './TutorContextSidebar';
+import AiFeedbackPanel from './AiFeedbackPanel';
+import { calculatePreviewBand } from '../../utils/ieltsScoring';
 
 const IELTS_CRITERIA = {
   writing: [
@@ -26,63 +28,80 @@ const IELTS_CRITERIA = {
  * - Các trường hợp lẻ khác làm tròn XUỐNG số nguyên hoặc .5 gần nhất.
  * (Ví dụ: 6.25 -> 6.5; 6.75 -> 7.0; 6.125 -> 6.0; 6.875 -> 6.5)
  */
-const calculatePreviewBand = (scores) => {
-  const validScores = scores.filter(s => typeof s === 'number' && !isNaN(s));
-  if (validScores.length === 0) return 0;
-  
-  const sum = validScores.reduce((acc, score) => acc + score, 0);
-  const average = sum / validScores.length;
-  
-  const intPart = Math.floor(average);
-  const decPart = average - intPart;
-  
-  if (decPart === 0.25) return intPart + 0.5;
-  if (decPart === 0.75) return intPart + 1.0;
-  if (decPart >= 0.5) return intPart + 0.5;
-  return intPart;
+const renderHighlightValue = (value) => {
+  if (Array.isArray(value)) return value.join(', ');
+  if (value && typeof value === 'object') return JSON.stringify(value);
+  return value ?? '';
 };
 
-const TutorGradingPanel = ({ submissionId, type, studentId, onGradingComplete, tasks, activeTaskId, audioUrl, readOnly, editMode, initialData }) => {
+const EMPTY_SCORES = {
+  taskAchievementScore: '',
+  coherenceScore: '',
+  lexicalScore: '',
+  grammarScore: '',
+  fluencyScore: '',
+  pronunciationScore: ''
+};
+
+const getScoreValue = (value) => {
+  if (value && typeof value === 'object') return value.band ?? value.score ?? '';
+  return value ?? '';
+};
+
+const getScoresFromGrade = (source) => {
+  if (!source) return EMPTY_SCORES;
+  return {
+    taskAchievementScore: getScoreValue(source.criterionScores?.taskAchievementOrResponse) || source.scores?.taskAchievement || '',
+    coherenceScore: getScoreValue(source.criterionScores?.coherenceCohesion) || source.scores?.coherence || '',
+    lexicalScore: getScoreValue(source.criterionScores?.lexicalResource) || source.scores?.lexical || '',
+    grammarScore: getScoreValue(source.criterionScores?.grammaticalRangeAccuracy) || source.scores?.grammar || '',
+    fluencyScore: getScoreValue(source.criterionScores?.fluencyCoherence) || source.scores?.fluency || '',
+    pronunciationScore: getScoreValue(source.criterionScores?.pronunciation) || source.scores?.pronunciation || ''
+  };
+};
+
+const TutorGradingPanel = ({
+  submissionId,
+  type,
+  studentId,
+  onGradingComplete,
+  tasks,
+  activeTaskId,
+  activeTaskNumber,
+  audioUrl,
+  readOnly,
+  editMode,
+  initialData,
+  aiFeedback,
+  existingTutorGrade
+}) => {
   const navigate = useNavigate();
   const [taskScores, setTaskScores] = useState({});
   const [taskFeedbacks, setTaskFeedbacks] = useState({});
   const [showNotesModal, setShowNotesModal] = useState(false);
   const [highlights, setHighlights] = useState(null);
+  const [prelimFeedbacks, setPrelimFeedbacks] = useState({});
   
   const [submitting, setSubmitting] = useState(false);
   const [prelimLoading, setPrelimLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [submitSuccess, setSubmitSuccess] = useState(null);
 
-  useEffect(() => {
-    if (initialData && (readOnly || editMode)) {
-      const initScores = {
-        taskAchievementScore: initialData.scores?.taskAchievement || '',
-        coherenceScore: initialData.scores?.coherence || '',
-        lexicalScore: initialData.scores?.lexical || '',
-        grammarScore: initialData.scores?.grammar || '',
-        fluencyScore: initialData.scores?.fluency || '',
-        pronunciationScore: initialData.scores?.pronunciation || ''
-      };
-      setTaskScores({ [activeTaskId]: initScores });
-      setTaskFeedbacks({ [activeTaskId]: initialData.writtenFeedback || '' });
-    }
-  }, [initialData, readOnly, activeTaskId]);
-
-  const currentScores = taskScores[activeTaskId] || {
-    taskAchievementScore: '',
-    coherenceScore: '',
-    lexicalScore: '',
-    grammarScore: '',
-    fluencyScore: '',
-    pronunciationScore: ''
-  };
-  const currentFeedback = taskFeedbacks[activeTaskId] || '';
+  const panelKey = type === 'speaking' ? 'speaking-session' : activeTaskId;
+  const panelTitle = type === 'speaking'
+    ? 'Speaking Session'
+    : (tasks?.find(t => t.id === activeTaskId)?.name || 'Task');
+  const sourceGrade = existingTutorGrade || (initialData && (readOnly || editMode) ? initialData : null);
+  const currentScores = taskScores[panelKey] || getScoresFromGrade(sourceGrade);
+  const currentFeedback = taskFeedbacks[panelKey] ?? sourceGrade?.writtenFeedback ?? '';
+  const currentAiFeedback = prelimFeedbacks[panelKey] || aiFeedback;
 
   const handleScoreChange = (key, value) => {
     setTaskScores(prev => ({ 
       ...prev, 
-      [activeTaskId]: {
-        ...(prev[activeTaskId] || {}),
+      [panelKey]: {
+        ...currentScores,
+        ...(prev[panelKey] || {}),
         [key]: value
       }
     }));
@@ -91,12 +110,19 @@ const TutorGradingPanel = ({ submissionId, type, studentId, onGradingComplete, t
   const handleFeedbackChange = (value) => {
     setTaskFeedbacks(prev => ({
       ...prev,
-      [activeTaskId]: value
+      [panelKey]: value
     }));
   };
 
   const getCriteriaList = () => {
-    return IELTS_CRITERIA[type] || [];
+    if (type !== 'writing') return IELTS_CRITERIA[type] || [];
+    return [
+      {
+        key: 'taskAchievementScore',
+        label: Number(activeTaskNumber) === 1 ? 'Task Achievement' : 'Task Response'
+      },
+      ...IELTS_CRITERIA.writing.slice(1)
+    ];
   };
 
   const previewBandScore = () => {
@@ -111,9 +137,45 @@ const TutorGradingPanel = ({ submissionId, type, studentId, onGradingComplete, t
     try {
       setPrelimLoading(true);
       setError(null);
-      const response = await gradingService.runPrelimCheck(submissionId);
+      const response = await gradingService.runPrelimCheck(type, submissionId, activeTaskNumber);
       if (response.success) {
-        setHighlights(response.data.highlights);
+        const suggestion = response.data;
+        setHighlights({
+          keyProblems: suggestion?.keyProblems || [],
+          suggestedRewrite: suggestion?.suggestedRewrite || '',
+          tutorNotes: suggestion?.tutorNotes || '',
+        });
+        if (suggestion?.aiFeedback) {
+          setPrelimFeedbacks(prev => ({
+            ...prev,
+            [panelKey]: {
+              ...suggestion.aiFeedback,
+              taskNumber: type === 'speaking' ? null : activeTaskNumber,
+            }
+          }));
+        }
+        if (suggestion?.suggestedCriteria) {
+          setTaskScores(prev => ({
+            ...prev,
+            [panelKey]: {
+              ...(prev[panelKey] || {}),
+              ...(type === 'speaking' ? {
+                fluencyScore: suggestion.suggestedCriteria.fluencyScore ?? '',
+                lexicalScore: suggestion.suggestedCriteria.lexicalScore ?? '',
+                grammarScore: suggestion.suggestedCriteria.grammarScore ?? '',
+                pronunciationScore: suggestion.suggestedCriteria.pronunciationScore ?? ''
+              } : {
+                taskAchievementScore: suggestion.suggestedCriteria.taskAchievementOrResponse ?? '',
+                coherenceScore: suggestion.suggestedCriteria.coherenceCohesion ?? '',
+                lexicalScore: suggestion.suggestedCriteria.lexicalResource ?? '',
+                grammarScore: suggestion.suggestedCriteria.grammaticalRangeAccuracy ?? ''
+              })
+            }
+          }));
+        }
+        if (suggestion?.feedbackDraft) {
+          handleFeedbackChange(suggestion.feedbackDraft);
+        }
       }
     } catch (err) {
       setError(err.response?.data?.error?.message || 'Failed to run prelim check.');
@@ -128,11 +190,13 @@ const TutorGradingPanel = ({ submissionId, type, studentId, onGradingComplete, t
     try {
       setSubmitting(true);
       setError(null);
+      setSubmitSuccess(null);
       
       const criteria = getCriteriaList();
       const payload = {
         writtenFeedback: currentFeedback,
-        bandScore: previewBandScore() || 0 
+        bandScore: previewBandScore() || 0,
+        taskNumber: activeTaskNumber
       };
       
       criteria.forEach(c => {
@@ -147,10 +211,17 @@ const TutorGradingPanel = ({ submissionId, type, studentId, onGradingComplete, t
       }
 
       if (response.success) {
+        const isCompleted = type !== 'writing' || response.data?.tutorStatus === 'graded';
+        setSubmitSuccess({
+          completed: isCompleted,
+          message: isCompleted
+            ? 'Đã gửi điểm cho học sinh.'
+            : 'Đã lưu điểm task này. Hãy chuyển sang task còn lại để hoàn tất bài Writing.',
+        });
         if (onGradingComplete) {
-          onGradingComplete();
+          onGradingComplete(response.data);
         }
-        navigate(editMode ? '/grading/tutor/schedule' : '/grading/tutor/queue');
+        if (editMode) navigate('/grading/tutor/schedule');
       }
     } catch (err) {
       setError(err.response?.data?.error?.message || 'Failed to submit grades.');
@@ -164,7 +235,7 @@ const TutorGradingPanel = ({ submissionId, type, studentId, onGradingComplete, t
       <div className="bg-canvas rounded-4 p-4 h-100 d-flex flex-column">
         <div className="d-flex justify-content-between align-items-center mb-4">
           <h4 className="text-ink fw-bold mb-0">
-            Grading Panel - {tasks?.find(t => t.id === activeTaskId)?.name || 'Task'}
+            Grading Panel - {panelTitle}
             {readOnly && <span className="badge bg-secondary ms-2 fs-6">Chỉ đọc</span>}
             {editMode && <span className="badge bg-warning text-dark ms-2 fs-6">Chỉnh sửa điểm</span>}
           </h4>
@@ -198,6 +269,23 @@ const TutorGradingPanel = ({ submissionId, type, studentId, onGradingComplete, t
             </div>
           )}
 
+          {submitSuccess && (
+            <div className="bg-canvas-soft border-start border-4 border-success text-ink p-3 mb-4 rounded" role="status">
+              <div className="d-flex justify-content-between align-items-center gap-3 flex-wrap">
+                <span className="fw-medium">{submitSuccess.message}</span>
+                {submitSuccess.completed && (
+                  <button
+                    type="button"
+                    className="btn btn-dark rounded-pill px-4 py-2 fw-bold"
+                    onClick={() => navigate('/grading/tutor/queue')}
+                  >
+                    Quay lại hàng chờ chấm
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+
           {type === 'speaking' && audioUrl && (
             <div className="mb-4">
               <h5 className="text-ink fw-bold">Student Audio</h5>
@@ -205,7 +293,7 @@ const TutorGradingPanel = ({ submissionId, type, studentId, onGradingComplete, t
             </div>
           )}
 
-          {!readOnly && (
+          {!readOnly && ['writing', 'speaking'].includes(type) && (
             <div className="mb-4 d-flex justify-content-between align-items-center">
               <button 
                 type="button"
@@ -238,7 +326,7 @@ const TutorGradingPanel = ({ submissionId, type, studentId, onGradingComplete, t
                 <ul className="mb-0 ps-3">
                   {Object.keys(highlights).map(key => (
                     <li key={key} className="mb-1" style={{ fontSize: '14px' }}>
-                      <strong className="text-capitalize">{key.replace(/_/g, ' ')}:</strong> {highlights[key]}
+                      <strong className="text-capitalize">{key.replace(/_/g, ' ')}:</strong> {renderHighlightValue(highlights[key])}
                     </li>
                   ))}
                 </ul>
@@ -247,6 +335,20 @@ const TutorGradingPanel = ({ submissionId, type, studentId, onGradingComplete, t
                   {JSON.stringify(highlights, null, 2)}
                 </pre>
               )}
+            </div>
+          )}
+
+          {['writing', 'speaking'].includes(type) && currentAiFeedback && (
+            <div className="mb-4">
+              <h5 className="fw-bold text-ink mb-3">AI Reference</h5>
+              <AiFeedbackPanel
+                report={currentAiFeedback ? {
+                  ...currentAiFeedback,
+                  taskNumber: type === 'speaking' ? null : activeTaskNumber,
+                  submissionType: type,
+                } : null}
+                showDisclaimer={false}
+              />
             </div>
           )}
 
@@ -333,4 +435,3 @@ const TutorGradingPanel = ({ submissionId, type, studentId, onGradingComplete, t
 };
 
 export default TutorGradingPanel;
-export { calculatePreviewBand };

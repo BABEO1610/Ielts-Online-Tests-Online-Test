@@ -469,6 +469,19 @@ const isInvalidKnowledgeResponse = (response, contextInjection) =>
   contextInjection.mode === ASSISTANT_INTENTS.IELTS_KNOWLEDGE &&
   response.aiResponseValid === false;
 
+const buildAssistantUsageContext = ({ payload, contextInjection, user }) => {
+  const pageType = payload.context?.pageType;
+  const isReview = pageType === 'review'
+    || pageType === 'result'
+    || contextInjection?.mode === ASSISTANT_INTENTS.POST_TEST_REVIEW;
+  return {
+    userId: user?.id || user?.sub || null,
+    feature: isReview ? 'explain_with_ai' : 'chatbot',
+    entityType: isReview ? 'test_attempt' : 'chatbot_message',
+    entityId: isReview ? (payload.context?.attemptId || null) : (payload.sessionId || null),
+  };
+};
+
 const generateCheckedAnswer = async ({ payload, contextInjection }) => {
   const prompt = buildPrompt({ message: payload.message, contextInjection });
   const rawAnswer = await aiService.generateAssistantAnswer({
@@ -476,6 +489,7 @@ const generateCheckedAnswer = async ({ payload, contextInjection }) => {
     message: payload.message,
     systemPrompt: prompt.systemPrompt,
     userPrompt: prompt.userPrompt,
+    usageContext: buildAssistantUsageContext({ payload, contextInjection, user: payload.user }),
   });
   return normalizeAndSelfCheck({ rawAnswer, contextInjection });
 };
@@ -491,6 +505,7 @@ const generateCheckedStreamAnswer = async ({ payload, contextInjection }) => {
     onDelta: (delta) => {
       streamedText += delta;
     },
+    usageContext: buildAssistantUsageContext({ payload, contextInjection, user: payload.user }),
   });
   return normalizeAndSelfCheck({
     rawAnswer: rawAnswer || streamedText,
@@ -526,6 +541,7 @@ const generateKnowledgeRetryAnswer = async ({ payload, contextInjection }) => {
       'Current student question:',
       payload.message,
     ].join('\n'),
+    usageContext: buildAssistantUsageContext({ payload, contextInjection, user: payload.user }),
   });
   return normalizeAndSelfCheck({
     rawAnswer,
@@ -663,7 +679,18 @@ const runAssistantPipeline = async ({ user, payload, useStream = false }) => {
 
   if (intent === ASSISTANT_INTENTS.UNKNOWN) {
     const { classifyScope } = require('./assistant.scope-classifier');
-    classifierResult = await classifyScope(payload.message);
+    classifierResult = await classifyScope(payload.message, {
+      usageContext: {
+        userId: user?.id || user?.sub || null,
+        feature: ['review', 'result'].includes(payload.context?.pageType)
+          ? 'explain_with_ai'
+          : 'chatbot',
+        entityType: ['review', 'result'].includes(payload.context?.pageType)
+          ? 'test_attempt'
+          : 'chatbot_message',
+        entityId: payload.context?.attemptId || payload.sessionId || null,
+      },
+    });
     classifierUsed = true;
     intent = classifierResult.intent;
     
@@ -714,7 +741,7 @@ const runAssistantPipeline = async ({ user, payload, useStream = false }) => {
     return contextResult;
   }
 
-  const result = await buildAiResult({ payload, contextInjection, useStream });
+  const result = await buildAiResult({ payload: { ...payload, user }, contextInjection, useStream });
   tracePipeline({
     payload,
     user,

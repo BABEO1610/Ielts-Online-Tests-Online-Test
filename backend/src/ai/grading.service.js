@@ -14,6 +14,12 @@ const {
 } = require('../services/ai.service');
 const { buildSystemPrompt, buildUserPrompt } = require('./grading.prompt');
 const { validateGradingResponse } = require('./grading.validator');
+const {
+  buildSpeakingSystemPrompt,
+  buildSpeakingUserPrompt,
+  buildSpeakingSessionUserPrompt,
+} = require('./speakingGrading.prompt');
+const { validateSpeakingGradingResponse } = require('./speakingGrading.validator');
 const { AI_GRADE_ERRORS, PROMPT_VERSION } = require('./aiGrading.constants');
 const AppError = require('../utils/AppError');
 
@@ -25,7 +31,7 @@ const AI_NOT_CONFIGURED_MESSAGE =
  * Call Gemini API for grading with timeout.
  * @returns {string} Raw response text
  */
-const callGeminiGrading = async (systemPrompt, userPrompt) => {
+const callGeminiGrading = async (systemPrompt, userPrompt, usageContext = {}) => {
   const { geminiApiKey, model } = getAiConfig();
   if (!geminiApiKey) {
     throw new AppError(
@@ -45,6 +51,7 @@ const callGeminiGrading = async (systemPrompt, userPrompt) => {
       systemPrompt,
       userPrompt,
       timeoutMs: AI_TIMEOUT_MS,
+      usageContext,
     });
     return { rawText: answer, modelName };
   } catch (err) {
@@ -103,7 +110,7 @@ const gradeWriting = async (submission, taskType, opts = {}) => {
   });
 
   const { rawText, modelName } = await callGeminiGrading(
-    systemPrompt, userPrompt
+    systemPrompt, userPrompt, opts.usageContext
   );
 
   const result = validateGradingResponse(rawText);
@@ -127,6 +134,70 @@ const gradeWriting = async (submission, taskType, opts = {}) => {
   };
 };
 
+const gradeSpeakingPart = async (part, opts = {}) => {
+  const systemPrompt = buildSpeakingSystemPrompt();
+  const userPrompt = buildSpeakingUserPrompt({
+    partNumber: part.part_number,
+    promptText: part.prompt_text,
+    transcript: part.transcript,
+    testTitle: opts.testTitle || null,
+  });
+
+  const { rawText, modelName } = await callGeminiGrading(systemPrompt, userPrompt, opts.usageContext);
+  const result = validateSpeakingGradingResponse(rawText);
+  if (!result.success) {
+    logger.error('AI Speaking grading validation failed', {
+      errors: result.errors,
+    });
+    throw new AppError(
+      AI_GRADE_ERRORS.AIGRADE_004.message,
+      AI_GRADE_ERRORS.AIGRADE_004.status,
+      'AIGRADE_004'
+    );
+  }
+
+  return {
+    ...result.data,
+    rawResponse: rawText,
+    modelName,
+    promptVersion: PROMPT_VERSION,
+    transcriptWordCount: countWords(part.transcript),
+  };
+};
+
+const gradeSpeakingSession = async (parts, opts = {}) => {
+  const systemPrompt = buildSpeakingSystemPrompt();
+  const userPrompt = buildSpeakingSessionUserPrompt({
+    parts: parts.map(part => ({
+      partNumber: part.part_number,
+      promptText: part.prompt_text,
+      transcript: part.transcript,
+    })),
+    testTitle: opts.testTitle || null,
+  });
+
+  const { rawText, modelName } = await callGeminiGrading(systemPrompt, userPrompt, opts.usageContext);
+  const result = validateSpeakingGradingResponse(rawText);
+  if (!result.success) {
+    logger.error('AI Speaking session grading validation failed', {
+      errors: result.errors,
+    });
+    throw new AppError(
+      AI_GRADE_ERRORS.AIGRADE_004.message,
+      AI_GRADE_ERRORS.AIGRADE_004.status,
+      'AIGRADE_004'
+    );
+  }
+
+  return {
+    ...result.data,
+    rawResponse: rawText,
+    modelName,
+    promptVersion: PROMPT_VERSION,
+    transcriptWordCount: parts.reduce((sum, part) => sum + countWords(part.transcript), 0),
+  };
+};
+
 /**
  * Count words in a text string.
  */
@@ -135,4 +206,4 @@ const countWords = (text) => {
   return String(text).trim().split(/\s+/).filter(Boolean).length;
 };
 
-module.exports = { gradeWriting, countWords };
+module.exports = { gradeWriting, gradeSpeakingPart, gradeSpeakingSession, countWords };

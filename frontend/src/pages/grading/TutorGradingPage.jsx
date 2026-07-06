@@ -1,13 +1,16 @@
-import React, { useState, useEffect } from 'react';
-import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import TutorGradingPanel from '../../components/grading/TutorGradingPanel';
 import SubmissionViewer from '../../components/grading/SubmissionViewer';
 import gradingService from '../../services/grading.service';
 import { getGradingHistoryById } from '../../services/gradingHistory.service';
 
+const formatHalfBand = (value) => (Math.round(Number(value) * 2) / 2).toFixed(1);
+
 const TutorGradingPage = () => {
   const { type, submissionId } = useParams();
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   
   const [submissionData, setSubmissionData] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -15,6 +18,7 @@ const TutorGradingPage = () => {
   const [activeTaskIndex, setActiveTaskIndex] = useState(0);
   const [isGeneratingTranscript, setIsGeneratingTranscript] = useState(false);
   const [gradedData, setGradedData] = useState(null);
+  const [refreshKey, setRefreshKey] = useState(0);
   const mode = searchParams.get('mode');
 
   // Safely define activeTask first so it can be used in the handler
@@ -46,13 +50,18 @@ const TutorGradingPage = () => {
           const item = res.data;
           let tasks = (item.parts || []).map(p => ({
             id: p.submissionId,
+            taskNumber: p.taskNumber,
+            partNumber: p.partNumber,
             name: type === 'writing' ? `Task ${p.taskNumber}` : `Part ${p.partNumber}`,
             prompt: p.promptText,
             audioUrl: p.audioUrl,
             transcript: p.transcript,
             fileType: p.fileUrl ? 'image' : 'text',
             originalFileUrl: p.fileUrl,
-            extractedText: p.responseText
+            extractedText: p.responseText,
+            wordCount: p.wordCount,
+            aiFeedback: p.aiFeedback,
+            tutorGrade: p.tutorGrade
           }));
           setSubmissionData({ ...item, tasks });
         } else {
@@ -72,7 +81,7 @@ const TutorGradingPage = () => {
       }
     };
     fetchDetail();
-  }, [type, submissionId]);
+  }, [type, submissionId, refreshKey, mode]);
 
   if (isLoading) return <div className="p-4 text-center mt-5" style={{fontFamily: 'UberMoveText, system-ui, sans-serif'}}>Đang tải dữ liệu bài thi...</div>;
   if (error) return <div className="p-4 text-center text-danger mt-5" style={{fontFamily: 'UberMoveText, system-ui, sans-serif'}}>{error}</div>;
@@ -95,13 +104,38 @@ const TutorGradingPage = () => {
         <div className="col-lg-6 col-xl-5 h-100 border-end border-light d-flex flex-column" style={{ overflowY: 'auto' }}>
           
           <div className="px-4 pt-4 pb-3 border-bottom" style={{ backgroundColor: '#fff' }}>
-            <h4 className="fw-bold mb-3" style={{ fontFamily: 'UberMove, system-ui, sans-serif' }}>
-              Nội dung bài thi {activeTask.name ? `- ${activeTask.name}` : ''}
-            </h4>
+            <div className="d-flex justify-content-between align-items-start gap-3 mb-3 flex-wrap">
+              <h4 className="fw-bold mb-0" style={{ fontFamily: 'UberMove, system-ui, sans-serif' }}>
+                Nội dung bài thi {activeTask.name ? `- ${activeTask.name}` : ''}
+              </h4>
+              <button
+                type="button"
+                className="btn btn-dark rounded-pill px-4 py-2 fw-bold"
+                onClick={() => navigate('/grading/tutor/queue')}
+              >
+                Quay lại hàng chờ chấm
+              </button>
+            </div>
             <div className="mb-0">
               <span className="badge bg-dark me-2 py-2 px-3">Học viên: {submissionData.student?.fullName || 'Ẩn danh'}</span>
               <span className="badge bg-secondary py-2 px-3" style={{textTransform: 'uppercase'}}>{type}</span>
             </div>
+            {type === 'writing' && (
+              <div className="d-flex gap-2 flex-wrap mt-3">
+                <span className="badge bg-light text-dark border py-2 px-3">
+                  AI: {submissionData.aiStatus === 'completed' ? 'AI đã hoàn thành' : submissionData.aiStatus === 'failed' ? 'AI chấm lỗi' : 'AI đang chấm'}
+                </span>
+                <span className="badge bg-light text-dark border py-2 px-3">
+                  Tutor: {submissionData.tutorStatus === 'graded' ? 'Đã chấm' : 'Đang chờ chấm'}
+                </span>
+                {submissionData.overallAiBand !== null && submissionData.overallAiBand !== undefined && (
+                  <span className="badge bg-dark py-2 px-3">AI Overall {formatHalfBand(submissionData.overallAiBand)}</span>
+                )}
+                {submissionData.overallTutorBand !== null && submissionData.overallTutorBand !== undefined && (
+                  <span className="badge bg-dark py-2 px-3">Tutor Overall {formatHalfBand(submissionData.overallTutorBand)}</span>
+                )}
+              </div>
+            )}
             
             {submissionData.tasks?.length > 1 && (
               <div className="d-flex gap-2 mt-4">
@@ -176,11 +210,15 @@ const TutorGradingPage = () => {
               submissionId={submissionId} 
               type={type} 
               studentId={submissionData.student?.id}
-              activeTaskId="overall"
+              activeTaskId={activeTask.id}
+              activeTaskNumber={activeTask.taskNumber || activeTask.partNumber}
               tasks={submissionData.tasks}
+              aiFeedback={activeTask.aiFeedback}
+              existingTutorGrade={activeTask.tutorGrade}
               readOnly={effectiveMode === 'view'}
               editMode={effectiveMode === 'edit'}
               initialData={gradedData}
+              onGradingComplete={() => setRefreshKey(key => key + 1)}
             />
           </div>
         </div>

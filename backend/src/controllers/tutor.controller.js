@@ -161,13 +161,50 @@ class TutorController {
       next(error);
     }
   }
+
+  /**
+   * POST /api/v1/tutors/submissions/:type/:submissionId/ai-prelim
+   */
+  static async runAiPrelimCheck(req, res, next) {
+    try {
+      const { type, submissionId } = req.params;
+      if (!['writing', 'speaking'].includes(type)) {
+        return res.status(400).json({ success: false, error: { message: 'Invalid type' }, data: null, meta: null });
+      }
+
+      const result = await TutorService.runAiPrelimCheck(type, submissionId, {
+        ...req.body,
+        usageContext: {
+          userId: req.user.id,
+          feature: 'tutor_ai_reference',
+          entityType: type === 'speaking' ? 'speaking_submission' : 'writing_submission',
+          entityId: submissionId,
+        },
+      });
+
+      res.status(200).json({
+        success: true,
+        data: result,
+        error: null,
+        meta: null
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   /**
    * POST /api/v1/tutors/submissions/speaking/:partId/transcribe
    */
   static async transcribeSpeaking(req, res, next) {
     try {
       const { partId } = req.params;
-      const transcript = await TutorService.transcribeSpeakingPart(partId);
+      const transcript = await TutorService.transcribeSpeakingPart(partId, {
+        userId: req.user.id,
+        feature: 'tutor_ai_reference',
+        entityType: 'speaking_submission',
+        entityId: partId,
+      });
       
       res.status(200).json({
         success: true,

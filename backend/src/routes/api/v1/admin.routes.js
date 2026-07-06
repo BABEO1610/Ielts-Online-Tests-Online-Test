@@ -7,6 +7,7 @@ const sessionsService = require('../../../services/sessions.service');
 const contactsService = require('../../../services/contacts.service');
 const auditService = require('../../../services/audit.service');
 const adminControllerFactory = require('../../../controllers/admin.controller');
+const adminMetricsController = require('../../../controllers/adminMetrics.controller');
 const authorizeFactory = require('../../../middleware/authorize');
 const authenticate = require('../../../middleware/authenticate');
 
@@ -15,6 +16,10 @@ const adminController = adminControllerFactory(usersService, AppError, sessionsS
 const authorize = authorizeFactory(AppError);
 
 // T039: API quản lý user dành cho Admin
+router.get('/overview', authenticate, authorize('admin'), adminMetricsController.getOverview);
+router.get('/reports/export.csv', authenticate, authorize('admin'), adminMetricsController.exportReportsCsv);
+router.get('/reports', authenticate, authorize('admin'), adminMetricsController.getReports);
+router.get('/ai-usage', authenticate, authorize('admin'), adminMetricsController.getAiUsage);
 router.get('/users', authenticate, authorize('admin'), adminController.listUsers);
 router.put('/users/:id/role', authenticate, authorize('admin'), adminController.updateUserRole);
 router.put('/users/:id/status', authenticate, authorize('admin'), adminController.updateUserStatus);

@@ -1,7 +1,7 @@
 const { verifyAccessToken } = require('../utils/token.util');
 const redisClient = require('../config/redis');
 const { findActiveSession } = require('../db/queries/sessions.queries');
-const pool = require('../config/database');
+const { pool } = require('../db/pool');
 const AppError = require('../utils/AppError'); // Giả định AppError đã được tạo ở T030
 
 /**
