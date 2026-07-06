@@ -839,7 +839,10 @@ class TutorService {
           SELECT ss.id, ss.speaking_group_id, ss.status, ss.grader, ss.user_id, u.full_name as student_name
           FROM speaking_submissions ss
           LEFT JOIN users u ON u.id = ss.user_id
-          WHERE ss.id = $1 FOR UPDATE
+          WHERE ss.id::text = $1 OR ss.speaking_group_id::text = $1
+          ORDER BY ss.part_number ASC NULLS LAST
+          LIMIT 1
+          FOR UPDATE OF ss
         `;
         const checkResult = await client.query(checkQuery, [submissionId]);
         if (checkResult.rowCount === 0) {

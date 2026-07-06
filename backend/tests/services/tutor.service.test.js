@@ -109,6 +109,59 @@ describe('TutorService schema compatibility', () => {
     );
   });
 
+  it('submits tutor speaking grade without locking the nullable joined user row', async () => {
+    const client = {
+      query: jest.fn(),
+      release: jest.fn(),
+    };
+    pool.connect.mockResolvedValueOnce(client);
+    AuditLogService.logAction.mockResolvedValueOnce({});
+
+    client.query
+      .mockResolvedValueOnce({}) // BEGIN
+      .mockResolvedValueOnce({
+        rowCount: 1,
+        rows: [{
+          id: 'part-1',
+          speaking_group_id: 'group-1',
+          status: 'pending',
+          grader: 'tutor',
+          user_id: 'student-1',
+          student_name: 'Student One',
+        }],
+      })
+      .mockResolvedValueOnce({
+        rows: [
+          { id: 'part-1', status: 'pending', grader: 'tutor' },
+          { id: 'part-2', status: 'pending', grader: 'tutor' },
+          { id: 'part-3', status: 'pending', grader: 'tutor' },
+        ],
+      })
+      .mockResolvedValueOnce({ rows: [{ id: 'part-1' }] })
+      .mockResolvedValueOnce({ rowCount: 0, rows: [] })
+      .mockResolvedValueOnce({})
+      .mockResolvedValueOnce({})
+      .mockResolvedValueOnce({}); // COMMIT
+
+    const result = await TutorService.gradeSubmission('speaking', 'group-1', 'tutor-1', {
+      bandScore: 6,
+      fluencyScore: 6,
+      lexicalScore: 6,
+      grammarScore: 6,
+      pronunciationScore: 6,
+      writtenFeedback: 'Overall speaking feedback.',
+    });
+
+    expect(client.query.mock.calls[1][0]).toContain('FOR UPDATE OF ss');
+    expect(client.query.mock.calls[1][0]).toContain('ss.speaking_group_id::text = $1');
+    expect(result).toEqual(expect.objectContaining({
+      success: true,
+      studentId: 'student-1',
+      tutorStatus: 'graded',
+      overallTutorBand: 6,
+    }));
+  });
+
   it('lists AI references without requiring writing_submissions.overall_ai_band', async () => {
     pool.query
       .mockResolvedValueOnce(rowsForColumns(['submission_id', 'submission_type', 'band_score']))
