@@ -70,7 +70,7 @@ function flattenTestData(testData, allowedPassageNumbers) {
         // ignore
       }
 
-      (block.questions || []).forEach((q) => {
+      (block.questions || []).forEach((q, qIdx) => {
         // Normalise options: backend stores as JSONB (array of {label,text} or plain strings)
         let options = [];
         if (Array.isArray(q.options)) {
@@ -83,6 +83,9 @@ function flattenTestData(testData, allowedPassageNumbers) {
           id: q.id,
           order: q.questionOrder, // matches backend field name
           passageNumber: passage.passageNumber,
+          blockId: b.id,
+          // blockContent rendered above the first question of each block
+          blockContent: qIdx === 0 ? (b.content || null) : null,
           type: blockQType,
           text: q.text || '',
           options,
@@ -153,7 +156,8 @@ function ReadingTestPage() {
     const fetchTest = async () => {
       try {
         setLoading(true);
-        const res = await testService.getTestById(testId);
+        // ponytail: use /take endpoint so answers are stripped server-side
+        const res = await testService.getTestForStudent(testId);
         if (!cancelled) {
           if (res.success && res.data) {
             setTestData(res.data);
@@ -341,6 +345,14 @@ function ReadingTestPage() {
                       })()}
                     </span>
                   </div>
+
+                  {/* Block content: images / diagrams tutor embedded in this block */}
+                  {q.blockContent && (
+                    <div
+                      className="mb-3"
+                      dangerouslySetInnerHTML={{ __html: q.blockContent }}
+                    />
+                  )}
 
                   {/* Question text */}
                   {q.text && <p className="body-md-strong mb-3">{q.text}</p>}
