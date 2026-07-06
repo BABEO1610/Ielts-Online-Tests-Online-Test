@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import StudentNavbar from '../../components/layout/StudentNavbar';
 import ModeSelector from '../../components/objective-testing/ModeSelector';
+import Pagination from '../../components/common/Pagination';
 import { testService } from '../../services/test.service';
 import { attemptService } from '../../services/attempt.service';
 
@@ -16,12 +17,13 @@ import { attemptService } from '../../services/attempt.service';
  */
 
 const DIFFICULTY_STYLE = {
-  'easy':         { bg: '#efefef', color: '#5e5e5e', label: 'Dễ' },
-  'intermediate': { bg: '#000',    color: '#fff',     label: 'Trung bình' },
-  'advanced':     { bg: '#282828', color: '#afafaf',  label: 'Khó' },
-  'Dễ':           { bg: '#efefef', color: '#5e5e5e',  label: 'Dễ' },
-  'Trung bình':   { bg: '#000',    color: '#fff',     label: 'Trung bình' },
-  'Khó':          { bg: '#282828', color: '#afafaf',  label: 'Khó' },
+  'easy':         { bg: '#efefef', color: '#5e5e5e', label: 'Beginner' },
+  'intermediate': { bg: '#000',    color: '#fff',     label: 'Intermediate' },
+  'advanced':     { bg: '#282828', color: '#afafaf',  label: 'Advanced' },
+  'Dễ':           { bg: '#efefef', color: '#5e5e5e',  label: 'Beginner' },
+  'Trung bình':   { bg: '#000',    color: '#fff',     label: 'Intermediate' },
+  'Khó':          { bg: '#282828', color: '#afafaf',  label: 'Advanced' },
+  'beginner':     { bg: '#efefef', color: '#5e5e5e',  label: 'Beginner' },
 };
 
 /** Map passage blocks to a display-friendly format */
@@ -194,9 +196,15 @@ const ReadingPage = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [difficultyFilter, setDifficultyFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 6;
   const [attemptStats, setAttemptStats] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, difficultyFilter, statusFilter]);
 
   useEffect(() => {
     let mounted = true;
@@ -361,9 +369,9 @@ const ReadingPage = () => {
                   style={{ fontSize: '14px', border: '1px solid #d1d1d1' }}
                 >
                   <option value="">Tất cả độ khó</option>
-                  <option value="beginner">Dễ (Beginner)</option>
-                  <option value="intermediate">Trung bình (Intermediate)</option>
-                  <option value="advanced">Khó (Advanced)</option>
+                  <option value="beginner">Beginner</option>
+                  <option value="intermediate">Intermediate</option>
+                  <option value="advanced">Advanced</option>
                 </select>
               </div>
 
@@ -397,108 +405,121 @@ const ReadingPage = () => {
                   <span className="visually-hidden">Loading...</span>
                 </div>
               </div>
-            ) : exams.filter(exam => {
+            ) : (() => {
+              const getDiffEnum = (diff) => {
+                if (!diff) return 'intermediate';
+                const d = diff.toLowerCase();
+                if (['dễ', 'easy', 'beginner'].includes(d)) return 'beginner';
+                if (['khó', 'advanced'].includes(d)) return 'advanced';
+                return 'intermediate';
+              };
+
+              const filteredExams = exams.filter(exam => {
                 const matchSearch = exam.title.toLowerCase().includes(searchTerm.toLowerCase());
-                const matchDiff = difficultyFilter === '' || exam.difficulty === difficultyFilter;
+                const examDiffEnum = getDiffEnum(exam.difficulty);
+                const matchDiff = difficultyFilter === '' || examDiffEnum === difficultyFilter;
                 const isCompleted = attemptStats[exam.id] !== undefined;
                 const matchStatus = statusFilter === 'all' || 
                                     (statusFilter === 'completed' && isCompleted) || 
                                     (statusFilter === 'incomplete' && !isCompleted);
                 return matchSearch && matchDiff && matchStatus;
-              }).length === 0 ? (
-              <div className="text-center py-5 text-muted bg-white rounded-4 border">Không tìm thấy bài thi phù hợp với bộ lọc hiện tại.</div>
-            ) : (
-              <div className="row g-4">
-                {exams.filter(exam => {
-                  const matchSearch = exam.title.toLowerCase().includes(searchTerm.toLowerCase());
-                  const matchDiff = difficultyFilter === '' || exam.difficulty === difficultyFilter;
-                  const isCompleted = attemptStats[exam.id] !== undefined;
-                  const matchStatus = statusFilter === 'all' || 
-                                      (statusFilter === 'completed' && isCompleted) || 
-                                      (statusFilter === 'incomplete' && !isCompleted);
-                  return matchSearch && matchDiff && matchStatus;
-                }).map((exam) => {
-                  const diff = DIFFICULTY_STYLE[exam.difficulty || 'intermediate'] || DIFFICULTY_STYLE['intermediate'];
-                  const bestBandScore = attemptStats[exam.id];
-                  const isCompleted = bestBandScore !== undefined;
+              });
 
-                  return (
-                  <div key={exam.id} className="col-md-6">
-                    <div
-                      className="p-3 rounded-4 h-100 d-flex flex-column justify-content-between position-relative overflow-hidden"
-                      style={{ 
-                        border: isCompleted ? '2px solid #86efac' : '1px solid #e2e2e2', 
-                        backgroundColor: isCompleted ? '#f0fdf4' : '#fff',
-                        cursor: 'pointer', 
-                        transition: 'all 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275)' 
-                      }}
-                      onMouseEnter={e => {
-                        e.currentTarget.style.boxShadow = 'rgba(0,0,0,0.1) 0px 10px 25px -5px, rgba(0,0,0,0.04) 0px 10px 10px -5px';
-                        e.currentTarget.style.transform = 'translateY(-4px)';
-                      }}
-                      onMouseLeave={e => {
-                        e.currentTarget.style.boxShadow = 'none';
-                        e.currentTarget.style.transform = 'none';
-                      }}
-                      onClick={() => handleViewExam(exam)}
-                    >
-                      {/* Optional subtle background pattern */}
-                      <div style={{ position: 'absolute', top: '-10%', right: '-10%', opacity: 0.03, pointerEvents: 'none' }}>
-                        <svg width="100" height="100" viewBox="0 0 100 100"><circle cx="50" cy="50" r="40" fill="#000" /></svg>
-                      </div>
+              const totalPages = Math.ceil(filteredExams.length / ITEMS_PER_PAGE);
+              const paginatedExams = filteredExams.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
 
-                      <div className="position-relative">
-                        <div className="d-flex justify-content-between align-items-start mb-2">
-                          <div className="d-flex gap-2 align-items-center flex-wrap">
-                            <span
-                              className="rounded-pill px-2 py-1 fw-medium"
-                              style={{ backgroundColor: diff.bg, color: diff.color, fontSize: '12px', fontFamily: 'UberMoveText, system-ui, sans-serif' }}
-                            >
-                              {exam.difficulty}
-                            </span>
-                            {isCompleted && (
-                              <span className="rounded-pill px-2 py-1 fw-bold d-inline-flex align-items-center gap-1" style={{ backgroundColor: '#dcfce7', color: '#166534', fontSize: '12px' }}>
-                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><polyline points="20 6 9 17 4 12"></polyline></svg>
-                                Band {bestBandScore.toFixed(1)}
+              if (filteredExams.length === 0) {
+                return <div className="text-center py-5 text-muted bg-white rounded-4 border">Không tìm thấy bài thi phù hợp với bộ lọc hiện tại.</div>;
+              }
+
+              return (
+                <>
+                  <div className="row g-4">
+                    {paginatedExams.map((exam) => {
+                      const diff = DIFFICULTY_STYLE[exam.difficulty || 'intermediate'] || DIFFICULTY_STYLE['intermediate'];
+                      const bestBandScore = attemptStats[exam.id];
+                      const isCompleted = bestBandScore !== undefined;
+
+                      return (
+                      <div key={exam.id} className="col-md-6">
+                        <div
+                          className="p-3 rounded-4 h-100 d-flex flex-column justify-content-between position-relative overflow-hidden"
+                          style={{ 
+                            border: isCompleted ? '2px solid #86efac' : '1px solid #e2e2e2', 
+                            backgroundColor: isCompleted ? '#f0fdf4' : '#fff',
+                            cursor: 'pointer', 
+                            transition: 'all 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275)' 
+                          }}
+                          onMouseEnter={e => {
+                            e.currentTarget.style.boxShadow = 'rgba(0,0,0,0.1) 0px 10px 25px -5px, rgba(0,0,0,0.04) 0px 10px 10px -5px';
+                            e.currentTarget.style.transform = 'translateY(-4px)';
+                          }}
+                          onMouseLeave={e => {
+                            e.currentTarget.style.boxShadow = 'none';
+                            e.currentTarget.style.transform = 'none';
+                          }}
+                          onClick={() => handleViewExam(exam)}
+                        >
+                          {/* Optional subtle background pattern */}
+                          <div style={{ position: 'absolute', top: '-10%', right: '-10%', opacity: 0.03, pointerEvents: 'none' }}>
+                            <svg width="100" height="100" viewBox="0 0 100 100"><circle cx="50" cy="50" r="40" fill="#000" /></svg>
+                          </div>
+
+                          <div className="position-relative">
+                            <div className="d-flex justify-content-between align-items-start mb-2">
+                              <div className="d-flex gap-2 align-items-center flex-wrap">
+                                <span
+                                  className="rounded-pill px-2 py-1 fw-medium"
+                                  style={{ backgroundColor: diff.bg, color: diff.color, fontSize: '12px', fontFamily: 'UberMoveText, system-ui, sans-serif' }}
+                                >
+                                  {diff.label || exam.difficulty}
+                                </span>
+                                {isCompleted && (
+                                  <span className="rounded-pill px-2 py-1 fw-bold d-inline-flex align-items-center gap-1" style={{ backgroundColor: '#dcfce7', color: '#166534', fontSize: '12px' }}>
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                                    Band {bestBandScore.toFixed(1)}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+
+                            <h3 className="fw-bold mb-1 text-dark" style={{ fontFamily: 'UberMove, system-ui, sans-serif', fontSize: '18px', lineHeight: '1.3' }}>
+                              {exam.title}
+                            </h3>
+
+                            <div className="d-flex flex-wrap gap-3 mb-2 mt-2">
+                              <span className="text-muted fw-medium d-flex align-items-center gap-1" style={{ fontSize: '13px' }}>
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                                {exam.duration_minutes || 60} phút
                               </span>
-                            )}
+                              <span className="text-muted fw-medium d-flex align-items-center gap-1" style={{ fontSize: '13px' }}>
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+                                {exam.participantCount || 0} lượt thi
+                              </span>
+                            </div>
+                          </div>
+                          
+                          <div className="mt-2 pt-2 border-top position-relative d-flex justify-content-between align-items-center">
+                            <span className="text-muted" style={{ fontSize: '12px' }}>
+                              Cập nhật: {new Date(exam.created_at || Date.now()).toLocaleDateString('vi-VN')}
+                            </span>
+                            <button
+                              className={`btn rounded-pill px-3 py-1 fw-medium ${isCompleted ? 'btn-outline-success' : 'btn-dark'}`}
+                              style={{ fontFamily: 'UberMoveText, system-ui, sans-serif', fontSize: '13px' }}
+                              onClick={(e) => { e.stopPropagation(); handleViewExam(exam); }}
+                            >
+                              {isCompleted ? 'Làm lại →' : 'Vào thi →'}
+                            </button>
                           </div>
                         </div>
-
-                        <h3 className="fw-bold mb-1 text-dark" style={{ fontFamily: 'UberMove, system-ui, sans-serif', fontSize: '18px', lineHeight: '1.3' }}>
-                          {exam.title}
-                        </h3>
-
-                        <div className="d-flex flex-wrap gap-3 mb-2 mt-2">
-                          <span className="text-muted fw-medium d-flex align-items-center gap-1" style={{ fontSize: '13px' }}>
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
-                            {exam.duration_minutes || 60} phút
-                          </span>
-                          <span className="text-muted fw-medium d-flex align-items-center gap-1" style={{ fontSize: '13px' }}>
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
-                            {exam.participantCount || 0} lượt thi
-                          </span>
-                        </div>
                       </div>
-                      
-                      <div className="mt-2 pt-2 border-top position-relative d-flex justify-content-between align-items-center">
-                        <span className="text-muted" style={{ fontSize: '12px' }}>
-                          Cập nhật: {new Date(exam.created_at || Date.now()).toLocaleDateString('vi-VN')}
-                        </span>
-                        <button
-                          className={`btn rounded-pill px-3 py-1 fw-medium ${isCompleted ? 'btn-outline-success' : 'btn-dark'}`}
-                          style={{ fontFamily: 'UberMoveText, system-ui, sans-serif', fontSize: '13px' }}
-                          onClick={(e) => { e.stopPropagation(); handleViewExam(exam); }}
-                        >
-                          {isCompleted ? 'Làm lại →' : 'Vào thi →'}
-                        </button>
-                      </div>
-                    </div>
+                    );
+                    })}
                   </div>
-                );
-                })}
-              </div>
-            )}
+                  <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
+                </>
+              );
+            })()}
           </div>
         </div>
       </main>
