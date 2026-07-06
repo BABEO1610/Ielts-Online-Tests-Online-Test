@@ -62,10 +62,17 @@ const insertAiReport = async (db, valuesByColumn) => {
 
 const getSpeakingGroupParts = async (submissionIdOrGroupId) => {
   const { rows } = await pool.query(
-    `SELECT ss.*, mt.title AS test_title
+    `WITH target AS (
+       SELECT COALESCE(speaking_group_id, id) AS group_id
+       FROM speaking_submissions
+       WHERE id::text = $1 OR speaking_group_id::text = $1
+       ORDER BY part_number ASC NULLS LAST
+       LIMIT 1
+     )
+     SELECT ss.*, mt.title AS test_title
      FROM speaking_submissions ss
+     JOIN target t ON COALESCE(ss.speaking_group_id, ss.id) = t.group_id
      LEFT JOIN mock_tests mt ON mt.id = ss.test_id
-     WHERE ss.id::text = $1 OR ss.speaking_group_id::text = $1
      ORDER BY ss.part_number ASC`,
     [submissionIdOrGroupId]
   );

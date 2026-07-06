@@ -557,9 +557,11 @@ class TutorService {
     } else if (type === 'speaking') {
       const query = `
         WITH base AS (
-            SELECT speaking_group_id
+            SELECT COALESCE(speaking_group_id, id) AS group_id
             FROM speaking_submissions
-            WHERE id = $1
+            WHERE id::text = $1 OR speaking_group_id::text = $1
+            ORDER BY part_number ASC NULLS LAST
+            LIMIT 1
         )
         SELECT
             ss.speaking_group_id,
@@ -580,7 +582,7 @@ class TutorService {
                 ORDER BY ss.part_number
             ) AS parts
         FROM speaking_submissions ss
-        JOIN base b ON b.speaking_group_id = ss.speaking_group_id
+        JOIN base b ON COALESCE(ss.speaking_group_id, ss.id) = b.group_id
         JOIN users u ON u.id = ss.user_id
         LEFT JOIN mock_tests mt ON mt.id = ss.test_id
         GROUP BY
