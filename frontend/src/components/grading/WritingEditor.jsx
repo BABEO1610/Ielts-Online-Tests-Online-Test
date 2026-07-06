@@ -12,7 +12,6 @@ const WritingEditor = forwardRef(({
   onContentChange
 }, ref) => {
   const [text, setText] = useState('');
-  const [grader, setGrader] = useState('tutor');
 
   const isPending = status === 'pending';
   const charCount = text.length;
@@ -32,8 +31,7 @@ const WritingEditor = forwardRef(({
       return {
         task_number: taskNumber,
         prompt_text: promptText,
-        response_text: responseText,
-        grader: grader
+        response_text: responseText
       };
     }
   }));
@@ -60,42 +58,6 @@ const WritingEditor = forwardRef(({
         <div className="d-flex justify-content-between mt-2 text-muted small">
           <span>{charCount}/{MAX_CHARS} ký tự</span>
           <span>Từ: {text.trim() === '' ? 0 : text.trim().split(/\s+/).length}</span>
-        </div>
-      </div>
-
-      <div className="grader-selection mb-4">
-        <p className="mb-2 fw-bold text-dark">Chọn người chấm:</p>
-        <div className="d-flex gap-4">
-          <div className="form-check">
-            <input 
-              className="form-check-input" 
-              type="radio" 
-              name={`grader-${taskNumber}`} 
-              id={`graderTutor-${taskNumber}`} 
-              value="tutor" 
-              checked={grader === 'tutor'} 
-              onChange={(e) => setGrader(e.target.value)}
-              disabled={isPending}
-            />
-            <label className="form-check-label" htmlFor={`graderTutor-${taskNumber}`}>
-              Giảng viên chấm
-            </label>
-          </div>
-          <div className="form-check">
-            <input 
-              className="form-check-input" 
-              type="radio" 
-              name={`grader-${taskNumber}`} 
-              id={`graderAi-${taskNumber}`} 
-              value="ai" 
-              checked={grader === 'ai'} 
-              onChange={(e) => setGrader(e.target.value)}
-              disabled={isPending}
-            />
-            <label className="form-check-label" htmlFor={`graderAi-${taskNumber}`}>
-              AI chấm điểm - nhận feedback nhanh
-            </label>
-          </div>
         </div>
       </div>
     </div>

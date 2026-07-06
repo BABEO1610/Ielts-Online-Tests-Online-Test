@@ -156,12 +156,43 @@ const WritingPage = () => {
     return () => { mounted = false; };
   }, [isAuthenticated]);
 
-  const handleViewExam = (exam) => {
+  const handleViewExam = async (exam) => {
     if (!isAuthenticated) {
       navigate('/login', { state: { message: 'Vui lòng đăng nhập để xem chi tiết đề thi' } });
       return;
     }
-    setSelectedExam(exam);
+    
+    setError(null);
+    try {
+      setLoading(true);
+      const res = await testService.getTestById(exam.id);
+      if (res.success && res.data) {
+        const fullExam = res.data;
+        const tasks = (fullExam.passages || []).map(p => {
+          let instructionData = {};
+          try {
+            if (p.instruction) instructionData = JSON.parse(p.instruction);
+          } catch (e) {
+            // ignore
+          }
+          return {
+            id: p.id,
+            task_number: p.passageNumber,
+            title: instructionData.title || `Task ${p.passageNumber}`,
+            content: p.content,
+            duration: instructionData.duration || (p.passageNumber === 1 ? '20 phút' : '40 phút'),
+            min_words: instructionData.min_words || (p.passageNumber === 1 ? 150 : 250)
+          };
+        });
+        setSelectedExam({ ...exam, ...fullExam, tasks });
+      } else {
+        setError(res.error?.message || 'Không thể tải chi tiết đề thi.');
+      }
+    } catch (err) {
+      setError('Lỗi kết nối khi tải chi tiết đề thi.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleStartExam = (modeConfig) => {
@@ -388,11 +419,6 @@ const WritingPage = () => {
                               <span className="rounded-pill px-2 py-1 fw-bold d-inline-flex align-items-center gap-1" style={{ backgroundColor: '#dcfce7', color: '#166534', fontSize: '12px' }}>
                                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><polyline points="20 6 9 17 4 12"></polyline></svg>
                                 Band {bestBandScore.toFixed(1)}
-                              </span>
-                            )}
-                            {exam.participantCount > 0 && (
-                              <span className="rounded-pill px-2 py-1 fw-medium" style={{ backgroundColor: '#fff3cd', color: '#856404', fontSize: '12px' }}>
-                                🔥 Trending
                               </span>
                             )}
                           </div>
