@@ -82,17 +82,21 @@ const TutorGradingPanel = ({
   const [error, setError] = useState(null);
   const [submitSuccess, setSubmitSuccess] = useState(null);
 
+  const panelKey = type === 'speaking' ? 'speaking-session' : activeTaskId;
+  const panelTitle = type === 'speaking'
+    ? 'Speaking Session'
+    : (tasks?.find(t => t.id === activeTaskId)?.name || 'Task');
   const sourceGrade = existingTutorGrade || (initialData && (readOnly || editMode) ? initialData : null);
-  const currentScores = taskScores[activeTaskId] || getScoresFromGrade(sourceGrade);
-  const currentFeedback = taskFeedbacks[activeTaskId] ?? sourceGrade?.writtenFeedback ?? '';
-  const currentAiFeedback = prelimFeedbacks[activeTaskId] || aiFeedback;
+  const currentScores = taskScores[panelKey] || getScoresFromGrade(sourceGrade);
+  const currentFeedback = taskFeedbacks[panelKey] ?? sourceGrade?.writtenFeedback ?? '';
+  const currentAiFeedback = prelimFeedbacks[panelKey] || aiFeedback;
 
   const handleScoreChange = (key, value) => {
     setTaskScores(prev => ({ 
       ...prev, 
-      [activeTaskId]: {
+      [panelKey]: {
         ...currentScores,
-        ...(prev[activeTaskId] || {}),
+        ...(prev[panelKey] || {}),
         [key]: value
       }
     }));
@@ -101,7 +105,7 @@ const TutorGradingPanel = ({
   const handleFeedbackChange = (value) => {
     setTaskFeedbacks(prev => ({
       ...prev,
-      [activeTaskId]: value
+      [panelKey]: value
     }));
   };
 
@@ -139,17 +143,17 @@ const TutorGradingPanel = ({
         if (suggestion?.aiFeedback) {
           setPrelimFeedbacks(prev => ({
             ...prev,
-            [activeTaskId]: {
+            [panelKey]: {
               ...suggestion.aiFeedback,
-              taskNumber: activeTaskNumber,
+              taskNumber: type === 'speaking' ? null : activeTaskNumber,
             }
           }));
         }
         if (suggestion?.suggestedCriteria) {
           setTaskScores(prev => ({
             ...prev,
-            [activeTaskId]: {
-              ...(prev[activeTaskId] || {}),
+            [panelKey]: {
+              ...(prev[panelKey] || {}),
               ...(type === 'speaking' ? {
                 fluencyScore: suggestion.suggestedCriteria.fluencyScore ?? '',
                 lexicalScore: suggestion.suggestedCriteria.lexicalScore ?? '',
@@ -226,7 +230,7 @@ const TutorGradingPanel = ({
       <div className="bg-canvas rounded-4 p-4 h-100 d-flex flex-column">
         <div className="d-flex justify-content-between align-items-center mb-4">
           <h4 className="text-ink fw-bold mb-0">
-            Grading Panel - {tasks?.find(t => t.id === activeTaskId)?.name || 'Task'}
+            Grading Panel - {panelTitle}
             {readOnly && <span className="badge bg-secondary ms-2 fs-6">Chỉ đọc</span>}
             {editMode && <span className="badge bg-warning text-dark ms-2 fs-6">Chỉnh sửa điểm</span>}
           </h4>
@@ -333,7 +337,11 @@ const TutorGradingPanel = ({
             <div className="mb-4">
               <h5 className="fw-bold text-ink mb-3">AI Reference</h5>
               <AiFeedbackPanel
-                report={currentAiFeedback ? { ...currentAiFeedback, taskNumber: activeTaskNumber } : null}
+                report={currentAiFeedback ? {
+                  ...currentAiFeedback,
+                  taskNumber: type === 'speaking' ? null : activeTaskNumber,
+                  submissionType: type,
+                } : null}
                 showDisclaimer={false}
               />
             </div>

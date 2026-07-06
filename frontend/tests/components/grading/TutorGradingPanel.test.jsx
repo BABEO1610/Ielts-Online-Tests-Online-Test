@@ -152,5 +152,67 @@ describe('TutorGradingPanel Component', () => {
         expect(screen.getByTestId('textarea-feedback')).toHaveValue('Needs clearer support.');
       });
     });
+
+    it('keeps speaking prelim feedback shared when switching parts', async () => {
+      gradingService.runPrelimCheck.mockResolvedValueOnce({
+        success: true,
+        data: {
+          suggestedCriteria: {
+            fluencyScore: 6,
+            lexicalScore: 6,
+            grammarScore: 5.5,
+            pronunciationScore: 6,
+          },
+          feedbackDraft: 'Overall speaking feedback for all 3 parts.',
+          keyProblems: ['grammar'],
+          aiFeedback: {
+            submissionType: 'speaking',
+            overallBand: 6,
+            criterionScores: {
+              fluencyCoherence: { band: 6, feedback: 'Mostly coherent.' },
+              lexicalResource: { band: 6, feedback: 'Adequate range.' },
+              grammaticalRangeAccuracy: { band: 5.5, feedback: 'Frequent slips.' },
+              pronunciation: { band: 6, feedback: 'Generally clear.' },
+            },
+          },
+        },
+      });
+
+      const speakingProps = {
+        ...defaultProps,
+        type: 'speaking',
+        activeTaskId: 'part-1',
+        activeTaskNumber: 1,
+        tasks: [
+          { id: 'part-1', name: 'Part 1' },
+          { id: 'part-2', name: 'Part 2' },
+          { id: 'part-3', name: 'Part 3' },
+        ],
+      };
+
+      const { rerender } = render(
+        <MemoryRouter>
+          <TutorGradingPanel {...speakingProps} />
+        </MemoryRouter>
+      );
+
+      fireEvent.click(screen.getByText('Run AI Prelim Check'));
+
+      await waitFor(() => {
+        expect(screen.getByText('Grading Panel - Speaking Session')).toBeInTheDocument();
+        expect(screen.getByTestId('textarea-feedback')).toHaveValue('Overall speaking feedback for all 3 parts.');
+        expect(screen.getByTestId('input-fluencyScore')).toHaveValue('6');
+      });
+
+      rerender(
+        <MemoryRouter>
+          <TutorGradingPanel {...speakingProps} activeTaskId="part-2" activeTaskNumber={2} />
+        </MemoryRouter>
+      );
+
+      expect(screen.getByText('Grading Panel - Speaking Session')).toBeInTheDocument();
+      expect(screen.getByTestId('textarea-feedback')).toHaveValue('Overall speaking feedback for all 3 parts.');
+      expect(screen.getByTestId('input-fluencyScore')).toHaveValue('6');
+    });
   });
 });
