@@ -109,14 +109,19 @@ const getLatestCompletedReports = async (partIds) => {
   return reportBySubmission;
 };
 
-const ensureTranscript = async (part) => {
+const ensureTranscript = async (part, usageContext = null) => {
   if (part.transcript && String(part.transcript).trim()) {
     return part.transcript;
   }
   if (!part.audio_url) {
     throw new AppError('Speaking transcript is required before AI grading.', 422, 'SPEAKING_TRANSCRIPT_REQUIRED');
   }
-  const transcript = await generateTranscript(part.audio_url);
+  const transcript = await generateTranscript(part.audio_url, usageContext || {
+    userId: part.user_id,
+    feature: 'speaking_grading',
+    entityType: 'speaking_submission',
+    entityId: part.id,
+  });
   await pool.query(
     'UPDATE speaking_submissions SET transcript = $1 WHERE id = $2',
     [transcript, part.id]
@@ -173,7 +178,7 @@ const saveFailedReport = (part, error) => insertAiReport(pool, {
   }),
 });
 
-const gradeSpeakingGroup = async (submissionIdOrGroupId, { force = false } = {}) => {
+const gradeSpeakingGroup = async (submissionIdOrGroupId, { force = false, usageContext = null } = {}) => {
   const parts = await getSpeakingGroupParts(submissionIdOrGroupId);
   if (parts.length !== 3) {
     throw new AppError('Speaking AI grading requires exactly 3 parts.', 400, 'SPEAKING_PARTS_REQUIRED');
@@ -197,11 +202,17 @@ const gradeSpeakingGroup = async (submissionIdOrGroupId, { force = false } = {})
     for (const part of parts) {
       partsWithTranscripts.push({
         ...part,
-        transcript: await ensureTranscript(part),
+        transcript: await ensureTranscript(part, usageContext),
       });
     }
     const result = await gradeSpeakingSession(partsWithTranscripts, {
       testTitle: representativePart.test_title,
+      usageContext: usageContext || {
+        userId: representativePart.user_id,
+        feature: 'speaking_grading',
+        entityType: 'speaking_submission',
+        entityId: representativePart.speaking_group_id || representativePart.id,
+      },
     });
     const report = await saveCompletedReport(representativePart, result);
     return {
