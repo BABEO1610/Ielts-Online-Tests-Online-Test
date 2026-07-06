@@ -194,6 +194,56 @@ describe('TutorService schema compatibility', () => {
     }));
   });
 
+  it('calculates AI reference list band from completed task reports', async () => {
+    pool.query
+      .mockResolvedValueOnce(rowsForColumns(['submission_id', 'submission_type', 'band_score', 'computed_band', 'status']))
+      .mockResolvedValueOnce(rowsForColumns(['id', 'writing_group_id', 'status', 'overall_ai_band']))
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            submission_id: 'task-1',
+            writing_group_id: 'group-1',
+            student_id: 'student-1',
+            student_name: 'Student One',
+            test_title: 'Writing Test',
+            task_number: 1,
+            submitted_at: '2026-07-05T00:00:00.000Z',
+            submission_status: 'ai_graded',
+            overall_ai_band: null,
+            ai_band: '6.0',
+            ai_report_status: 'completed',
+            error_message: null,
+            generated_at: '2026-07-05T00:01:00.000Z',
+          },
+          {
+            submission_id: 'task-2',
+            writing_group_id: 'group-1',
+            student_id: 'student-1',
+            student_name: 'Student One',
+            test_title: 'Writing Test',
+            task_number: 2,
+            submitted_at: '2026-07-05T00:00:00.000Z',
+            submission_status: 'ai_graded',
+            overall_ai_band: null,
+            ai_band: '7.0',
+            ai_report_status: 'completed',
+            error_message: null,
+            generated_at: '2026-07-05T00:02:00.000Z',
+          },
+        ],
+      });
+
+    const result = await TutorService.getAiReferenceList();
+
+    expect(pool.query.mock.calls[2][0]).toContain('COALESCE(agr.band_score, agr.computed_band) AS ai_band');
+    expect(result[0]).toEqual(expect.objectContaining({
+      submissionId: 'group-1',
+      aiBand: 6.5,
+      reportStatus: 'completed',
+      taskLabel: 'Task 1 + Task 2',
+    }));
+  });
+
   it('runs Speaking AI prelim from a single part id by loading all group parts', async () => {
     const reportColumns = [
       'submission_id',

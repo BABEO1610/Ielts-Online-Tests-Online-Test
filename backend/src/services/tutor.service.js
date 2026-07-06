@@ -1635,6 +1635,9 @@ class TutorService {
     const errorMessageSelect = hasErrorMessage
       ? 'agr.error_message'
       : 'NULL::text AS error_message';
+    const reportBandExpr = reportColumns.has('computed_band')
+      ? 'COALESCE(agr.band_score, agr.computed_band)'
+      : 'agr.band_score';
     const failedPredicates = [
       hasReportStatus ? "(ws.status = 'pending' AND agr.status = 'failed')" : null,
       hasErrorMessage ? '(ws.status = \'pending\' AND agr.error_message IS NOT NULL)' : null,
@@ -1662,7 +1665,7 @@ class TutorService {
         ws.submitted_at,
         ws.status::text AS submission_status,
         ${overallAiBandSelect},
-        agr.band_score AS ai_band,
+        ${reportBandExpr} AS ai_band,
         ${reportStatusSelect},
         ${errorMessageSelect},
         agr.generated_at
@@ -1674,7 +1677,7 @@ class TutorService {
         FROM ai_grading_reports
         WHERE submission_type = 'writing'
         ORDER BY submission_id,
-                 CASE WHEN band_score IS NOT NULL THEN 0 ELSE 1 END,
+                 CASE WHEN ${reportColumns.has('computed_band') ? 'COALESCE(band_score, computed_band)' : 'band_score'} IS NOT NULL THEN 0 ELSE 1 END,
                  generated_at DESC
       ) agr
         ON agr.submission_id = ws.id
@@ -1692,6 +1695,7 @@ class TutorService {
     for (const row of rows) {
       const groupId = row.writing_group_id || row.submission_id;
       if (!grouped.has(groupId)) {
+        const overallAiBand = toNumberOrNull(row.overall_ai_band);
         grouped.set(groupId, {
           submissionId: groupId,
           studentId: row.student_id,
@@ -1699,7 +1703,7 @@ class TutorService {
           testTitle: row.test_title,
           submittedAt: row.submitted_at,
           submissionStatus: row.submission_status,
-          aiBand: isValidHalfBandScore(row.overall_ai_band) ? parseFloat(row.overall_ai_band) : null,
+          aiBand: isValidHalfBandScore(overallAiBand) ? overallAiBand : null,
           reportStatus: null,
           errorMessage: null,
           generatedAt: row.generated_at,
@@ -1708,7 +1712,7 @@ class TutorService {
       }
 
       const item = grouped.get(groupId);
-      const taskBand = row.ai_band ? parseFloat(row.ai_band) : null;
+      const taskBand = toNumberOrNull(row.ai_band);
       const taskStatus = row.ai_report_status || (taskBand !== null ? REPORT_STATUS.COMPLETED : null);
       item.tasks.push({
         submissionId: row.submission_id,
