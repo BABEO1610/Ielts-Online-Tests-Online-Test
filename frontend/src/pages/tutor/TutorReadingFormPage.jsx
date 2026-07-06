@@ -99,11 +99,12 @@ function TutorReadingFormPage({ testId }) {
           correctAnswers: correctAnswerIds,
         };
       });
-      return { id: blockId, type: block.type, range: block.range || '', questions };
+      return { id: blockId, type: block.type, range: block.range || '', content: block.content || '', questions };
     }
 
     // ── TRUE_FALSE_NOT_GIVEN & YES_NO_NOT_GIVEN ─────────────────────────────
     if (['TRUE_FALSE_NOT_GIVEN', 'YES_NO_NOT_GIVEN'].includes(block.type)) {
+
       const questions = (block.questions || []).map((q, qi) => {
         let rawOpts = q.options;
         if (typeof rawOpts === 'string') { try { rawOpts = JSON.parse(rawOpts); } catch { rawOpts = {}; } }
@@ -116,7 +117,7 @@ function TutorReadingFormPage({ testId }) {
           options: rawOpts || {},
         };
       });
-      return { id: blockId, type: block.type, range: block.range || '', questions };
+      return { id: blockId, type: block.type, range: block.range || '', content: block.content || '', questions };
     }
 
     // ── Matching types ───────────────────────────────────────────────────────
@@ -146,7 +147,7 @@ function TutorReadingFormPage({ testId }) {
         };
       });
 
-      return { id: blockId, type: block.type, range: block.range || '', options: normalizedOpts, questions };
+      return { id: blockId, type: block.type, range: block.range || '', content: block.content || '', options: normalizedOpts, questions };
     }
 
     // ── Completion / Short-answer types ──────────────────────────────────────
@@ -156,7 +157,7 @@ function TutorReadingFormPage({ testId }) {
       correctAnswer: q.correctAnswer || '',
       explanation: q.explanation || '',
     }));
-    return { id: blockId, type: block.type, range: block.range || '', questions };
+    return { id: blockId, type: block.type, range: block.range || '', content: block.content || '', questions };
   };
 
 
