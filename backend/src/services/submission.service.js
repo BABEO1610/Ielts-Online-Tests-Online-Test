@@ -827,7 +827,15 @@ class SubmissionService {
           const result = await gradeWriting(
             task,
             task.task_number === 1 ? 'task1' : 'task2',
-            { testTitle: task.test_title || testTitle }
+            {
+              testTitle: task.test_title || testTitle,
+              usageContext: {
+                userId,
+                feature: 'writing_grading',
+                entityType: 'writing_submission',
+                entityId: task.id,
+              },
+            }
           );
           await saveCompletedAiReport(task, result);
           aiResults.push({
