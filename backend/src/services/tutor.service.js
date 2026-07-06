@@ -263,10 +263,13 @@ class TutorService {
 
       if (type === 'writing') {
         // 1. SELECT FOR UPDATE
+        // NOTE: Must use INNER JOIN (not LEFT JOIN) because PostgreSQL forbids
+        // FOR UPDATE on the nullable side of an OUTER JOIN (code 0A000).
+        // user_id is NOT NULL FK so INNER JOIN loses no rows.
         const checkQuery = `
           SELECT ws.id, ws.writing_group_id, ws.status, ws.grader, ws.user_id, u.full_name as student_name
           FROM writing_submissions ws
-          LEFT JOIN users u ON u.id = ws.user_id
+          JOIN users u ON u.id = ws.user_id
           WHERE ws.id = $1 FOR UPDATE
         `;
         const checkResult = await client.query(checkQuery, [submissionId]);
@@ -319,10 +322,11 @@ class TutorService {
 
       } else if (type === 'speaking') {
         // 1. SELECT FOR UPDATE
+        // NOTE: Must use INNER JOIN (not LEFT JOIN) — same reason as writing above.
         const checkQuery = `
           SELECT ss.id, ss.speaking_group_id, ss.status, ss.grader, ss.user_id, u.full_name as student_name
           FROM speaking_submissions ss
-          LEFT JOIN users u ON u.id = ss.user_id
+          JOIN users u ON u.id = ss.user_id
           WHERE ss.id = $1 FOR UPDATE
         `;
         const checkResult = await client.query(checkQuery, [submissionId]);
