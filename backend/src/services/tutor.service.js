@@ -1132,6 +1132,7 @@ class TutorService {
       entityId: usageContext.entityId || partId,
     });
 
+    
     await pool.query('UPDATE speaking_submissions SET transcript = $1 WHERE id = $2', [transcript, partId]);
 
     return transcript;
