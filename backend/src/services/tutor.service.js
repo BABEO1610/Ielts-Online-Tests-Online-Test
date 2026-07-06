@@ -9,6 +9,7 @@ const {
 } = require('../utils/scoring');
 const { gradeWriting } = require('../ai/grading.service');
 const { REPORT_STATUS } = require('../ai/aiGrading.constants');
+const { gradeSpeakingGroup, getLatestCompletedReports } = require('./speakingAiGrading.service');
 
 const countWords = (text) =>
   String(text || '').trim().split(/\s+/).filter(Boolean).length;
@@ -64,6 +65,20 @@ const getTableColumns = async (db, tableName) => {
 };
 
 const buildCriterionScores = (report, parsedCriteria = null) => {
+  if (report?.submission_type === 'speaking') {
+    const fallback = {
+      fluencyCoherence: toNumberOrNull(report.fluency_score),
+      lexicalResource: toNumberOrNull(report.lexical_score),
+      grammaticalRangeAccuracy: toNumberOrNull(report.grammar_score),
+      pronunciation: toNumberOrNull(report.pronunciation_score),
+    };
+    if (!parsedCriteria) return fallback;
+    return {
+      ...fallback,
+      ...parsedCriteria,
+    };
+  }
+
   const fallback = {
     taskAchievementOrResponse: toNumberOrNull(report.task_achievement_score),
     coherenceCohesion: toNumberOrNull(report.coherence_score),
@@ -80,6 +95,17 @@ const buildCriterionScores = (report, parsedCriteria = null) => {
 const buildDetailedFeedback = (feedback, criteria) => {
   if (feedback.detailedFeedback && Object.keys(feedback.detailedFeedback).length > 0) {
     return feedback.detailedFeedback;
+  }
+  if (
+    criteria?.fluencyCoherence !== undefined
+    || criteria?.pronunciation !== undefined
+  ) {
+    return {
+      fluencyCoherence: criteria?.fluencyCoherence?.feedback || '',
+      lexicalResource: criteria?.lexicalResource?.feedback || '',
+      grammaticalRangeAccuracy: criteria?.grammaticalRangeAccuracy?.feedback || '',
+      pronunciation: criteria?.pronunciation?.feedback || '',
+    };
   }
   return {
     taskAchievementOrResponse: criteria?.taskAchievementOrResponse?.feedback || '',
@@ -99,6 +125,7 @@ const mapAiReport = (report) => {
   const criterionScores = buildCriterionScores(report, parsedCriteria);
   return {
     id: report.id,
+    submissionType: report.submission_type,
     status: report.status || REPORT_STATUS.COMPLETED,
     errorMessage: report.error_message || null,
     overallBand: toNumberOrNull(report.band_score),
@@ -124,6 +151,7 @@ const mapAiReport = (report) => {
     bandWarning: report.band_validation_warning || null,
     generatedAt: report.generated_at,
     taskNumber: report.task_number,
+    partNumber: report.part_number,
   };
 };
 
@@ -162,10 +190,13 @@ const buildFeedbackDraft = (ai) => [
   ai?.detailedFeedback && Object.keys(ai.detailedFeedback).length > 0
     ? [
         'Criterion feedback',
+        ai.detailedFeedback.fluencyCoherence && `- Fluency & Coherence: ${ai.detailedFeedback.fluencyCoherence}`,
         ai.detailedFeedback.taskAchievementOrResponse && `- Task Achievement/Response: ${ai.detailedFeedback.taskAchievementOrResponse}`,
         ai.detailedFeedback.coherenceCohesion && `- Coherence & Cohesion: ${ai.detailedFeedback.coherenceCohesion}`,
         ai.detailedFeedback.lexicalResource && `- Lexical Resource: ${ai.detailedFeedback.lexicalResource}`,
         ai.detailedFeedback.grammarRangeAccuracy && `- Grammar Range & Accuracy: ${ai.detailedFeedback.grammarRangeAccuracy}`,
+        ai.detailedFeedback.grammaticalRangeAccuracy && `- Grammatical Range & Accuracy: ${ai.detailedFeedback.grammaticalRangeAccuracy}`,
+        ai.detailedFeedback.pronunciation && `- Pronunciation: ${ai.detailedFeedback.pronunciation}`,
       ].filter(Boolean).join('\n')
     : '',
   listSection('Strengths', ai?.strengths),
@@ -236,6 +267,58 @@ const formatPrelimFromReport = (report, fallbackTaskNumber = null) => {
       grammarRangeAccuracy: report.grammar_score,
     },
   });
+};
+
+const formatSpeakingPrelimFromReport = (report, allReports = []) => {
+  const ai = mapAiReport(report);
+  const completed = allReports
+    .map(mapAiReport)
+    .filter(item => item?.overallBand !== null && item?.overallBand !== undefined);
+  const overall = completed.length === 3
+    ? roundToNearestHalf(completed.reduce((sum, item) => sum + Number(item.overallBand), 0) / 3)
+    : null;
+
+  return {
+    partNumber: report.part_number,
+    suggestedOverallBand: ai?.overallBand || null,
+    suggestedCriteria: {
+      fluencyScore: ai?.criterionScores?.fluencyCoherence?.band
+        ?? ai?.criterionScores?.fluencyCoherence
+        ?? null,
+      lexicalScore: ai?.criterionScores?.lexicalResource?.band
+        ?? ai?.criterionScores?.lexicalResource
+        ?? null,
+      grammarScore: ai?.criterionScores?.grammaticalRangeAccuracy?.band
+        ?? ai?.criterionScores?.grammaticalRangeAccuracy
+        ?? null,
+      pronunciationScore: ai?.criterionScores?.pronunciation?.band
+        ?? ai?.criterionScores?.pronunciation
+        ?? null,
+    },
+    feedbackDraft: buildFeedbackDraft(ai),
+    keyProblems: ai?.weaknesses || [],
+    suggestedRewrite: '',
+    tutorNotes: [
+      ai?.summary,
+      ai?.nextStudyAdvice,
+      overall !== null ? `Overall 3-part reference band: ${overall.toFixed(1)}` : '',
+    ].filter(Boolean).join('\n\n'),
+    groupSummary: {
+      overallBand: overall,
+      parts: completed.map(item => ({
+        partNumber: item.partNumber,
+        overallBand: item.overallBand,
+        summary: item.summary,
+      })),
+    },
+    aiFeedback: {
+      ...ai,
+      taskNumber: report.part_number,
+      partNumber: report.part_number,
+      submissionType: 'speaking',
+      status: ai?.status || REPORT_STATUS.COMPLETED,
+    },
+  };
 };
 
 const getAiReportColumns = async () => {
@@ -509,6 +592,8 @@ class TutorService {
       const result = await pool.query(query, [submissionId]);
       if (result.rows.length === 0) return null;
       const row = result.rows[0];
+      const parts = row.parts || [];
+      const aiBySubmission = await getLatestCompletedReports(parts.map(part => part.submissionId));
       return {
         type: 'speaking',
         speakingGroupId: row.speaking_group_id,
@@ -520,7 +605,10 @@ class TutorService {
         submittedAt: row.submitted_at,
         status: row.status,
         grader: row.grader,
-        parts: row.parts
+        parts: parts.map(part => ({
+          ...part,
+          aiFeedback: mapAiReport(aiBySubmission.get(part.submissionId)),
+        }))
       };
     }
     return null;
@@ -958,49 +1046,12 @@ class TutorService {
 
   static async runSpeakingAiPrelimCheck(submissionId, payload = {}) {
     const partNumber = Number(payload.partNumber ?? payload.taskNumber ?? payload.part_number);
-    const partRes = await pool.query(
-      `SELECT id, part_number, audio_url, transcript
-       FROM speaking_submissions
-       WHERE id::text = $1 OR speaking_group_id::text = $1
-       ORDER BY part_number ASC`,
-      [submissionId]
-    );
-    if (partRes.rows.length === 0) {
-      throw new AppError('Speaking submission not found', 404);
+    const result = await gradeSpeakingGroup(submissionId, { force: true });
+    const report = result.reports.find(row => row.part_number === partNumber) || result.reports[0];
+    if (!report || report.status === REPORT_STATUS.FAILED) {
+      throw new AppError(report?.error_message || 'Speaking AI prelim check failed.', 422, 'SPEAKING_AI_FAILED');
     }
-
-    const part = partRes.rows.find(row => row.part_number === partNumber) || partRes.rows[0];
-    const noAudioNote = part.audio_url
-      ? 'Audio is available, but the current AI grading provider in this codebase is not wired for reliable Speaking pronunciation scoring.'
-      : 'low-confidence - no audio, Pronunciation cannot be scored.';
-
-    return {
-      partNumber: part.part_number,
-      suggestedOverallBand: null,
-      suggestedCriteria: {
-        fluencyCoherence: null,
-        lexicalResource: null,
-        grammaticalRangeAccuracy: null,
-        pronunciation: null,
-      },
-      feedbackDraft: [
-        'AI reference only. No final Speaking band was generated.',
-        part.transcript ? `Transcript available:\n${part.transcript}` : 'No transcript is available yet.',
-        noAudioNote,
-      ].join('\n\n'),
-      keyProblems: part.transcript ? [] : ['Generate transcript before using text-based AI reference.'],
-      suggestedRewrite: '',
-      tutorNotes: noAudioNote,
-      aiFeedback: {
-        status: 'low_confidence',
-        overallBand: null,
-        summary: noAudioNote,
-        strengths: [],
-        weaknesses: part.transcript ? [] : ['No transcript available.'],
-        actionPlan: ['Tutor should listen to the audio and score Pronunciation manually.'],
-        taskNumber: part.part_number,
-      },
-    };
+    return formatSpeakingPrelimFromReport(report, result.reports);
   }
 
   static async transcribeSpeakingPart(partId) {

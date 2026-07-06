@@ -40,12 +40,19 @@ const badgeToneStyles = {
   muted: { backgroundColor: '#f1f1f1', color: '#666' },
 };
 
+const normalizeCriterionValue = (value) => {
+  if (value && typeof value === 'object') {
+    return value.band ?? value.score ?? value.value ?? null;
+  }
+  return value ?? null;
+};
+
 const getCriterionValue = (scores, key) => {
   if (!scores) return null;
   if (key === 'grammarRangeAccuracy') {
-    return scores.grammarRangeAccuracy ?? scores.grammaticalRangeAccuracy ?? null;
+    return normalizeCriterionValue(scores.grammarRangeAccuracy ?? scores.grammaticalRangeAccuracy);
   }
-  return scores[key] ?? null;
+  return normalizeCriterionValue(scores[key]);
 };
 
 const getTutorCriterionRows = (tutorGrade, taskNumber) => {
@@ -190,6 +197,134 @@ const OverallWritingBandCard = ({ tasks, source }) => {
             </div>
           </div>
         )}
+      </div>
+    </div>
+  );
+};
+
+const getSpeakingCriterionRows = (aiFeedback) => {
+  const scores = aiFeedback?.criterionScores || {};
+  return [
+    {
+      key: 'fluencyCoherence',
+      label: 'Fluency & Coherence',
+      score: getCriterionValue(scores, 'fluencyCoherence'),
+    },
+    {
+      key: 'lexicalResource',
+      label: 'Lexical Resource',
+      score: getCriterionValue(scores, 'lexicalResource'),
+    },
+    {
+      key: 'pronunciation',
+      label: 'Pronunciation',
+      score: getCriterionValue(scores, 'pronunciation'),
+    },
+    {
+      key: 'grammaticalRangeAccuracy',
+      label: 'Grammatical Range & Accuracy',
+      score: getCriterionValue(scores, 'grammaticalRangeAccuracy'),
+    },
+  ];
+};
+
+const SpeakingPartCard = ({ part }) => (
+  <div className="card border shadow-none mb-3">
+    <div className="card-header bg-white fw-bold">Part {part.partNumber}</div>
+    <div className="card-body">
+      <div className="mb-3">
+        <div className="fw-semibold mb-2">Đề bài</div>
+        <p className="mb-0" style={{ whiteSpace: 'pre-wrap', lineHeight: 1.7 }}>
+          {part.prompt || 'Không có đề bài.'}
+        </p>
+      </div>
+      {part.audioUrl && (
+        <div className="mb-3">
+          <div className="fw-semibold mb-2">Bản ghi âm</div>
+          <audio controls src={part.audioUrl} className="w-100" />
+        </div>
+      )}
+      <div className="mb-3">
+        <div className="fw-semibold mb-2">Script / transcript</div>
+        <p className="mb-0 bg-light rounded-3 p-3" style={{ whiteSpace: 'pre-wrap', lineHeight: 1.8 }}>
+          {part.transcript || 'Chưa có transcript.'}
+        </p>
+      </div>
+      {part.aiPartFeedback && (
+        <div>
+          <div className="fw-semibold mb-2">Nhận xét AI cho Part {part.partNumber}</div>
+          <p className="mb-2" style={{ whiteSpace: 'pre-wrap', lineHeight: 1.7 }}>
+            {part.aiPartFeedback.summary || 'Chưa có nhận xét riêng cho part này.'}
+          </p>
+          {!!part.aiPartFeedback.strengths?.length && (
+            <p className="mb-1"><strong>Điểm mạnh:</strong> {part.aiPartFeedback.strengths.join('; ')}</p>
+          )}
+          {!!part.aiPartFeedback.weaknesses?.length && (
+            <p className="mb-0"><strong>Cần cải thiện:</strong> {part.aiPartFeedback.weaknesses.join('; ')}</p>
+          )}
+        </div>
+      )}
+    </div>
+  </div>
+);
+
+const SpeakingFeedbackDetail = ({ data }) => {
+  const aiFeedback = data.aiFeedback;
+  const overall = data.overallSpeakingBand ?? aiFeedback?.overallBand ?? null;
+  const badge = getScoreBadge(overall);
+
+  return (
+    <div className="feedback-report mt-4" style={{ fontFamily: 'UberMoveText, system-ui, sans-serif' }}>
+      <div className="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-3">
+        <div>
+          <h3 className="fw-bold mb-1">Speaking Feedback Detail</h3>
+          <p className="text-muted mb-0">{data.testTitle || 'IELTS Speaking'}</p>
+        </div>
+        <span className="badge text-bg-light border">AI: {STATUS_LABELS[data.aiStatus] || data.aiStatus || 'Chưa có AI feedback'}</span>
+      </div>
+
+      <div className="card border shadow-none mb-4">
+        <div className="card-body p-4">
+          <div className="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-3">
+            <div>
+              <h4 className="fw-bold mb-1">Overall Speaking Band</h4>
+              <p className="text-muted mb-0">
+                Trung bình 4 tiêu chí Speaking, làm tròn theo bước 0.5. Không tách band riêng từng part.
+              </p>
+            </div>
+            {overall !== null && (
+              <div className="d-flex align-items-center gap-3">
+                <span className="display-5 fw-bold text-dark mb-0">{formatBand(overall)}</span>
+                <span
+                  className={`badge rounded-pill px-3 py-2 ${badgeToneClasses[badge.tone] || ''}`}
+                  style={badgeToneStyles[badge.tone]}
+                >
+                  {badge.label}
+                </span>
+              </div>
+            )}
+          </div>
+          <CriterionScoreCards rows={getSpeakingCriterionRows(aiFeedback)} />
+          {aiFeedback?.summary && (
+            <p className="mb-0" style={{ whiteSpace: 'pre-wrap', lineHeight: 1.8 }}>
+              {aiFeedback.summary}
+            </p>
+          )}
+          {aiFeedback?.transcriptNotes && (
+            <div className="alert alert-light border mt-3 mb-0">{aiFeedback.transcriptNotes}</div>
+          )}
+        </div>
+      </div>
+
+      <div className="row g-4">
+        <div className="col-lg-5">
+          {(data.parts || []).map(part => (
+            <SpeakingPartCard key={part.submissionId || part.partNumber} part={part} />
+          ))}
+        </div>
+        <div className="col-lg-7">
+          <AiFeedbackPanel report={aiFeedback ? { ...aiFeedback, submissionType: 'speaking' } : null} />
+        </div>
       </div>
     </div>
   );
@@ -372,6 +507,10 @@ const FeedbackReport = ({ submissionId, type }) => {
 
   if (type === 'writing' && Array.isArray(reportData?.tasks)) {
     return <WritingFeedbackDetail data={reportData} />;
+  }
+
+  if (type === 'speaking' && Array.isArray(reportData?.parts)) {
+    return <SpeakingFeedbackDetail data={reportData} />;
   }
 
   if (!reportData || (!reportData.ai_report && !reportData.tutor_report)) {
