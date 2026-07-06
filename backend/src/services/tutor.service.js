@@ -213,15 +213,15 @@ const buildFeedbackDraft = (ai) => [
   ai?.summary ? `Summary\n${ai.summary}` : '',
   ai?.detailedFeedback && Object.keys(ai.detailedFeedback).length > 0
     ? [
-        'Criterion feedback',
-        ai.detailedFeedback.fluencyCoherence && `- Fluency & Coherence: ${ai.detailedFeedback.fluencyCoherence}`,
-        ai.detailedFeedback.taskAchievementOrResponse && `- Task Achievement/Response: ${ai.detailedFeedback.taskAchievementOrResponse}`,
-        ai.detailedFeedback.coherenceCohesion && `- Coherence & Cohesion: ${ai.detailedFeedback.coherenceCohesion}`,
-        ai.detailedFeedback.lexicalResource && `- Lexical Resource: ${ai.detailedFeedback.lexicalResource}`,
-        ai.detailedFeedback.grammarRangeAccuracy && `- Grammar Range & Accuracy: ${ai.detailedFeedback.grammarRangeAccuracy}`,
-        ai.detailedFeedback.grammaticalRangeAccuracy && `- Grammatical Range & Accuracy: ${ai.detailedFeedback.grammaticalRangeAccuracy}`,
-        ai.detailedFeedback.pronunciation && `- Pronunciation: ${ai.detailedFeedback.pronunciation}`,
-      ].filter(Boolean).join('\n')
+      'Criterion feedback',
+      ai.detailedFeedback.fluencyCoherence && `- Fluency & Coherence: ${ai.detailedFeedback.fluencyCoherence}`,
+      ai.detailedFeedback.taskAchievementOrResponse && `- Task Achievement/Response: ${ai.detailedFeedback.taskAchievementOrResponse}`,
+      ai.detailedFeedback.coherenceCohesion && `- Coherence & Cohesion: ${ai.detailedFeedback.coherenceCohesion}`,
+      ai.detailedFeedback.lexicalResource && `- Lexical Resource: ${ai.detailedFeedback.lexicalResource}`,
+      ai.detailedFeedback.grammarRangeAccuracy && `- Grammar Range & Accuracy: ${ai.detailedFeedback.grammarRangeAccuracy}`,
+      ai.detailedFeedback.grammaticalRangeAccuracy && `- Grammatical Range & Accuracy: ${ai.detailedFeedback.grammaticalRangeAccuracy}`,
+      ai.detailedFeedback.pronunciation && `- Pronunciation: ${ai.detailedFeedback.pronunciation}`,
+    ].filter(Boolean).join('\n')
     : '',
   listSection('Strengths', ai?.strengths),
   listSection('Major errors', ai?.majorErrors, formatErrorItem),
@@ -870,6 +870,7 @@ class TutorService {
 
       } else if (type === 'speaking') {
         // 1. SELECT FOR UPDATE
+        // NOTE: Must use INNER JOIN (not LEFT JOIN) — same reason as writing above.
         const checkQuery = `
           SELECT ss.id, ss.speaking_group_id, ss.status, ss.grader, ss.user_id, u.full_name as student_name
           FROM speaking_submissions ss
@@ -980,7 +981,7 @@ class TutorService {
       }
 
       await client.query('COMMIT');
-      
+
       // Ghi audit log sau khi commit thành công
       try {
         await AuditLogService.logAction(
@@ -989,8 +990,8 @@ class TutorService {
           type === 'writing' ? 'writing_submissions' : 'speaking_submissions',
           submissionId,
           null, // old_value
-          { 
-            reason: `Band ${payload.bandScore}`, 
+          {
+            reason: `Band ${payload.bandScore}`,
             band_score: payload.bandScore,
             student_name: studentName
           }, // new_value
@@ -1118,7 +1119,7 @@ class TutorService {
     if (part.transcript) {
       return part.transcript;
     }
-    
+
     if (!part.audio_url) {
       throw new AppError('No audio URL found for this part', 400);
     }
@@ -1130,9 +1131,10 @@ class TutorService {
       entityType: usageContext.entityType || 'speaking_submission',
       entityId: usageContext.entityId || partId,
     });
+
     
     await pool.query('UPDATE speaking_submissions SET transcript = $1 WHERE id = $2', [transcript, partId]);
-    
+
     return transcript;
   }
   /**
@@ -1218,7 +1220,7 @@ class TutorService {
       ORDER BY t.attempts_count DESC, t.id, d.date::date ASC;
     `;
     const recentTestsResult = await pool.query(recentTestsQuery);
-    
+
     const recentTestsMap = {};
     recentTestsResult.rows.forEach(row => {
       if (!recentTestsMap[row.id]) {
@@ -1467,8 +1469,8 @@ class TutorService {
           'tutor_feedback_reports',
           report.id,
           null,
-          { 
-            reason: `Thu hồi bài chấm`, 
+          {
+            reason: `Thu hồi bài chấm`,
             submission_id: submissionId,
             skill: report.writing_submission_id ? 'writing' : 'speaking',
             student_name: report.student_name
@@ -1488,7 +1490,7 @@ class TutorService {
       client.release();
     }
   }
-    
+
   /**
    * Update grading result
    */
@@ -1548,8 +1550,8 @@ class TutorService {
           'tutor_feedback_reports',
           report.id,
           null,
-          { 
-            reason: `Band ${payload.bandScore}`, 
+          {
+            reason: `Band ${payload.bandScore}`,
             band_score: payload.bandScore,
             submission_id: submissionId,
             skill: report.writing_submission_id ? 'writing' : 'speaking',
@@ -1583,7 +1585,7 @@ class TutorService {
         ALTER TYPE log_action ADD VALUE IF NOT EXISTS 'submission_drafted';
         ALTER TYPE log_action ADD VALUE IF NOT EXISTS 'private_note_added';
       `);
-      
+
       // BACKFILL missing logs
       await pool.query(`
         INSERT INTO audit_logs (actor_id, action, target_table, target_id, new_value, ip_address)
@@ -1602,7 +1604,7 @@ class TutorService {
           AND al.target_id = COALESCE(tfr.writing_submission_id, tfr.speaking_submission_id)
         )
       `);
-      
+
       // BACKFILL missing test_updated logs based on mock_tests updated_at > created_at
       await pool.query(`
         INSERT INTO audit_logs (actor_id, action, target_table, target_id, new_value, ip_address, created_at)
