@@ -1079,14 +1079,29 @@ class TutorService {
     const result = await gradeWriting(
       task,
       taskNumber === 1 ? 'task1' : 'task2',
-      { testTitle: task.test_title }
+      {
+        testTitle: task.test_title,
+        usageContext: payload.usageContext || {
+          userId: task.user_id,
+          feature: 'tutor_ai_reference',
+          entityType: 'writing_submission',
+          entityId: task.id,
+        },
+      }
     );
     return formatPrelimFromAiResult(taskNumber, result);
   }
 
   static async runSpeakingAiPrelimCheck(submissionId, payload = {}) {
     const partNumber = Number(payload.partNumber ?? payload.taskNumber ?? payload.part_number);
-    const result = await gradeSpeakingGroup(submissionId, { force: true });
+    const result = await gradeSpeakingGroup(submissionId, {
+      force: true,
+      usageContext: payload.usageContext || {
+        feature: 'tutor_ai_reference',
+        entityType: 'speaking_submission',
+        entityId: submissionId,
+      },
+    });
     const report = result.reports.find(row => row.part_number === partNumber) || result.reports[0];
     if (!report || report.status === REPORT_STATUS.FAILED) {
       throw new AppError(report?.error_message || 'Speaking AI prelim check failed.', 422, 'SPEAKING_AI_FAILED');
@@ -1094,7 +1109,7 @@ class TutorService {
     return formatSpeakingPrelimFromReport(report, result.reports);
   }
 
-  static async transcribeSpeakingPart(partId) {
+  static async transcribeSpeakingPart(partId, usageContext = {}) {
     const res = await pool.query('SELECT audio_url, transcript FROM speaking_submissions WHERE id = $1', [partId]);
     if (res.rows.length === 0) {
       throw new AppError('Speaking part not found', 404);
@@ -1109,7 +1124,12 @@ class TutorService {
     }
 
     const { generateTranscript } = require('./ai.service');
-    const transcript = await generateTranscript(part.audio_url);
+    const transcript = await generateTranscript(part.audio_url, {
+      ...usageContext,
+      feature: usageContext.feature || 'tutor_ai_reference',
+      entityType: usageContext.entityType || 'speaking_submission',
+      entityId: usageContext.entityId || partId,
+    });
     
     await pool.query('UPDATE speaking_submissions SET transcript = $1 WHERE id = $2', [transcript, partId]);
     
