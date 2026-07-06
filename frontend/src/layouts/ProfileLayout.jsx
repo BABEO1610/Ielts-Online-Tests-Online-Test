@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import ChangePwdModal from '../components/profile/ChangePwdModal';
 import ContactHistoryModal from '../components/profile/ContactHistoryModal';
+import StudentNavbar from '../components/layout/StudentNavbar';
 import '../styles/profile.css';
 import api from '../services/api';
 
@@ -10,7 +10,6 @@ const ProfileLayout = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const [showPwdModal, setShowPwdModal] = useState(false);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   
   const [contactMessage, setContactMessage] = useState('');
@@ -58,58 +57,7 @@ const ProfileLayout = () => {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', backgroundColor: '#f3f3f3' }}>
       {/* ── Navbar Chung ──────────────────────────────────────────────────────── */}
-      <nav className="navbar navbar-expand-lg bg-white border-bottom sticky-top px-3 px-md-5 py-3">
-        <div className="container-fluid p-0">
-          <Link className="navbar-brand fw-bold text-dark fs-4" to="/" style={{ fontFamily: 'UberMove, system-ui, sans-serif' }}>
-            IELTSZone
-          </Link>
-          <div className="d-flex align-items-center gap-3">
-            {user ? (
-              <div className="dropdown">
-                <button
-                  className="btn btn-light rounded-pill px-4 py-2 fw-medium border-0 d-flex align-items-center gap-2"
-                  type="button"
-                  data-bs-toggle="dropdown"
-                  style={{ backgroundColor: '#efefef' }}
-                >
-                  {user?.avatar_url ? (
-                    <img src={user.avatar_url} alt="Avatar" className="rounded-circle" style={{ width: '24px', height: '24px', objectFit: 'cover' }} />
-                  ) : (
-                    <div className="bg-dark text-white rounded-circle d-flex align-items-center justify-content-center" style={{ width: '24px', height: '24px', fontSize: '12px' }}>
-                      {user?.full_name?.charAt(0)?.toUpperCase() || 'U'}
-                    </div>
-                  )}
-                  <span className="d-none d-sm-inline">{user?.full_name || 'Học viên'}</span>
-                </button>
-                <ul className="dropdown-menu dropdown-menu-end rounded-4 shadow border-0 mt-2 p-2">
-                  <li><Link className="dropdown-item rounded-3 py-2" to="/profile">Hồ sơ cá nhân</Link></li>
-                  <li><Link className="dropdown-item rounded-3 py-2" to="/practice-history">Lịch sử làm bài</Link></li>
-                  <li><button className="dropdown-item rounded-3 py-2" onClick={() => setShowPwdModal(true)}>Đổi mật khẩu</button></li>
-                  <li><hr className="dropdown-divider" /></li>
-                  <li><button className="dropdown-item rounded-3 py-2 text-danger" onClick={handleLogout}>Đăng xuất</button></li>
-                </ul>
-              </div>
-            ) : (
-              <>
-                <Link
-                  to="/login"
-                  className="btn btn-light rounded-pill px-4 py-2 fw-medium border-0"
-                  style={{ backgroundColor: '#efefef', fontSize: '15px' }}
-                >
-                  Đăng nhập
-                </Link>
-                <Link
-                  to="/register"
-                  className="btn btn-dark rounded-pill px-4 py-2 fw-medium border-0"
-                  style={{ fontSize: '15px' }}
-                >
-                  Đăng ký
-                </Link>
-              </>
-            )}
-          </div>
-        </div>
-      </nav>
+      <StudentNavbar />
 
       {/* ── Main Content with Sidebar ─────────────────────────────────────────── */}
       <div className="container-fluid flex-grow-1 py-4 px-md-5" style={{ maxWidth: '1400px', margin: '0 auto' }}>
@@ -218,7 +166,6 @@ const ProfileLayout = () => {
         </div>
       </footer>
 
-      <ChangePwdModal isOpen={showPwdModal} onClose={() => setShowPwdModal(false)} />
       <ContactHistoryModal isOpen={showHistoryModal} onClose={() => setShowHistoryModal(false)} />
     </div>
   );
