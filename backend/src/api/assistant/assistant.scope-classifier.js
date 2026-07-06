@@ -1,9 +1,12 @@
 const { ASSISTANT_INTENTS } = require('./assistant.intent');
 const aiService = require('../../services/ai.service');
 
-const classifyScope = async (message) => {
+const classifyScope = async (message, options = {}) => {
   try {
-    const rawJson = await aiService.generateScopeClassification({ message });
+    const rawJson = await aiService.generateScopeClassification({
+      message,
+      usageContext: options.usageContext,
+    });
     const parsed = JSON.parse(rawJson);
     
     // Map internal classification back to our standard intents if necessary

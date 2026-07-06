@@ -50,16 +50,6 @@ const SAMPLE_SESSIONS = [
 ];
 
 
-const SAMPLE_REPORT = [
-  { day: iso(-6), new_users: 1, test_attempts: 4, ai_calls: 88, submissions: 6 },
-  { day: iso(-5), new_users: 0, test_attempts: 6, ai_calls: 102, submissions: 9 },
-  { day: iso(-4), new_users: 2, test_attempts: 9, ai_calls: 140, submissions: 12 },
-  { day: iso(-3), new_users: 1, test_attempts: 7, ai_calls: 121, submissions: 8 },
-  { day: iso(-2), new_users: 0, test_attempts: 5, ai_calls: 165, submissions: 11 },
-  { day: iso(-1), new_users: 1, test_attempts: 8, ai_calls: 158, submissions: 10 },
-  { day: iso(0), new_users: 0, test_attempts: 3, ai_calls: 142, submissions: 5 },
-];
-
 const SAMPLE_TUTORS = [
   { id: 'tu1', name: 'Bá Minh' }, { id: 'tu2', name: 'hương dương' },
   { id: 'tu3', name: 'huhu' }, { id: 'tu4', name: 'hâha' },
@@ -90,7 +80,7 @@ export async function reviewTest(id, action) {
     return true;
   } catch (error) {
     const msg = error?.response?.data?.error?.message || 'Không thể duyệt đề thi. Vui lòng thử lại.';
-    throw new Error(msg);
+    throw new Error(msg, { cause: error });
   }
 }
 export async function reviewResource(id, action) {
@@ -99,7 +89,7 @@ export async function reviewResource(id, action) {
     return true;
   } catch (error) {
     const msg = error?.response?.data?.error?.message || 'Không thể duyệt tài liệu. Vui lòng thử lại.';
-    throw new Error(msg);
+    throw new Error(msg, { cause: error });
   }
 }
 export async function fetchTestDetail(id) {
@@ -122,7 +112,7 @@ export async function retryGrading(type, id) {
     return true;
   } catch (error) {
     const msg = error?.response?.data?.error?.message || 'Không thể chấm lại. Vui lòng thử lại.';
-    throw new Error(msg);
+    throw new Error(msg, { cause: error });
   }
 }
 
@@ -152,14 +142,38 @@ export async function updateContactStatus(id, payload) {
     return true; 
   } catch (error) { 
     const msg = error?.response?.data?.error?.message || 'Không thể cập nhật liên hệ. Vui lòng thử lại.';
-    throw new Error(msg);
+    throw new Error(msg, { cause: error });
   }
 }
 
 // ── Reports ─────────────────────────────────────────────────────────────────────
-export async function fetchReport(/* { from, to } */) {
-  try { return ok((await api.get('/admin/reports/usage')).data.data); }
-  catch { return sample(SAMPLE_REPORT); }
+export async function fetchReport(params = {}) {
+  const qs = new URLSearchParams();
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== '') qs.set(key, value);
+  });
+  const suffix = qs.toString() ? `?${qs.toString()}` : '';
+  const res = await api.get(`/admin/reports${suffix}`);
+  return ok(res.data.data);
+}
+
+export async function exportReportCsv(params = {}) {
+  const qs = new URLSearchParams();
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== '') qs.set(key, value);
+  });
+  const suffix = qs.toString() ? `?${qs.toString()}` : '';
+  const res = await api.get(`/admin/reports/export.csv${suffix}`, { responseType: 'blob' });
+  const disposition = res.headers?.['content-disposition'] || '';
+  const filename = disposition.match(/filename="([^"]+)"/)?.[1] || 'admin-report.csv';
+  const url = URL.createObjectURL(res.data);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
 }
 
 // ── Tutor assignment ────────────────────────────────────────────────────────────

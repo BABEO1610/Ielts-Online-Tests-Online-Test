@@ -31,7 +31,7 @@ const AI_NOT_CONFIGURED_MESSAGE =
  * Call Gemini API for grading with timeout.
  * @returns {string} Raw response text
  */
-const callGeminiGrading = async (systemPrompt, userPrompt) => {
+const callGeminiGrading = async (systemPrompt, userPrompt, usageContext = {}) => {
   const { geminiApiKey, model } = getAiConfig();
   if (!geminiApiKey) {
     throw new AppError(
@@ -51,6 +51,7 @@ const callGeminiGrading = async (systemPrompt, userPrompt) => {
       systemPrompt,
       userPrompt,
       timeoutMs: AI_TIMEOUT_MS,
+      usageContext,
     });
     return { rawText: answer, modelName };
   } catch (err) {
@@ -109,7 +110,7 @@ const gradeWriting = async (submission, taskType, opts = {}) => {
   });
 
   const { rawText, modelName } = await callGeminiGrading(
-    systemPrompt, userPrompt
+    systemPrompt, userPrompt, opts.usageContext
   );
 
   const result = validateGradingResponse(rawText);
@@ -142,7 +143,7 @@ const gradeSpeakingPart = async (part, opts = {}) => {
     testTitle: opts.testTitle || null,
   });
 
-  const { rawText, modelName } = await callGeminiGrading(systemPrompt, userPrompt);
+  const { rawText, modelName } = await callGeminiGrading(systemPrompt, userPrompt, opts.usageContext);
   const result = validateSpeakingGradingResponse(rawText);
   if (!result.success) {
     logger.error('AI Speaking grading validation failed', {
@@ -175,7 +176,7 @@ const gradeSpeakingSession = async (parts, opts = {}) => {
     testTitle: opts.testTitle || null,
   });
 
-  const { rawText, modelName } = await callGeminiGrading(systemPrompt, userPrompt);
+  const { rawText, modelName } = await callGeminiGrading(systemPrompt, userPrompt, opts.usageContext);
   const result = validateSpeakingGradingResponse(rawText);
   if (!result.success) {
     logger.error('AI Speaking session grading validation failed', {
