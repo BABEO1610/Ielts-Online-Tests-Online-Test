@@ -43,15 +43,20 @@ const EMPTY_SCORES = {
   pronunciationScore: ''
 };
 
+const getScoreValue = (value) => {
+  if (value && typeof value === 'object') return value.band ?? value.score ?? '';
+  return value ?? '';
+};
+
 const getScoresFromGrade = (source) => {
   if (!source) return EMPTY_SCORES;
   return {
-    taskAchievementScore: source.criterionScores?.taskAchievementOrResponse || source.scores?.taskAchievement || '',
-    coherenceScore: source.criterionScores?.coherenceCohesion || source.scores?.coherence || '',
-    lexicalScore: source.criterionScores?.lexicalResource || source.scores?.lexical || '',
-    grammarScore: source.criterionScores?.grammaticalRangeAccuracy || source.scores?.grammar || '',
-    fluencyScore: source.scores?.fluency || '',
-    pronunciationScore: source.scores?.pronunciation || ''
+    taskAchievementScore: getScoreValue(source.criterionScores?.taskAchievementOrResponse) || source.scores?.taskAchievement || '',
+    coherenceScore: getScoreValue(source.criterionScores?.coherenceCohesion) || source.scores?.coherence || '',
+    lexicalScore: getScoreValue(source.criterionScores?.lexicalResource) || source.scores?.lexical || '',
+    grammarScore: getScoreValue(source.criterionScores?.grammaticalRangeAccuracy) || source.scores?.grammar || '',
+    fluencyScore: getScoreValue(source.criterionScores?.fluencyCoherence) || source.scores?.fluency || '',
+    pronunciationScore: getScoreValue(source.criterionScores?.pronunciation) || source.scores?.pronunciation || ''
   };
 };
 

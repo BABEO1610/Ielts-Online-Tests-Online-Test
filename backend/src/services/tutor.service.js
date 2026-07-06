@@ -157,6 +157,30 @@ const mapAiReport = (report) => {
 
 const mapTutorGrade = (report) => {
   if (!report) return null;
+  if (report.speaking_submission_id || report.fluency_score !== undefined || report.pronunciation_score !== undefined) {
+    const fluency = report.fluency_score ? parseFloat(report.fluency_score) : null;
+    const lexical = report.lexical_score ? parseFloat(report.lexical_score) : null;
+    const grammar = report.grammar_score ? parseFloat(report.grammar_score) : null;
+    const pronunciation = report.pronunciation_score ? parseFloat(report.pronunciation_score) : null;
+    return {
+      id: report.id,
+      overallBand: report.band_score ? parseFloat(report.band_score) : null,
+      criterionScores: {
+        fluencyCoherence: fluency,
+        lexicalResource: lexical,
+        grammaticalRangeAccuracy: grammar,
+        pronunciation,
+      },
+      scores: {
+        fluency,
+        lexical,
+        grammar,
+        pronunciation,
+      },
+      writtenFeedback: report.written_feedback || '',
+      updatedAt: report.updated_at,
+    };
+  }
   return {
     id: report.id,
     overallBand: report.band_score ? parseFloat(report.band_score) : null,
@@ -595,7 +619,17 @@ class TutorService {
       if (result.rows.length === 0) return null;
       const row = result.rows[0];
       const parts = row.parts || [];
-      const aiBySubmission = await getLatestCompletedReports(parts.map(part => part.submissionId));
+      const partIds = parts.map(part => part.submissionId);
+      const aiBySubmission = await getLatestCompletedReports(partIds);
+      const tutorRes = await pool.query(
+        `SELECT DISTINCT ON (speaking_submission_id) *
+         FROM tutor_feedback_reports
+         WHERE speaking_submission_id = ANY($1::uuid[])
+         ORDER BY speaking_submission_id, updated_at DESC, created_at DESC`,
+        [partIds]
+      );
+      const tutorBySubmission = new Map(tutorRes.rows.map(report => [report.speaking_submission_id, report]));
+      const latestTutorReport = tutorRes.rows[0] || null;
       return {
         type: 'speaking',
         speakingGroupId: row.speaking_group_id,
@@ -610,6 +644,7 @@ class TutorService {
         parts: parts.map(part => ({
           ...part,
           aiFeedback: mapAiReport(aiBySubmission.get(part.submissionId)),
+          tutorGrade: mapTutorGrade(tutorBySubmission.get(part.submissionId) || latestTutorReport),
         }))
       };
     }

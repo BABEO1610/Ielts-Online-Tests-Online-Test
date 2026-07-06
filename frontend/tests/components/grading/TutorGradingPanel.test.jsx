@@ -53,6 +53,33 @@ describe('TutorGradingPanel Component', () => {
         'https://cdn.example/audio.mp3'
       );
     });
+
+    it('shows saved tutor speaking grade in read-only mode', () => {
+      renderPanel({
+        type: 'speaking',
+        activeTaskId: 'part-1',
+        activeTaskNumber: 1,
+        tasks: [{ id: 'part-1', name: 'Part 1' }],
+        readOnly: true,
+        existingTutorGrade: {
+          overallBand: 6,
+          criterionScores: {
+            fluencyCoherence: 6,
+            lexicalResource: 6.5,
+            grammaticalRangeAccuracy: 5.5,
+            pronunciation: 6,
+          },
+          writtenFeedback: 'Saved speaking feedback for the student.',
+        },
+      });
+
+      expect(screen.getByTestId('input-fluencyScore')).toHaveValue('6');
+      expect(screen.getByTestId('input-lexicalScore')).toHaveValue('6.5');
+      expect(screen.getByTestId('input-grammarScore')).toHaveValue('5.5');
+      expect(screen.getByTestId('input-pronunciationScore')).toHaveValue('6');
+      expect(screen.getByTestId('preview-band')).toHaveTextContent('6.0');
+      expect(screen.getByTestId('textarea-feedback')).toHaveValue('Saved speaking feedback for the student.');
+    });
   });
 
   describe('Form Submission', () => {
