@@ -244,14 +244,9 @@ class TestService {
         mt.created_at,
         COUNT(q.id) as questions,
         (
-          SELECT COUNT(DISTINCT user_id) 
-          FROM (
-            SELECT user_id FROM test_attempts WHERE test_id = mt.id
-            UNION
-            SELECT user_id FROM writing_submissions WHERE test_id = mt.id
-            UNION
-            SELECT user_id FROM speaking_submissions WHERE test_id = mt.id
-          ) AS all_participants
+          COALESCE((SELECT COUNT(DISTINCT user_id) FROM test_attempts WHERE test_id = mt.id), 0) +
+          COALESCE((SELECT COUNT(DISTINCT user_id) FROM writing_submissions WHERE test_id = mt.id), 0) +
+          COALESCE((SELECT COUNT(DISTINCT user_id) FROM speaking_submissions WHERE test_id = mt.id), 0)
         ) as participant_count
       FROM mock_tests mt
       LEFT JOIN questions q ON mt.id = q.test_id

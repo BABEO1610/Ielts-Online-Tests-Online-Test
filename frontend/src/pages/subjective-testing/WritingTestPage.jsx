@@ -4,7 +4,6 @@ import StudentNavbar from '../../components/layout/StudentNavbar';
 import WritingEditor from '../../components/grading/WritingEditor';
 import FeedbackReport from '../../components/grading/FeedbackReport';
 import TimerBar from '../../components/objective-testing/TimerBar';
-import AutoSubmitModal from '../../components/objective-testing/AutoSubmitModal';
 import gradingService from '../../services/grading.service';
 
 const getErrorMessage = (error) =>
@@ -21,13 +20,67 @@ const collectWritingTasks = (refs) => {
     throw new Error('Bài Writing phải có đủ Task 1 và Task 2.');
   }
 
-  const graders = [...new Set(tasksData.map(task => task.grader || 'tutor'))];
-  if (graders.length > 1) {
-    throw new Error('Vui lòng chọn cùng một hình thức chấm cho cả bài Writing.');
-  }
-
-  return { tasksData, selectedGrader: graders[0] };
+  return tasksData;
 };
+
+const WritingSubmitModal = ({ isOpen, isTimeUp, onConfirm, onCancel, isSubmitting }) => {
+  const [grader, setGrader] = useState('ai');
+  if (!isOpen) return null;
+
+  return (
+    <>
+      <div className="modal-backdrop fade show" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}></div>
+      <div className="modal fade show d-block" tabIndex="-1">
+        <div className="modal-dialog modal-dialog-centered">
+          <div className="modal-content border-0 shadow" style={{ borderRadius: '16px' }}>
+            <div className="modal-body p-4 text-center">
+              {isTimeUp ? (
+                <>
+                  <h4 className="fw-bold mb-3 text-danger">Đã hết thời gian làm bài!</h4>
+                  <p className="text-muted mb-4">Vui lòng chọn người chấm điểm cho bài thi của bạn.</p>
+                </>
+              ) : (
+                <>
+                  <h4 className="fw-bold mb-3">Nộp bài thi</h4>
+                  <p className="text-muted mb-4">Bạn có chắc chắn muốn nộp bài? Vui lòng chọn người chấm điểm.</p>
+                </>
+              )}
+              
+              <div className="d-flex flex-column gap-3 mb-4 text-start">
+                <label className={`p-3 rounded-3 border ${grader === 'ai' ? 'border-dark bg-light' : ''}`} style={{ cursor: 'pointer' }}>
+                  <div className="form-check mb-0">
+                    <input className="form-check-input" type="radio" name="grader" value="ai" checked={grader === 'ai'} onChange={() => setGrader('ai')} disabled={isSubmitting} />
+                    <span className="fw-bold ms-2">AI chấm điểm</span>
+                    <p className="text-muted small mb-0 ms-4 mt-1">Nhận kết quả và feedback chi tiết ngay lập tức.</p>
+                  </div>
+                </label>
+                <label className={`p-3 rounded-3 border ${grader === 'tutor' ? 'border-dark bg-light' : ''}`} style={{ cursor: 'pointer' }}>
+                  <div className="form-check mb-0">
+                    <input className="form-check-input" type="radio" name="grader" value="tutor" checked={grader === 'tutor'} onChange={() => setGrader('tutor')} disabled={isSubmitting} />
+                    <span className="fw-bold ms-2">Giảng viên chấm</span>
+                    <p className="text-muted small mb-0 ms-4 mt-1">Kết quả sẽ được trả sau 24-48h làm việc.</p>
+                  </div>
+                </label>
+              </div>
+
+              <div className="d-flex gap-2 justify-content-end">
+                {!isTimeUp && (
+                  <button type="button" className="btn btn-light rounded-pill px-4" onClick={onCancel} disabled={isSubmitting}>
+                    Hủy
+                  </button>
+                )}
+                <button type="button" className="btn btn-dark rounded-pill px-4 fw-bold" onClick={() => onConfirm(grader)} disabled={isSubmitting}>
+                  {isSubmitting ? 'Đang nộp...' : 'Xác nhận nộp bài'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+};
+
 
 /**
  * WritingTestScreen — Component màn hình làm bài
@@ -35,24 +88,22 @@ const collectWritingTasks = (refs) => {
 const WritingTestScreen = ({ exam, onSubmitSuccess, practiceMode, customTimeLimit }) => {
   const editorRefs = useRef([]);
   const submittingRef = useRef(false);
-  const [showAutoSubmit, setShowAutoSubmit] = useState(false);
+  const [showSubmitModal, setShowSubmitModal] = useState(false);
+  const [isTimeUp, setIsTimeUp] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [activeTaskIndex, setActiveTaskIndex] = useState(0);
   const [taskTexts, setTaskTexts] = useState({});
   const [completedTasks, setCompletedTasks] = useState({});
 
-  // Tính tổng thời gian của cả 2 task (thường là 60 phút)
-  const durationMinutes = exam.tasks.reduce((total, task) => total + (parseInt(task.duration) || 0), 0);
+  // Sử dụng trực tiếp thuộc tính tổng thời gian của đề thi (mặc định 60 phút)
+  const durationMinutes = exam.duration || 60;
 
-  const submitAllTasks = useCallback(async () => {
+  const submitAllTasks = useCallback(async (selectedGrader) => {
     if (submittingRef.current) return;
     submittingRef.current = true;
     setIsSubmitting(true);
-    setShowAutoSubmit(true);
     try {
-      const { tasksData, selectedGrader } = collectWritingTasks(
-        editorRefs.current
-      );
+      const tasksData = collectWritingTasks(editorRefs.current);
 
       const payload = {
         test_id: exam.id,
@@ -64,24 +115,23 @@ const WritingTestScreen = ({ exam, onSubmitSuccess, practiceMode, customTimeLimi
       if (onSubmitSuccess) onSubmitSuccess(response);
     } catch (error) {
       console.error('Writing submit failed', error);
-      setShowAutoSubmit(false);
       window.alert(getErrorMessage(error));
     } finally {
       submittingRef.current = false;
       setIsSubmitting(false);
-      setShowAutoSubmit(false);
+      setShowSubmitModal(false);
     }
   }, [exam.id, onSubmitSuccess]);
 
   const handleTimeUp = useCallback(() => {
-    submitAllTasks();
-  }, [submitAllTasks]);
+    setIsTimeUp(true);
+    setShowSubmitModal(true);
+  }, []);
 
   const handleSubmitEarly = useCallback(() => {
-    if (window.confirm('Bạn có chắc chắn muốn nộp toàn bộ bài thi Viết ngay bây giờ?')) {
-      submitAllTasks();
-    }
-  }, [submitAllTasks]);
+    setIsTimeUp(false);
+    setShowSubmitModal(true);
+  }, []);
 
   const activeTask = exam.tasks[activeTaskIndex];
   const activeTaskNumber = activeTask.task_number;
@@ -167,7 +217,7 @@ const WritingTestScreen = ({ exam, onSubmitSuccess, practiceMode, customTimeLimi
                 testId={exam.id}
                 taskNumber={task.task_number}
                 promptText={task.prompt_text}
-                status="new"
+                status={isSubmitting || isTimeUp ? 'pending' : 'new'}
                 onContentChange={handleTaskTextChange}
               />
               <div className="px-4 pb-4 d-flex justify-content-end">
@@ -207,7 +257,13 @@ const WritingTestScreen = ({ exam, onSubmitSuccess, practiceMode, customTimeLimi
         </div>
       </div>
 
-      <AutoSubmitModal isOpen={showAutoSubmit} />
+      <WritingSubmitModal 
+        isOpen={showSubmitModal} 
+        isTimeUp={isTimeUp} 
+        onConfirm={submitAllTasks} 
+        onCancel={() => setShowSubmitModal(false)} 
+        isSubmitting={isSubmitting} 
+      />
     </div>
   );
 };

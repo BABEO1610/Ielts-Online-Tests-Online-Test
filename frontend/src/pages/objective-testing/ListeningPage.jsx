@@ -367,11 +367,6 @@ const ListeningPage = () => {
                                 Band {bestBandScore.toFixed(1)}
                               </span>
                             )}
-                            {exam.participantCount > 0 && (
-                              <span className="rounded-pill px-2 py-1 fw-medium" style={{ backgroundColor: '#fff3cd', color: '#856404', fontSize: '12px' }}>
-                                🔥 Trending
-                              </span>
-                            )}
                           </div>
                         </div>
 
