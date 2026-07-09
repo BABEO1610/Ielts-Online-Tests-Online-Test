@@ -12,6 +12,19 @@ const createMessageId = () => {
   return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 };
 
+const NON_RETRYABLE_ASSISTANT_CODES = new Set([
+  'LOGIN_REQUIRED',
+  'FORBIDDEN',
+  'VALIDATION_ERROR',
+  'ASSISTANT_DISABLED_DURING_TEST',
+  'OUT_OF_SCOPE',
+  'MISSING_CONTEXT',
+  'ATTEMPT_NOT_FOUND',
+  'ATTEMPT_NOT_SUBMITTED',
+  'QUESTION_NOT_FOUND',
+  'MISSING_EXPLANATION',
+]);
+
 const toMessage = (row) => ({
   id: row.id || createMessageId(),
   messageId: row.id || null,
@@ -181,6 +194,11 @@ const GlobalAssistantPanel = ({ availability, onClose }) => {
     });
 
     if (streamed?.code && !receivedDelta) {
+      if (NON_RETRYABLE_ASSISTANT_CODES.has(streamed.code)) {
+        setIsLoading(false);
+        return;
+      }
+
       const fallback = await assistantApi.sendChat({ message, context: requestContext });
       if (handleSendError(fallback)) return;
 
@@ -261,13 +279,13 @@ const GlobalAssistantPanel = ({ availability, onClose }) => {
           {suggestedLinks.length > 0 && (
             <div className="assistant-links" aria-label="Gợi ý liên kết">
               {suggestedLinks.map((link) => (
-                <a key={`${link.href}-${link.label}`} href={link.href}>
+                <a key={`${link.href || link.url}-${link.label}`} href={link.href || link.url}>
                   <span>{link.label}</span>
                   <ExternalLink size={14} aria-hidden="true" />
                 </a>
               ))}
               {linkMeta?.hasMore && (
-                <a className="assistant-links__more" href={linkMeta.allUrl || suggestedLinks[0]?.href || '#'}>
+                <a className="assistant-links__more" href={linkMeta.allUrl || suggestedLinks[0]?.href || suggestedLinks[0]?.url || '#'}>
                   <span>Xem tất cả {linkMeta.totalMatched} kết quả</span>
                   <ExternalLink size={14} aria-hidden="true" />
                 </a>
