@@ -2,7 +2,6 @@ const redisClient = require('../../config/redis');
 const { findActiveSession } = require('../../db/queries/sessions.queries');
 const { verifyAccessToken } = require('../../utils/token.util');
 const assistantService = require('./assistant.service');
-const { getAiConfig, normalizeGeminiModel } = require('../../services/ai.service');
 const { validateChatPayload, validateRatingPayload } = require('./assistant.validation');
 const {
   ERROR_CODES,
@@ -13,10 +12,12 @@ const {
 const sendAssistantError = (res, code, message = ERROR_MESSAGES[code]) => {
   const status = HTTP_STATUS_BY_CODE[code] || 500;
   return res.status(status).json({
+    success: false,
     answer: null,
     suggestedLinks: [],
     code,
     message,
+    intent: code,
   });
 };
 
@@ -26,12 +27,16 @@ const sendAssistantResult = (res, result) => {
   }
 
   return res.status(200).json({
+    success: true,
     answer: result.answer,
     suggestedLinks: result.suggestedLinks || [],
     linkMeta: result.linkMeta || null,
     conversationId: result.conversationId || null,
     messageId: result.messageId || null,
     intent: result.intent || null,
+    needsMoreContext: Boolean(result.needsMoreContext),
+    grounding: result.grounding || null,
+    safety: result.safety || null,
     code: null,
   });
 };
@@ -92,7 +97,7 @@ const ensureStudent = (user) => {
     return ERROR_CODES.LOGIN_REQUIRED;
   }
 
-  if (user.role !== 'student') {
+  if (String(user.role || '').toLowerCase() !== 'student') {
     return ERROR_CODES.FORBIDDEN;
   }
 
@@ -114,6 +119,11 @@ const chat = async (req, res) => {
     const roleError = ensureStudent(auth.user);
     if (roleError) {
       return sendAssistantError(res, roleError);
+    }
+
+    const preflight = assistantService.preflightChatPayload(validation.value);
+    if (preflight?.code) {
+      return sendAssistantError(res, preflight.code, preflight.message);
     }
 
     const result = await assistantService.handleChat({
@@ -146,6 +156,11 @@ const chatStream = async (req, res) => {
     const roleError = ensureStudent(auth.user);
     if (roleError) {
       return sendAssistantError(res, roleError);
+    }
+
+    const preflight = assistantService.preflightChatPayload(validation.value);
+    if (preflight?.code) {
+      return sendAssistantError(res, preflight.code, preflight.message);
     }
 
     res.status(200);
@@ -198,17 +213,25 @@ const history = async (req, res) => {
 };
 
 const status = async (req, res) => {
-  const config = getAiConfig();
-  const isGemini = ['gemini', 'google', 'google-ai-studio'].includes(config.provider);
+  try {
+    const auth = await resolveAuthenticatedUser(req);
+    if (auth.code) {
+      return sendAssistantError(res, auth.code);
+    }
 
-  return res.status(200).json({
-    code: null,
-    provider: config.provider,
-    requestedModel: config.model,
-    effectiveModel: isGemini ? normalizeGeminiModel(config.model) : config.model,
-    keyConfigured: isGemini ? Boolean(config.geminiApiKey) : Boolean(config.openaiApiKey),
-    keyVariable: isGemini ? 'GEMINI_API_KEY or GOOGLE_AI_API_KEY' : 'OPENAI_API_KEY',
-  });
+    const roleError = ensureStudent(auth.user);
+    if (roleError) {
+      return sendAssistantError(res, roleError);
+    }
+
+    return res.status(200).json({
+      code: null,
+      status: 'ok',
+    });
+  } catch (error) {
+    console.error('[AssistantController] status failed:', error);
+    return sendAssistantError(res, ERROR_CODES.INTERNAL_ERROR);
+  }
 };
 
 const rateMessage = async (req, res) => {
