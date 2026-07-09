@@ -154,3 +154,77 @@ thật với auth state và database thật, rồi ghi lại kết quả thực 
 | Có pdf nào trong thư viện? | FIND_LESSON | Query `library_resources` với `resource_type = pdf` hoặc keyword pdf | Bịa resource/link | Success: Hiện tại trong thư viện của ch... |
 | Có những đề nào trong hệ thống? | FIND_TEST | Ở home/test context, query `mock_tests` published | Tự động coi là IELTS_KNOWLEDGE | Success: Hiện tại hệ thống có các bài t... |
 | Có đề thi reading nào không? | FIND_TEST | Query `mock_tests` skill reading, chỉ published | Query `library_resources` | Success: Hiện tại hệ thống có rất nhiều... |
+
+---
+
+## Automated Verification Log - 2026-07-09
+
+Muc dich: ghi truc tiep ket qua kiem thu lien quan den phan ra hoi dong cua AI chatbot va AI grading nhanh cho Writing/Speaking. Lan kiem thu nay khong them test file moi, khong drop/delete/sua database; chi chay Jest tren cac test hien co trong repo.
+
+### 1. Global IELTS Virtual Assistant
+
+Lenh da chay:
+
+```bash
+npm test -- --runTestsByPath tests/unit/api/assistant.service.test.js tests/unit/api/assistant.context.test.js tests/unit/api/assistant.intent.test.js tests/unit/api/assistant.guardrails.test.js tests/unit/api/assistant.response.test.js tests/unit/api/assistant.selfcheck.test.js tests/unit/api/assistant.prompts.test.js tests/unit/api/assistant.validation.test.js tests/unit/api/assistant.knowledge-retriever.test.js tests/unit/api/assistant.user-resolver.test.js
+```
+
+Ket qua: PASS - 10 test suites, 168 tests.
+
+| Hang muc | File test chinh | Ket qua |
+|---|---|---|
+| Intent routing: greeting, navigation, find test, find lesson, IELTS knowledge, review, out-of-scope | `assistant.intent.test.js`, `assistant.service.test.js` | PASS |
+| Guardrails: active test, grading request, fake test/answer, private data, out-of-scope | `assistant.guardrails.test.js`, `assistant.selfcheck.test.js` | PASS |
+| Static knowledge retrieval: Matching Headings, TFNG, Writing Task 1/2, Speaking guide/common mistakes | `assistant.knowledge-retriever.test.js`, `assistant.service.test.js` | PASS |
+| Context builder: DB lookup context, suggested links, review context, navigation links | `assistant.context.test.js`, `assistant.service.test.js` | PASS |
+| Session memory/follow-up behavior: recent conversation routes follow-up to IELTS_KNOWLEDGE or FIND_TEST correctly | `assistant.service.test.js` | PASS |
+| Response normalization: JSON/plain text/fallback handling | `assistant.response.test.js`, `assistant.service.test.js` | PASS |
+| Prompt contract: JSON response contract, recent conversation, retrieved knowledge injection | `assistant.prompts.test.js`, `assistant.service.test.js` | PASS |
+| Validation: payload/message/context constraints | `assistant.validation.test.js` | PASS |
+| User display name resolution | `assistant.user-resolver.test.js`, `assistant.service.test.js` | PASS |
+
+Nhan xet nhanh:
+
+- Chatbot khong cham Writing/Speaking trong chat; grading request duoc route sang safe feedback/guardrail.
+- Chatbot co session memory cho follow-up, vi du "de khac di" tiep tuc dung Reading skill tu cau truoc.
+- Suggested links/context grounding da duoc cover trong cac test assistant context/service hien co.
+- Cac test nay khong goi AI provider that va khong ghi/xoa database.
+
+### 2. AI Grading nhanh cho Writing/Speaking
+
+Lenh da chay:
+
+```bash
+npm test -- --runTestsByPath tests/unit/ai/grading.prompt.test.js tests/unit/ai/grading.validator.test.js tests/unit/ai/speakingGrading.validator.test.js tests/unit/services/aiUsage.service.test.js tests/unit/utils/scoring.test.js tests/utils/getBandScore.test.js
+```
+
+Ket qua: PASS - 6 test suites, 21 tests.
+
+| Hang muc | File test chinh | Ket qua |
+|---|---|---|
+| Writing AI prompt contract | `grading.prompt.test.js` | PASS |
+| Writing AI response validator: JSON format, band/criteria validation, normalized feedback | `grading.validator.test.js` | PASS |
+| Speaking AI response validator: FC/LR/GRA/Pronunciation, overall band normalization | `speakingGrading.validator.test.js` | PASS |
+| AI usage logging: success/failure metadata, provider/model/latency fields | `aiUsage.service.test.js` | PASS |
+| IELTS scoring utilities: band calculation, weighted Writing overall | `scoring.test.js`, `getBandScore.test.js` | PASS |
+
+Nhan xet nhanh:
+
+- Writing AI grading co prompt va validator rieng, khong tin raw AI response neu sai format.
+- Speaking AI grading validator dam bao du 4 tieu chi Speaking va normalize band ve buoc 0.5.
+- Scoring utility da test tinh band va weighted Writing overall.
+- AI usage logging da test de phuc vu tracking quota/latency/error.
+
+### 3. Ket luan trang thai
+
+| Phan | Trang thai automated test |
+|---|---|
+| Global assistant chatbot | PASS |
+| Chatbot memory/follow-up routing | PASS |
+| Chatbot guardrails/scope safety | PASS |
+| Chatbot suggested links/context grounding | PASS |
+| Writing AI grading prompt/validator/scoring | PASS |
+| Speaking AI grading validator/scoring | PASS |
+| AI usage logging | PASS |
+
+Ghi chu: Chua chay live manual eval bang `backend/scripts/eval-assistant.js` trong lan nay vi script do tao session va ghi ket qua dua tren database/API that. Lan kiem thu nay chi dung automated Jest tests hien co de tranh tac dong database.
