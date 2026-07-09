@@ -20,6 +20,16 @@ const STATIC_ROUTES = {
 
 const toFrontendUrl = (path) => `${FRONTEND_BASE_URL}${path}`;
 
+const buildLink = ({ label, path, type }) => {
+  const href = toFrontendUrl(path);
+  return {
+    label,
+    href,
+    url: href,
+    type,
+  };
+};
+
 const getSkillRoute = (skill) => SKILL_ROUTES[String(skill || '').toLowerCase()] || '/tests';
 
 const buildTestRoute = ({ id, skill }) => {
@@ -33,18 +43,19 @@ const buildLibraryRoute = ({ id } = {}) => (id ? `/library?resourceId=${encodeUR
 
 const buildAssistantLink = ({ type, id, skill, label }) => {
   if (type === 'test') {
-    return { label: label || 'IELTS test', href: toFrontendUrl(buildTestRoute({ id, skill })) };
+    return buildLink({ label: label || 'IELTS test', path: buildTestRoute({ id, skill }), type: 'test' });
   }
   if (type === 'library_resource') {
-    return { label: label || 'IELTS resource', href: toFrontendUrl(buildLibraryRoute({ id })) };
+    return buildLink({ label: label || 'IELTS resource', path: buildLibraryRoute({ id }), type: 'library_resource' });
   }
   const route = STATIC_ROUTES[type] || '/';
-  return { label: label || type || 'IELTSZone', href: toFrontendUrl(route) };
+  return buildLink({ label: label || type || 'IELTSZone', path: route, type: 'route' });
 };
 
 module.exports = {
   STATIC_ROUTES,
   toFrontendUrl,
+  buildLink,
   getSkillRoute,
   buildTestRoute,
   buildLibraryRoute,
