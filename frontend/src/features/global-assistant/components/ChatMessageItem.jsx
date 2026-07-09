@@ -1,4 +1,4 @@
-import { ThumbsDown, ThumbsUp } from 'lucide-react';
+import { ThumbsDown, ThumbsUp, Bot } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
@@ -19,6 +19,11 @@ const ChatMessageItem = ({ message, onRate }) => {
 
   return (
     <div className={`assistant-message assistant-message--${role}`}>
+      {role === 'assistant' && (
+        <div className="assistant-message__avatar" aria-hidden="true">
+          <Bot size={18} />
+        </div>
+      )}
       <div className="assistant-message__bubble">
         {content}
         {canRate && (
