@@ -43,10 +43,15 @@ const tryParseJson = (cleaned) => {
 const normalizeSuggestedLinks = (links) => {
   if (!Array.isArray(links)) return [];
   return links
-    .map((link) => ({
-      label: String(link.label || link.title || link.href || '').trim(),
-      href: String(link.href || link.link || '').trim(),
-    }))
+    .map((link) => {
+      const href = String(link.href || link.url || link.link || '').trim();
+      return {
+        label: String(link.label || link.title || href || '').trim(),
+        href,
+        url: href,
+        type: String(link.type || 'route').trim(),
+      };
+    })
     .filter((link) => link.label && link.href)
     .slice(0, ASSISTANT_CONTEXT_RESULT_LIMIT);
 };

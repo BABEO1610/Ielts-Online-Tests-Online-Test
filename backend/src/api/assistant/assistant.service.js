@@ -21,10 +21,37 @@ const buildErrorResult = (code, message = ERROR_MESSAGES[code]) => ({
   suggestedLinks: [],
   conversationId: null,
   messageId: null,
-  intent: null,
+  intent: code,
   code,
   message,
 });
+
+const buildGuardrailIntent = ({ guardrail, message, context }) => {
+  if (guardrail.code === ERROR_CODES.OUT_OF_SCOPE) return ASSISTANT_INTENTS.OUT_OF_SCOPE;
+  if (guardrail.code === ERROR_CODES.FORBIDDEN) return ERROR_CODES.FORBIDDEN;
+  if (guardrail.code === ERROR_CODES.ASSISTANT_DISABLED_DURING_TEST) {
+    return ERROR_CODES.ASSISTANT_DISABLED_DURING_TEST;
+  }
+
+  const ruleIntent = detectIntent({ message, context });
+  return ruleIntent === ASSISTANT_INTENTS.UNKNOWN ? guardrail.code : ruleIntent;
+};
+
+const DEFAULT_GROUNDING = {
+  usedDatabase: false,
+  usedKnowledgeBase: false,
+  usedSessionMemory: false,
+  sourceTables: [],
+  resultCount: 0,
+};
+
+const DEFAULT_SAFETY = {
+  outOfScope: false,
+  inventedContent: false,
+  containsBandScore: false,
+  containsWritingSpeakingGrading: false,
+  containsPrivateData: false,
+};
 
 const buildSuccessResult = ({
   answer,
@@ -41,6 +68,9 @@ const buildSuccessResult = ({
   fallbackReason = null,
   fallbackType = null,
   dbLookupCalled = null,
+  needsMoreContext = false,
+  grounding = null,
+  safety = null,
 }) => ({
   answer,
   suggestedLinks,
@@ -56,6 +86,13 @@ const buildSuccessResult = ({
   fallbackReason,
   fallbackType,
   dbLookupCalled,
+  needsMoreContext: Boolean(needsMoreContext),
+  grounding: grounding || { ...DEFAULT_GROUNDING },
+  safety: {
+    ...DEFAULT_SAFETY,
+    ...(safety || {}),
+    outOfScope: Boolean(safety?.outOfScope || intent === ASSISTANT_INTENTS.OUT_OF_SCOPE),
+  },
   code: null,
 });
 
@@ -136,14 +173,36 @@ const isEmptyLookupContext = (contextInjection) =>
 
 const limitDisplayLinks = (links = []) => links.slice(0, ASSISTANT_DISPLAY_RESULT_LIMIT);
 
+const getSourceTables = (queryTable) => {
+  if (!queryTable) return [];
+  return [...new Set(String(queryTable).split('/').map((table) => table.trim()).filter(Boolean))];
+};
+
+const buildGroundingMetadata = (contextInjection = {}) => ({
+  usedDatabase: Boolean(contextInjection.debug?.queryTable),
+  usedKnowledgeBase: Boolean(contextInjection.debug?.usedKnowledgeBase || contextInjection.knowledgeResults?.length),
+  usedSessionMemory: Boolean(contextInjection.sessionMemory?.length),
+  sourceTables: getSourceTables(contextInjection.debug?.queryTable),
+  resultCount: Array.isArray(contextInjection.databaseResults) ? contextInjection.databaseResults.length : 0,
+  knowledgeTopic: contextInjection.debug?.detectedTopic || null,
+});
+
+const buildSafetyMetadata = (intent, response = {}) => ({
+  ...DEFAULT_SAFETY,
+  ...(response.safety || {}),
+  outOfScope: Boolean(response.safety?.outOfScope || intent === ASSISTANT_INTENTS.OUT_OF_SCOPE),
+});
+
 const buildLinkMeta = (contextInjection, links = contextInjection.suggestedLinks || []) => {
   const totalMatched = contextInjection.debug?.contextRowCount ?? links.length;
-  const displayedCount = Math.min(links.length, ASSISTANT_DISPLAY_RESULT_LIMIT);
+  const displayedCount = Math.min(links.length, ASSISTANT_DISPLAY_RESULT_LIMIT, totalMatched);
   return {
     totalMatched,
     displayedCount,
     hasMore: totalMatched > displayedCount,
-    allUrl: contextInjection.mode === ASSISTANT_INTENTS.FIND_LESSON ? '/library' : null,
+    allUrl: contextInjection.mode === ASSISTANT_INTENTS.FIND_LESSON
+      ? '/library'
+      : (contextInjection.mode === ASSISTANT_INTENTS.FIND_TEST ? '/tests' : null),
   };
 };
 
@@ -218,7 +277,6 @@ const getFallbackAnswer = (contextInjection) => {
 };
 
 const buildIeltsKnowledgeFallback = (message) => {
-  return 'Mình đang gặp lỗi khi tạo câu trả lời IELTS. Bạn thử hỏi lại giúp mình nhé.';
   const text = String(message || '').toLowerCase();
   const normalized = text.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
   if (normalized.includes('overview') || normalized.includes('task 1')) {
@@ -260,7 +318,7 @@ const isGenericAssistantAnswer = (answer) => {
 };
 
 const emitAssistantDebug = (data) => {
-  if (process.env.ASSISTANT_DEBUG === 'false') return;
+  if (process.env.ASSISTANT_DEBUG !== 'true') return;
   console.info('[AssistantDebug]', {
     message: data.message || null,
     route: data.route || null,
@@ -368,7 +426,10 @@ const {
 
 const buildImmediateIntentResult = (intent, userNameContext = null, user = null, message = '') => {
   if (intent === ASSISTANT_INTENTS.OUT_OF_SCOPE) {
-    return buildSuccessResult({ answer: buildOutOfScopeResponse(), intent });
+    return {
+      ...buildErrorResult(ERROR_CODES.OUT_OF_SCOPE, buildOutOfScopeResponse()),
+      intent: ASSISTANT_INTENTS.OUT_OF_SCOPE,
+    };
   }
   if (intent === ASSISTANT_INTENTS.GREETING) {
     return buildSuccessResult({
@@ -385,19 +446,30 @@ const buildImmediateIntentResult = (intent, userNameContext = null, user = null,
     return buildSuccessResult({ answer: buildClarificationResponse(message), intent });
   }
   if (intent === ASSISTANT_INTENTS.GRADING_REQUEST_SAFE_FEEDBACK) {
-    return buildSuccessResult({ answer: buildSafeGradingResponse(), intent });
+    return {
+      ...buildErrorResult(ERROR_CODES.OUT_OF_SCOPE, buildSafeGradingResponse()),
+      intent: ASSISTANT_INTENTS.OUT_OF_SCOPE,
+    };
   }
   return null;
 };
 
 const buildGuardrailResult = ({ message, context }) => {
   const guardrail = evaluateGuardrails({ message, context });
-  if (guardrail.blocked) return buildErrorResult(guardrail.code, guardrail.message);
-  if (context.pageType === 'active-test') {
-    return buildErrorResult(ERROR_CODES.ASSISTANT_DISABLED_DURING_TEST);
+  if (guardrail.blocked) {
+    return {
+      ...buildErrorResult(guardrail.code, guardrail.message),
+      intent: buildGuardrailIntent({ guardrail, message, context }),
+    };
   }
   return null;
 };
+
+const preflightChatPayload = (payload = {}) =>
+  buildGuardrailResult({
+    message: payload.message,
+    context: payload.context || {},
+  });
 
 const buildImmediateContextResult = (contextInjection) => {
   if (contextInjection.directAnswer) {
@@ -408,6 +480,9 @@ const buildImmediateContextResult = (contextInjection) => {
       intent: contextInjection.mode,
       finalResponseMode: contextInjection.finalResponseMode || 'immediate',
       dbLookupCalled: Boolean(contextInjection.debug?.queryTable),
+      needsMoreContext: contextInjection.finalResponseMode === 'clarification',
+      grounding: buildGroundingMetadata(contextInjection),
+      safety: buildSafetyMetadata(contextInjection.mode),
     });
   }
   if (contextInjection.errorCode) return buildErrorResult(contextInjection.errorCode);
@@ -420,14 +495,21 @@ const buildImmediateContextResult = (contextInjection) => {
       fallbackUsed: true,
       finalResponseMode: 'safe_missing_data_with_suggestions',
       dbLookupCalled: Boolean(contextInjection.debug?.queryTable),
+      grounding: buildGroundingMetadata(contextInjection),
+      safety: buildSafetyMetadata(contextInjection.mode),
     });
   }
   if (isEmptyLookupContext(contextInjection)) {
     return buildSuccessResult({
       answer: buildLookupFallbackAnswer(contextInjection),
+      suggestedLinks: limitDisplayLinks(contextInjection.suggestedLinks || []),
+      linkMeta: buildLinkMeta(contextInjection),
       intent: contextInjection.mode,
       finalResponseMode: 'safe_missing_data',
       dbLookupCalled: Boolean(contextInjection.debug?.queryTable),
+      needsMoreContext: false,
+      grounding: buildGroundingMetadata(contextInjection),
+      safety: buildSafetyMetadata(contextInjection.mode),
     });
   }
   return null;
@@ -609,6 +691,12 @@ const buildAiResult = async ({ payload, contextInjection, useStream }) => {
       fallbackReason: response.invalidReason || fallbackReason,
       fallbackType: fallbackType || (response.fallbackUsed ? 'deterministic_fallback' : null),
       dbLookupCalled: Boolean(contextInjection.debug?.queryTable),
+      needsMoreContext: Boolean(response.needsMoreContext),
+      grounding: {
+        ...buildGroundingMetadata(contextInjection),
+        usedDatabase: Boolean(response.usedDatabase || contextInjection.debug?.queryTable),
+      },
+      safety: buildSafetyMetadata(contextInjection.mode, response),
     }),
     finalResponseMode: response.finalResponseMode
   };
@@ -665,6 +753,21 @@ const tracePipeline = ({
 };
 
 const runAssistantPipeline = async ({ user, payload, useStream = false }) => {
+  const preflightResult = preflightChatPayload(payload);
+  if (preflightResult) {
+    tracePipeline({
+      payload,
+      user,
+      userNameContext: null,
+      ruleIntent: preflightResult.intent,
+      classifierUsed: false,
+      classifierResult: null,
+      answerProviderCalled: false,
+      finalResponseMode: 'guardrail_blocked',
+    });
+    return preflightResult;
+  }
+
   const sessionId = payload.sessionId || null;
   const routingContext = await buildRoutingContext({ user, payload, sessionId });
   const originalIntent = detectIntent({ message: payload.message, context: routingContext });
@@ -709,12 +812,6 @@ const runAssistantPipeline = async ({ user, payload, useStream = false }) => {
   if (intentResult) {
     tracePipeline({ payload, user, userNameContext, ruleIntent: originalIntent, classifierUsed, classifierResult, answerProviderCalled: false, finalResponseMode: 'immediate' });
     return intentResult;
-  }
-
-  const guardrailResult = buildGuardrailResult({ message: payload.message, context: payload.context });
-  if (guardrailResult) {
-    tracePipeline({ payload, user, userNameContext, ruleIntent: originalIntent, classifierUsed, classifierResult, answerProviderCalled: false, finalResponseMode: 'guardrail_blocked' });
-    return { ...guardrailResult, intent };
   }
 
   const contextInjection = await buildContextInjection({
@@ -772,6 +869,9 @@ const persistSuccessfulResult = async ({ user, payload, result }) => {
 
 const handleChat = async ({ user, payload }) => {
   try {
+    const preflightResult = preflightChatPayload(payload);
+    if (preflightResult) return preflightResult;
+
     const sessionId = await safeCreateSession(user.id);
     const payloadWithSession = { ...payload, sessionId };
     const result = await runAssistantPipeline({ user, payload: payloadWithSession });
@@ -786,6 +886,9 @@ const handleChat = async ({ user, payload }) => {
 
 const handleChatStream = async ({ user, payload, onEvent }) => {
   try {
+    const preflightResult = preflightChatPayload(payload);
+    if (preflightResult) return preflightResult;
+
     const sessionId = await safeCreateSession(user.id);
     const payloadWithSession = { ...payload, sessionId };
     const result = await runAssistantPipeline({ user, payload: payloadWithSession, useStream: true });
@@ -841,5 +944,6 @@ module.exports = {
   rateMessage,
   buildErrorResult,
   buildSuccessResult,
+  preflightChatPayload,
   runAssistantPipeline,
 };

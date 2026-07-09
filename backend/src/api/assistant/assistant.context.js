@@ -1,6 +1,7 @@
 const { pool } = require('../../db/pool');
 const repository = require('./assistant.repository');
 const { ASSISTANT_INTENTS, normalizeText } = require('./assistant.intent');
+const { buildNavigationResponse } = require('./assistant.responses');
 const { retrieveKnowledge } = require('./assistant.knowledge-retriever');
 const { parseLookupMessage } = require('./assistant.lookup-parser');
 const {
@@ -21,13 +22,13 @@ const {
 const columnCache = new Map();
 
 const WEBSITE_ROUTES = [
-  { label: 'Listening', href: toFrontendUrl(STATIC_ROUTES.listening) },
-  { label: 'Reading', href: toFrontendUrl(STATIC_ROUTES.reading) },
-  { label: 'Writing', href: toFrontendUrl(STATIC_ROUTES.writing) },
-  { label: 'Speaking', href: toFrontendUrl(STATIC_ROUTES.speaking) },
-  { label: 'Library', href: toFrontendUrl(STATIC_ROUTES.library) },
-  { label: 'Practice History', href: toFrontendUrl(STATIC_ROUTES.practiceHistory) },
-  { label: 'Profile', href: toFrontendUrl(STATIC_ROUTES.profile) },
+  buildAssistantLink({ type: 'listening', label: 'Listening' }),
+  buildAssistantLink({ type: 'reading', label: 'Reading' }),
+  buildAssistantLink({ type: 'writing', label: 'Writing' }),
+  buildAssistantLink({ type: 'speaking', label: 'Speaking' }),
+  buildAssistantLink({ type: 'library', label: 'Library' }),
+  buildAssistantLink({ type: 'practiceHistory', label: 'Practice History' }),
+  buildAssistantLink({ type: 'profile', label: 'Profile' }),
 ];
 
 const STUDY_TIPS = [
@@ -159,12 +160,16 @@ const toTestLinks = (tests) =>
   tests.map((item) => ({
     label: item.title || 'IELTS test',
     href: item.route || toFrontendUrl(buildTestRoute({ id: item.id, skill: item.skill })),
+    url: item.route || toFrontendUrl(buildTestRoute({ id: item.id, skill: item.skill })),
+    type: 'test',
   }));
 
 const toLessonLinks = (resources) =>
   resources.map((item) => ({
     label: item.title || 'IELTS resource',
     href: item.route || toFrontendUrl('/library'),
+    url: item.route || toFrontendUrl('/library'),
+    type: 'library_resource',
   }));
 
 const mapTestRows = (rows) => rows.map((row) => ({
@@ -482,7 +487,13 @@ const buildStaticContext = (injection, intent, message = '') => {
   if (intent === ASSISTANT_INTENTS.GREETING) return injection;
   if (intent === ASSISTANT_INTENTS.NAVIGATION) {
     const links = buildNavigationLinks(message);
-    return { ...injection, databaseResults: links, suggestedLinks: links };
+    return {
+      ...injection,
+      directAnswer: buildNavigationResponse(message),
+      finalResponseMode: 'immediate',
+      databaseResults: links,
+      suggestedLinks: links,
+    };
   }
   return {
     ...injection,
@@ -493,10 +504,13 @@ const buildStaticContext = (injection, intent, message = '') => {
 const buildFindTestContext = async ({ injection, message, context }) => {
   try {
     const data = await queryPublishedTests(message, context);
+    const suggestedLinks = data.rows.length
+      ? toTestLinks(data.rows)
+      : [buildAssistantLink({ type: 'tests', label: 'Xem danh sach bai test' })];
     return {
       ...injection,
       databaseResults: data.rows,
-      suggestedLinks: toTestLinks(data.rows),
+      suggestedLinks,
       debug: { 
         queryTable: ASSISTANT_TABLE_MAP.mock_tests, 
         selectedColumns: data.selectedColumns,
@@ -539,10 +553,13 @@ const buildFindTestContext = async ({ injection, message, context }) => {
 const buildFindLessonContext = async ({ injection, message, context }) => {
   try {
     const data = await queryPublishedResources(message, context);
+    const suggestedLinks = data.rows.length
+      ? toLessonLinks(data.rows)
+      : [buildAssistantLink({ type: 'library', label: 'Mo thu vien' })];
     return {
       ...injection,
       databaseResults: data.rows,
-      suggestedLinks: toLessonLinks(data.rows),
+      suggestedLinks,
       debug: { 
         queryTable: ASSISTANT_TABLE_MAP.library_resources, 
         selectedColumns: data.selectedColumns,

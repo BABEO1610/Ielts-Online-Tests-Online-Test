@@ -4,6 +4,9 @@ const DEFAULT_ERROR = {
   answer: null,
   suggestedLinks: [],
   linkMeta: null,
+  grounding: null,
+  safety: null,
+  needsMoreContext: false,
   conversationId: null,
   code: 'INTERNAL_ERROR',
   message: 'Trợ lý IELTS đang gặp lỗi. Vui lòng thử lại sau.',
@@ -17,6 +20,9 @@ const normalizeAssistantError = (error) => {
       answer: null,
       suggestedLinks: data.suggestedLinks || [],
       linkMeta: data.linkMeta || null,
+      grounding: data.grounding || null,
+      safety: data.safety || null,
+      needsMoreContext: Boolean(data.needsMoreContext),
       conversationId: null,
       code: data.code,
       message: data.message || DEFAULT_ERROR.message,
@@ -79,7 +85,7 @@ export const assistantApi = {
       if (!response.ok || !response.body) {
         const data = await response.json().catch(() => null);
         const error = data?.code
-          ? { answer: null, suggestedLinks: [], linkMeta: null, conversationId: null, code: data.code, message: data.message }
+          ? { answer: null, suggestedLinks: [], linkMeta: null, grounding: null, safety: null, needsMoreContext: false, conversationId: null, code: data.code, message: data.message }
           : DEFAULT_ERROR;
         onError?.(error);
         return error;

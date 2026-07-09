@@ -32,7 +32,12 @@ const OUT_OF_SCOPE_PATTERNS = [
   /\b(tu van mua|nen mua|mua)\b.*\b(dien thoai|iphone|android|laptop|may tinh|san pham|product)\b/,
   /\b(dien thoai|iphone|android|laptop|may tinh)\b.*\b(nao|mua|nen chon|tu van)\b/,
   /\b(hack|cheat|bypass|crack)\b/,
+  /\b(malware|virus|token stealer|lay token)\b/,
+  /\b(fake certificate|certificate gia|chung chi gia)\b/,
+  /\b(tao account admin|create admin account)\b/,
+  /\b(lam ho|lam thay|giai ho|thi ho)\b.*\b(bai|bai thi|test|de thi)\b/,
   /\b(medical advice|legal advice|financial advice|investment advice)\b/,
+  /\b(suc khoe|y te|benh|thuoc|bac si|doctor|medicine|health advice)\b/,
 ];
 
 const WRITING_SPEAKING_GRADING_PATTERNS = [
@@ -47,13 +52,23 @@ const FAKE_CONTENT_PATTERNS = [
   /\b(fake|bia|make up|invent)\b.*\b(test|lesson|answer|explanation|dap an|giai thich|de)\b/,
   /\b(tao|generate|create)\b.*\b(de thi|bai test|mock test|ielts test|answer key|dap an|explanation|giai thich)\b/,
   /\bbia\b.*\b(de|bai|dap an|giai thich)\b/,
+  /\b(de|bai test|mock test|ielts test)\b.*\b(gia|fake)\b.*\b(dap an|answer key)\b/,
+  /\b(viet ho|viet giup|soan ho|tao giup)\b.*\b(de|de thi|bai test|mock test|ielts test)\b.*\b(dap an|answer key)\b/,
+  /\b(answer key|dap an)\b.*\b(cambridge|de chua lam|chua nop|chua lam)\b/,
+  /\b(du doan|predict)\b.*\b(de ielts|de thi|real test|ngay mai)\b/,
 ];
 
 const PRIVATE_DATA_PATTERNS = [
   /\b(system prompt|internal prompt|developer prompt|hidden prompt)\b/,
+  /\b(api key|gemini api key|secret key|access token|refresh token|env|environment variable|config noi bo|cau hinh noi bo)\b/,
+  /\b(model nao|provider nao|dang dung model|requested model|effective model)\b/,
+  /\b(admin|private)\b.*\b(link|route|url|duong dan)\b/,
+  /\b(link|route|url|duong dan)\b.*\b(admin|private)\b/,
+  /\b(db|database|bang|table|mock_tests|library_resources)\b.*\b(raw|dump|xem du lieu|du lieu)\b/,
   /\b(admin-only|admin only|private data|du lieu rieng tu|du lieu nguoi khac)\b/,
   /\b(unpublished|chua publish|chua duoc cong khai)\b/,
   /\b(user khac|student khac|hoc vien khac)\b/,
+  /\b(lich su chat|du lieu|email|attempt|bai lam)\b.*\b(user khac|student khac|hoc vien khac|ban khac|nguoi khac)\b/,
 ];
 
 const REVIEW_DURING_TEST_PATTERNS = [

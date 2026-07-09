@@ -295,6 +295,11 @@ const isReviewRequest = (text) => hasAny(text, [
 const isNavigation = (text) => hasAny(text, [
   /\b(mo|vao|xem|di den|navigate|open)\b.*\b(trang listening|trang reading|trang writing|trang speaking|thu vien|library|profile|lich su|history)\b/,
   /\b(xem lich su lam bai|practice history|vao thu vien|xem profile)\b/,
+  /\b(website|ieltszone|site)\b.*\b(co gi|co nhung gi|lam duoc gi|what can i do|features?)\b/,
+  /\b(what can i do|where can i|how do i|where is)\b.*\b(website|site|ieltszone|test|library|results?|history|profile)\b/,
+  /\b(trang nao|vao dau|o dau|tim o dau|bam dau|lam the nao)\b.*\b(lam bai|bai thi|de thi|test|thu vien|library|tai lieu|ket qua|review|lich su|profile|ho so|dang xuat|doi mat khau)\b/,
+  /\b(bat dau|start)\b.*\b(test|bai thi|de thi)\b/,
+  /\b(xem|tim)\b.*\b(ket qua|review|lich su luyen tap|practice history|tai lieu hoc)\b.*\b(o dau|where|trang nao|vao dau)\b/,
 ]);
 
 const detectIntent = ({ message, context = {} }) => {
@@ -319,6 +324,7 @@ const detectIntent = ({ message, context = {} }) => {
     /\b(dien thoai|iphone|android|laptop|may tinh)\b.*\b(nao|mua|nen chon|tu van)\b/,
     /\b(hack|cheat|bypass|crack)\b/,
     /\b(medical advice|legal advice|financial advice|investment advice)\b/,
+    /\b(suc khoe|y te|benh|thuoc|bac si|doctor|medicine|health advice)\b/,
     /\b(code|react|javascript|python|java|html|css|lập trình|lap trinh)\b/,
   ])) {
     return ASSISTANT_INTENTS.OUT_OF_SCOPE;
@@ -328,7 +334,7 @@ const detectIntent = ({ message, context = {} }) => {
     /\b(cham|grade|score|danh gia)\b.*\b(band|writing|speaking|essay|bai)\b/,
     /\bband\b.*\b(may|score|diem|du doan|predict)\b/,
   ])) {
-    return ASSISTANT_INTENTS.GRADING_REQUEST_SAFE_FEEDBACK;
+    return ASSISTANT_INTENTS.OUT_OF_SCOPE;
   }
 
   if (isImmediateGreetingOrThanks(message) || hasAny(text, [
@@ -366,6 +372,10 @@ const detectIntent = ({ message, context = {} }) => {
     return ASSISTANT_INTENTS.CLARIFICATION;
   }
 
+  if (isNavigation(text)) {
+    return ASSISTANT_INTENTS.NAVIGATION;
+  }
+
   if (isLibraryLookup(text, context)) {
     return ASSISTANT_INTENTS.FIND_LESSON;
   }
@@ -376,10 +386,6 @@ const detectIntent = ({ message, context = {} }) => {
 
   if (isLessonLookup(text)) {
     return ASSISTANT_INTENTS.FIND_LESSON;
-  }
-
-  if (isNavigation(text)) {
-    return ASSISTANT_INTENTS.NAVIGATION;
   }
 
   if (isKnowledgeStrategyQuery(text)) {
