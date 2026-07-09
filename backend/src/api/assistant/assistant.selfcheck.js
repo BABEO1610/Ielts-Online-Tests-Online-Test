@@ -44,7 +44,7 @@ const containsPromptLeak = (answer) =>
 
 const hasExternalLinks = (links) =>
   links.some((link) => {
-    const href = String(link.href || '');
+    const href = String(link.href || link.url || '');
     return /^https?:\/\//i.test(href) && !href.includes('localhost') && !href.includes('ielts');
   });
 
