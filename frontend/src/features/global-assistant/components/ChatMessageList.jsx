@@ -1,4 +1,4 @@
-import { BookOpen, Loader2 } from 'lucide-react';
+import { BookOpen, Bot } from 'lucide-react';
 import ChatMessageItem from './ChatMessageItem';
 
 const ChatMessageList = ({ messages, isLoading, onRate, listRef }) => {
@@ -19,9 +19,13 @@ const ChatMessageList = ({ messages, isLoading, onRate, listRef }) => {
       ))}
       {isLoading && (
         <div className="assistant-message assistant-message--assistant">
+          <div className="assistant-message__avatar" aria-hidden="true">
+            <Bot size={18} />
+          </div>
           <div className="assistant-message__bubble assistant-message__bubble--loading">
-            <Loader2 size={16} aria-hidden="true" />
-            <span>Đang xử lý...</span>
+            <div className="assistant-loading-dots" aria-label="Đang trả lời...">
+              <span></span><span></span><span></span>
+            </div>
           </div>
         </div>
       )}
