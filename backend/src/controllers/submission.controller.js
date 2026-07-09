@@ -136,6 +136,13 @@ class SubmissionController {
       if (!grader || !['ai', 'tutor'].includes(grader)) {
         throw new AppError('grader must be ai or tutor', 400, 'INVALID_FIELD');
       }
+      if (grader === 'ai') {
+        throw new AppError(
+          'AI Speaking grading requires all 3 parts. Use /submissions/speaking/full.',
+          400,
+          'SPEAKING_FULL_SUBMISSION_REQUIRED'
+        );
+      }
 
       // Delegate to submitFullSpeaking with single part (speaking_group_id will be generated)
       const result = await SubmissionService.submitFullSpeaking(userId, test_id, grader, [
