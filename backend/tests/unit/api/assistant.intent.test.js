@@ -100,6 +100,20 @@ describe('Assistant intent router', () => {
     expect(intent).toBe(ASSISTANT_INTENTS.NAVIGATION);
   });
 
+  it.each([
+    'Website có những gì?',
+    'Tôi vào trang nào để làm bài?',
+    'Tôi xem lịch sử luyện tập ở đâu?',
+    'Where can I find my results?',
+  ])('routes broad website navigation request to NAVIGATION: %s', (message) => {
+    const intent = detectIntent({
+      message,
+      context: { pageType: 'home' },
+    });
+
+    expect(intent).toBe(ASSISTANT_INTENTS.NAVIGATION);
+  });
+
   it('routes review question with attempt context to POST_TEST_REVIEW', () => {
     const intent = detectIntent({
       message: 'Vì sao câu 5 đáp án là B?',
@@ -315,13 +329,13 @@ describe('Assistant intent router', () => {
     expect(intent).toBe(ASSISTANT_INTENTS.OUT_OF_SCOPE);
   });
 
-  it('routes grading band requests to safe grading feedback', () => {
+  it('routes grading band requests to OUT_OF_SCOPE', () => {
     const intent = detectIntent({
       message: 'cham bai nay band may',
       context: { pageType: 'home' },
     });
 
-    expect(intent).toBe(ASSISTANT_INTENTS.GRADING_REQUEST_SAFE_FEEDBACK);
+    expect(intent).toBe(ASSISTANT_INTENTS.OUT_OF_SCOPE);
   });
 
   it('routes Writing Task 2 outline requests to IELTS_KNOWLEDGE', () => {
