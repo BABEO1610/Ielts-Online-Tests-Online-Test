@@ -53,7 +53,14 @@ const rateLimitFactory = (rateLimit) => {
      * EARS[Ubiquitous]: THE system SHALL enforce a max of 5 req/min for Forgot Password endpoints.
      * @type {import('express').RequestHandler}
      */
-    forgotPasswordLimiter: createLimiter(5, 1, 'Too many password reset requests from this IP, please try again after a minute.')
+    forgotPasswordLimiter: createLimiter(5, 1, 'Too many password reset requests from this IP, please try again after a minute.'),
+
+    /**
+     * Rate limiter for assistant chat endpoints (30 req / 1 min)
+     * EARS[Ubiquitous]: THE system SHALL enforce spam protection for chatbot endpoints.
+     * @type {import('express').RequestHandler}
+     */
+    assistantLimiter: createLimiter(30, 1, 'Too many assistant messages from this IP, please try again after a minute.')
   };
 };
 
