@@ -15,12 +15,13 @@ const toSafeInt = (value) => {
   return Math.trunc(number);
 };
 
-const normalizeAiUsageMetadata = (metadata = {}) => {
-  const promptTokens = toSafeInt(metadata.promptTokenCount ?? metadata.prompt_tokens);
-  const completionTokens = toSafeInt(metadata.candidatesTokenCount ?? metadata.completion_tokens);
-  const thinkingTokens = toSafeInt(metadata.thoughtsTokenCount ?? metadata.thinking_tokens);
-  const cachedTokens = toSafeInt(metadata.cachedContentTokenCount ?? metadata.cached_tokens);
-  const explicitTotal = metadata.totalTokenCount ?? metadata.total_tokens;
+const normalizeAiUsageMetadata = (metadata) => {
+  const meta = metadata || {};
+  const promptTokens = toSafeInt(meta.promptTokenCount ?? meta.prompt_tokens);
+  const completionTokens = toSafeInt(meta.candidatesTokenCount ?? meta.completion_tokens);
+  const thinkingTokens = toSafeInt(meta.thoughtsTokenCount ?? meta.thinking_tokens);
+  const cachedTokens = toSafeInt(meta.cachedContentTokenCount ?? meta.cached_tokens);
+  const explicitTotal = meta.totalTokenCount ?? meta.total_tokens;
   const totalTokens = explicitTotal === undefined || explicitTotal === null
     ? promptTokens + completionTokens + thinkingTokens + cachedTokens
     : toSafeInt(explicitTotal);
@@ -34,12 +35,15 @@ const normalizeAiUsageMetadata = (metadata = {}) => {
   };
 };
 
-const normalizeOpenAiUsageMetadata = (usage = {}) => ({
-  promptTokenCount: usage.prompt_tokens,
-  candidatesTokenCount: usage.completion_tokens,
-  totalTokenCount: usage.total_tokens,
-  cachedContentTokenCount: usage.prompt_tokens_details?.cached_tokens,
-});
+const normalizeOpenAiUsageMetadata = (usage) => {
+  const u = usage || {};
+  return {
+    promptTokenCount: u.prompt_tokens,
+    candidatesTokenCount: u.completion_tokens,
+    totalTokenCount: u.total_tokens,
+    cachedContentTokenCount: u.prompt_tokens_details?.cached_tokens,
+  };
+};
 
 const sanitizeFeature = (feature) => (
   ALLOWED_FEATURES.has(feature) ? feature : 'unknown'
