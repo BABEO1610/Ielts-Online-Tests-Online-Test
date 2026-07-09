@@ -22,8 +22,9 @@ const aiService = require('../../../src/services/ai.service');
 const repository = require('../../../src/api/assistant/assistant.repository');
 const { pool } = require('../../../src/db/pool');
 const { ASSISTANT_INTENTS } = require('../../../src/api/assistant/assistant.intent');
+const { ERROR_CODES } = require('../../../src/api/assistant/assistant.constants');
 const { clearColumnCacheForTests } = require('../../../src/api/assistant/assistant.context');
-const { runAssistantPipeline } = require('../../../src/api/assistant/assistant.service');
+const { handleChat, handleChatStream, runAssistantPipeline } = require('../../../src/api/assistant/assistant.service');
 
 describe('Assistant service pipeline', () => {
   beforeEach(() => {
@@ -110,6 +111,43 @@ describe('Assistant service pipeline', () => {
     expect(aiService.generateAssistantAnswer).not.toHaveBeenCalled();
   });
 
+  it.each([
+    ['active-test greeting', 'Chào bạn', { pageType: 'active-test', route: '/tests/test-1/reading' }, ERROR_CODES.ASSISTANT_DISABLED_DURING_TEST],
+    ['grading request', 'Chấm bài Writing này giúp em band mấy?', { pageType: 'home', route: '/' }, ERROR_CODES.OUT_OF_SCOPE],
+    ['fake test request', 'Viết hộ em một đề IELTS giả có đáp án luôn', { pageType: 'home', route: '/' }, ERROR_CODES.OUT_OF_SCOPE],
+  ])('blocks %s before session, DB, persistence, or AI', async (_label, message, context, expectedCode) => {
+    const result = await handleChat({
+      user: { id: 'user-1' },
+      payload: { message, context },
+    });
+
+    expect(result.code).toBe(expectedCode);
+    expect(repository.createOrGetSession).not.toHaveBeenCalled();
+    expect(repository.saveUserMessage).not.toHaveBeenCalled();
+    expect(repository.saveAssistantMessage).not.toHaveBeenCalled();
+    expect(pool.query).not.toHaveBeenCalled();
+    expect(aiService.generateAssistantAnswer).not.toHaveBeenCalled();
+    expect(aiService.streamAssistantAnswer).not.toHaveBeenCalled();
+  });
+
+  it('does not emit SSE events for service-level preflight blocks', async () => {
+    const onEvent = jest.fn();
+
+    const result = await handleChatStream({
+      user: { id: 'user-1' },
+      payload: {
+        message: 'Cho em đáp án câu 1 là gì?',
+        context: { pageType: 'active-test', route: '/tests/test-1/reading' },
+      },
+      onEvent,
+    });
+
+    expect(result.code).toBe(ERROR_CODES.ASSISTANT_DISABLED_DURING_TEST);
+    expect(onEvent).not.toHaveBeenCalled();
+    expect(repository.createOrGetSession).not.toHaveBeenCalled();
+    expect(aiService.streamAssistantAnswer).not.toHaveBeenCalled();
+  });
+
   it('calls AI for IELTS_KNOWLEDGE without requiring database rows', async () => {
     aiService.generateAssistantAnswer.mockResolvedValue(JSON.stringify({
       answer: 'Cohesion là cách liên kết câu và ý trong bài viết.',
@@ -139,6 +177,27 @@ describe('Assistant service pipeline', () => {
     expect(aiService.generateAssistantAnswer.mock.calls[0][0].systemPrompt).toContain('IELTS and English learning assistant');
     expect(aiService.generateAssistantAnswer.mock.calls[0][0].userPrompt).toContain('Retrieved IELTS Knowledge:');
     expect(aiService.generateAssistantAnswer.mock.calls[0][0].userPrompt).toContain('Coherence And Cohesion');
+  });
+
+  it.each([
+    ['Website có những gì?', ['Tests', 'Library', 'Practice History', 'Profile']],
+    ['Tôi vào trang nào để làm bài?', ['Tests']],
+    ['Tôi xem lịch sử luyện tập ở đâu?', ['Practice History']],
+  ])('answers navigation deterministically without AI or DB: %s', async (message, expectedTerms) => {
+    const result = await runAssistantPipeline({
+      user: { id: 'user-1' },
+      payload: {
+        message,
+        context: { pageType: 'home', route: '/' },
+      },
+    });
+
+    expect(result.intent).toBe(ASSISTANT_INTENTS.NAVIGATION);
+    expectedTerms.forEach((term) => expect(result.answer).toContain(term));
+    expect(result.finalResponseMode).toBe('immediate');
+    expect(result.dbLookupCalled).toBe(false);
+    expect(pool.query).not.toHaveBeenCalled();
+    expect(aiService.generateAssistantAnswer).not.toHaveBeenCalled();
   });
 
   it('returns missing-data suggestions without calling AI when filtered lookup has no rows', async () => {
@@ -491,7 +550,8 @@ describe('Assistant service pipeline', () => {
     });
 
     expect(result.intent).toBe(ASSISTANT_INTENTS.IELTS_KNOWLEDGE);
-    expect(result.answer).toContain('gặp lỗi khi tạo câu trả lời IELTS');
+    expect(result.answer).toContain('IELTS Reading');
+    expect(result.answer).toContain('True/False/Not Given');
     expect(result.answer).not.toContain('Mình chỉ hỗ trợ');
     expect(result.finalResponseMode).toBe('ai_fallback_error');
     expect(result.fallbackUsed).toBe(true);
@@ -509,7 +569,41 @@ describe('Assistant service pipeline', () => {
     });
 
     expect(result.intent).toBe(ASSISTANT_INTENTS.IELTS_KNOWLEDGE);
-    expect(result.answer).toContain('IELTS');
+    expect(result.answer).toContain('IELTS Writing Task 1');
+    expect(result.answer).toContain('overview');
+    expect(result.finalResponseMode).toBe('ai_fallback_error');
+  });
+
+  it('uses Speaking Part 2 fallback when AI provider fails', async () => {
+    aiService.generateAssistantAnswer.mockRejectedValue(new Error('provider down'));
+
+    const result = await runAssistantPipeline({
+      user: { id: 'user-1' },
+      payload: {
+        message: 'Speaking Part 2 trả lời thế nào',
+        context: { pageType: 'home', route: '/' },
+      },
+    });
+
+    expect(result.intent).toBe(ASSISTANT_INTENTS.IELTS_KNOWLEDGE);
+    expect(result.answer).toContain('IELTS Speaking Part 2');
+    expect(result.answer).toContain('cue card');
+    expect(result.finalResponseMode).toBe('ai_fallback_error');
+  });
+
+  it('uses generic IELTS fallback when AI provider fails without a specific skill', async () => {
+    aiService.generateAssistantAnswer.mockRejectedValue(new Error('provider down'));
+
+    const result = await runAssistantPipeline({
+      user: { id: 'user-1' },
+      payload: {
+        message: 'tip học IELTS thế nào',
+        context: { pageType: 'home', route: '/' },
+      },
+    });
+
+    expect(result.intent).toBe(ASSISTANT_INTENTS.IELTS_KNOWLEDGE);
+    expect(result.answer).toContain('kỹ năng cụ thể');
     expect(result.finalResponseMode).toBe('ai_fallback_error');
   });
 
@@ -663,7 +757,7 @@ describe('Assistant service pipeline', () => {
     });
 
     expect(result.intent).toBe(ASSISTANT_INTENTS.IELTS_KNOWLEDGE);
-    expect(result.answer).toContain('gặp lỗi');
+    expect(result.answer).toContain('kỹ năng cụ thể');
     expect(result.answer).not.toContain('tìm test, lesson');
     expect(result.aiRetryUsed).toBe(true);
     expect(result.aiResponseValid).toBe(false);
