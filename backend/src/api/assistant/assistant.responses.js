@@ -57,11 +57,37 @@ const buildClarificationResponse = (message = '') => {
 };
 
 const buildSafeGradingResponse = () => {
-  return 'Hệ thống hiện tại lưu trữ bài nộp của bạn để Tutor hoặc AI tự động chấm dứt điểm, nhưng vì mình là trợ lý chat nhanh nên mình không thể chấm điểm (band score) trực tiếp ở đây. Bạn hãy nộp bài qua chức năng Test để nhận kết quả nhé!';
+  return 'Mình không chấm band Writing/Speaking trực tiếp trong khung chat này. Bạn hãy dùng flow nộp/chấm bài chính thức của hệ thống; ở đây mình chỉ có thể giải thích tiêu chí chung hoặc gợi ý cách luyện.';
 };
 
 const buildOutOfScopeResponse = () => {
   return ERROR_MESSAGES[ERROR_CODES.OUT_OF_SCOPE] || 'Xin lỗi, mình chỉ có thể trả lời các vấn đề liên quan đến IELTS hoặc cách sử dụng website này. Mình không thể hỗ trợ bạn các vấn đề khác.';
+};
+
+const buildNavigationResponse = (message = '') => {
+  const text = normalizeImmediateText(message);
+
+  if (/\b(admin|staff|private)\b/.test(text)) {
+    return 'Mình chỉ hướng dẫn các khu vực dành cho học viên. Mình không cung cấp hoặc bịa link admin/private.';
+  }
+
+  if (/\b(lich su|history|practice history|ket qua|result|review)\b/.test(text)) {
+    return 'Bạn có thể vào Practice History để xem bài đã làm, kết quả và mở phần review khi bài đã được nộp.';
+  }
+
+  if (/\b(thu vien|library|tai lieu|pdf|audio|resource)\b/.test(text)) {
+    return 'Bạn vào Library để tìm tài liệu học, PDF, audio hoặc resource IELTS đang có trên hệ thống.';
+  }
+
+  if (/\b(profile|ho so|tai khoan|doi mat khau|password)\b/.test(text)) {
+    return 'Bạn vào Profile để xem thông tin tài khoản và các thiết lập cá nhân mà hệ thống hỗ trợ.';
+  }
+
+  if (/\b(test|bai thi|de thi|lam bai|start|reading|listening|writing|speaking)\b/.test(text)) {
+    return 'Bạn vào Tests hoặc chọn kỹ năng Reading, Listening, Writing, Speaking để xem danh sách bài luyện và bắt đầu làm bài.';
+  }
+
+  return 'IELTSZone có các khu vực chính cho học viên: Tests để luyện bài, Library để xem tài liệu, Practice History/Review để xem kết quả đã nộp, và Profile để quản lý tài khoản.';
 };
 
 module.exports = {
@@ -69,4 +95,5 @@ module.exports = {
   buildClarificationResponse,
   buildSafeGradingResponse,
   buildOutOfScopeResponse,
+  buildNavigationResponse,
 };

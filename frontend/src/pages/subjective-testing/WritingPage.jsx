@@ -178,10 +178,12 @@ const WritingPage = () => {
           return {
             id: p.id,
             task_number: p.passageNumber,
-            title: instructionData.title || `Task ${p.passageNumber}`,
-            content: p.content,
+            title: p.title || `Task ${p.passageNumber}`,
+            prompt_text: p.content,
             duration: instructionData.duration || (p.passageNumber === 1 ? '20 phút' : '40 phút'),
-            min_words: instructionData.min_words || (p.passageNumber === 1 ? 150 : 250)
+            min_words: instructionData.min_words || (p.passageNumber === 1 ? 150 : 250),
+            illustration: instructionData.imageUrl || null,
+            hint: instructionData.hint || null
           };
         });
         setSelectedExam({ ...exam, ...fullExam, tasks });

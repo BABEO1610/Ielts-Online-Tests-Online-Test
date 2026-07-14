@@ -16,7 +16,12 @@ describe('Assistant response normalization', () => {
     });
 
     expect(result.answer).toBe('Bạn có thể thử Test A.');
-    expect(result.suggestedLinks).toEqual([{ label: 'Test A', href: '/tests/a' }]);
+    expect(result.suggestedLinks).toEqual([{
+      label: 'Test A',
+      href: '/tests/a',
+      url: '/tests/a',
+      type: 'route',
+    }]);
     expect(result.usedDatabase).toBe(true);
   });
 

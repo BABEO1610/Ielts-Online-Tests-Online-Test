@@ -411,10 +411,10 @@ class TutorService {
       query += ` AND student_name ILIKE $${params.length}`;
     }
 
-    // Filter by assigned tutor
+    // Filter by assigned tutor (or unassigned so any tutor can pick them up)
     if (filters.tutorId) {
       params.push(filters.tutorId);
-      query += ` AND assigned_tutor_id = $${params.length}`;
+      query += ` AND (assigned_tutor_id = $${params.length} OR assigned_tutor_id IS NULL)`;
     }
 
     query += ' ORDER BY submitted_at ASC';

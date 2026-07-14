@@ -1,3 +1,7 @@
+> **⚠️ DEPRECATED / Historical Proposal — Không còn là source of truth.**
+> Source of truth hiện tại: `spec.md`, `plan.md`, `tasks.md`, `RFC.md` trong
+> `.sdd/specs/global-ielts-virtual-assistant/`.
+
 # Implementation Approach: Controlled Context Assistant Upgrade
 
 **Feature Name**: `global-ielts-virtual-assistant`  

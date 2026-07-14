@@ -26,7 +26,7 @@
 #       safety.md
 #     specs/
 #       feat-auth-and-users/
-#       feat-ai-assistance/
+#       global-ielts-virtual-assistant/
 #       feat-content-library/
 #       feat-objective-testing/
 #       feat-subjective-grading/

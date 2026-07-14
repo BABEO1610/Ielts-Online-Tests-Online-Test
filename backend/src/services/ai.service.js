@@ -131,7 +131,8 @@ const generateOpenAiAnswer = async ({ model, apiKey, mode, message, officialCont
     body: JSON.stringify({
       model,
       temperature: 0.2,
-      max_tokens: 450,
+      max_tokens: 2048,
+      response_format: { type: 'json_object' },
       messages: [
         { role: 'system', content: prompts.systemPrompt },
         { role: 'user', content: prompts.userPrompt },
@@ -200,7 +201,8 @@ const generateGeminiAnswer = async ({ model, apiKey, mode, message, officialCont
         },
         generationConfig: {
           temperature: 0.2,
-          maxOutputTokens: 450,
+          maxOutputTokens: 2048,
+          responseMimeType: 'application/json',
         },
         contents: [
           {
@@ -278,7 +280,7 @@ const generateGeminiJsonAnswer = async ({
           systemInstruction: { parts: [{ text: systemPrompt }] },
           generationConfig: {
             temperature: 0.15,
-            maxOutputTokens: 4096,
+            maxOutputTokens: 2048,
             responseMimeType: 'application/json',
           },
           contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
@@ -350,6 +352,7 @@ ALLOWED SCOPES:
 - Website help/navigation/features
 - If user wants to paraphrase but didn't provide text, intent is CLARIFICATION, needsUserInput is true.
 - If user wants to paraphrase a specific text, intent is IELTS_KNOWLEDGE, allowed is true.
+- Small talk, casual greetings, or user preferences (e.g., how to address the user) -> intent is IELTS_KNOWLEDGE, allowed is true.
 - If user asks website features, intent is WEBSITE_HELP, allowed is true.
 
 BLOCKED SCOPES (set intent to OUT_OF_SCOPE, allowed to false):
@@ -371,7 +374,7 @@ BLOCKED SCOPES (set intent to OUT_OF_SCOPE, allowed to false):
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           systemInstruction: { parts: [{ text: systemPrompt }] },
-          generationConfig: { temperature: 0.1, responseMimeType: 'application/json' },
+          generationConfig: { temperature: 0.1, maxOutputTokens: 2048, responseMimeType: 'application/json' },
           contents: [{ role: 'user', parts: [{ text: message }] }],
         }),
       }
@@ -410,6 +413,7 @@ BLOCKED SCOPES (set intent to OUT_OF_SCOPE, allowed to false):
       body: JSON.stringify({
         model,
         temperature: 0.1,
+        max_tokens: 2048,
         response_format: { type: 'json_object' },
         messages: [
           { role: 'system', content: systemPrompt },
@@ -534,7 +538,7 @@ const streamOpenAiAnswer = async ({ model, apiKey, mode, message, officialContex
     body: JSON.stringify({
       model,
       temperature: 0.2,
-      max_tokens: 450,
+      max_tokens: 2048,
       stream: true,
       messages: [
         { role: 'system', content: prompts.systemPrompt },
@@ -824,6 +828,7 @@ module.exports = {
   streamAssistantAnswer,
   generateTranscript,
   generateGeminiJsonAnswer,
+  generateScopeClassification,
   getAiConfig,
   normalizeGeminiModel,
 };
