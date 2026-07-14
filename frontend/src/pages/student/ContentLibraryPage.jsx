@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Toaster, toast } from 'react-hot-toast';
 import StudentNavbar from '../../components/layout/StudentNavbar';
 import html2pdf from 'html2pdf.js';
+import Pagination from '../../components/common/Pagination';
 import { fetchLibraryResources } from '../../services/library.service';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -387,9 +388,15 @@ const ContentLibraryPage = () => {
   const [downloadingId, setDownloadingId] = useState(null);
   const [activeSkill, setActiveSkill] = useState(''); // Thực ra là activeResourceType
   const [searchQuery, setSearchQuery] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 9;
   const [previewTest, setPreviewTest] = useState(null);
   const [resources, setResources] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, activeSkill]);
 
   useEffect(() => {
     const fetchResources = async () => {
@@ -469,6 +476,9 @@ const ContentLibraryPage = () => {
       setDownloadingId(null);
     }
   };
+
+  const totalPages = Math.ceil(resources.length / ITEMS_PER_PAGE);
+  const paginatedResources = resources.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
 
   return (
     <div className="bg-light min-vh-100" data-testid="library-page">
@@ -551,78 +561,83 @@ const ContentLibraryPage = () => {
             </div>
           </div>
         ) : (
-          <div className="row row-cols-1 row-cols-md-2 row-cols-xl-3 g-4" data-testid="test-list">
-            {resources.map((test) => (
-              <div className="col" key={test.id} data-testid={`test-item-${test.id}`}>
-                <div className="card h-100 border-0 shadow-sm rounded-4">
-                  <div className="card-body p-4 d-flex flex-column">
-                    <div className="d-flex justify-content-between align-items-center mb-3">
-                      <div className="d-flex gap-2">
-                        <span className={`badge rounded-pill ${SKILL_BADGE[test.skill]} text-capitalize`}>{test.resource_type}</span>
-                        <span className={`badge rounded-pill text-bg-secondary`}>{test.category || 'Tài liệu'}</span>
+          <>
+            <div className="row row-cols-1 row-cols-md-2 row-cols-xl-3 g-4" data-testid="test-list">
+              {paginatedResources.map((test) => (
+                <div className="col" key={test.id} data-testid={`test-item-${test.id}`}>
+                  <div className="card h-100 border-0 shadow-sm rounded-4">
+                    <div className="card-body p-4 d-flex flex-column">
+                      <div className="d-flex justify-content-between align-items-center mb-3">
+                        <div className="d-flex gap-2">
+                          <span className={`badge rounded-pill ${SKILL_BADGE[test.skill]} text-capitalize`}>{test.resource_type}</span>
+                          <span className={`badge rounded-pill text-bg-secondary`}>{test.category || 'Tài liệu'}</span>
+                        </div>
+                        <span className="text-muted small">{test.resource_type === 'pdf' ? 'PDF' : 'Audio'}</span>
                       </div>
-                      <span className="text-muted small">{test.resource_type === 'pdf' ? 'PDF' : 'Audio'}</span>
-                    </div>
 
-                    <h5 className="card-title fw-bold text-dark mb-2">{test.title}</h5>
-                    <p className="card-text text-muted small flex-grow-1 mb-4">{test.description}</p>
+                      <h5 className="card-title fw-bold text-dark mb-2">{test.title}</h5>
+                      <p className="card-text text-muted small flex-grow-1 mb-4">{test.description}</p>
 
-                    <div className="d-flex flex-column gap-2 mt-auto">
-                      <button
-                        className="btn btn-dark w-100 d-flex align-items-center justify-content-center gap-2 fw-medium rounded-pill"
-                        onClick={() => setPreviewTest(test)}
-                        data-testid={`btn-view-${test.id}`}
-                      >
-                        Thông tin chi tiết →
-                      </button>
-                      <div className="d-flex gap-2">
-                        {test.resource_type === 'pdf' ? (
-                          <button
-                            className="btn btn-outline-danger flex-grow-1 d-flex align-items-center justify-content-center gap-1 fw-medium"
-                            onClick={() => {
-                              const link = document.createElement('a');
-                              link.href = test.file_url;
-                              link.setAttribute('download', test.title);
-                              document.body.appendChild(link);
-                              link.click();
-                              link.parentNode.removeChild(link);
-                            }}
-                            data-testid={`btn-download-pdf-${test.id}`}
-                          >
-                            <i className="bi bi-file-earmark-pdf-fill"></i> Tải PDF
-                          </button>
-                        ) : test.resource_type === 'audio' ? (
-                          <button
-                            className="btn btn-outline-secondary flex-grow-1 d-flex align-items-center justify-content-center gap-1 fw-medium"
-                            onClick={() => {
-                              const link = document.createElement('a');
-                              link.href = test.file_url;
-                              link.setAttribute('download', test.title);
-                              document.body.appendChild(link);
-                              link.click();
-                              link.parentNode.removeChild(link);
-                            }}
-                            data-testid={`btn-download-audio-${test.id}`}
-                          >
-                            <i className="bi bi-music-note-beamed"></i> Tải Audio
-                          </button>
-                        ) : (
-                          <button
-                            className="btn btn-outline-info flex-grow-1 d-flex align-items-center justify-content-center gap-1 fw-medium"
-                            onClick={() => {
-                              window.open(test.file_url, '_blank');
-                            }}
-                          >
-                            <i className="bi bi-download"></i> Tải file
-                          </button>
-                        )}
+                      <div className="d-flex flex-column gap-2 mt-auto">
+                        <button
+                          className="btn btn-dark w-100 d-flex align-items-center justify-content-center gap-2 fw-medium rounded-pill"
+                          onClick={() => setPreviewTest(test)}
+                          data-testid={`btn-view-${test.id}`}
+                        >
+                          Thông tin chi tiết →
+                        </button>
+                        <div className="d-flex gap-2">
+                          {test.resource_type === 'pdf' ? (
+                            <button
+                              className="btn btn-outline-danger flex-grow-1 d-flex align-items-center justify-content-center gap-1 fw-medium"
+                              onClick={() => {
+                                const link = document.createElement('a');
+                                link.href = test.file_url;
+                                link.setAttribute('download', test.title);
+                                document.body.appendChild(link);
+                                link.click();
+                                link.parentNode.removeChild(link);
+                              }}
+                              data-testid={`btn-download-pdf-${test.id}`}
+                            >
+                              <i className="bi bi-file-earmark-pdf-fill"></i> Tải PDF
+                            </button>
+                          ) : test.resource_type === 'audio' ? (
+                            <button
+                              className="btn btn-outline-secondary flex-grow-1 d-flex align-items-center justify-content-center gap-1 fw-medium"
+                              onClick={() => {
+                                const link = document.createElement('a');
+                                link.href = test.file_url;
+                                link.setAttribute('download', test.title);
+                                document.body.appendChild(link);
+                                link.click();
+                                link.parentNode.removeChild(link);
+                              }}
+                              data-testid={`btn-download-audio-${test.id}`}
+                            >
+                              <i className="bi bi-music-note-beamed"></i> Tải Audio
+                            </button>
+                          ) : (
+                            <button
+                              className="btn btn-outline-info flex-grow-1 d-flex align-items-center justify-content-center gap-1 fw-medium"
+                              onClick={() => {
+                                window.open(test.file_url, '_blank');
+                              }}
+                            >
+                              <i className="bi bi-download"></i> Tải file
+                            </button>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+            {resources.length > 0 && (
+              <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
+            )}
+          </>
         )}
       </div>
     </div>
