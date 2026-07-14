@@ -1,11 +1,14 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { useTheme } from '../../context/ThemeContext';
+import { Sun, Moon } from 'lucide-react';
 import CreateTutorModal from '../admin/CreateTutorModal';
 import ChangePwdModal from '../profile/ChangePwdModal';
 
 const AdminNavbar = () => {
   const { user, logout } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
   const [showTutorModal, setShowTutorModal] = useState(false);
   const [showPwdModal, setShowPwdModal] = useState(false);
@@ -20,10 +23,10 @@ const AdminNavbar = () => {
   };
 
   return (
-    <nav className="navbar navbar-expand-lg bg-white border-bottom sticky-top px-3 px-md-5 py-3">
+    <nav className="navbar navbar-expand-lg sticky-top px-3 px-md-5 py-3" style={{ backgroundColor: 'var(--canvas)', borderBottom: '1px solid var(--surface-pressed)' }}>
       <div className="container-fluid p-0 d-flex justify-content-between align-items-center">
         <div className="d-flex align-items-center gap-4">
-          <Link className="navbar-brand fw-bold text-danger fs-4 m-0" to="/admin" style={{ fontFamily: 'UberMove, system-ui, sans-serif' }}>
+          <Link className="navbar-brand fw-bold fs-4 m-0" to="/admin" style={{ color: 'var(--ink)', fontFamily: 'var(--font-display)' }}>
             IELTSZone Admin
           </Link>
           <button 
@@ -34,28 +37,39 @@ const AdminNavbar = () => {
           </button>
         </div>
 
-        <div className="dropdown">
+        <div className="d-flex align-items-center gap-3">
           <button
-            className="btn btn-light rounded-pill px-4 py-2 fw-medium border-0 d-flex align-items-center gap-2"
-            type="button"
-            data-bs-toggle="dropdown"
-            style={{ backgroundColor: '#efefef' }}
+            onClick={toggleTheme}
+            className="btn rounded-circle d-flex align-items-center justify-content-center"
+            style={{ width: '40px', height: '40px', backgroundColor: 'var(--canvas-soft)', color: 'var(--ink)', border: 'none' }}
+            title="Toggle theme"
           >
-            {user?.avatar_url ? (
-              <img src={user.avatar_url} alt="Avatar" className="rounded-circle" style={{ width: '24px', height: '24px', objectFit: 'cover' }} />
-            ) : (
-              <div className="bg-danger text-white rounded-circle d-flex align-items-center justify-content-center" style={{ width: '24px', height: '24px', fontSize: '12px' }}>
-                {user?.full_name?.charAt(0)?.toUpperCase() || 'A'}
-              </div>
-            )}
-            <span className="d-none d-sm-inline">{user?.full_name || 'Admin'}</span>
+            {theme === 'dark' ? <Sun size={18} strokeWidth={2.5} /> : <Moon size={18} strokeWidth={2.5} />}
           </button>
-          <ul className="dropdown-menu dropdown-menu-end rounded-4 shadow border-0 mt-2 p-2">
-            <li><Link className="dropdown-item rounded-3 py-2" to="/profile">Hồ sơ cá nhân</Link></li>
-            <li><button className="dropdown-item rounded-3 py-2" onClick={() => setShowPwdModal(true)}>Đổi mật khẩu</button></li>
-            <li><hr className="dropdown-divider" /></li>
-            <li><button className="dropdown-item rounded-3 py-2 text-danger" onClick={handleLogout}>Đăng xuất</button></li>
-          </ul>
+          
+          <div className="dropdown">
+            <button
+              className="btn rounded-pill px-4 py-2 fw-medium border-0 d-flex align-items-center gap-2"
+              type="button"
+              data-bs-toggle="dropdown"
+              style={{ backgroundColor: 'var(--canvas-soft)', color: 'var(--ink)' }}
+            >
+              {user?.avatar_url ? (
+                <img src={user.avatar_url} alt="Avatar" className="rounded-circle" style={{ width: '24px', height: '24px', objectFit: 'cover' }} />
+              ) : (
+                <div className="rounded-circle d-flex align-items-center justify-content-center" style={{ width: '24px', height: '24px', fontSize: '12px', backgroundColor: 'var(--primary)', color: 'var(--on-primary)' }}>
+                  {user?.full_name?.charAt(0)?.toUpperCase() || 'A'}
+                </div>
+              )}
+              <span className="d-none d-sm-inline">{user?.full_name || 'Admin'}</span>
+            </button>
+            <ul className="dropdown-menu dropdown-menu-end rounded-4 shadow border-0 mt-2 p-2" style={{ backgroundColor: 'var(--canvas)' }}>
+              <li><Link className="dropdown-item rounded-3 py-2" to="/profile" style={{ color: 'var(--ink)' }}>Hồ sơ cá nhân</Link></li>
+              <li><button className="dropdown-item rounded-3 py-2" onClick={() => setShowPwdModal(true)} style={{ color: 'var(--ink)' }}>Đổi mật khẩu</button></li>
+              <li><hr className="dropdown-divider" style={{ borderColor: 'var(--surface-pressed)' }} /></li>
+              <li><button className="dropdown-item rounded-3 py-2 text-danger" onClick={handleLogout}>Đăng xuất</button></li>
+            </ul>
+          </div>
         </div>
       </div>
       

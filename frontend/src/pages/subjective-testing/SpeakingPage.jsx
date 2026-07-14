@@ -107,7 +107,7 @@ const SpeakingPartList = ({ exam, onStartExam, onBack }) => {
   };
 
   return (
-    <div className="bg-white min-vh-100 pb-5">
+    <div className=" min-vh-100 pb-5">
       <StudentNavbar />
       <main className="container-fluid px-3 px-md-5 mt-4 mt-md-5" style={{ maxWidth: '1200px' }}>
         <div className="d-flex align-items-center gap-3 mb-2">
@@ -278,11 +278,11 @@ const SpeakingPage = () => {
   }
 
   return (
-    <div className="bg-white min-vh-100 pb-5">
+    <div className=" min-vh-100 pb-5">
       <StudentNavbar />
       <main className="container-fluid px-3 px-md-5 mt-4 mt-md-5" style={{ maxWidth: '1200px' }}>
         {/* Hero Section */}
-        <div className="mb-5 d-flex align-items-center gap-4 bg-white p-4 rounded-4" style={{ border: '1px solid #e2e2e2' }}>
+        <div className="mb-5 d-flex align-items-center gap-4 bg-white p-4 rounded-4 border">
           <div 
             className="hero-illustration-container d-none d-md-flex" 
             style={{ 
@@ -363,7 +363,8 @@ const SpeakingPage = () => {
         <div className="row">
           {/* Sidebar Filter */}
           <div className="col-lg-3 mb-4">
-            <div className="p-4 rounded-4 bg-white" style={{ border: '1px solid #e2e2e2', position: 'sticky', top: '20px' }}>
+            <div className="p-4 rounded-4 bg-white border"
+              style={{ position: 'sticky', top: '20px' }}>
               <h5 className="fw-bold mb-4" style={{ fontFamily: 'UberMove, system-ui, sans-serif' }}>Lọc đề thi</h5>
               
               <div className="mb-4">
@@ -374,7 +375,7 @@ const SpeakingPage = () => {
                   placeholder="Nhập tên đề thi..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  style={{ fontSize: '14px', border: '1px solid #d1d1d1' }}
+                  style={{ fontSize: '14px' }}
                 />
               </div>
 
@@ -384,7 +385,7 @@ const SpeakingPage = () => {
                   className="form-select rounded-pill px-3 py-2"
                   value={difficultyFilter} 
                   onChange={(e) => setDifficultyFilter(e.target.value)}
-                  style={{ fontSize: '14px', border: '1px solid #d1d1d1' }}
+                  style={{ fontSize: '14px' }}
                 >
                   <option value="">Tất cả độ khó</option>
                   <option value="beginner">Beginner</option>
@@ -399,7 +400,7 @@ const SpeakingPage = () => {
                   className="form-select rounded-pill px-3 py-2"
                   value={statusFilter} 
                   onChange={(e) => setStatusFilter(e.target.value)}
-                  style={{ fontSize: '14px', border: '1px solid #d1d1d1' }}
+                  style={{ fontSize: '14px' }}
                 >
                   <option value="all">Tất cả</option>
                   <option value="completed">Đã làm</option>
@@ -453,10 +454,9 @@ const SpeakingPage = () => {
                       return (
                       <div key={exam.id} className="col-md-6">
                         <div
-                          className="p-3 rounded-4 h-100 d-flex flex-column justify-content-between position-relative overflow-hidden"
+                          className="card border-0 bg-white shadow-sm p-3 rounded-4 h-100 d-flex flex-column justify-content-between position-relative overflow-hidden"
                           style={{ 
-                            border: isCompleted ? '2px solid #86efac' : '1px solid #e2e2e2', 
-                            backgroundColor: isCompleted ? '#f0fdf4' : '#fff',
+                            ...(isCompleted ? { border: '2px solid #86efac', backgroundColor: 'var(--canvas-soft)' } : {}),
                             cursor: 'pointer', 
                             transition: 'all 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275)' 
                           }}

@@ -73,6 +73,81 @@
   --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
+:root[data-theme="dark"] {
+  /* Colors - Inverted for dark mode */
+  --primary: #ffffff;
+  --on-primary: #000000;
+  --ink: #f0f0f0;
+  --body: #a0a0a0;
+  --mute: #5a5a5a;
+  --hairline-mid: #6a6a6a;
+  --canvas: #0a0a0a;
+  --canvas-soft: #141414;
+  --canvas-softer: #1f1f1f;
+  --surface-pressed: #2a2a2a;
+  --black-elevated: #282828;
+
+  /* Shadows - Adjusted for dark mode */
+  --shadow-subtle: rgba(0, 0, 0, 0.4) 0px 4px 16px 0px;
+  --shadow-card: rgba(0, 0, 0, 0.5) 0px 4px 16px 0px;
+  --shadow-pill: rgba(0, 0, 0, 0.4) 0px 2px 8px 0px;
+}
+
+/* Force Bootstrap utilities to respect our Dark Theme */
+[data-theme="dark"] .bg-white,
+[data-theme="dark"] .card,
+[data-theme="dark"] .modal-content,
+[data-theme="dark"] .dropdown-menu,
+[data-theme="dark"] .list-group-item,
+[data-theme="dark"] .offcanvas {
+  background-color: var(--canvas) !important;
+}
+
+[data-theme="dark"] .bg-light,
+[data-theme="dark"] .input-group-text,
+[data-theme="dark"] .form-control,
+[data-theme="dark"] .form-select {
+  background-color: var(--canvas-soft) !important;
+  color: var(--ink) !important;
+}
+
+[data-theme="dark"] .text-dark {
+  color: var(--ink) !important;
+}
+[data-theme="dark"] .text-muted {
+  color: var(--mute) !important;
+}
+
+[data-theme="dark"] .border, 
+[data-theme="dark"] .border-bottom, 
+[data-theme="dark"] .border-top, 
+[data-theme="dark"] .border-end, 
+[data-theme="dark"] .border-start,
+[data-theme="dark"] .card,
+[data-theme="dark"] .form-control,
+[data-theme="dark"] .form-select,
+[data-theme="dark"] .input-group-text,
+[data-theme="dark"] .list-group-item,
+[data-theme="dark"] hr {
+  border-color: var(--surface-pressed) !important;
+}
+
+[data-theme="dark"] .shadow-sm {
+  box-shadow: var(--shadow-subtle) !important;
+}
+[data-theme="dark"] .shadow {
+  box-shadow: var(--shadow-card) !important;
+}
+[data-theme="dark"] .navbar {
+  background-color: var(--canvas) !important;
+}
+
+/* Fix input placeholder color in dark mode */
+[data-theme="dark"] ::placeholder {
+  color: var(--mute) !important;
+  opacity: 1;
+}
+
 body {
   margin: 0;
   background-color: var(--canvas-soft); /* So auth cards pop on gray background */
