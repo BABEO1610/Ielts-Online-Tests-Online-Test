@@ -1,3 +1,5 @@
+const { isAddressPreferenceRequest } = require('./assistant.memory');
+
 const ASSISTANT_INTENTS = {
   GREETING: 'GREETING',
   NAVIGATION: 'NAVIGATION',
@@ -119,16 +121,26 @@ const isExplicitTestLookup = (text) => hasAny(text, [
   /\b(reading|listening|writing|speaking)\b.*\b(test|mock|de thi)\b.*\b(moi nhat|cu nhat|latest|newest|oldest|recent|so\s*\d{1,3}|\d{1,3})\b/,
   /\b(test|mock|de thi)\b.*\b(reading|listening|writing|speaking)\b/,
   /\b(de|test|mock)\b.*\btrong he thong\b/,
+  /\b(?:tim|find|search|goi y|de xuat|chon|recommend|suggest|cho toi|cho minh|cho em|give me|show me)\s+(?:(?:giup|cho)\s+(?:toi|minh|em)\s+)?(?:1|mot|vai)?\s*de\s+(?:phu hop|de luyen|luyen|lam|reading|listening|writing|speaking|cho minh|cho toi|nay|do|hai|2|two)\b/,
 ]);
 
 const isTestLookup = (text) => isExplicitTestLookup(text);
 
-const isLessonLookup = (text) => hasAny(text, [
-  /\b(lesson|bai hoc|resource|tai lieu|video|article)\b/,
-  /\b(thu vien|library)\b.*\b(lesson|bai hoc|resource|tai lieu|video|article|pdf|audio|gi|de|bai)\b/,
-  /\b(co|thu vien|library)\b.*\b(pdf|audio|video|grammar|tai lieu)\b/,
-  /\b(co|tim|find|search|goi y|de xuat)\b.*\b(bai hoc|lesson|resource|tai lieu)\b/,
-]);
+const isLessonLookup = (text) => {
+  const isGrammarArticleQuestion = hasAny(text, [
+    /\b(?:english|grammar|definite|indefinite)\s+articles?\b/,
+    /\b(?:use|using|explain|learn)\s+(?:english\s+)?articles?\b/,
+    /\barticles?\b.*\b(?:a\s*\/\s*an|a an the|the)\b/,
+  ]);
+  const requestsContentLookup = /\b(?:find|search|show me|library|resource|tim|thu vien|tai lieu)\b/.test(text);
+  if (isGrammarArticleQuestion && !requestsContentLookup) return false;
+  return hasAny(text, [
+    /\b(lesson|bai hoc|resource|tai lieu|video|articles?)\b/,
+    /\b(thu vien|library)\b.*\b(lesson|bai hoc|resource|tai lieu|video|articles?|pdf|audio|gi|de|bai)\b/,
+    /\b(co|thu vien|library)\b.*\b(pdf|audio|video|grammar|tai lieu)\b/,
+    /\b(co|tim|find|search|goi y|de xuat)\b.*\b(bai hoc|lesson|resource|tai lieu)\b/,
+  ]);
+};
 
 const isAmbiguousLibraryTestLookup = (text, context) => {
   if (context?.pageType === 'library') return false;
@@ -139,10 +151,7 @@ const isAmbiguousLibraryTestLookup = (text, context) => {
 const isLibraryLookup = (text, context) => {
   if (context?.pageType !== 'library') return false;
   if (/\b(mock test|practice test|ielts test|bai thi|de thi|test|mock)\b/.test(text)) return false;
-  return hasAny(text, [
-    /\b(thu vien|library|tai lieu|pdf|audio|video|sach|resource|lesson)\b/,
-    /\b(co|tim|find|search|danh sach|liet ke|hien thi)\b/,
-  ]);
+  return /\b(thu vien|library|tai lieu|pdf|audio|video|sach|resource|lesson|bai hoc)\b/.test(text);
 };
 
 const isAmbiguousSkillRequest = (text) => hasAny(text, [
@@ -160,7 +169,24 @@ const isContextDependentPracticeFollowUp = (text) => hasAny(text, [
   /\b(de|bai|test)\s+khac\b/,
   /\b(another|other)\s+(test|one|practice)\b/,
   /\b(cho toi|cho minh|cho em|give me|show me)\b.*\b(bai|de|test|practice)\b.*\b(luyen|practice)\b.*\b(cach|phuong phap|method|strategy|technique)\s+(nay|do|this|that)\b/,
+  /\b(?:tim|find|search|goi y|de xuat|chon|recommend|suggest|cho toi|cho minh|cho em|give me|show me)\s+(?:(?:giup|cho)\s+(?:toi|minh|em)\s+)?(?:1|mot|vai)?\s*(?:de|bai|test|practice)\b.{0,80}\b(?:phu hop|luyen|phan nay|cai nay|ky thuat nay|hai ky thuat|ca hai|this|that|these|both)\b/,
 ]);
+
+const isContextDependentContinuation = (text) => hasAny(text, [
+  /^(?:(?:cho(?: toi| minh| em)?|give me|show me)\s+)?(?:vi du|example)(?:\s+khac|\s+another)?(?:\s+(?:di|nhe|please))?$/,
+  /^(?:tiep tuc|noi tiep|continue|go on)(?:\s+(?:di|nhe|please))?$/,
+  /^(?:cai|mot cai|one|another)\s+khac(?:\s+(?:di|nhe|please))?$/,
+  /\b(?:y|phan|cau tra loi|noi dung|point|answer)\s+(?:tren|do|nay|above|that)\b/,
+  /\b(?:ket hop|dung|su dung|ap dung|so sanh|combine|use|apply|compare)\b.*\b(?:ca hai|hai\s+(?:cai|ky thuat|phuong phap)?\s*(?:nay|do)|2\s*(?:cai|ky thuat|phuong phap)?\s*(?:nay|do)|chung|both|these two|the two|them)\b/,
+  /\b(?:ca hai|hai\s+(?:cai|ky thuat|phuong phap)?\s*(?:nay|do)|2\s*(?:cai|ky thuat|phuong phap)?\s*(?:nay|do)|both|these two|the two)\b.*\b(?:ket hop|dung cung|su dung|ap dung|so sanh|combine|use together|apply|compare)\b/,
+]);
+
+const hasContextFollowUpCue = (message) => {
+  const text = normalizeText(message).trim();
+  return isContextDependentStrategyFollowUp(text)
+    || isContextDependentPracticeFollowUp(text)
+    || isContextDependentContinuation(text);
+};
 
 const IELTS_KNOWLEDGE_ALIASES = [
   'matching heading',
@@ -228,6 +254,29 @@ const ENGLISH_LEARNING_ALIASES = [
   'cach viet tieng anh',
   'cách viết tiếng anh',
   'complex sentence',
+  'present perfect',
+  'past simple',
+  'conditional sentence',
+  'conditionals',
+  'passive voice',
+  'relative clause',
+  'modal verb',
+  'english article',
+  'definite article',
+  'indefinite article',
+  'articles',
+  'article a an the',
+  'preposition',
+  'phrasal verb',
+  'word form',
+  'word family',
+  'idiom',
+  'thi hien tai hoan thanh',
+  'cau dieu kien',
+  'cau bi dong',
+  'menh de quan he',
+  'mao tu',
+  'gioi tu',
   'paraphrase',
   'rewrite sentence',
   'collocation',
@@ -295,6 +344,7 @@ const isReviewRequest = (text) => hasAny(text, [
 const isNavigation = (text) => hasAny(text, [
   /\b(mo|vao|xem|di den|navigate|open)\b.*\b(trang listening|trang reading|trang writing|trang speaking|thu vien|library|profile|lich su|history)\b/,
   /\b(xem lich su lam bai|practice history|vao thu vien|xem profile)\b/,
+  /\b(lich su|history|practice history|ket qua|result|review)\b.*\b(o dau|where|trang nao|vao dau|ben ngoai)\b/,
   /\b(website|ieltszone|site)\b.*\b(co gi|co nhung gi|lam duoc gi|what can i do|features?)\b/,
   /\b(what can i do|where can i|how do i|where is)\b.*\b(website|site|ieltszone|test|library|results?|history|profile)\b/,
   /\b(trang nao|vao dau|o dau|tim o dau|bam dau|lam the nao)\b.*\b(lam bai|bai thi|de thi|test|thu vien|library|tai lieu|ket qua|review|lich su|profile|ho so|dang xuat|doi mat khau)\b/,
@@ -330,6 +380,10 @@ const detectIntent = ({ message, context = {} }) => {
     return ASSISTANT_INTENTS.OUT_OF_SCOPE;
   }
 
+  if (isAddressPreferenceRequest(message)) {
+    return ASSISTANT_INTENTS.IELTS_KNOWLEDGE;
+  }
+
   if (hasAny(text, [
     /\b(cham|grade|score|danh gia)\b.*\b(band|writing|speaking|essay|bai)\b/,
     /\bband\b.*\b(may|score|diem|du doan|predict)\b/,
@@ -351,6 +405,7 @@ const detectIntent = ({ message, context = {} }) => {
     if ([ASSISTANT_INTENTS.FIND_TEST, ASSISTANT_INTENTS.IELTS_KNOWLEDGE].includes(context.previousIntent)) {
       return ASSISTANT_INTENTS.FIND_TEST;
     }
+    if (context.recentMessages?.length) return ASSISTANT_INTENTS.UNKNOWN;
     return ASSISTANT_INTENTS.CLARIFICATION;
   }
 
@@ -361,6 +416,20 @@ const detectIntent = ({ message, context = {} }) => {
     if (context.previousIntent === ASSISTANT_INTENTS.IELTS_KNOWLEDGE) {
       return ASSISTANT_INTENTS.IELTS_KNOWLEDGE;
     }
+    if (context.recentMessages?.length) return ASSISTANT_INTENTS.UNKNOWN;
+    return ASSISTANT_INTENTS.CLARIFICATION;
+  }
+
+  if (isContextDependentContinuation(text)) {
+    if ([
+      ASSISTANT_INTENTS.IELTS_KNOWLEDGE,
+      ASSISTANT_INTENTS.FIND_TEST,
+      ASSISTANT_INTENTS.FIND_LESSON,
+      ASSISTANT_INTENTS.POST_TEST_REVIEW,
+    ].includes(context.previousIntent)) {
+      return context.previousIntent;
+    }
+    if (context.recentMessages?.length) return ASSISTANT_INTENTS.UNKNOWN;
     return ASSISTANT_INTENTS.CLARIFICATION;
   }
 
@@ -402,5 +471,6 @@ const detectIntent = ({ message, context = {} }) => {
 module.exports = {
   ASSISTANT_INTENTS,
   detectIntent,
+  hasContextFollowUpCue,
   normalizeText,
 };
