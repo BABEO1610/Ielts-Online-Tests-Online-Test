@@ -12,19 +12,6 @@ const createMessageId = () => {
   return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 };
 
-const NON_RETRYABLE_ASSISTANT_CODES = new Set([
-  'LOGIN_REQUIRED',
-  'FORBIDDEN',
-  'VALIDATION_ERROR',
-  'ASSISTANT_DISABLED_DURING_TEST',
-  'OUT_OF_SCOPE',
-  'MISSING_CONTEXT',
-  'ATTEMPT_NOT_FOUND',
-  'ATTEMPT_NOT_SUBMITTED',
-  'QUESTION_NOT_FOUND',
-  'MISSING_EXPLANATION',
-]);
-
 const toMessage = (row) => ({
   id: row.id || createMessageId(),
   messageId: row.id || null,
@@ -48,10 +35,16 @@ const collectVisibleItems = () => {
     .map((title) => ({ title }));
 };
 
-const GlobalAssistantPanel = ({ availability, onClose }) => {
+const GlobalAssistantPanel = ({
+  availability,
+  conversationId,
+  onConversationIdChange,
+  onClose,
+}) => {
   const [messages, setMessages] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [historyLoaded, setHistoryLoaded] = useState(false);
+  const [historyReloadToken, setHistoryReloadToken] = useState(0);
   const [error, setError] = useState(null);
   const [suggestedLinks, setSuggestedLinks] = useState([]);
   const [linkMeta, setLinkMeta] = useState(null);
@@ -71,16 +64,22 @@ const GlobalAssistantPanel = ({ availability, onClose }) => {
 
     const loadHistory = async () => {
       if (!availability.isAuthenticated || historyLoaded) return;
-      const response = await assistantApi.getHistory();
+      const response = await assistantApi.getHistory({ conversationId });
 
       if (!isMounted) return;
       if (response.code === 'LOGIN_REQUIRED') {
         setRequiresLogin(true);
         return;
       }
+      if (response.code) {
+        setError(response.message || 'Không thể tải lịch sử hội thoại lúc này.');
+        return;
+      }
       if (Array.isArray(response.history)) {
         setMessages(response.history.map(toMessage).filter((item) => item.content));
       }
+      if (response.conversationId) onConversationIdChange(response.conversationId);
+      setError(null);
       setHistoryLoaded(true);
     };
 
@@ -89,7 +88,13 @@ const GlobalAssistantPanel = ({ availability, onClose }) => {
     return () => {
       isMounted = false;
     };
-  }, [availability.isAuthenticated, historyLoaded]);
+  }, [
+    availability.isAuthenticated,
+    conversationId,
+    historyLoaded,
+    historyReloadToken,
+    onConversationIdChange,
+  ]);
 
   useEffect(() => {
     if (showLoginPrompt) return undefined;
@@ -129,9 +134,9 @@ const GlobalAssistantPanel = ({ availability, onClose }) => {
       setRequiresLogin(true);
       return;
     }
+    if (!historyLoaded || availability.isDisabled || isLoading) return;
 
     const assistantLocalId = createMessageId();
-    let receivedDelta = false;
 
     setMessages((current) => [
       ...current,
@@ -150,6 +155,7 @@ const GlobalAssistantPanel = ({ availability, onClose }) => {
     const streamed = await assistantApi.streamChat({
       message,
       context: requestContext,
+      conversationId,
       onStart: () => {
         setMessages((current) => [
           ...current,
@@ -162,7 +168,6 @@ const GlobalAssistantPanel = ({ availability, onClose }) => {
         ]);
       },
       onDelta: (delta) => {
-        receivedDelta = true;
         setMessages((current) =>
           current.map((item) =>
             item.id === assistantLocalId
@@ -187,34 +192,15 @@ const GlobalAssistantPanel = ({ availability, onClose }) => {
         );
         setSuggestedLinks(response.suggestedLinks || []);
         setLinkMeta(response.linkMeta || null);
+        if (response.conversationId) onConversationIdChange(response.conversationId);
       },
       onError: (response) => {
+        setMessages((current) => current.filter((item) => item.id !== assistantLocalId));
         handleSendError(response);
       },
     });
 
-    if (streamed?.code && !receivedDelta) {
-      if (NON_RETRYABLE_ASSISTANT_CODES.has(streamed.code)) {
-        setIsLoading(false);
-        return;
-      }
-
-      const fallback = await assistantApi.sendChat({ message, context: requestContext });
-      if (handleSendError(fallback)) return;
-
-      setMessages((current) => [
-        ...current,
-        {
-          id: createMessageId(),
-          messageId: fallback.messageId || null,
-          role: 'assistant',
-          content: fallback.answer || '',
-        },
-      ]);
-      setSuggestedLinks(fallback.suggestedLinks || []);
-      setLinkMeta(fallback.linkMeta || null);
-    }
-
+    if (streamed?.code) setError(streamed.message || 'Trợ lý IELTS đang gặp lỗi.');
     setIsLoading(false);
   };
 
@@ -266,6 +252,17 @@ const GlobalAssistantPanel = ({ availability, onClose }) => {
             <div className="assistant-error" role="alert">
               <AlertCircle size={16} aria-hidden="true" />
               <span>{error}</span>
+              {!historyLoaded && availability.isAuthenticated && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setError(null);
+                    setHistoryReloadToken((value) => value + 1);
+                  }}
+                >
+                  Thử tải lại
+                </button>
+              )}
             </div>
           )}
 
@@ -294,7 +291,7 @@ const GlobalAssistantPanel = ({ availability, onClose }) => {
           )}
 
           <ChatInputBox
-            disabled={!availability.isAuthenticated || availability.isDisabled}
+            disabled={!availability.isAuthenticated || availability.isDisabled || !historyLoaded}
             isLoading={isLoading}
             onSend={handleSend}
           />
