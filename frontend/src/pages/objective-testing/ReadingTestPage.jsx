@@ -25,6 +25,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useLocation, useParams, useNavigate } from 'react-router-dom';
 import TimerBar from '../../components/objective-testing/TimerBar';
 import AutoSubmitModal from '../../components/objective-testing/AutoSubmitModal';
+import ReviewModal from '../../components/objective-testing/ReviewModal';
 import { testService } from '../../services/test.service';
 import { attemptService } from '../../services/attempt.service';
 import '../../styles/objective-testing.css';
@@ -83,9 +84,9 @@ function flattenTestData(testData, allowedPassageNumbers) {
           id: q.id,
           order: q.questionOrder, // matches backend field name
           passageNumber: passage.passageNumber,
-          blockId: b.id,
+          blockId: block.id,
           // blockContent rendered above the first question of each block
-          blockContent: qIdx === 0 ? (b.content || null) : null,
+          blockContent: qIdx === 0 ? (block.content || null) : null,
           type: blockQType,
           text: q.text || '',
           options,
@@ -94,7 +95,7 @@ function flattenTestData(testData, allowedPassageNumbers) {
     });
   });
 
-  questions.sort((a, b) => a.order - b.order);
+  questions.sort((qa, qb) => qa.order - qb.order);
   return { passages, questions };
 }
 
@@ -148,6 +149,7 @@ function ReadingTestPage() {
   const [currentQuestion,  setCurrentQuestion]  = useState(null);       // highlighted question order
   const [activePassageNum, setActivePassageNum] = useState(allowedPassageNumbers[0]);
   const [showAutoSubmit,   setShowAutoSubmit]   = useState(false);
+  const [showReview,       setShowReview]       = useState(false);
   const [startTime]                             = useState(Date.now());
 
   // ── Fetch test data ─────────────────────────────────────────────────────────
@@ -183,9 +185,13 @@ function ReadingTestPage() {
   }, [testId]);
 
   // ── Flatten data ────────────────────────────────────────────────────────────
-  const { passages, questions } = testData
-    ? flattenTestData(testData, allowedPassageNumbers)
-    : { passages: [], questions: [] };
+  let passages = [], questions = [];
+  try {
+    if (testData) ({ passages, questions } = flattenTestData(testData, allowedPassageNumbers));
+  } catch (e) {
+    // ponytail: catch-all để tránh trang trắng khi data shape bất ngờ từ backend
+    console.error('[ReadingTestPage] flattenTestData failed:', e);
+  }
 
   const activePassageContent = passages.find((p) => p.passageNumber === activePassageNum)?.content || '';
   const activeQuestions = questions.filter((q) => q.passageNumber === activePassageNum);
@@ -275,6 +281,7 @@ function ReadingTestPage() {
         customTimeLimit={customTimeLimit}
         onTimeUp={handleTimeUp}
         onSubmitEarly={handleSubmitEarly}
+        onReview={() => setShowReview(true)}
         practiceMode={practiceMode}
       />
 
@@ -560,6 +567,20 @@ function ReadingTestPage() {
 
       {/* Auto Submit Modal (shows during submit) */}
       <AutoSubmitModal isOpen={showAutoSubmit} />
+
+      {/* Review Modal — xem tổng quan câu hỏi đã/chưa trả lời */}
+      <ReviewModal
+        isOpen={showReview}
+        onClose={() => setShowReview(false)}
+        questions={questions.map((q) => ({ ...q, passage: `Passage ${q.passageNumber}` }))}
+        answers={answers}
+        onNavigate={(qOrder) => {
+          // Switch passage tab nếu câu hỏi ở passage khác
+          const target = questions.find((q) => q.order === qOrder);
+          if (target) setActivePassageNum(target.passageNumber);
+          scrollToQuestion(qOrder);
+        }}
+      />
     </div>
   );
 }
