@@ -16,10 +16,19 @@ ALTER TABLE contact_submissions
     ADD COLUMN IF NOT EXISTS assigned_to_id UUID        REFERENCES users(id) ON DELETE SET NULL,
     ADD COLUMN IF NOT EXISTS resolved_at   TIMESTAMPTZ;
 
--- 2. Migrate dữ liệu cũ: resolved=true → status='resolved'
-UPDATE contact_submissions
-SET status = 'resolved', resolved_at = created_at
-WHERE resolved = TRUE AND status = 'pending';
+-- 2. Migrate dữ liệu cũ: resolved=true → status='resolved' (chỉ nếu cột còn tồn tại)
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'contact_submissions' AND column_name = 'resolved'
+  ) THEN
+    UPDATE contact_submissions
+    SET status = 'resolved', resolved_at = created_at
+    WHERE resolved = TRUE AND status = 'pending';
+  END IF;
+END;
+$$;
 
 -- 3. Xóa cột resolved cũ (thay bằng status VARCHAR)
 ALTER TABLE contact_submissions
