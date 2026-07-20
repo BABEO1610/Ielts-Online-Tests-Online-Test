@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { fetchTutorAssignments, assignTutor } from '../../services/adminOps.service';
+import Pagination from '../../components/common/Pagination';
 
 const TutorAssignmentPage = () => {
   const [tutors, setTutors] = useState([]);
@@ -7,15 +8,20 @@ const TutorAssignmentPage = () => {
   const [isSample, setIsSample] = useState(false);
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState(null);
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [meta, setMeta] = useState(null);
 
   const load = useCallback(async () => {
     setLoading(true);
-    const res = await fetchTutorAssignments();
+    const res = await fetchTutorAssignments({ page: currentPage, limit: 10 });
     setTutors(res.data.tutors);
     setRows(res.data.assignments);
     setIsSample(res.isSample);
+    setMeta(res.data.meta);
     setLoading(false);
-  }, []);
+  }, [currentPage]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -81,6 +87,15 @@ const TutorAssignmentPage = () => {
           </table>
         </div>
       </div>
+      
+      {/* Pagination */}
+      {meta && meta.totalPages > 1 && (
+        <Pagination 
+          currentPage={meta.page} 
+          totalPages={meta.totalPages} 
+          onPageChange={setCurrentPage} 
+        />
+      )}
     </div>
   );
 };

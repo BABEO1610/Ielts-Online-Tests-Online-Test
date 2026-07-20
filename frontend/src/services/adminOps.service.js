@@ -59,6 +59,16 @@ const SAMPLE_ASSIGNMENTS = [
   { id: 'w1', student: 'Not Hướng Dương', email: 'nothuongduong@gmail.com', type: 'writing', task_or_part: 2, target_band: 7.0, tutor_id: 'tu1', submitted_at: iso(0, -1) },
   { id: 's1', student: 'Đạt Nguyễn Văn', email: 'thuyk2444@gmail.com', type: 'speaking', task_or_part: 1, target_band: 6.5, tutor_id: null, submitted_at: iso(0, -2) },
   { id: 'w2', student: 'wed201c', email: 'wed201c@gmail.com', type: 'writing', task_or_part: 1, target_band: 8.0, tutor_id: 'tu2', submitted_at: iso(0, -3) },
+  { id: 's2', student: 'Le Tien Thanh', email: 'thanhthe171416@fpt.edu.vn', type: 'speaking', task_or_part: 3, target_band: 6.0, tutor_id: null, submitted_at: iso(0, -4) },
+  { id: 'w3', student: 'admin', email: 'admin@ieltszone.vn', type: 'writing', task_or_part: 1, target_band: 7.5, tutor_id: 'tu3', submitted_at: iso(0, -5) },
+  { id: 'w4', student: 'Bá Minh', email: 'baminh1610@gmail.com', type: 'writing', task_or_part: 2, target_band: 5.5, tutor_id: null, submitted_at: iso(0, -6) },
+  { id: 's3', student: 'Trần Văn A', email: 'tranvana@example.com', type: 'speaking', task_or_part: 2, target_band: 6.5, tutor_id: 'tu4', submitted_at: iso(-1, -1) },
+  { id: 'w5', student: 'Nguyễn Thị B', email: 'nguyenthib@example.com', type: 'writing', task_or_part: 2, target_band: 7.0, tutor_id: null, submitted_at: iso(-1, -2) },
+  { id: 's4', student: 'Lê Văn C', email: 'levanc@example.com', type: 'speaking', task_or_part: 1, target_band: 8.0, tutor_id: 'tu1', submitted_at: iso(-1, -3) },
+  { id: 'w6', student: 'Phạm Thị D', email: 'phamthid@example.com', type: 'writing', task_or_part: 1, target_band: 6.0, tutor_id: null, submitted_at: iso(-1, -4) },
+  { id: 's5', student: 'Hoàng Văn E', email: 'hoangvane@example.com', type: 'speaking', task_or_part: 3, target_band: 7.5, tutor_id: 'tu2', submitted_at: iso(-2, 0) },
+  { id: 'w7', student: 'Vũ Thị F', email: 'vuthif@example.com', type: 'writing', task_or_part: 2, target_band: 6.5, tutor_id: null, submitted_at: iso(-2, -1) },
+  { id: 'w8', student: 'Đặng Văn G', email: 'dangvang@example.com', type: 'writing', task_or_part: 1, target_band: 7.0, tutor_id: 'tu3', submitted_at: iso(-2, -2) },
 ];
 
 // ── Content review ───────────────────────────────────────────────────────────
@@ -102,9 +112,17 @@ export async function fetchResourceDetail(id) {
 }
 
 // ── Grading oversight ─────────────────────────────────────────────────────────
-export async function fetchSubmissions() {
-  const res = await api.get('/admin/submissions');
-  return ok(res.data.data ?? []);
+export async function fetchSubmissions(params = {}) {
+  const qs = new URLSearchParams();
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== '' && value !== 'all') qs.set(key, value);
+  });
+  const suffix = qs.toString() ? `?${qs.toString()}` : '';
+  const res = await api.get(`/admin/submissions${suffix}`);
+  return ok({ 
+    data: res.data.data ?? [],
+    meta: res.data.meta 
+  });
 }
 export async function retryGrading(type, id) {
   try {
@@ -177,12 +195,34 @@ export async function exportReportCsv(params = {}) {
 }
 
 // ── Tutor assignment ────────────────────────────────────────────────────────────
-export async function fetchTutorAssignments() {
+export async function fetchTutorAssignments(params = {}) {
   try {
-    const res = await api.get('/admin/tutor-assignments');
-    return ok({ tutors: res.data.data.tutors, assignments: res.data.data.assignments });
+    const qs = new URLSearchParams();
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== '') qs.set(key, value);
+    });
+    const suffix = qs.toString() ? `?${qs.toString()}` : '';
+    const res = await api.get(`/admin/tutor-assignments${suffix}`);
+    return ok({ 
+      tutors: res.data.data.tutors, 
+      assignments: res.data.data.assignments,
+      meta: res.data.meta 
+    });
   } catch {
-    return sample({ tutors: SAMPLE_TUTORS, assignments: SAMPLE_ASSIGNMENTS });
+    const page = Math.max(1, Number(params.page || 1));
+    const limit = Math.max(1, Number(params.limit || 10));
+    const start = (page - 1) * limit;
+    const pagedAssignments = SAMPLE_ASSIGNMENTS.slice(start, start + limit);
+    return sample({ 
+      tutors: SAMPLE_TUTORS, 
+      assignments: pagedAssignments,
+      meta: {
+        page,
+        limit,
+        total: SAMPLE_ASSIGNMENTS.length,
+        totalPages: Math.ceil(SAMPLE_ASSIGNMENTS.length / limit)
+      }
+    });
   }
 }
 export async function assignTutor(submissionId, type, tutorId) {

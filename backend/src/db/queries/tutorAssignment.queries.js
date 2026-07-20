@@ -23,7 +23,7 @@ const getTutors = async () => {
  * Gets all pending submissions (writing and speaking)
  * @returns {Promise<Array>}
  */
-const getPendingSubmissions = async () => {
+const getPendingSubmissions = async (limit = 10, offset = 0) => {
   const result = await pool.query(`
     SELECT 
       ws.writing_group_id::text as id, 
@@ -60,8 +60,24 @@ const getPendingSubmissions = async () => {
     GROUP BY ss.speaking_group_id, u.full_name, u.email, u.target_band_score
     
     ORDER BY submitted_at DESC
-  `);
+    LIMIT $1 OFFSET $2
+  `, [limit, offset]);
   return result.rows;
+};
+
+/**
+ * Gets total count of pending submissions (writing and speaking)
+ * @returns {Promise<number>}
+ */
+const getPendingSubmissionsCount = async () => {
+  const result = await pool.query(`
+    SELECT (
+      (SELECT COUNT(DISTINCT writing_group_id) FROM writing_submissions WHERE status = 'pending')
+      +
+      (SELECT COUNT(DISTINCT speaking_group_id) FROM speaking_submissions WHERE status = 'pending')
+    ) as total
+  `);
+  return Number(result.rows[0].total);
 };
 
 /**
@@ -136,6 +152,7 @@ const getSubmissionByIdAndType = async (submissionId, type) => {
 module.exports = {
   getTutors,
   getPendingSubmissions,
+  getPendingSubmissionsCount,
   assignTutorToSubmission,
   getSubmissionByIdAndType,
 };

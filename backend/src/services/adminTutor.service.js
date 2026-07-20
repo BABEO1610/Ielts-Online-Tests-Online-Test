@@ -7,10 +7,12 @@ const queries = require('../db/queries/tutorAssignment.queries');
 const usersQueries = require('../db/queries/users.queries');
 const AuditLogService = require('./audit.service');
 
-const getAssignmentData = async () => {
-  const [tutors, submissions] = await Promise.all([
+const getAssignmentData = async (page = 1, limit = 10) => {
+  const offset = (page - 1) * limit;
+  const [tutors, submissions, total] = await Promise.all([
     queries.getTutors(),
-    queries.getPendingSubmissions()
+    queries.getPendingSubmissions(limit, offset),
+    queries.getPendingSubmissionsCount()
   ]);
 
   const formattedSubmissions = submissions.map(s => ({
@@ -18,7 +20,16 @@ const getAssignmentData = async () => {
     target_band: s.target_band ? Number(s.target_band) : null
   }));
 
-  return { tutors, assignments: formattedSubmissions };
+  return {
+    tutors,
+    assignments: formattedSubmissions,
+    meta: {
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit)
+    }
+  };
 };
 
 const assignSubmission = async (actorId, submissionId, type, tutorId) => {
