@@ -6,7 +6,7 @@ Trạng thái: Active — Mô tả kiến trúc đang chạy, không phải prop
 
 - `frontend/src/App.jsx` — render widget chatbot toàn cục.
 - `frontend/src/features/global-assistant/components/GlobalAssistantButton.jsx` — nút
-  mở chatbot.
+  mở chatbot và giữ `conversationId` khi panel đóng/mở.
 - `frontend/src/features/global-assistant/components/GlobalAssistantPanel.jsx` — panel
   chat, gửi/nhận tin nhắn, auto-scroll.
 - `frontend/src/features/global-assistant/hooks/useAssistantAvailability.js` — quyết
@@ -33,18 +33,22 @@ Trạng thái: Active — Mô tả kiến trúc đang chạy, không phải prop
 ### Service:
 
 - `assistant.service.js` — chạy pipeline chính: tạo/reuse session, intent routing,
-  context injection, gọi AI, selfcheck, persistence.
+  recent-topic/reference memory, preference memory, context injection, gọi AI,
+  selfcheck, persistence.
 
 ### Repository:
 
-- `assistant.repository.js` — persist sessions/messages, đọc history, kiểm tra cột
-  động trước khi insert.
+- `assistant.repository.js` — persist sessions/messages, đọc history đúng owned
+  conversation, chọn active session theo message activity, kiểm tra cột động trước
+  khi insert và enforce ownership khi resolve session/insert message.
 
 ### Intent & Classifier:
 
 - `assistant.intent.js` — rule-based regex phát hiện intent từ message.
+- `assistant.memory.js` — parse/sanitize preferred address và hỗ trợ set/recall/clear.
 - `assistant.scope-classifier.js` — LLM scope classifier chạy khi rule intent trả
-  UNKNOWN, trả JSON gồm intent, allowed, confidence, skill, needsUserInput.
+  UNKNOWN; nhận recent conversation dưới dạng untrusted reference context và trả JSON
+  gồm intent, allowed, confidence, skill, needsUserInput.
 
 ### Context:
 
@@ -67,18 +71,20 @@ Trạng thái: Active — Mô tả kiến trúc đang chạy, không phải prop
 ### Validation:
 
 - `assistant.validation.js` — validate message (trim, 2000 ký tự), context,
-  pageType whitelist, normalize attemptId/questionId/route/visibleItems.
+  `conversationId` UUID, pageType whitelist, normalize attemptId/questionId/route/visibleItems.
 
 ### AI Provider:
 
-- `backend/src/services/ai.service.js` — wrapper gọi AI provider (Gemini).
+- `backend/src/services/ai.service.js` — wrapper Gemini/OpenAI, chọn provider mặc định,
+  cô lập model theo provider và hỗ trợ structured/plain-text mode.
 - `backend/src/services/aiUsage.service.js` — ghi log metadata vào `ai_usage_logs`.
 
 ## 3. Database
 
 Bảng chatbot dùng trực tiếp:
 
-- `chatbot_sessions` — lưu phiên chat: id, user_id, started_at, ended_at.
+- `chatbot_sessions` — lưu phiên chat: id, user_id, preferred_address, started_at,
+  ended_at.
 - `chatbot_messages` — lưu tin nhắn: id, session_id, role, content, tokens_used,
   created_at.
 
@@ -95,9 +101,9 @@ Bảng DB lookup (chỉ đọc):
 - `question_answers` — đọc câu trả lời đã nộp cho review.
 - `questions` — đọc câu hỏi và explanation chính thức.
 
-NEEDS_MANUAL_CHECK: Code repository dùng bảng `chatbot_sessions` và
-`chatbot_messages` nhưng repo hiện không thấy dedicated migration file tạo các bảng
-này.
+Migration `024_create_chatbot_history_tables.sql` tạo/đồng bộ hai bảng chatbot,
+rating fields và structured `preferred_address`. Migration phải được apply ở từng
+environment trước khi kỳ vọng memory persistence hoạt động.
 
 ## 4. Luồng Request
 
@@ -105,12 +111,14 @@ này.
 
 ```text
 GlobalAssistantPanel
-  -> assistantApi.streamChat / sendChat
+  -> assistantApi.streamChat; không tự resubmit JSON khi delivery chưa chắc chắn
+  -> gửi lại conversationId do backend cấp
   -> POST /api/v1/assistant/chat/stream hoặc /chat
   -> assistantLimiter (rate limit)
   -> validateChatPayload
   -> resolveAuthenticatedUser + ensureStudent
   -> evaluateGuardrails
+  -> resolve active conversation thuộc authenticated student
   -> runAssistantPipeline
      -> detect intent (rule-based, fallback LLM classifier)
      -> buildContextInjection
@@ -157,7 +165,10 @@ Assistant dùng context nhỏ nhất có thể:
   `backend/src/api/assistant/knowledge-base/`, inject vào prompt.
 - Post-test review → query `test_attempts`, `questions`, `question_answers` với
   ownership check.
-- Session memory → lấy N tin nhắn gần nhất để hiểu follow-up.
+- Session memory → lấy 12 tin nhắn user/assistant gần nhất, giữ topic/skill gần đây để
+  hiểu follow-up, đại từ chỉ định và yêu cầu recommendation nối tiếp.
+- Preferred address → lưu có cấu trúc trên active conversation; dùng tự nhiên, có thể
+  recall/clear và luôn được coi là untrusted prompt data.
 
 Hiện tại **không dùng** vector database hay external RAG service.
 
@@ -166,8 +177,12 @@ Hiện tại **không dùng** vector database hay external RAG service.
 AI calls đi qua `backend/src/services/ai.service.js`. Metadata được ghi vào
 `ai_usage_logs`.
 
-Khi AI provider lỗi ở câu hỏi kiến thức IELTS, `assistant.service.js` trả
-deterministic fallback:
+Nếu `AI_PROVIDER` không đặt, Gemini key có độ ưu tiên cho Global Assistant; nếu không
+có Gemini key mới dùng OpenAI key. `GEMINI_MODEL`/`OPENAI_MODEL` được tách riêng và
+Gemini API key đi qua `x-goog-api-key` header.
+
+Knowledge response sai structured format được retry đúng một lần dưới dạng plain text.
+Khi provider hoặc retry vẫn lỗi, `assistant.service.js` trả deterministic fallback:
 
 - Writing Task 1 overview.
 - Speaking Part 2.
@@ -201,10 +216,12 @@ Các biện pháp đã triển khai:
 
 ## 10. Giới Hạn Đã Biết (Known Limits)
 
-- `chatbot_sessions` và `chatbot_messages` được dùng bởi repository code nhưng repo
-  không chứa dedicated migration file tạo bảng.
+- Migration 024 cần được apply ở environment đang chạy; repository giữ best-effort
+  compatibility nếu schema cũ chưa có preference/rating columns.
 - Rating persistence là best-effort: `assistant.repository.js` chỉ update rating
   columns nếu schema `chatbot_messages` có cột tương ứng.
 - Stream endpoint trả SSE events nhưng backend normalize final response trước khi gửi
   về UI (chưa phải token-by-token streaming).
+- Chưa có durable request-id idempotency ở DB; frontend vì vậy không retry tự động một
+  stream request có thể đã được backend persist.
 - Full vector RAG / knowledge-base nâng cao chưa được triển khai.
