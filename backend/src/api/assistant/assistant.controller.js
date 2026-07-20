@@ -201,9 +201,16 @@ const history = async (req, res) => {
       return sendAssistantError(res, roleError);
     }
 
-    const rows = await assistantService.getHistory(auth.user.id);
+    const result = await assistantService.getHistory(
+      auth.user.id,
+      typeof req.query.conversationId === 'string' ? req.query.conversationId : null
+    );
+    const normalized = Array.isArray(result)
+      ? { history: result, conversationId: null }
+      : result;
     return res.status(200).json({
-      history: rows,
+      history: normalized.history || [],
+      conversationId: normalized.conversationId || null,
       code: null,
     });
   } catch (error) {

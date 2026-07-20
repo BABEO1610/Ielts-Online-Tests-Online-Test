@@ -62,16 +62,16 @@ const parseSsePayload = (chunk) => {
 };
 
 export const assistantApi = {
-  sendChat: async ({ message, context }) => {
+  sendChat: async ({ message, context, conversationId = null }) => {
     try {
-      const response = await api.post('/assistant/chat', { message, context });
+      const response = await api.post('/assistant/chat', { message, context, conversationId });
       return response.data;
     } catch (error) {
       return normalizeAssistantError(error);
     }
   },
 
-  streamChat: async ({ message, context, onStart, onDelta, onDone, onError }) => {
+  streamChat: async ({ message, context, conversationId = null, onStart, onDelta, onDone, onError }) => {
     try {
       const response = await fetch(getApiUrl('/assistant/chat/stream'), {
         method: 'POST',
@@ -79,7 +79,7 @@ export const assistantApi = {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ message, context }),
+        body: JSON.stringify({ message, context, conversationId }),
       });
 
       if (!response.ok || !response.body) {
@@ -95,33 +95,41 @@ export const assistantApi = {
       const decoder = new TextDecoder();
       let buffer = '';
       let finalResult = null;
+      const handleSsePayload = (payload) => {
+        if (!payload) return;
+        const { event, data } = payload;
+        if (event === 'assistant.start') onStart?.(data);
+        if (event === 'assistant.delta') onDelta?.(data.delta || '');
+        if (event === 'assistant.done') {
+          finalResult = data;
+          onDone?.(data);
+        }
+        if (event === 'assistant.error') {
+          finalResult = data;
+          onError?.(data);
+        }
+      };
 
       while (true) {
         const { value, done } = await reader.read();
-        if (done) break;
+        if (done) {
+          buffer += decoder.decode();
+          break;
+        }
 
         buffer += decoder.decode(value, { stream: true });
         const chunks = buffer.split('\n\n');
         buffer = chunks.pop() || '';
 
-        chunks
-          .map(parseSsePayload)
-          .filter(Boolean)
-          .forEach(({ event, data }) => {
-            if (event === 'assistant.start') onStart?.(data);
-            if (event === 'assistant.delta') onDelta?.(data.delta || '');
-            if (event === 'assistant.done') {
-              finalResult = data;
-              onDone?.(data);
-            }
-            if (event === 'assistant.error') {
-              finalResult = data;
-              onError?.(data);
-            }
-          });
+        chunks.map(parseSsePayload).forEach(handleSsePayload);
       }
 
-      return finalResult || DEFAULT_ERROR;
+      if (buffer.trim()) handleSsePayload(parseSsePayload(buffer));
+      if (finalResult) return finalResult;
+
+      const incompleteStreamError = { ...DEFAULT_ERROR };
+      onError?.(incompleteStreamError);
+      return incompleteStreamError;
     } catch (error) {
       const normalized = normalizeAssistantError(error);
       onError?.(normalized);
@@ -138,9 +146,11 @@ export const assistantApi = {
     }
   },
 
-  getHistory: async () => {
+  getHistory: async ({ conversationId = null } = {}) => {
     try {
-      const response = await api.get('/assistant/history');
+      const response = await api.get('/assistant/history', {
+        params: conversationId ? { conversationId } : undefined,
+      });
       return response.data;
     } catch (error) {
       return normalizeAssistantError(error);

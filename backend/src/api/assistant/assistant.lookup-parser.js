@@ -15,7 +15,10 @@ const CONTROL_TERMS = new Set([
   'tim', 'cho', 'toi', 'minh', 'ban', 'de', 'bai', 'thi', 'test', 'mock',
   'ielts', 'cu', 'nhat', 'moi', 'gan', 'day', 'so', 'mot', 'vai', 'cai',
   'nao', 'khong', 'co', 'trong', 'he', 'thong', 'bat', 'ky', 'mo', 'vao',
-  'lam', 'xem',
+  'lam', 'xem', 'phu', 'hop', 'voi', 'nhe', 'nha', 'please', 'giup', 'duoc',
+  'nen', 'nay', 'do', 'phan', 'find', 'search', 'show', 'give', 'recommend',
+  'suggest', 'me', 'my', 'for', 'about', 'suitable',
+  've', 'chu', 'tai', 'lieu', 'lien', 'quan', 'den',
   ...SKILLS,
 ]);
 

@@ -5,6 +5,8 @@ const classifyScope = async (message, options = {}) => {
   try {
     const rawJson = await aiService.generateScopeClassification({
       message,
+      recentMessages: options.recentMessages || [],
+      routingHints: options.routingHints || {},
       usageContext: options.usageContext,
     });
     const parsed = JSON.parse(rawJson);

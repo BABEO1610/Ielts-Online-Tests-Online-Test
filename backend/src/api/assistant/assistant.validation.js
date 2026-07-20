@@ -1,6 +1,7 @@
 const { ERROR_CODES, PAGE_TYPES } = require('./assistant.constants');
 
 const MAX_MESSAGE_LENGTH = 2000;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const normalizeNullableString = (value) => {
   if (value === undefined || value === null || value === '') return null;
@@ -61,6 +62,12 @@ const validateChatPayload = (body) => {
     errors.push('context.route must be string or null.');
   }
 
+  const rawConversationId = normalizeNullableString(body.conversationId ?? body.sessionId);
+  const sessionId = rawConversationId && UUID_RE.test(rawConversationId) ? rawConversationId : null;
+  if (rawConversationId !== null && !sessionId) {
+    errors.push('conversationId must be a valid UUID or null.');
+  }
+
   if (errors.length > 0) {
     return {
       error: { code: ERROR_CODES.VALIDATION_ERROR, message: errors.join(' ') },
@@ -73,6 +80,7 @@ const validateChatPayload = (body) => {
     value: {
       message,
       context: { pageType, attemptId, questionId, route, visibleItems },
+      sessionId,
     },
   };
 };

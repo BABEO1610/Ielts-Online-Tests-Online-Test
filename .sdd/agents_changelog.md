@@ -218,3 +218,56 @@ Khi admin phân công giảng viên, trang "Nhật ký duyệt & thay đổi" hi
 - ✅ ADR-003: Response format `{ success, data, error, meta }` không thay đổi
 - ✅ DATA-03: Migration chỉ ADD VALUE vào enum, không phá schema cũ
 
+---
+
+## [2026-07-20] | Codex | Global IELTS Assistant provider và conversation memory
+
+### Thay đổi
+
+- Sửa chọn provider/model: Gemini là mặc định của Global Assistant khi có Gemini key,
+  model được cô lập theo provider và Gemini key chuyển khỏi URL sang header.
+- Cho knowledge response retry một lần ở plain-text mode trước deterministic fallback.
+- Thêm owned `conversationId`, ownership-atomic message insert và structured
+  `preferred_address` theo active conversation (set/recall/clear, sanitize input).
+- Giữ conversation khi panel đóng/mở, cải thiện chained follow-up và đánh dấu mọi
+  conversation memory là untrusted prompt data.
+- Cập nhật spec/plan/tasks/eval và migration 024.
+
+### Verification
+
+- Backend targeted: PASS — 19 suites, 254 tests.
+- Frontend focused: PASS — 2 files, 3 tests; assistant ESLint PASS; production build PASS.
+- Không chạy live AI/DB và không đọc `.env`; migration 024 vẫn cần apply theo quy trình
+  deploy của environment.
+
+---
+
+## [2026-07-21] | Codex | Multi-turn topic memory và recommendation theo hội thoại
+
+### Thay đổi
+
+- Nhận diện tham chiếu nhiều lượt (`hai cái này`, `both`, `chúng`) và inject tối đa 12
+  lượt user/assistant gần nhất cùng topic/skill server-derived vào prompt/classifier.
+- Route yêu cầu mơ hồ “tìm 1 đề phù hợp” sang `FIND_TEST`, kế thừa Reading từ
+  Skimming/Scanning và giữ test/link được DB-grounding.
+- Làm fallback lookup tự nhiên hơn theo preferred address/topic nhưng không suy đoán
+  band hoặc năng lực.
+- Scope history theo owned conversation và resume active session có message mới nhất,
+  tránh UI hiển thị một session trong khi AI dùng session khác.
+- Library route không còn cướp câu hỏi kiến thức; topic được lọc trong SQL trước limit
+  và quantity được áp sau xếp hạng.
+- Lookup response bị provider lỗi hoặc nêu title ngoài DB được thay bằng câu trả lời/link
+  deterministic đã grounded.
+- Frontend chờ canonical history trước khi cho gửi, parse cả SSE frame cuối và không
+  tự resubmit JSON khi stream delivery chưa chắc chắn để tránh lưu trùng memory.
+- Prompt bỏ các block memory/preference/state/knowledge bị lặp; knowledge fallback dùng
+  recent Skimming/Scanning và không còn câu “Mình chưa gọi được AI”.
+
+### Verification
+
+- Backend targeted: PASS — 19 suites, 272 tests.
+- Frontend focused: PASS — 3 files, 7 tests; assistant ESLint PASS; production build PASS.
+- Read-only DB preflight xác nhận session/history selection mới cùng chọn đúng
+  conversation gần nhất. Nodemon đã tự restart backend và health trả HTTP 200;
+  migration 024 vẫn chưa apply.
+

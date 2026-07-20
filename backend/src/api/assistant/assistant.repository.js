@@ -139,21 +139,51 @@ const buildSearchCondition = ({ columns, fields, terms, values }) => {
   return `(${perTermConditions.join(' AND ')})`;
 };
 
-const createOrGetSession = async (userId) => {
+const createOrGetSession = async (userId, requestedSessionId = null) => {
   const tableName = 'chatbot_sessions';
-  const columns = await getTableColumns(tableName);
+  const [columns, messageColumns] = await Promise.all([
+    getTableColumns(tableName),
+    getTableColumns('chatbot_messages'),
+  ]);
   if (!columns.has('id')) return null;
 
   const userColumn = pickColumn(columns, ['user_id', 'student_id', 'created_by']);
   if (!userColumn) return null;
 
   try {
-    const orderColumn = pickColumn(columns, ['updated_at', 'created_at']);
-    const orderClause = orderColumn ? `ORDER BY ${quoteIdent(orderColumn)} DESC` : '';
+    const endedColumn = pickColumn(columns, ['ended_at', 'closed_at']);
+    const activeClause = endedColumn ? `AND ${quoteIdent(endedColumn)} IS NULL` : '';
+    if (requestedSessionId) {
+      const requested = await pool.query(
+        `SELECT id FROM ${quoteIdent(tableName)}
+         WHERE id = $1 AND ${quoteIdent(userColumn)} = $2 ${activeClause}
+         LIMIT 1`,
+        [requestedSessionId, userId]
+      );
+      if (requested.rows[0]?.id) return requested.rows[0].id;
+    }
+
+    const orderColumn = pickColumn(columns, ['updated_at', 'started_at', 'created_at']);
+    const messageSessionColumn = pickColumn(messageColumns, ['session_id', 'chatbot_session_id', 'conversation_id']);
+    const messageCreatedColumn = pickColumn(messageColumns, ['created_at', 'sent_at', 'timestamp']);
+    const activityOrder = messageSessionColumn && messageCreatedColumn
+      ? `(SELECT MAX(activity.${quoteIdent(messageCreatedColumn)})
+          FROM ${quoteIdent('chatbot_messages')} activity
+          WHERE activity.${quoteIdent(messageSessionColumn)} = session_row.id)`
+      : null;
+    const orderParts = [
+      activityOrder ? `${activityOrder} DESC NULLS LAST` : null,
+      orderColumn ? `session_row.${quoteIdent(orderColumn)} DESC` : null,
+      'session_row.id DESC',
+    ].filter(Boolean);
+    const qualifiedActiveClause = endedColumn
+      ? `AND session_row.${quoteIdent(endedColumn)} IS NULL`
+      : '';
     const existing = await pool.query(
-      `SELECT id FROM ${quoteIdent(tableName)}
-       WHERE ${quoteIdent(userColumn)} = $1
-       ${orderClause}
+      `SELECT session_row.id FROM ${quoteIdent(tableName)} session_row
+       WHERE session_row.${quoteIdent(userColumn)} = $1
+       ${qualifiedActiveClause}
+       ORDER BY ${orderParts.join(', ')}
        LIMIT 1`,
       [userId]
     );
@@ -186,36 +216,45 @@ const createOrGetSession = async (userId) => {
 };
 
 const saveMessage = async ({ sessionId, userId, role, message }) => {
-  if (!sessionId || !message) return null;
+  if (!sessionId || !userId || !message) return null;
 
   const tableName = 'chatbot_messages';
-  const columns = await getTableColumns(tableName);
-  if (columns.size === 0) return null;
+  const [columns, sessionColumns] = await Promise.all([
+    getTableColumns(tableName),
+    getTableColumns('chatbot_sessions'),
+  ]);
+  if (columns.size === 0 || !sessionColumns.has('id')) return null;
 
   const sessionColumn = pickColumn(columns, ['session_id', 'chatbot_session_id', 'conversation_id']);
   const contentColumn = pickColumn(columns, ['message', 'content', 'message_text', 'text', 'body']);
-  if (!sessionColumn || !contentColumn) return null;
+  const sessionUserColumn = pickColumn(sessionColumns, ['user_id', 'student_id', 'created_by']);
+  if (!sessionColumn || !contentColumn || !sessionUserColumn) return null;
 
   const insertColumns = [sessionColumn, contentColumn];
-  const values = [sessionId, message];
+  const selectValues = ['s.id', '$3'];
+  const values = [sessionId, userId, message];
 
   const roleColumn = pickColumn(columns, ['role', 'sender', 'message_role']);
   if (roleColumn) {
     insertColumns.push(roleColumn);
+    selectValues.push(`$${values.length + 1}`);
     values.push(role);
   }
 
   const userColumn = pickColumn(columns, ['user_id', 'student_id']);
-  if (userColumn && userId) {
+  if (userColumn) {
     insertColumns.push(userColumn);
-    values.push(userId);
+    selectValues.push('$2');
   }
 
   try {
-    const placeholders = values.map((_, index) => `$${index + 1}`).join(', ');
+    const endedColumn = pickColumn(sessionColumns, ['ended_at', 'closed_at']);
+    const activeClause = endedColumn ? `AND s.${quoteIdent(endedColumn)} IS NULL` : '';
     const result = await pool.query(
       `INSERT INTO ${quoteIdent(tableName)} (${insertColumns.map(quoteIdent).join(', ')})
-       VALUES (${placeholders})
+       SELECT ${selectValues.join(', ')}
+       FROM ${quoteIdent('chatbot_sessions')} s
+       WHERE s.id = $1 AND s.${quoteIdent(sessionUserColumn)} = $2 ${activeClause}
        RETURNING id`,
       values
     );
@@ -248,7 +287,9 @@ const getRecentMessages = async (userId, sessionId, limit = 8) => {
   const createdColumn = pickColumn(messageColumns, ['created_at', 'sent_at', 'timestamp']);
   const selectRole = roleColumn ? `m.${quoteIdent(roleColumn)} AS role` : `'assistant' AS role`;
   const selectCreated = createdColumn ? `m.${quoteIdent(createdColumn)} AS created_at` : 'NULL AS created_at';
-  const orderClause = createdColumn ? `ORDER BY m.${quoteIdent(createdColumn)} DESC` : 'ORDER BY m.id DESC';
+  const orderClause = createdColumn
+    ? `ORDER BY m.${quoteIdent(createdColumn)} DESC, m.id DESC`
+    : 'ORDER BY m.id DESC';
 
   try {
     const result = await pool.query(
@@ -275,7 +316,7 @@ const getRecentMessages = async (userId, sessionId, limit = 8) => {
   }
 };
 
-const getHistory = async (userId) => {
+const getHistory = async (userId, requestedSessionId = null) => {
   const sessionColumns = await getTableColumns('chatbot_sessions');
   const messageColumns = await getTableColumns('chatbot_messages');
   if (!sessionColumns.has('id') || messageColumns.size === 0) return [];
@@ -287,19 +328,57 @@ const getHistory = async (userId) => {
 
   const roleColumn = pickColumn(messageColumns, ['role', 'sender', 'message_role']);
   const createdColumn = pickColumn(messageColumns, ['created_at', 'sent_at', 'timestamp']);
+  const endedColumn = pickColumn(sessionColumns, ['ended_at', 'closed_at']);
+  const sessionOrderColumn = pickColumn(sessionColumns, ['updated_at', 'started_at', 'created_at']);
   const selectRole = roleColumn ? `m.${quoteIdent(roleColumn)} AS role` : `'assistant' AS role`;
   const selectCreated = createdColumn ? `m.${quoteIdent(createdColumn)} AS created_at` : 'NULL AS created_at';
-  const orderClause = createdColumn ? `ORDER BY m.${quoteIdent(createdColumn)} ASC` : '';
+  const innerOrderClause = createdColumn
+    ? `ORDER BY m.${quoteIdent(createdColumn)} DESC, m.id DESC`
+    : 'ORDER BY m.id DESC';
+  const outerOrderClause = createdColumn
+    ? 'ORDER BY recent.created_at ASC, recent.id ASC'
+    : 'ORDER BY recent.id ASC';
+  const targetActiveClause = endedColumn ? `AND target.${quoteIdent(endedColumn)} IS NULL` : '';
+  const targetActivityJoin = createdColumn
+    ? `LEFT JOIN ${quoteIdent('chatbot_messages')} activity
+         ON activity.${quoteIdent(sessionColumn)} = target.id`
+    : '';
+  const targetGroupBy = sessionOrderColumn
+    ? `GROUP BY target.id, target.${quoteIdent(sessionOrderColumn)}`
+    : 'GROUP BY target.id';
+  const targetOrderParts = [
+    createdColumn ? `MAX(activity.${quoteIdent(createdColumn)}) DESC NULLS LAST` : null,
+    sessionOrderColumn ? `target.${quoteIdent(sessionOrderColumn)} DESC` : null,
+    'target.id DESC',
+  ].filter(Boolean);
 
   try {
     const result = await pool.query(
-      `SELECT m.id, ${selectRole}, m.${quoteIdent(contentColumn)} AS content, ${selectCreated}
-       FROM ${quoteIdent('chatbot_messages')} m
-       INNER JOIN ${quoteIdent('chatbot_sessions')} s ON s.id = m.${quoteIdent(sessionColumn)}
-       WHERE s.${quoteIdent(userColumn)} = $1
-       ${orderClause}
-       LIMIT 100`,
-      [userId]
+      `WITH target_session AS (
+         SELECT target.id
+         FROM ${quoteIdent('chatbot_sessions')} target
+         ${targetActivityJoin}
+         WHERE target.${quoteIdent(userColumn)} = $1
+           AND ($2::text IS NULL OR target.id::text = $2::text)
+           ${targetActiveClause}
+         ${targetGroupBy}
+         ORDER BY ${targetOrderParts.join(', ')}
+         LIMIT 1
+       )
+       SELECT *
+       FROM (
+         SELECT m.id,
+                m.${quoteIdent(sessionColumn)} AS conversation_id,
+                ${selectRole},
+                m.${quoteIdent(contentColumn)} AS content,
+                ${selectCreated}
+         FROM ${quoteIdent('chatbot_messages')} m
+         INNER JOIN target_session selected ON selected.id = m.${quoteIdent(sessionColumn)}
+         ${innerOrderClause}
+         LIMIT 100
+       ) recent
+       ${outerOrderClause}`,
+      [userId, requestedSessionId || null]
     );
     return result.rows;
   } catch (error) {
@@ -307,6 +386,63 @@ const getHistory = async (userId) => {
     return [];
   }
 };
+
+const getSessionPreference = async (userId, sessionId) => {
+  if (!userId || !sessionId) return { supported: false, preferredAddress: null };
+  const tableName = 'chatbot_sessions';
+  const columns = await getTableColumns(tableName);
+  const userColumn = pickColumn(columns, ['user_id', 'student_id', 'created_by']);
+  const preferenceColumn = pickColumn(columns, ['preferred_address', 'preferred_name']);
+  if (!columns.has('id') || !userColumn || !preferenceColumn) {
+    return { supported: false, preferredAddress: null };
+  }
+
+  try {
+    const endedColumn = pickColumn(columns, ['ended_at', 'closed_at']);
+    const activeClause = endedColumn ? `AND ${quoteIdent(endedColumn)} IS NULL` : '';
+    const result = await pool.query(
+      `SELECT ${quoteIdent(preferenceColumn)} AS preferred_address
+       FROM ${quoteIdent(tableName)}
+       WHERE id = $1 AND ${quoteIdent(userColumn)} = $2 ${activeClause}
+       LIMIT 1`,
+      [sessionId, userId]
+    );
+    return {
+      supported: true,
+      preferredAddress: result.rows[0]?.preferred_address || null,
+    };
+  } catch (error) {
+    console.warn('[AssistantRepository] Session preference read skipped:', error.message);
+    return { supported: false, preferredAddress: null };
+  }
+};
+
+const setSessionPreference = async ({ userId, sessionId, preferredAddress }) => {
+  if (!userId || !sessionId) return false;
+  const tableName = 'chatbot_sessions';
+  const columns = await getTableColumns(tableName);
+  const userColumn = pickColumn(columns, ['user_id', 'student_id', 'created_by']);
+  const preferenceColumn = pickColumn(columns, ['preferred_address', 'preferred_name']);
+  if (!columns.has('id') || !userColumn || !preferenceColumn) return false;
+
+  try {
+    const endedColumn = pickColumn(columns, ['ended_at', 'closed_at']);
+    const activeClause = endedColumn ? `AND ${quoteIdent(endedColumn)} IS NULL` : '';
+    const result = await pool.query(
+      `UPDATE ${quoteIdent(tableName)}
+       SET ${quoteIdent(preferenceColumn)} = $3
+       WHERE id = $1 AND ${quoteIdent(userColumn)} = $2 ${activeClause}
+       RETURNING id`,
+      [sessionId, userId, preferredAddress || null]
+    );
+    return Boolean(result.rows[0]?.id);
+  } catch (error) {
+    console.warn('[AssistantRepository] Session preference update skipped:', error.message);
+    return false;
+  }
+};
+
+const clearColumnCacheForTests = () => columnCache.clear();
 
 const rateAssistantMessage = async ({ userId, messageId, rating, reason }) => {
   const sessionColumns = await getTableColumns('chatbot_sessions');
@@ -771,8 +907,11 @@ module.exports = {
   saveUserMessage,
   saveAssistantMessage,
   getRecentMessages,
+  getSessionPreference,
+  setSessionPreference,
   getHistory,
   findGeneralContent,
   getAttemptContext,
   rateAssistantMessage,
+  clearColumnCacheForTests,
 };

@@ -1,4 +1,8 @@
-const { ASSISTANT_INTENTS, detectIntent } = require('../../../src/api/assistant/assistant.intent');
+const {
+  ASSISTANT_INTENTS,
+  detectIntent,
+  hasContextFollowUpCue,
+} = require('../../../src/api/assistant/assistant.intent');
 
 describe('Assistant intent router', () => {
   it('routes greeting without database lookup intent', () => {
@@ -53,6 +57,15 @@ describe('Assistant intent router', () => {
     });
 
     expect(intent).toBe(ASSISTANT_INTENTS.FIND_LESSON);
+  });
+
+  it('does not steal an IELTS knowledge question just because it is asked on the library page', () => {
+    const intent = detectIntent({
+      message: 'Skimming có khác scanning không?',
+      context: { pageType: 'library' },
+    });
+
+    expect(intent).toBe(ASSISTANT_INTENTS.IELTS_KNOWLEDGE);
   });
 
   it('routes Cambridge reading test query to FIND_TEST', () => {
@@ -336,6 +349,93 @@ describe('Assistant intent router', () => {
     });
 
     expect(intent).toBe(ASSISTANT_INTENTS.OUT_OF_SCOPE);
+  });
+
+  it.each([
+    'lich su lam bai o dau',
+    'lich su ben ngoai',
+  ])('routes natural practice history location questions to NAVIGATION: %s', (message) => {
+    const intent = detectIntent({
+      message,
+      context: { pageType: 'home' },
+    });
+
+    expect(intent).toBe(ASSISTANT_INTENTS.NAVIGATION);
+  });
+
+  it.each([
+    'hãy gọi tôi là Siêu nhân Đạt',
+    'call me Captain Dat',
+    'Bạn đang gọi tôi là gì?',
+  ])('routes session preference messages without relying on the scope classifier: %s', (message) => {
+    expect(detectIntent({ message, context: { pageType: 'home' } }))
+      .toBe(ASSISTANT_INTENTS.IELTS_KNOWLEDGE);
+  });
+
+  it('uses previous knowledge intent for a short example follow-up', () => {
+    expect(detectIntent({
+      message: 'cho ví dụ',
+      context: { previousIntent: ASSISTANT_INTENTS.IELTS_KNOWLEDGE },
+    })).toBe(ASSISTANT_INTENTS.IELTS_KNOWLEDGE);
+  });
+
+  it('lets the history-aware classifier resolve a follow-up when rules cannot infer the prior intent', () => {
+    expect(detectIntent({
+      message: 'cho ví dụ',
+      context: {
+        pageType: 'home',
+        recentMessages: [{ role: 'user', content: 'Explain inversion in English.' }],
+      },
+    })).toBe(ASSISTANT_INTENTS.UNKNOWN);
+  });
+
+  it('still asks for clarification when a short follow-up has no conversation history', () => {
+    expect(detectIntent({
+      message: 'cho ví dụ',
+      context: { pageType: 'home' },
+    })).toBe(ASSISTANT_INTENTS.CLARIFICATION);
+  });
+
+  it('uses recent knowledge context for a two-topic combination follow-up', () => {
+    const message = 'kết hợp 2 cái này như thế nào?';
+
+    expect(hasContextFollowUpCue(message)).toBe(true);
+    expect(detectIntent({
+      message,
+      context: { previousIntent: ASSISTANT_INTENTS.IELTS_KNOWLEDGE },
+    })).toBe(ASSISTANT_INTENTS.IELTS_KNOWLEDGE);
+  });
+
+  it('routes a vague suitable-test follow-up to FIND_TEST even on the library page', () => {
+    const message = 'tìm 1 đề phù hợp với mình nhé';
+
+    expect(hasContextFollowUpCue(message)).toBe(true);
+    expect(detectIntent({
+      message,
+      context: {
+        pageType: 'library',
+        previousIntent: ASSISTANT_INTENTS.IELTS_KNOWLEDGE,
+        previousSkill: 'reading',
+      },
+    })).toBe(ASSISTANT_INTENTS.FIND_TEST);
+  });
+
+  it.each([
+    'What is the present perfect?',
+    'Explain conditional sentences',
+    'Câu bị động dùng như thế nào?',
+    'How do I learn phrasal verbs?',
+    'How do I use English articles?',
+  ])('routes common English-learning topics directly to IELTS_KNOWLEDGE: %s', (message) => {
+    expect(detectIntent({ message, context: { pageType: 'home' } }))
+      .toBe(ASSISTANT_INTENTS.IELTS_KNOWLEDGE);
+  });
+
+  it('still treats an explicit search for English articles as a lesson lookup', () => {
+    expect(detectIntent({
+      message: 'Find me English articles',
+      context: { pageType: 'home' },
+    })).toBe(ASSISTANT_INTENTS.FIND_LESSON);
   });
 
   it('routes Writing Task 2 outline requests to IELTS_KNOWLEDGE', () => {
