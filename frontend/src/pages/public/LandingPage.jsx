@@ -423,6 +423,7 @@ const HeroMockUI = () => {
 
 // ─── MAIN LANDING PAGE ────────────────────────────────────────────────────────
 const LandingPage = () => {
+    const { user } = useAuth();
     const { scrollYProgress } = useScroll();
     // Subtle parallax — keep it minimal, no color blobs
     const yBg = useTransform(scrollYProgress, [0, 1], [0, 200]);
@@ -595,32 +596,51 @@ const LandingPage = () => {
                                 transition={{ delay: 0.3, duration: 0.6 }}
                                 style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center', marginBottom: '40px' }}
                             >
-                                <MagneticButton>
-                                    <Link to="/register" style={{
-                                        display: 'inline-flex', alignItems: 'center',
-                                        padding: '14px 28px', borderRadius: '999px',
-                                        backgroundColor: 'var(--ink)', color: 'var(--canvas)',
-                                        fontWeight: 500, fontSize: '16px', textDecoration: 'none',
-                                        transition: 'background-color 0.2s ease',
-                                    }}
-                                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--black-elevated)'}
-                                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'var(--ink)'}
-                                    >
-                                        Bắt đầu miễn phí
-                                    </Link>
-                                </MagneticButton>
-                                <Link to="/listening" style={{
-                                    display: 'inline-flex', alignItems: 'center',
-                                    padding: '14px 28px', borderRadius: '999px',
-                                    backgroundColor: 'var(--canvas-soft)', color: 'var(--ink)',
-                                    fontWeight: 500, fontSize: '16px', textDecoration: 'none',
-                                    transition: 'background-color 0.2s ease',
-                                }}
-                                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--surface-pressed)'}
-                                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'var(--canvas-soft)'}
-                                >
-                                    Xem đề thi thử
-                                </Link>
+                                {!user ? (
+                                    <>
+                                        <MagneticButton>
+                                            <Link to="/register" style={{
+                                                display: 'inline-flex', alignItems: 'center',
+                                                padding: '14px 28px', borderRadius: '999px',
+                                                backgroundColor: 'var(--ink)', color: 'var(--canvas)',
+                                                fontWeight: 500, fontSize: '16px', textDecoration: 'none',
+                                                transition: 'background-color 0.2s ease',
+                                            }}
+                                                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--black-elevated)'}
+                                                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'var(--ink)'}
+                                            >
+                                                Bắt đầu miễn phí
+                                            </Link>
+                                        </MagneticButton>
+                                        <Link to="/listening" style={{
+                                            display: 'inline-flex', alignItems: 'center',
+                                            padding: '14px 28px', borderRadius: '999px',
+                                            backgroundColor: 'var(--canvas-soft)', color: 'var(--ink)',
+                                            fontWeight: 500, fontSize: '16px', textDecoration: 'none',
+                                            transition: 'background-color 0.2s ease',
+                                        }}
+                                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--surface-pressed)'}
+                                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'var(--canvas-soft)'}
+                                        >
+                                            Xem đề thi thử
+                                        </Link>
+                                    </>
+                                ) : (
+                                    <MagneticButton>
+                                        <Link to="/listening" style={{
+                                            display: 'inline-flex', alignItems: 'center',
+                                            padding: '14px 28px', borderRadius: '999px',
+                                            backgroundColor: 'var(--ink)', color: 'var(--canvas)',
+                                            fontWeight: 500, fontSize: '16px', textDecoration: 'none',
+                                            transition: 'background-color 0.2s ease',
+                                        }}
+                                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--black-elevated)'}
+                                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'var(--ink)'}
+                                        >
+                                            Tiếp tục luyện tập
+                                        </Link>
+                                    </MagneticButton>
+                                )}
                             </motion.div>
 
                             {/* Trust bar */}
@@ -1007,6 +1027,7 @@ const LandingPage = () => {
 
             {/* ── FINAL CTA ── */}
             {/* hero-band-dark: ink bg per DESIGN.md */}
+            {!user && (
             <section style={{ padding: 'clamp(28px, 4vw, 48px) 32px clamp(60px, 8vw, 80px)', position: 'relative', zIndex: 1, backgroundColor: 'var(--canvas)' }}>
                 <div className="container">
                     <motion.div
@@ -1085,6 +1106,7 @@ const LandingPage = () => {
                     </motion.div>
                 </div>
             </section>
+            )}
 
             {/* ── FOOTER ── */}
             {/* footer: primary (black) bg per DESIGN.md */}

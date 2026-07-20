@@ -11,12 +11,14 @@ const adminTutorController = {
    */
   getTutorAssignments: async (req, res, next) => {
     try {
-      const data = await adminTutorService.getAssignmentData();
+      const page = Math.max(1, parseInt(req.query.page) || 1);
+      const limit = Math.max(1, parseInt(req.query.limit) || 10);
+      const { tutors, assignments, meta } = await adminTutorService.getAssignmentData(page, limit);
       res.status(200).json({
         success: true,
-        data,
+        data: { tutors, assignments },
         error: null,
-        meta: null
+        meta
       });
     } catch (error) {
       next(error);

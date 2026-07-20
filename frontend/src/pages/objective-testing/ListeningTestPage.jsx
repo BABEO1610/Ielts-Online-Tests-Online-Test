@@ -8,13 +8,14 @@
  * 
  * Design: Uber-inspired — sticky audio player, clean question cards.
  */
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import TimerBar from '../../components/objective-testing/TimerBar';
 import AutoSubmitModal from '../../components/objective-testing/AutoSubmitModal';
 import ReviewModal from '../../components/objective-testing/ReviewModal';
 import ListeningBlockRenderer from '../../components/tutor/listening/ListeningBlockRenderer';
 import { testService } from '../../services/test.service';
+import { attemptService } from '../../services/attempt.service';
 import '../../styles/objective-testing.css';
 
 function renderBlockContent(content) {
@@ -24,6 +25,115 @@ function renderBlockContent(content) {
     return <img src={content.trim()} alt="Diagram / Map" className="img-fluid rounded border mb-2" style={{ maxHeight: '400px', display: 'block', margin: '10px auto' }} />;
   }
   return <div dangerouslySetInnerHTML={{ __html: content }} />;
+}
+
+// ─── AudioPlayer ──────────────────────────────────────────────────────────────────────────────
+/**
+ * Mode-aware audio player.
+ * Simulation (practiceMode=false): auto-play on mount, no controls at all.
+ *   Guards: seeking → revert to lastTime; pause → force resume.
+ * Practice (practiceMode=true): play/pause + rewind 10s + seek bar.
+ */
+function AudioPlayer({ src, practiceMode }) {
+  const audioRef = useRef(null);
+  const lastTimeRef = useRef(0); // ponytail: track last safe time to guard seek
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+
+  const fmt = (s) => {
+    const m = Math.floor(s / 60);
+    const sec = Math.floor(s % 60);
+    return `${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
+  };
+
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    const onTimeUpdate = () => { lastTimeRef.current = audio.currentTime; setCurrentTime(audio.currentTime); };
+    const onLoaded    = () => setDuration(audio.duration || 0);
+    const onPlay      = () => setIsPlaying(true);
+    const onPause     = () => {
+      setIsPlaying(false);
+      // Simulation guard: resume immediately if paused (tab-switch, devtools, etc.)
+      if (!practiceMode) audio.play().catch(() => {});
+    };
+    const onSeeking   = () => {
+      // Simulation guard: revert any seek attempt
+      if (!practiceMode) audio.currentTime = lastTimeRef.current;
+    };
+
+    audio.addEventListener('timeupdate',     onTimeUpdate);
+    audio.addEventListener('loadedmetadata', onLoaded);
+    audio.addEventListener('play',           onPlay);
+    audio.addEventListener('pause',          onPause);
+    audio.addEventListener('seeking',        onSeeking);
+
+    if (!practiceMode) audio.play().catch(() => {}); // auto-play for simulation
+
+    return () => {
+      audio.removeEventListener('timeupdate',     onTimeUpdate);
+      audio.removeEventListener('loadedmetadata', onLoaded);
+      audio.removeEventListener('play',           onPlay);
+      audio.removeEventListener('pause',          onPause);
+      audio.removeEventListener('seeking',        onSeeking);
+    };
+  }, [practiceMode]);
+
+  return (
+    <div style={{ marginTop: 8 }}>
+      <audio ref={audioRef} src={src} style={{ display: 'none' }} />
+      {practiceMode ? (
+        // Practice: full controls
+        <div className="d-flex align-items-center gap-3 flex-wrap">
+          <button
+            className="btn btn-sm btn-outline-secondary rounded-pill px-3"
+            onClick={() => { const a = audioRef.current; if (a) a.currentTime = Math.max(0, a.currentTime - 10); }}
+            title="Rewind 10 seconds"
+          >
+            ⏮ 10s
+          </button>
+          <button
+            className="btn btn-sm btn-dark rounded-circle d-flex align-items-center justify-content-center"
+            style={{ width: 36, height: 36, padding: 0, fontSize: 16 }}
+            onClick={() => { const a = audioRef.current; if (!a) return; isPlaying ? a.pause() : a.play(); }}
+          >
+            {isPlaying ? '⏸' : '▶'}
+          </button>
+          <input
+            type="range" min={0} max={duration || 0} step={0.5} value={currentTime}
+            onChange={(e) => { const a = audioRef.current; if (a) a.currentTime = Number(e.target.value); }}
+            style={{ flex: 1, minWidth: 120, accentColor: '#000' }}
+          />
+          <span style={{ fontSize: 13, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', color: 'var(--mute)' }}>
+            {fmt(currentTime)} / {fmt(duration)}
+          </span>
+        </div>
+      ) : (
+        // Simulation: display-only — no controls whatsoever
+        <div className="d-flex align-items-center gap-3 flex-wrap">
+          <span
+            className="d-inline-flex align-items-center gap-2 rounded-pill px-3 py-1"
+            style={{ background: '#fee2e2', color: '#991b1b', fontSize: 13, fontWeight: 600 }}
+          >
+            <span style={{
+              width: 8, height: 8, borderRadius: '50%', background: '#ef4444', display: 'inline-block',
+              animation: 'audioPulse 1.5s ease-in-out infinite'
+            }} />
+            Playing
+          </span>
+          <span style={{ fontSize: 13, fontVariantNumeric: 'tabular-nums', color: 'var(--mute)' }}>
+            {fmt(currentTime)}{duration > 0 ? ` / ${fmt(duration)}` : ''}
+          </span>
+          <span style={{ fontSize: 12, color: 'var(--mute)', fontStyle: 'italic' }}>
+            Audio will play once — listen carefully
+          </span>
+          <style>{`@keyframes audioPulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.5;transform:scale(1.3)} }`}</style>
+        </div>
+      )}
+    </div>
+  );
 }
 
 function ListeningTestPage() {
@@ -45,6 +155,7 @@ function ListeningTestPage() {
   const [activeSection, setActiveSection] = useState('Section 1');
   const [showAutoSubmit, setShowAutoSubmit] = useState(false);
   const [isReviewOpen, setIsReviewOpen] = useState(false);
+  const [startTime] = useState(Date.now());
 
   // Fetch test data
   useEffect(() => {
@@ -87,11 +198,11 @@ function ListeningTestPage() {
     if (isSubmitting) return;
     setIsSubmitting(true);
     
-    // In real app, calculate time spent
-    const timeSpentSeconds = customTimeLimit ? customTimeLimit * 60 : 30 * 60; // Mock calculation
+    // Tính thời gian thực tế user đã làm bài
+    const timeSpentSeconds = Math.round((Date.now() - startTime) / 1000);
 
     try {
-      const result = await testService.submitObjectiveTest(id, { answers, timeSpentSeconds });
+      const result = await attemptService.submitAttempt(id, { answers, timeSpent: timeSpentSeconds, practiceMode });
       if (result && result.success) {
         navigate(`/results/${result.data.attemptId}`, { replace: true });
       } else {
@@ -195,17 +306,10 @@ function ListeningTestPage() {
             </svg>
             <span className="body-sm-strong">Listening Audio — {testData?.title}</span>
           </div>
-          <audio
-            controls
-            id="audio-element"
-            style={{ marginTop: 8 }}
+          <AudioPlayer
             src={testData?.audioUrl || "/audio/sample-listening.mp3"}
-          >
-            Your browser does not support the audio element.
-          </audio>
-          <p className="caption mt-1 mb-0" style={{ color: 'var(--mute)' }}>
-            Audio will play once. Listen carefully.
-          </p>
+            practiceMode={practiceMode}
+          />
         </div>
       </div>
 

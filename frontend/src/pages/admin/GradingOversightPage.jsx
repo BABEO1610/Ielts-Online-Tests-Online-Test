@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { fetchSubmissions, retryGrading } from '../../services/adminOps.service';
 import { formatDateTime } from '../../utils/adminFormat';
+import Pagination from '../../components/common/Pagination';
 
 const STATUS_FILTERS = [
   { key: 'all', label: 'Tất cả' },
@@ -23,21 +24,31 @@ const GradingOversightPage = () => {
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState(null);
   const [error, setError] = useState(null);
+  
+  // Pagination & meta state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [meta, setMeta] = useState(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetchSubmissions();
-      setRows(res.data);
+      const res = await fetchSubmissions({ status: filter, page: currentPage, limit: 10 });
+      setRows(res.data.data);
+      setMeta(res.data.meta);
     } catch (err) {
       setError(err.message || 'Không thể tải dữ liệu. Vui lòng thử lại.');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [filter, currentPage]);
 
   useEffect(() => { load(); }, [load]);
+
+  const handleFilterChange = (newFilter) => {
+    setFilter(newFilter);
+    setCurrentPage(1);
+  };
 
   const onRetry = async (row) => {
     setBusyId(row.id);
@@ -51,8 +62,9 @@ const GradingOversightPage = () => {
     }
   };
 
-  const count = (status) => rows.filter((r) => r.status === status).length;
-  const visible = filter === 'all' ? rows : rows.filter((r) => r.status === filter);
+  const count = (status) => meta?.counts?.[status] || 0;
+  // `rows` is already filtered and paginated by the backend
+  const visible = rows;
 
   const STAT_CARDS = [
     { key: 'pending',      label: 'Đang chờ chấm' },
@@ -76,7 +88,7 @@ const GradingOversightPage = () => {
           <div
             key={card.key}
             className={`stat-card ${filter === card.key ? 'stat-card--dark' : ''}`}
-            onClick={() => setFilter(filter === card.key ? 'all' : card.key)}
+            onClick={() => handleFilterChange(filter === card.key ? 'all' : card.key)}
             style={{ cursor: 'pointer', transition: 'all 0.15s ease' }}
           >
             <span className="stat-card__label">{card.label}</span>
@@ -91,7 +103,7 @@ const GradingOversightPage = () => {
           <button
             key={f.key}
             className={`btn-pill ${filter === f.key ? 'btn-pill--dark' : 'btn-pill--ghost'}`}
-            onClick={() => setFilter(f.key)}
+            onClick={() => handleFilterChange(f.key)}
           >
             {f.label}
           </button>
@@ -147,6 +159,15 @@ const GradingOversightPage = () => {
           </table>
         </div>
       </div>
+      
+      {/* Pagination */}
+      {meta && meta.totalPages > 1 && (
+        <Pagination 
+          currentPage={meta.page} 
+          totalPages={meta.totalPages} 
+          onPageChange={setCurrentPage} 
+        />
+      )}
     </div>
   );
 };
