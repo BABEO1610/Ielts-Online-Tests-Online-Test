@@ -2,6 +2,10 @@ const js = require('@eslint/js');
 
 const nodeGlobals = {
   Buffer: 'readonly',
+  AbortController: 'readonly',
+  Blob: 'readonly',
+  FormData: 'readonly',
+  TextDecoder: 'readonly',
   __dirname: 'readonly',
   console: 'readonly',
   clearInterval: 'readonly',
