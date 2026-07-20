@@ -1,3 +1,5 @@
+ 
+
 # AGENTS.md — Dự án: IELTSZone
 
 # Phiên bản: 1.2.0 | Cập nhật: 2026-05-28 | Tác giả: Tech Lead
@@ -42,7 +44,6 @@ Stack công nghệ: Node.js 20, Express 5.x, React 18, Vite, PostgreSQL 16 (dùn
 - Tham khảo .agents/CLAUDE.md để biết kiến trúc chi tiết, User Roles và Core Features
 - Tham khảo .sdd/shared_context.md để biết DB Schema và API Contracts
 - Sprint hiện tại: Sprint 1 (Foundation - Setup project structure, Auth, DB schema)
-
 
 # Ponytail, lazy senior dev mode
 
