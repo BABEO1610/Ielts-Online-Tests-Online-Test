@@ -32,7 +32,7 @@ const AI_NOT_CONFIGURED_MESSAGE =
  * @returns {string} Raw response text
  */
 const callGeminiGrading = async (systemPrompt, userPrompt, usageContext = {}) => {
-  const { geminiApiKey, model } = getAiConfig();
+  const { geminiApiKey, geminiModel: configuredGeminiModel } = getAiConfig();
   if (!geminiApiKey) {
     throw new AppError(
       AI_NOT_CONFIGURED_MESSAGE,
@@ -41,7 +41,7 @@ const callGeminiGrading = async (systemPrompt, userPrompt, usageContext = {}) =>
   }
 
   const geminiModel = normalizeGeminiModel(
-    process.env.AI_GRADING_MODEL || model
+    process.env.AI_GRADING_MODEL || configuredGeminiModel
   );
 
   try {
