@@ -32,6 +32,28 @@ describe('Assistant validation', () => {
     expect(result.value.context.visibleItems[0].title).toBe('tam');
   });
 
+  it('accepts a canonical conversationId and normalizes it for the service', () => {
+    const conversationId = '7df412d8-291e-4bf3-901e-ea927ecc1a29';
+    const result = validateChatPayload({
+      message: 'chào bạn',
+      conversationId,
+      context: { pageType: 'home' },
+    });
+
+    expect(result.error).toBeNull();
+    expect(result.value.sessionId).toBe(conversationId);
+  });
+
+  it('rejects a malformed conversationId', () => {
+    const result = validateChatPayload({
+      message: 'chào bạn',
+      conversationId: 'not-a-uuid',
+      context: { pageType: 'home' },
+    });
+
+    expect(result.error.code).toBe(ERROR_CODES.VALIDATION_ERROR);
+  });
+
   it('rejects empty message', () => {
     const result = validateChatPayload({
       message: '   ',
