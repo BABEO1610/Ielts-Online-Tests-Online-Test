@@ -4,8 +4,8 @@ const { ASSISTANT_INTENTS, normalizeText } = require('./assistant.intent');
 const { buildNavigationResponse } = require('./assistant.responses');
 const { retrieveKnowledge } = require('./assistant.knowledge-retriever');
 const { parseLookupMessage } = require('./assistant.lookup-parser');
+const { findPreferredAddress, normalizePreferredAddress } = require('./assistant.memory');
 const {
-  STATIC_ROUTES,
   toFrontendUrl,
   buildTestRoute,
   buildLibraryRoute,
@@ -13,7 +13,6 @@ const {
 } = require('./assistant.link-builder');
 const {
   ERROR_CODES,
-  ERROR_MESSAGES,
   INTENT_CONTEXT_MAP,
   ASSISTANT_CONTEXT_RESULT_LIMIT,
   ASSISTANT_DB_LOOKUP_LIMIT,
@@ -57,10 +56,18 @@ const SEARCH_STOP_WORDS = new Set([
   'ielts', 'test', 'mock', 'reading', 'listening', 'writing', 'speaking',
   'topic', 'skill', 'level', 'lesson', 'library', 'resource', 'thu', 'vien',
   'bai', 'hoc', 'thi', 'tim', 'de', 'co', 'khong', 'nao', 'nhung', 'trong',
-  'he', 'thong', 'danh', 'sach', 'ban', 'bạn', 'có', 'không', 'nào', 'hệ thống', 'đề'
+  'he', 'thong', 'danh', 'sach', 'ban', 'bạn', 'có', 'không', 'nào', 'hệ thống', 'đề',
+  'phu', 'hop', 'voi', 'minh', 'toi', 'em', 'nhe', 'nha', 'please', 'giup', 'duoc', 'nay', 'do', 'phan',
+  've', 'chu', 'tai', 'lieu', 'mot', 'vai', 'cai', 'lien', 'quan', 'den',
+  'find', 'search', 'show', 'give', 'recommend', 'suggest', 'me', 'my', 'for', 'about', 'suitable'
 ]);
 
-const createBaseContext = ({ intent, sessionMemory = [] }) => {
+const createBaseContext = ({
+  intent,
+  sessionMemory = [],
+  preferredAddress = null,
+  conversationState = {},
+}) => {
   const map = INTENT_CONTEXT_MAP[intent] || INTENT_CONTEXT_MAP.UNKNOWN;
   return {
     mode: intent,
@@ -68,6 +75,18 @@ const createBaseContext = ({ intent, sessionMemory = [] }) => {
     knowledgeResults: [],
     knowledgeDebug: null,
     sessionMemory,
+    conversationPreferences: {
+      preferredAddress: preferredAddress || findPreferredAddress(sessionMemory),
+    },
+    conversationState: {
+      previousIntent: conversationState.previousIntent || null,
+      previousSkill: conversationState.previousSkill || null,
+      recentTopics: Array.isArray(conversationState.recentTopics)
+        ? conversationState.recentTopics.slice(-6)
+        : [],
+      assistantOfferedPractice: Boolean(conversationState.assistantOfferedPractice),
+      isFollowUp: Boolean(conversationState.isConversationFollowUp),
+    },
     allowedActions: map.allowedActions,
     forbiddenActions: map.forbiddenActions,
     suggestedLinks: [],
@@ -202,8 +221,8 @@ const getPublishCondition = async (tableName) => {
   return conditions.length ? conditions.join(' AND ') : '1=1';
 };
 
-const limitContextRows = (rows) => rows.slice(0, ASSISTANT_CONTEXT_RESULT_LIMIT);
-const SESSION_MEMORY_LIMIT = 8;
+const SESSION_MEMORY_LIMIT = 12;
+const PREFERENCE_MEMORY_LIMIT = 100;
 const SESSION_MEMORY_CONTENT_LIMIT = 700;
 
 const truncateMemoryContent = (value) => {
@@ -221,7 +240,14 @@ const normalizeSessionMemory = (rows = []) =>
     .filter((row) => row.content)
     .slice(-SESSION_MEMORY_LIMIT);
 
-const runPublishedTestQuery = async ({ skill, difficulty, titleNumber, sortOrder = 'DESC', limit = ASSISTANT_DB_LOOKUP_LIMIT }) => {
+const runPublishedTestQuery = async ({
+  skill,
+  difficulty,
+  titleNumber,
+  searchTerms = [],
+  sortOrder = 'DESC',
+  limit = ASSISTANT_DB_LOOKUP_LIMIT,
+}) => {
   const tableName = ASSISTANT_TABLE_MAP.mock_tests;
   const publishFilter = await getPublishCondition(tableName);
   const conditions = [publishFilter];
@@ -246,6 +272,12 @@ const runPublishedTestQuery = async ({ skill, difficulty, titleNumber, sortOrder
     const colonParam = `$${values.length}`;
     conditions.push(`(title::text ILIKE ${mockParam} OR title::text ILIKE ${testParam} OR title::text ILIKE ${colonParam})`);
   }
+  const keywordCondition = buildKeywordCondition({
+    fields: ['title', 'description'],
+    terms: searchTerms,
+    values,
+  });
+  if (keywordCondition) conditions.push(keywordCondition);
 
   const selectedColumns = 'id, title, description, skill, difficulty, duration_minutes';
   const result = await pool.query(
@@ -267,6 +299,20 @@ const runPublishedTestQuery = async ({ skill, difficulty, titleNumber, sortOrder
   };
 };
 
+const rankRowsBySearchTerms = (rows, searchTerms, fields) => rows
+  .map((row, originalIndex) => {
+    const normalizedFields = fields.map((field) => normalizeText(row[field] || ''));
+    const score = searchTerms.reduce((total, term) => {
+      const titleMatch = normalizedFields[0]?.includes(term) ? 2 : 0;
+      const metadataMatch = normalizedFields.slice(1).some((value) => value.includes(term)) ? 1 : 0;
+      return total + titleMatch + metadataMatch;
+    }, 0);
+    return { row, score, originalIndex };
+  })
+  .filter((item) => item.score > 0)
+  .sort((left, right) => right.score - left.score || left.originalIndex - right.originalIndex)
+  .map((item) => item.row);
+
 const queryPublishedTests = async (message, context = {}) => {
   const slots = parseLookupMessage(message);
   const skill = slots.skill || detectSkill(message) || context.previousSkill || null;
@@ -275,14 +321,22 @@ const queryPublishedTests = async (message, context = {}) => {
     ? slots.searchTerms
     : slots.isStructuredLookup ? [] : getSearchTerms({ message, context });
   const requestedQuantity = slots.quantity || (slots.action && slots.sort ? 1 : null);
-  const effectiveLimit = requestedQuantity || slots.titleNumber
-    ? Math.min(requestedQuantity || ASSISTANT_CONTEXT_RESULT_LIMIT, ASSISTANT_CONTEXT_RESULT_LIMIT)
-    : ASSISTANT_DB_LOOKUP_LIMIT;
+  const outputLimit = Math.min(
+    requestedQuantity || ASSISTANT_CONTEXT_RESULT_LIMIT,
+    ASSISTANT_CONTEXT_RESULT_LIMIT
+  );
+  const effectiveLimit = searchTerms.length > 0
+    ? ASSISTANT_DB_LOOKUP_LIMIT
+    : (requestedQuantity || slots.titleNumber
+      ? Math.min(requestedQuantity || ASSISTANT_CONTEXT_RESULT_LIMIT, ASSISTANT_CONTEXT_RESULT_LIMIT)
+      : ASSISTANT_DB_LOOKUP_LIMIT);
+  const limitOutputRows = (rows) => rows.slice(0, outputLimit);
   
   const result = await runPublishedTestQuery({
     skill,
     difficulty,
     titleNumber: slots.titleNumber,
+    searchTerms,
     sortOrder: slots.sortOrder,
     limit: effectiveLimit,
   });
@@ -290,7 +344,7 @@ const queryPublishedTests = async (message, context = {}) => {
     const suggestions = await runPublishedTestQuery({});
     return {
       ...suggestions,
-      rows: limitContextRows(suggestions.rows),
+      rows: limitOutputRows(suggestions.rows),
       searchTerms,
       exactTitleMatch: false,
       fuzzyTitleMatch: false,
@@ -308,44 +362,24 @@ const queryPublishedTests = async (message, context = {}) => {
     };
   };
 
-  if (result.rows.length === 0 && (skill || difficulty)) {
-    return fallbackResult('no_published_match_for_filter');
-  }
-
-  if (slots.isStructuredLookup) {
-    return {
-      ...result,
-      rows: limitContextRows(result.rows),
-      searchTerms,
-      exactTitleMatch: false,
-      fuzzyTitleMatch: false,
-      fallbackReason: null,
-      lookupMissing: false,
-      skillFilter: skill,
-      difficultyFilter: difficulty,
-      requestedQuantity,
-      effectiveLimit: result.effectiveLimit,
-      sortOrder: result.sortOrder,
-      sortField: result.sortField,
-      titleNumber: slots.titleNumber,
-      testNumber: slots.testNumber,
-      action: slots.action,
-    };
+  if (result.rows.length === 0) {
+    if (searchTerms.length > 0) return fallbackResult('no_published_match_for_terms');
+    if (skill || difficulty) return fallbackResult('no_published_match_for_filter');
   }
 
   if (searchTerms.length > 0) {
     const termStr = searchTerms.join(' ').toLowerCase();
     
     const exactRows = result.rows.filter(r => normalizeText(r.title) === termStr);
-    if (exactRows.length > 0) return { ...result, rows: limitContextRows(exactRows), searchTerms, exactTitleMatch: true, fuzzyTitleMatch: false, fallbackReason: null, lookupMissing: false, skillFilter: skill, difficultyFilter: difficulty, requestedQuantity, effectiveLimit: result.effectiveLimit, sortOrder: result.sortOrder, sortField: result.sortField, titleNumber: slots.titleNumber, testNumber: slots.testNumber, action: slots.action };
+    if (exactRows.length > 0) return { ...result, rows: limitOutputRows(exactRows), searchTerms, exactTitleMatch: true, fuzzyTitleMatch: false, fallbackReason: null, lookupMissing: false, skillFilter: skill, difficultyFilter: difficulty, requestedQuantity, effectiveLimit: result.effectiveLimit, sortOrder: result.sortOrder, sortField: result.sortField, titleNumber: slots.titleNumber, testNumber: slots.testNumber, action: slots.action };
 
-    const fuzzyRows = result.rows.filter(r => normalizeText(r.title).includes(termStr) || normalizeText(r.description || '').includes(termStr));
-    if (fuzzyRows.length > 0) return { ...result, rows: limitContextRows(fuzzyRows), searchTerms, exactTitleMatch: false, fuzzyTitleMatch: true, fallbackReason: null, lookupMissing: false, skillFilter: skill, difficultyFilter: difficulty, requestedQuantity, effectiveLimit: result.effectiveLimit, sortOrder: result.sortOrder, sortField: result.sortField, titleNumber: slots.titleNumber, testNumber: slots.testNumber, action: slots.action };
+    const fuzzyRows = rankRowsBySearchTerms(result.rows, searchTerms, ['title', 'description']);
+    if (fuzzyRows.length > 0) return { ...result, rows: limitOutputRows(fuzzyRows), searchTerms, exactTitleMatch: false, fuzzyTitleMatch: true, fallbackReason: null, lookupMissing: false, skillFilter: skill, difficultyFilter: difficulty, requestedQuantity, effectiveLimit: result.effectiveLimit, sortOrder: result.sortOrder, sortField: result.sortField, titleNumber: slots.titleNumber, testNumber: slots.testNumber, action: slots.action };
 
-    return { ...result, rows: limitContextRows(result.rows), searchTerms, exactTitleMatch: false, fuzzyTitleMatch: false, fallbackReason: 'no_exact_or_fuzzy_match', lookupMissing: false, skillFilter: skill, difficultyFilter: difficulty, requestedQuantity, effectiveLimit: result.effectiveLimit, sortOrder: result.sortOrder, sortField: result.sortField, titleNumber: slots.titleNumber, testNumber: slots.testNumber, action: slots.action };
+    return fallbackResult('no_exact_or_fuzzy_match');
   }
 
-  return { ...result, rows: limitContextRows(result.rows), searchTerms, exactTitleMatch: false, fuzzyTitleMatch: false, fallbackReason: null, lookupMissing: false, skillFilter: skill, difficultyFilter: difficulty, requestedQuantity, effectiveLimit: result.effectiveLimit, sortOrder: result.sortOrder, sortField: result.sortField, titleNumber: slots.titleNumber, testNumber: slots.testNumber, action: slots.action };
+  return { ...result, rows: limitOutputRows(result.rows), searchTerms, exactTitleMatch: false, fuzzyTitleMatch: false, fallbackReason: null, lookupMissing: false, skillFilter: skill, difficultyFilter: difficulty, requestedQuantity, effectiveLimit: result.effectiveLimit, sortOrder: result.sortOrder, sortField: result.sortField, titleNumber: slots.titleNumber, testNumber: slots.testNumber, action: slots.action };
 };
 
 const mapResourceRows = (rows) => rows.map((row) => ({
@@ -358,7 +392,11 @@ const mapResourceRows = (rows) => rows.map((row) => ({
   route: toFrontendUrl(buildLibraryRoute({ id: row.id })),
 }));
 
-const runPublishedResourceQuery = async ({ resourceType }) => {
+const runPublishedResourceQuery = async ({
+  resourceType,
+  searchTerms = [],
+  limit = ASSISTANT_DB_LOOKUP_LIMIT,
+}) => {
   const tableName = ASSISTANT_TABLE_MAP.library_resources;
   const columns = await getTableColumns(tableName);
   const publishFilter = await getPublishCondition(tableName);
@@ -372,62 +410,79 @@ const runPublishedResourceQuery = async ({ resourceType }) => {
 
   const fields = ['title', 'description', 'resource_type'];
   if (columns.has('category')) fields.push('category');
+  const keywordCondition = buildKeywordCondition({ fields, terms: searchTerms, values });
+  if (keywordCondition) conditions.push(keywordCondition);
 
   const categorySelect = columns.has('category') ? 'category' : 'NULL AS category';
   const selectedColumns = `id, title, description, ${categorySelect}, resource_type, file_size_bytes`;
+  const effectiveLimit = Math.max(1, Math.min(Number(limit) || ASSISTANT_DB_LOOKUP_LIMIT, ASSISTANT_DB_LOOKUP_LIMIT));
   const result = await pool.query(
     `SELECT ${selectedColumns}
      FROM ${tableName}
      WHERE ${conditions.join(' AND ')}
      ORDER BY created_at DESC
-     LIMIT ${ASSISTANT_DB_LOOKUP_LIMIT}`,
+     LIMIT ${effectiveLimit}`,
     values
   );
   return { 
     rows: mapResourceRows(result.rows), 
     dbRowCount: result.rows.length,
     publishFilter, 
-    selectedColumns
+    selectedColumns,
+    effectiveLimit,
   };
 };
 
 const queryPublishedResources = async (message, context = {}) => {
+  const slots = parseLookupMessage(message);
   const resourceType = detectResourceType(message);
   const skillTerm = detectSkill(message);
   const searchTerms = [...new Set([...getSearchTerms({ message, context }), skillTerm].filter(Boolean))];
-  
-  const result = await runPublishedResourceQuery({ resourceType });
+  const requestedQuantity = slots.quantity || null;
+  const outputLimit = Math.min(
+    requestedQuantity || ASSISTANT_CONTEXT_RESULT_LIMIT,
+    ASSISTANT_CONTEXT_RESULT_LIMIT
+  );
+  const limitOutputRows = (rows) => rows.slice(0, outputLimit);
+
+  const result = await runPublishedResourceQuery({
+    resourceType,
+    searchTerms,
+    limit: searchTerms.length > 0 ? ASSISTANT_DB_LOOKUP_LIMIT : (requestedQuantity || ASSISTANT_DB_LOOKUP_LIMIT),
+  });
   const fallbackResult = async (fallbackReason) => {
     const suggestions = await runPublishedResourceQuery({});
     return {
       ...suggestions,
-      rows: limitContextRows(suggestions.rows),
+      rows: limitOutputRows(suggestions.rows),
       searchTerms,
       exactTitleMatch: false,
       fuzzyTitleMatch: false,
       fallbackReason,
       lookupMissing: true,
       resourceTypeFilter: resourceType,
+      requestedQuantity,
     };
   };
 
-  if (result.rows.length === 0 && resourceType) {
-    return fallbackResult('no_published_match_for_filter');
+  if (result.rows.length === 0) {
+    if (searchTerms.length > 0) return fallbackResult('no_published_match_for_terms');
+    if (resourceType) return fallbackResult('no_published_match_for_filter');
   }
 
   if (searchTerms.length > 0) {
     const termStr = searchTerms.join(' ').toLowerCase();
     
     const exactRows = result.rows.filter(r => normalizeText(r.title) === termStr);
-    if (exactRows.length > 0) return { ...result, rows: limitContextRows(exactRows), searchTerms, exactTitleMatch: true, fuzzyTitleMatch: false, fallbackReason: null, lookupMissing: false, resourceTypeFilter: resourceType };
+    if (exactRows.length > 0) return { ...result, rows: limitOutputRows(exactRows), searchTerms, exactTitleMatch: true, fuzzyTitleMatch: false, fallbackReason: null, lookupMissing: false, resourceTypeFilter: resourceType, requestedQuantity };
 
-    const fuzzyRows = result.rows.filter(r => normalizeText(r.title).includes(termStr) || normalizeText(r.description || '').includes(termStr) || normalizeText(r.category || '').includes(termStr));
-    if (fuzzyRows.length > 0) return { ...result, rows: limitContextRows(fuzzyRows), searchTerms, exactTitleMatch: false, fuzzyTitleMatch: true, fallbackReason: null, lookupMissing: false, resourceTypeFilter: resourceType };
+    const fuzzyRows = rankRowsBySearchTerms(result.rows, searchTerms, ['title', 'description', 'category']);
+    if (fuzzyRows.length > 0) return { ...result, rows: limitOutputRows(fuzzyRows), searchTerms, exactTitleMatch: false, fuzzyTitleMatch: true, fallbackReason: null, lookupMissing: false, resourceTypeFilter: resourceType, requestedQuantity };
 
-    return { ...result, rows: limitContextRows(result.rows), searchTerms, exactTitleMatch: false, fuzzyTitleMatch: false, fallbackReason: 'no_exact_or_fuzzy_match', lookupMissing: true, resourceTypeFilter: resourceType };
+    return fallbackResult('no_exact_or_fuzzy_match');
   }
   
-  return { ...result, rows: limitContextRows(result.rows), searchTerms, exactTitleMatch: false, fuzzyTitleMatch: false, fallbackReason: null, lookupMissing: false, resourceTypeFilter: resourceType };
+  return { ...result, rows: limitOutputRows(result.rows), searchTerms, exactTitleMatch: false, fuzzyTitleMatch: false, fallbackReason: null, lookupMissing: false, resourceTypeFilter: resourceType, requestedQuantity };
 };
 
 const queryOwnedAttempt = async ({ attemptId, userId }) => {
@@ -469,10 +524,25 @@ const buildReviewResult = (row) => ({
   officialExplanation: row.explanation || null,
 });
 
-const getSessionMemory = async ({ user, sessionId }) => {
-  if (!user?.id || !sessionId) return [];
-  const rows = await repository.getRecentMessages(user.id, sessionId, SESSION_MEMORY_LIMIT);
-  return normalizeSessionMemory(rows);
+const getSessionContext = async ({ user, sessionId, recentMessages }) => {
+  if (!user?.id || !sessionId) return { sessionMemory: [], preferredAddress: null };
+  const [recentRows, storedPreference] = await Promise.all([
+    Array.isArray(recentMessages)
+      ? Promise.resolve(recentMessages.slice(-SESSION_MEMORY_LIMIT))
+      : repository.getRecentMessages(user.id, sessionId, SESSION_MEMORY_LIMIT),
+    typeof repository.getSessionPreference === 'function'
+      ? repository.getSessionPreference(user.id, sessionId)
+      : Promise.resolve({ supported: false, preferredAddress: null }),
+  ]);
+  const legacyPreferenceRows = storedPreference.supported
+    ? []
+    : await repository.getRecentMessages(user.id, sessionId, PREFERENCE_MEMORY_LIMIT);
+  return {
+    sessionMemory: normalizeSessionMemory(recentRows),
+    preferredAddress: storedPreference.supported
+      ? normalizePreferredAddress(storedPreference.preferredAddress)
+      : findPreferredAddress(legacyPreferenceRows),
+  };
 };
 
 const shouldLoadSessionMemory = (intent) => [
@@ -711,10 +781,14 @@ const buildKnowledgeContext = ({ injection, message, intent }) => {
 };
 
 const buildContextInjection = async ({ intent, message, context, user, sessionId }) => {
-  const sessionMemory = shouldLoadSessionMemory(intent)
-    ? await getSessionMemory({ user, sessionId })
-    : [];
-  const injection = createBaseContext({ intent, sessionMemory });
+  const sessionContext = shouldLoadSessionMemory(intent)
+    ? await getSessionContext({ user, sessionId, recentMessages: context?.recentMessages })
+    : { sessionMemory: [], preferredAddress: null };
+  const injection = createBaseContext({
+    intent,
+    ...sessionContext,
+    conversationState: context || {},
+  });
 
   if ([ASSISTANT_INTENTS.NAVIGATION, ASSISTANT_INTENTS.WEBSITE_HELP].includes(intent)) {
     return buildStaticContext(injection, ASSISTANT_INTENTS.NAVIGATION, message);
