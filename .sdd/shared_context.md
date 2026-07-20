@@ -344,10 +344,11 @@ CREATE TABLE library_resources (
 -- 18. AI CHATBOT SESSIONS & MESSAGES
 -- ─────────────────────────────────────────────
 CREATE TABLE chatbot_sessions (
-    id         UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id    UUID        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    started_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    ended_at   TIMESTAMPTZ
+    id                UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id           UUID        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    preferred_address VARCHAR(60),
+    started_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    ended_at          TIMESTAMPTZ
 );
 
 CREATE TABLE chatbot_messages (
@@ -356,7 +357,10 @@ CREATE TABLE chatbot_messages (
     role        VARCHAR(20) NOT NULL CHECK (role IN ('user', 'assistant')),
     content     TEXT        NOT NULL,
     tokens_used INT,
-    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    rating      VARCHAR(10) CHECK (rating IS NULL OR rating IN ('up', 'down')),
+    rating_reason TEXT,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 -- ─────────────────────────────────────────────
