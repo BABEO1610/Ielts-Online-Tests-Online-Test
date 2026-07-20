@@ -6,6 +6,7 @@ jest.mock('../../../src/db/pool', () => ({
 
 jest.mock('../../../src/api/assistant/assistant.repository', () => ({
   getRecentMessages: jest.fn().mockResolvedValue([]),
+  getSessionPreference: jest.fn().mockResolvedValue({ supported: false, preferredAddress: null }),
 }));
 
 const { pool } = require('../../../src/db/pool');
@@ -78,6 +79,8 @@ describe('Assistant context builder', () => {
     });
 
     expect(pool.query.mock.calls[1][0]).toContain('FROM library_resources');
+    expect(pool.query.mock.calls[1][0]).toContain('title::text ILIKE');
+    expect(pool.query.mock.calls[1][1]).toContain('%tam%');
     expect(result.databaseResults).toHaveLength(1);
     expect(result.databaseResults[0]).toMatchObject({
       id: 'res-1',
@@ -363,5 +366,123 @@ describe('Assistant context builder', () => {
     expect(result.databaseResults).toHaveLength(1);
     expect(result.debug.titleNumber).toBe(1);
     expect(result.debug.lookupMissing).toBe(false);
+  });
+
+  it('ignores conversational filler and ranks tests by meaningful topic terms', async () => {
+    pool.query
+      .mockResolvedValueOnce({ rows: [{ column_name: 'is_published' }, { column_name: 'review_status' }] })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: 'reading-general',
+            title: 'IELTSZone General Reading Practice',
+            description: 'A mixed-topic reading test',
+            skill: 'reading',
+            difficulty: 'intermediate',
+            duration_minutes: 60,
+          },
+          {
+            id: 'reading-environment',
+            title: 'Reading Practice: The Environment',
+            description: 'A passage about climate and conservation',
+            skill: 'reading',
+            difficulty: 'intermediate',
+            duration_minutes: 60,
+          },
+        ],
+      });
+
+    const result = await buildContextInjection({
+      intent: ASSISTANT_INTENTS.FIND_TEST,
+      message: 'Find me a Reading test about environment please',
+      context: { pageType: 'home', route: '/', visibleItems: [] },
+      user,
+      sessionId: null,
+    });
+
+    expect(result.debug.searchTerms).toEqual(['environment']);
+    expect(result.debug.fuzzyTitleMatch).toBe(true);
+    expect(result.debug.lookupMissing).toBe(false);
+    expect(result.databaseResults.map((item) => item.id)).toEqual(['reading-environment']);
+  });
+
+  it('filters a quantity lookup by topic before choosing the single result', async () => {
+    pool.query
+      .mockResolvedValueOnce({ rows: [{ column_name: 'is_published' }, { column_name: 'review_status' }] })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: 'reading-general',
+            title: 'Newest General Reading Practice',
+            description: 'A mixed-topic reading test',
+            skill: 'reading',
+            difficulty: 'intermediate',
+            duration_minutes: 60,
+          },
+          {
+            id: 'reading-environment',
+            title: 'Reading Practice: The Environment',
+            description: 'A passage about conservation',
+            skill: 'reading',
+            difficulty: 'intermediate',
+            duration_minutes: 60,
+          },
+        ],
+      });
+
+    const result = await buildContextInjection({
+      intent: ASSISTANT_INTENTS.FIND_TEST,
+      message: 'tìm 1 đề Reading về environment phù hợp với mình nhé',
+      context: { pageType: 'home', route: '/', visibleItems: [] },
+      user,
+      sessionId: null,
+    });
+
+    const [sql, params] = pool.query.mock.calls[1];
+    expect(sql).toContain('title::text ILIKE');
+    expect(sql.indexOf('ILIKE')).toBeLessThan(sql.indexOf('ORDER BY'));
+    expect(sql).toContain('LIMIT 50');
+    expect(params).toEqual(expect.arrayContaining(['reading', '%environment%']));
+    expect(params).not.toContain('%ve%');
+    expect(result.debug.requestedQuantity).toBe(1);
+    expect(result.databaseResults.map((item) => item.id)).toEqual(['reading-environment']);
+  });
+
+  it('returns only the requested number of grounded alternatives when a topic has no match', async () => {
+    pool.query
+      .mockResolvedValueOnce({ rows: [{ column_name: 'is_published' }, { column_name: 'review_status' }] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: 'reading-1',
+            title: 'IELTSZone Reading Practice 1',
+            description: 'Reading test',
+            skill: 'reading',
+            difficulty: 'intermediate',
+            duration_minutes: 60,
+          },
+          {
+            id: 'listening-1',
+            title: 'IELTSZone Listening Practice 1',
+            description: 'Listening test',
+            skill: 'listening',
+            difficulty: 'intermediate',
+            duration_minutes: 30,
+          },
+        ],
+      });
+
+    const result = await buildContextInjection({
+      intent: ASSISTANT_INTENTS.FIND_TEST,
+      message: 'tìm 1 đề về astronomy',
+      context: { pageType: 'home', route: '/', visibleItems: [] },
+      user,
+      sessionId: null,
+    });
+
+    expect(result.debug.lookupMissing).toBe(true);
+    expect(result.debug.fallbackReason).toBe('no_published_match_for_terms');
+    expect(result.databaseResults).toHaveLength(1);
   });
 });
