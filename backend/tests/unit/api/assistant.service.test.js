@@ -14,6 +14,8 @@ jest.mock('../../../src/api/assistant/assistant.repository', () => ({
   saveUserMessage: jest.fn(),
   saveAssistantMessage: jest.fn(),
   getRecentMessages: jest.fn(),
+  getSessionPreference: jest.fn(),
+  setSessionPreference: jest.fn(),
   getHistory: jest.fn(),
   rateAssistantMessage: jest.fn(),
 }));
@@ -32,6 +34,8 @@ describe('Assistant service pipeline', () => {
     pool.query.mockReset();
     pool.query.mockResolvedValue({ rows: [] });
     repository.getRecentMessages.mockResolvedValue([]);
+    repository.getSessionPreference.mockResolvedValue({ supported: false, preferredAddress: null });
+    repository.setSessionPreference.mockResolvedValue(true);
     repository.createOrGetSession.mockResolvedValue('session-1');
     repository.saveUserMessage.mockResolvedValue({ id: 'user-message-1' });
     repository.saveAssistantMessage.mockResolvedValue({ id: 'assistant-message-1' });
@@ -470,7 +474,7 @@ describe('Assistant service pipeline', () => {
       });
 
     aiService.generateAssistantAnswer.mockResolvedValue(JSON.stringify({
-      answer: 'Mình tìm thấy 1 đề Reading cũ nhất.',
+      answer: 'Mình tìm thấy IELTSZone Reading Mock Test 1, đây là đề Reading cũ nhất.',
       suggestedLinks: [],
       usedDatabase: true,
       needsMoreContext: false,
@@ -495,6 +499,112 @@ describe('Assistant service pipeline', () => {
     expect(result.fallbackUsed).toBeFalsy();
     expect(pool.query.mock.calls[1][0]).toContain('ORDER BY created_at ASC');
     expect(pool.query.mock.calls[1][0]).toContain('LIMIT 1');
+  });
+
+  it('uses a grounded deterministic lookup answer when the provider fails', async () => {
+    pool.query
+      .mockResolvedValueOnce({ rows: [{ column_name: 'is_published' }, { column_name: 'review_status' }] })
+      .mockResolvedValueOnce({
+        rows: [{
+          id: 'reading-practice-1',
+          title: 'IELTSZone Reading Practice 1',
+          description: 'Reading practice test',
+          skill: 'reading',
+          difficulty: 'intermediate',
+          duration_minutes: 60,
+        }],
+      });
+    aiService.generateAssistantAnswer.mockRejectedValue(new Error('provider down'));
+
+    const result = await handleChat({
+      user: { id: 'user-1' },
+      payload: {
+        message: 'có đề Reading nào không?',
+        context: { pageType: 'home', route: '/' },
+      },
+    });
+
+    expect(result.code).toBeNull();
+    expect(result.answer).toContain('IELTSZone Reading Practice 1');
+    expect(result.suggestedLinks[0].href).toContain('/tests/reading-practice-1/reading');
+    expect(result).toMatchObject({
+      fallbackUsed: true,
+      finalResponseMode: 'deterministic_fallback',
+      fallbackType: 'deterministic_fallback',
+      grounding: { usedDatabase: true },
+    });
+    expect(repository.saveUserMessage).toHaveBeenCalledTimes(1);
+    expect(repository.saveAssistantMessage).toHaveBeenCalledTimes(1);
+  });
+
+  it('replaces an invented lookup title with database-grounded results', async () => {
+    pool.query
+      .mockResolvedValueOnce({ rows: [{ column_name: 'is_published' }, { column_name: 'review_status' }] })
+      .mockResolvedValueOnce({
+        rows: [{
+          id: 'reading-practice-1',
+          title: 'IELTSZone Reading Practice 1',
+          description: 'Reading practice test',
+          skill: 'reading',
+          difficulty: 'intermediate',
+          duration_minutes: 60,
+        }],
+      });
+    aiService.generateAssistantAnswer.mockResolvedValue(JSON.stringify({
+      answer: 'Mình đề xuất Cambridge IELTS 19 Test 4 cho bạn.',
+      suggestedLinks: [],
+      usedDatabase: true,
+      needsMoreContext: false,
+      safety: {},
+    }));
+
+    const result = await runAssistantPipeline({
+      user: { id: 'user-1' },
+      payload: {
+        message: 'có đề Reading nào không?',
+        context: { pageType: 'home', route: '/' },
+      },
+    });
+
+    expect(result.answer).toContain('IELTSZone Reading Practice 1');
+    expect(result.answer).not.toContain('Cambridge IELTS 19 Test 4');
+    expect(result.fallbackUsed).toBe(true);
+    expect(result.fallbackReason).toBe('ungrounded_lookup_answer');
+    expect(result.finalResponseMode).toBe('deterministic_fallback');
+  });
+
+  it('keeps an AI lookup answer that names an actual database result', async () => {
+    pool.query
+      .mockResolvedValueOnce({ rows: [{ column_name: 'is_published' }, { column_name: 'review_status' }] })
+      .mockResolvedValueOnce({
+        rows: [{
+          id: 'reading-practice-1',
+          title: 'IELTSZone Reading Practice 1',
+          description: 'Reading practice test',
+          skill: 'reading',
+          difficulty: 'intermediate',
+          duration_minutes: 60,
+        }],
+      });
+    aiService.generateAssistantAnswer.mockResolvedValue(JSON.stringify({
+      answer: 'Được nè. IELTSZone Reading Practice 1 là lựa chọn bạn có thể mở để luyện.',
+      suggestedLinks: [],
+      usedDatabase: true,
+      needsMoreContext: false,
+      safety: {},
+    }));
+
+    const result = await runAssistantPipeline({
+      user: { id: 'user-1' },
+      payload: {
+        message: 'có đề Reading nào không?',
+        context: { pageType: 'home', route: '/' },
+      },
+    });
+
+    expect(result.answer).toContain('IELTSZone Reading Practice 1');
+    expect(result.fallbackUsed).toBe(false);
+    expect(result.finalResponseMode).toBe('ai');
   });
 
   it('returns three latest writing tests with displayed count three', async () => {
@@ -605,6 +715,35 @@ describe('Assistant service pipeline', () => {
     expect(result.intent).toBe(ASSISTANT_INTENTS.IELTS_KNOWLEDGE);
     expect(result.answer).toContain('kỹ năng cụ thể');
     expect(result.finalResponseMode).toBe('ai_fallback_error');
+  });
+
+  it('uses remembered Skimming and Scanning context in the provider fallback', async () => {
+    repository.getSessionPreference.mockResolvedValue({
+      supported: true,
+      preferredAddress: 'Siêu nhân Đạt',
+    });
+    repository.getRecentMessages.mockResolvedValue([
+      { role: 'user', content: 'Skimming là gì?' },
+      { role: 'assistant', content: 'Skimming là đọc lướt để nắm ý chính.' },
+      { role: 'user', content: 'Scanning là gì?' },
+      { role: 'assistant', content: 'Scanning là quét để tìm thông tin cụ thể.' },
+    ]);
+    aiService.generateAssistantAnswer.mockRejectedValue(new Error('provider down'));
+
+    const result = await runAssistantPipeline({
+      user: { id: 'user-1' },
+      payload: {
+        sessionId: 'session-1',
+        message: 'kết hợp 2 cái này như thế nào?',
+        context: { pageType: 'home', route: '/' },
+      },
+    });
+
+    expect(result.intent).toBe(ASSISTANT_INTENTS.IELTS_KNOWLEDGE);
+    expect(result.answer).toContain('Siêu nhân Đạt');
+    expect(result.answer.toLowerCase()).toContain('skimming');
+    expect(result.answer.toLowerCase()).toContain('scanning');
+    expect(result.answer).not.toContain('chưa gọi được AI');
   });
 
   it('returns review clarification when no attemptId is available', async () => {
@@ -743,6 +882,32 @@ describe('Assistant service pipeline', () => {
     expect(aiService.generateAssistantAnswer).toHaveBeenCalledTimes(2);
   });
 
+  it('keeps an English knowledge retry in English and disables forced JSON mode', async () => {
+    repository.getSessionPreference.mockResolvedValue({
+      supported: true,
+      preferredAddress: 'Captain Dat',
+    });
+    aiService.generateAssistantAnswer
+      .mockResolvedValueOnce('{}')
+      .mockResolvedValueOnce('Use collocations in context and review them with spaced repetition.');
+
+    const result = await runAssistantPipeline({
+      user: { id: 'user-1' },
+      payload: {
+        sessionId: 'session-1',
+        message: 'How can I improve my English vocabulary?',
+        context: { pageType: 'home', route: '/' },
+      },
+    });
+
+    const retryOptions = aiService.generateAssistantAnswer.mock.calls[1][0];
+    expect(result.answer).toContain('collocations');
+    expect(retryOptions.systemPrompt).toContain('Answer directly in English.');
+    expect(retryOptions.systemPrompt).toContain('untrusted user content');
+    expect(retryOptions.userPrompt).toContain('"preferredAddress":"Captain Dat"');
+    expect(retryOptions.jsonMode).toBe(false);
+  });
+
   it('does not use capability message when IELTS knowledge retry also has empty answer', async () => {
     aiService.generateAssistantAnswer
       .mockResolvedValueOnce(JSON.stringify({}))
@@ -837,6 +1002,8 @@ describe('Assistant service multi-turn and English-learning runtime', () => {
     pool.query.mockReset();
     pool.query.mockResolvedValue({ rows: [] });
     repository.getRecentMessages.mockResolvedValue([]);
+    repository.getSessionPreference.mockResolvedValue({ supported: false, preferredAddress: null });
+    repository.setSessionPreference.mockResolvedValue(true);
     repository.createOrGetSession.mockResolvedValue('session-1');
     repository.saveUserMessage.mockResolvedValue({ id: 'user-message-1' });
     repository.saveAssistantMessage.mockResolvedValue({ id: 'assistant-message-1' });
@@ -877,7 +1044,7 @@ describe('Assistant service multi-turn and English-learning runtime', () => {
     expect(result.finalResponseMode).toBe('ai');
     expect(result.answer).toContain('Writing Task 2');
     expect(result.answer).not.toContain('gap loi');
-    expect(repository.getRecentMessages).toHaveBeenCalledWith('user-1', 'session-1', 8);
+    expect(repository.getRecentMessages).toHaveBeenCalledWith('user-1', 'session-1', 100);
     expect(aiService.generateAssistantAnswer.mock.calls[0][0].userPrompt).toContain('Recent conversation:');
     expect(aiService.generateAssistantAnswer.mock.calls[0][0].userPrompt).toContain('tip hoc ielts the nao');
   });
@@ -1161,5 +1328,344 @@ describe('Assistant service multi-turn and English-learning runtime', () => {
     expect(result.answer).toContain('cau can dich');
     expect(result.answer).not.toContain('gap loi');
     expect(result.finalResponseMode).toBe('ai');
+  });
+
+  it('persists a preferred form of address without depending on the AI provider', async () => {
+    const result = await handleChat({
+      user: { id: 'user-1' },
+      payload: {
+        message: 'hãy gọi tôi là Siêu nhân Đạt',
+        context: { pageType: 'home', route: '/' },
+      },
+    });
+
+    expect(repository.createOrGetSession).toHaveBeenCalledWith('user-1', null);
+    expect(repository.saveUserMessage).toHaveBeenCalledWith(
+      'session-1',
+      'hãy gọi tôi là Siêu nhân Đạt',
+      'user-1'
+    );
+    expect(result.conversationId).toBe('session-1');
+    expect(result.answer).toContain('Siêu nhân Đạt');
+    expect(repository.setSessionPreference).toHaveBeenCalledWith({
+      userId: 'user-1',
+      sessionId: 'session-1',
+      preferredAddress: 'Siêu nhân Đạt',
+    });
+    expect(aiService.generateAssistantAnswer).not.toHaveBeenCalled();
+  });
+
+  it('uses the remembered form of address on a later greeting in the same owned session', async () => {
+    repository.getSessionPreference.mockResolvedValue({
+      supported: true,
+      preferredAddress: 'Siêu nhân Đạt',
+    });
+    repository.getRecentMessages.mockResolvedValue([
+      { role: 'user', content: 'hãy gọi tôi là Siêu nhân Đạt' },
+      { role: 'assistant', content: 'Được nhé, mình sẽ nhớ.' },
+    ]);
+
+    const result = await handleChat({
+      user: { id: 'user-1' },
+      payload: {
+        sessionId: 'session-1',
+        message: 'chào bạn',
+        context: { pageType: 'home', route: '/' },
+      },
+    });
+
+    expect(repository.createOrGetSession).toHaveBeenCalledWith('user-1', 'session-1');
+    expect(result.answer).toContain('Chào Siêu nhân Đạt!');
+    expect(aiService.generateAssistantAnswer).not.toHaveBeenCalled();
+  });
+
+  it('recalls the existing address instead of treating the word "gì" as a new name', async () => {
+    repository.getSessionPreference.mockResolvedValue({
+      supported: true,
+      preferredAddress: 'Siêu nhân Đạt',
+    });
+    repository.getRecentMessages.mockResolvedValue([
+      { role: 'user', content: 'hãy gọi tôi là Siêu nhân Đạt' },
+      { role: 'assistant', content: 'Được nhé, mình sẽ nhớ.' },
+    ]);
+
+    const result = await handleChat({
+      user: { id: 'user-1' },
+      payload: {
+        sessionId: 'session-1',
+        message: 'Bạn đang gọi tôi là gì?',
+        context: { pageType: 'home', route: '/' },
+      },
+    });
+
+    expect(result.answer).toBe('Bạn đã dặn mình gọi bạn là Siêu nhân Đạt.');
+    expect(result.answer).not.toContain('gọi bạn là gì.');
+    expect(aiService.generateAssistantAnswer).not.toHaveBeenCalled();
+  });
+
+  it('keeps a structured address preference after it falls outside recent messages', async () => {
+    repository.getSessionPreference.mockResolvedValue({
+      supported: true,
+      preferredAddress: 'Siêu nhân Đạt',
+    });
+    repository.getRecentMessages.mockResolvedValue(
+      Array.from({ length: 20 }, (_, index) => ({
+        role: index % 2 === 0 ? 'user' : 'assistant',
+        content: `message ${index + 1}`,
+      }))
+    );
+
+    const result = await handleChat({
+      user: { id: 'user-1' },
+      payload: {
+        sessionId: 'session-1',
+        message: 'hello',
+        context: { pageType: 'home', route: '/' },
+      },
+    });
+
+    expect(result.answer).toContain('Siêu nhân Đạt');
+    expect(repository.getSessionPreference).toHaveBeenCalledWith('user-1', 'session-1');
+  });
+
+  it('clears the structured address preference without calling the provider', async () => {
+    const result = await handleChat({
+      user: { id: 'user-1' },
+      payload: {
+        sessionId: 'session-1',
+        message: 'đừng gọi tôi như vậy nữa',
+        context: { pageType: 'home', route: '/' },
+      },
+    });
+
+    expect(result.answer).toContain('không dùng cách gọi đó nữa');
+    expect(repository.setSessionPreference).toHaveBeenCalledWith({
+      userId: 'user-1',
+      sessionId: 'session-1',
+      preferredAddress: null,
+    });
+    expect(aiService.generateAssistantAnswer).not.toHaveBeenCalled();
+  });
+
+  it('answers an English clear-preference request in English', async () => {
+    const result = await handleChat({
+      user: { id: 'user-1' },
+      payload: {
+        sessionId: 'session-1',
+        message: 'stop calling me Captain Dat',
+        context: { pageType: 'home', route: '/' },
+      },
+    });
+
+    expect(result.answer).toBe('Got it. I will stop using that form of address.');
+    expect(repository.setSessionPreference).toHaveBeenCalledWith({
+      userId: 'user-1',
+      sessionId: 'session-1',
+      preferredAddress: null,
+    });
+  });
+
+  it('injects the remembered preference into later English-learning answers', async () => {
+    repository.getRecentMessages.mockResolvedValue([
+      { role: 'user', content: 'gọi tôi là Siêu nhân Đạt' },
+      { role: 'assistant', content: 'Mình sẽ nhớ cách gọi đó.' },
+    ]);
+    aiService.generateAssistantAnswer.mockResolvedValue(JSON.stringify({
+      answer: 'Although introduces a clause, while despite is followed by a noun phrase.',
+      suggestedLinks: [],
+      usedDatabase: false,
+      needsMoreContext: false,
+      safety: {},
+    }));
+
+    await runAssistantPipeline({
+      user: { id: 'user-1' },
+      payload: {
+        sessionId: 'session-1',
+        message: 'phân biệt although và despite',
+        context: { pageType: 'home', route: '/' },
+      },
+    });
+
+    const userPrompt = aiService.generateAssistantAnswer.mock.calls[0][0].userPrompt;
+    expect(userPrompt).toContain('"preferredAddress":"Siêu nhân Đạt"');
+    expect(userPrompt).toContain('gọi tôi là Siêu nhân Đạt');
+  });
+
+  it('routes a short example follow-up from recent knowledge context', async () => {
+    repository.getRecentMessages.mockResolvedValue([
+      { role: 'user', content: 'Task 1 overview viết thế nào?' },
+      { role: 'assistant', content: 'Overview nêu các đặc điểm nổi bật.' },
+    ]);
+    aiService.generateAssistantAnswer.mockResolvedValue(JSON.stringify({
+      answer: 'Ví dụ: Overall, both categories increased, with A remaining the larger one.',
+      suggestedLinks: [],
+      usedDatabase: false,
+      needsMoreContext: false,
+      safety: {},
+    }));
+
+    const result = await runAssistantPipeline({
+      user: { id: 'user-1' },
+      payload: {
+        sessionId: 'session-1',
+        message: 'cho ví dụ',
+        context: { pageType: 'home', route: '/' },
+      },
+    });
+
+    expect(result.intent).toBe(ASSISTANT_INTENTS.IELTS_KNOWLEDGE);
+    expect(result.answer).toContain('Ví dụ');
+  });
+
+  it('keeps the original topic through consecutive short follow-ups', async () => {
+    repository.getRecentMessages.mockResolvedValue([
+      { role: 'user', content: 'Task 1 overview viết thế nào?' },
+      { role: 'assistant', content: 'Overview nêu các đặc điểm nổi bật.' },
+      { role: 'user', content: 'cho ví dụ' },
+      { role: 'assistant', content: 'Overall, both categories increased.' },
+    ]);
+    aiService.generateAssistantAnswer.mockResolvedValue(JSON.stringify({
+      answer: 'Ví dụ khác: Overall, sales rose, while costs remained stable.',
+      suggestedLinks: [],
+      usedDatabase: false,
+      needsMoreContext: false,
+      safety: {},
+    }));
+
+    const result = await runAssistantPipeline({
+      user: { id: 'user-1' },
+      payload: {
+        sessionId: 'session-1',
+        message: 'ví dụ khác',
+        context: { pageType: 'home', route: '/' },
+      },
+    });
+
+    expect(result.intent).toBe(ASSISTANT_INTENTS.IELTS_KNOWLEDGE);
+    expect(result.answer).toContain('Ví dụ khác');
+  });
+
+  it('uses both Skimming and Scanning turns when asked to combine the two', async () => {
+    repository.getSessionPreference.mockResolvedValue({
+      supported: true,
+      preferredAddress: 'Siêu nhân Đạt',
+    });
+    repository.getRecentMessages.mockResolvedValue([
+      { role: 'user', content: 'Skimming là gì?' },
+      { role: 'assistant', content: 'Skimming là đọc lướt để nắm ý chính của đoạn.' },
+      { role: 'user', content: 'Scanning là gì?' },
+      { role: 'assistant', content: 'Scanning là quét nhanh để tìm thông tin cụ thể.' },
+    ]);
+    aiService.generateAssistantAnswer.mockResolvedValue(JSON.stringify({
+      answer: 'Siêu nhân Đạt có thể skimming trước để định vị đoạn phù hợp, rồi scanning để tìm chi tiết cần thiết.',
+      suggestedLinks: [],
+      usedDatabase: false,
+      needsMoreContext: false,
+      safety: {
+        inventedContent: false,
+        outOfScope: false,
+        containsBandScore: false,
+        containsWritingSpeakingGrading: false,
+      },
+    }));
+
+    const result = await runAssistantPipeline({
+      user: { id: 'user-1' },
+      payload: {
+        sessionId: 'session-1',
+        message: 'kết hợp 2 cái này như thế nào?',
+        context: { pageType: 'home', route: '/' },
+      },
+    });
+
+    expect(result.intent).toBe(ASSISTANT_INTENTS.IELTS_KNOWLEDGE);
+    expect(result.grounding.usedSessionMemory).toBe(true);
+    expect(result.answer).toContain('Siêu nhân Đạt');
+    expect(pool.query).not.toHaveBeenCalled();
+    const userPrompt = aiService.generateAssistantAnswer.mock.calls[0][0].userPrompt;
+    expect(userPrompt).toContain('User: Skimming là gì?');
+    expect(userPrompt).toContain('Assistant: Skimming là đọc lướt để nắm ý chính của đoạn.');
+    expect(userPrompt).toContain('User: Scanning là gì?');
+    expect(userPrompt).toContain('Assistant: Scanning là quét nhanh để tìm thông tin cụ thể.');
+    expect(userPrompt).toContain('"preferredAddress":"Siêu nhân Đạt"');
+  });
+
+  it('uses knowledge history to find a grounded Reading test instead of library resources', async () => {
+    repository.getSessionPreference.mockResolvedValue({
+      supported: true,
+      preferredAddress: 'Siêu nhân Đạt',
+    });
+    repository.getRecentMessages.mockResolvedValue([
+      { role: 'user', content: 'Skimming là gì?' },
+      { role: 'assistant', content: 'Skimming là đọc lướt để nắm ý chính của đoạn.' },
+      { role: 'user', content: 'Scanning là gì?' },
+      {
+        role: 'assistant',
+        content: 'Scanning là quét nhanh để tìm thông tin cụ thể. Nếu cần thêm bài tập để luyện phần này thì cứ bảo mình nhé!',
+      },
+    ]);
+    pool.query
+      .mockResolvedValueOnce({
+        rows: [{ column_name: 'is_published' }, { column_name: 'review_status' }],
+      })
+      .mockResolvedValueOnce({
+        rows: [{
+          id: 'reading-practice-1',
+          title: 'IELTSZone Reading Practice 1',
+          description: 'Published Reading practice test',
+          skill: 'reading',
+          difficulty: 'intermediate',
+          duration_minutes: 60,
+        }],
+      });
+    aiService.generateAssistantAnswer.mockResolvedValue(JSON.stringify({
+      answer: 'Được nè, Siêu nhân Đạt. Mình gợi ý IELTSZone Reading Practice 1 để luyện phối hợp skimming và scanning.',
+      suggestedLinks: [],
+      usedDatabase: true,
+      needsMoreContext: false,
+      safety: {
+        inventedContent: false,
+        outOfScope: false,
+        containsBandScore: false,
+        containsWritingSpeakingGrading: false,
+      },
+    }));
+
+    const result = await runAssistantPipeline({
+      user: { id: 'user-1' },
+      payload: {
+        sessionId: 'session-1',
+        message: 'tìm 1 đề phù hợp với mình nhé',
+        context: { pageType: 'library', route: '/library' },
+      },
+    });
+
+    expect(result.intent).toBe(ASSISTANT_INTENTS.FIND_TEST);
+    expect(result.dbLookupCalled).toBe(true);
+    expect(result.grounding).toMatchObject({
+      usedDatabase: true,
+      usedSessionMemory: true,
+      sourceTables: ['mock_tests'],
+    });
+    expect(result.answer).toContain('Siêu nhân Đạt');
+    expect(result.answer).toContain('IELTSZone Reading Practice 1');
+    expect(result.suggestedLinks[0]).toMatchObject({
+      type: 'test',
+      href: expect.stringContaining('/tests/reading-practice-1/reading'),
+    });
+
+    const queries = pool.query.mock.calls.map(([sql]) => sql);
+    expect(queries.some((sql) => sql.includes('FROM mock_tests'))).toBe(true);
+    expect(queries.some((sql) => sql.includes('FROM library_resources'))).toBe(false);
+    const testQuery = pool.query.mock.calls.find(([sql]) => sql.includes('FROM mock_tests'));
+    expect(testQuery[1]).toEqual(expect.arrayContaining(['reading']));
+
+    const userPrompt = aiService.generateAssistantAnswer.mock.calls[0][0].userPrompt;
+    expect(userPrompt).toContain('User: Skimming là gì?');
+    expect(userPrompt).toContain('User: Scanning là gì?');
+    expect(userPrompt).toContain('Nếu cần thêm bài tập để luyện phần này');
+    expect(userPrompt).toContain('"preferredAddress":"Siêu nhân Đạt"');
+    expect(userPrompt).toContain('IELTSZone Reading Practice 1');
   });
 });
