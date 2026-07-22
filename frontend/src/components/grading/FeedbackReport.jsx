@@ -13,6 +13,10 @@ const STATUS_LABELS = {
   completed: 'AI đã hoàn thành',
   pending: 'AI đang chấm',
   failed: 'AI chấm lỗi',
+  queued: 'Đã xếp hàng',
+  running: 'AI đang phân tích audio',
+  retry_wait: 'Đang chờ thử lại',
+  needs_review: 'Đã chuyển tutor xác nhận',
   graded: 'Đã chấm',
   tutor_graded: 'Đã chấm',
 };
@@ -268,10 +272,25 @@ const SpeakingPartCard = ({ part }) => (
   </div>
 );
 
-const SpeakingFeedbackDetail = ({ data }) => {
+export const SpeakingFeedbackDetail = ({ data, onRetry, retrying = false, retryError = null }) => {
   const aiFeedback = data.aiFeedback;
   const overall = data.overallSpeakingBand ?? aiFeedback?.overallBand ?? null;
   const badge = getScoreBadge(overall);
+  const isAsync = Boolean(data.gradingStatus);
+  const isPublishable = !isAsync || (
+    data.gradingStatus === 'completed'
+    && aiFeedback?.evidenceMode === 'full_audio'
+    && overall !== null
+  );
+  const statusNotice = {
+    queued: 'Bài đã vào hàng đợi. Hệ thống chưa công bố điểm.',
+    running: 'Hệ thống đang kiểm tra audio và evidence. Hệ thống chưa công bố điểm.',
+    retry_wait: 'Lỗi tạm thời; worker sẽ tự thử lại. Hệ thống chưa công bố điểm.',
+    needs_review: 'Evidence hiện tại chưa đủ để công bố band Speaking. Bài đã được chuyển cho tutor nghe audio và xác nhận.',
+    failed: data.canRetry
+      ? 'Chấm tự động thất bại sau các lần thử. Bạn còn một lần yêu cầu retry thủ công.'
+      : 'Chấm tự động thất bại. Bài vẫn được giữ lại để hỗ trợ xử lý.',
+  }[data.gradingStatus];
 
   return (
     <div className="feedback-report mt-4" style={{ fontFamily: 'UberMoveText, system-ui, sans-serif' }}>
@@ -283,16 +302,38 @@ const SpeakingFeedbackDetail = ({ data }) => {
         <span className="badge text-bg-light border">AI: {STATUS_LABELS[data.aiStatus] || data.aiStatus || 'Chưa có AI feedback'}</span>
       </div>
 
+      {statusNotice && (
+        <div className="alert alert-info border" role="status">
+          {statusNotice}
+        </div>
+      )}
+
+      {data.gradingStatus === 'failed' && data.canRetry && onRetry && (
+        <div className="d-flex align-items-center gap-3 flex-wrap mb-4">
+          <button
+            type="button"
+            className="btn btn-dark rounded-pill px-4"
+            disabled={retrying}
+            onClick={onRetry}
+          >
+            {retrying ? 'Đang gửi yêu cầu...' : 'Chấm lại bằng AI'}
+          </button>
+          {retryError && <span className="text-danger" role="alert">{retryError}</span>}
+        </div>
+      )}
+
       <div className="card border shadow-none mb-4">
         <div className="card-body p-4">
           <div className="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-3">
             <div>
               <h4 className="fw-bold mb-1">Overall Speaking Band</h4>
               <p className="text-muted mb-0">
-                Trung bình 4 tiêu chí Speaking, làm tròn theo bước 0.5. Không tách band riêng từng part.
+                {isPublishable
+                  ? 'Kết quả chỉ được công bố khi đủ evidence audio cho cả 4 tiêu chí và qua calibration gate.'
+                  : 'Chưa có band hợp lệ. Transcript đơn thuần không đủ để chấm Fluency & Coherence hoặc Pronunciation.'}
               </p>
             </div>
-            {overall !== null && (
+            {isPublishable && (
               <div className="d-flex align-items-center gap-3">
                 <span className="display-5 fw-bold text-dark mb-0">{formatBand(overall)}</span>
                 <span
@@ -304,13 +345,13 @@ const SpeakingFeedbackDetail = ({ data }) => {
               </div>
             )}
           </div>
-          <CriterionScoreCards rows={getSpeakingCriterionRows(aiFeedback)} />
-          {aiFeedback?.summary && (
+          {isPublishable && <CriterionScoreCards rows={getSpeakingCriterionRows(aiFeedback)} />}
+          {isPublishable && aiFeedback?.summary && (
             <p className="mb-0" style={{ whiteSpace: 'pre-wrap', lineHeight: 1.8 }}>
               {aiFeedback.summary}
             </p>
           )}
-          {aiFeedback?.transcriptNotes && (
+          {isPublishable && aiFeedback?.transcriptNotes && (
             <div className="alert alert-light border mt-3 mb-0">{aiFeedback.transcriptNotes}</div>
           )}
         </div>
@@ -323,20 +364,33 @@ const SpeakingFeedbackDetail = ({ data }) => {
           ))}
         </div>
         <div className="col-lg-7">
-          <AiFeedbackPanel report={aiFeedback ? { ...aiFeedback, submissionType: 'speaking' } : null} />
+          {isPublishable ? (
+            <AiFeedbackPanel report={{ ...aiFeedback, submissionType: 'speaking' }} />
+          ) : (
+            <div className="alert alert-light border">
+              Không hiển thị điểm hoặc nhận xét suy diễn khi evidence chưa đạt điều kiện công bố.
+            </div>
+          )}
         </div>
       </div>
     </div>
   );
 };
 
-const WritingFeedbackDetail = ({ data }) => {
+export const WritingFeedbackDetail = ({
+  data,
+  onRetryTask,
+  retryingTaskId = null,
+  retryErrors = {},
+}) => {
   const [activeTaskNumber, setActiveTaskNumber] = useState(1);
   const tasks = data.tasks || [];
   const activeTask = tasks.find(task => task.taskNumber === activeTaskNumber) || tasks[0];
   const gradingSource = getPrimaryGradingSource(data);
   const isTutorContext = gradingSource === 'tutor';
   const shouldShowAiPanel = gradingSource === 'ai' || Boolean(activeTask?.aiFeedback);
+  const activeTaskFailed = activeTask?.aiFeedback?.status === 'failed'
+    || Boolean(activeTask?.aiFeedback?.errorMessage);
 
   if (!activeTask) {
     return <div className="alert alert-info">Chưa có dữ liệu Writing task.</div>;
@@ -401,8 +455,28 @@ const WritingFeedbackDetail = ({ data }) => {
               <div className="mb-3">
                 <span className="badge text-bg-light border">{getAiStatusText(activeTask, data)}</span>
               </div>
+              {activeTaskFailed && onRetryTask && (
+                <div className="mb-3">
+                  <button
+                    type="button"
+                    className="btn btn-dark rounded-pill px-4"
+                    disabled={retryingTaskId === activeTask.submissionId}
+                    onClick={() => onRetryTask(activeTask.submissionId)}
+                  >
+                    {retryingTaskId === activeTask.submissionId
+                      ? 'Đang chấm lại...'
+                      : `Chấm lại Task ${activeTask.taskNumber} bằng AI`}
+                  </button>
+                  {retryErrors[activeTask.submissionId] && (
+                    <div className="text-danger mt-2" role="alert">
+                      {retryErrors[activeTask.submissionId]}
+                    </div>
+                  )}
+                </div>
+              )}
               <AiFeedbackPanel
                 report={activeTask.aiFeedback ? { ...activeTask.aiFeedback, taskNumber: activeTask.taskNumber } : null}
+                isPending={data.aiStatus === 'pending'}
               />
             </>
           )}
@@ -426,6 +500,10 @@ const FeedbackReport = ({ submissionId, type }) => {
   const [reportData, setReportData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [retrying, setRetrying] = useState(false);
+  const [retryError, setRetryError] = useState(null);
+  const [writingRetryTaskId, setWritingRetryTaskId] = useState(null);
+  const [writingRetryErrors, setWritingRetryErrors] = useState({});
   const { socket } = useGradingSocket();
 
   const fetchFeedback = useCallback(async () => {
@@ -434,7 +512,19 @@ const FeedbackReport = ({ submissionId, type }) => {
       setError(null);
       const response = await gradingService.getFeedback(submissionId, type);
       if (response.success) {
-        setReportData(response.data);
+        let nextData = response.data;
+        if (type === 'speaking' && Array.isArray(nextData?.parts)) {
+          const parts = await Promise.all(nextData.parts.map(async (part) => {
+            try {
+              const audioResponse = await gradingService.getAudioUrl(part.submissionId, 'speaking');
+              return { ...part, audioUrl: audioResponse.data?.url || '' };
+            } catch {
+              return part;
+            }
+          }));
+          nextData = { ...nextData, parts };
+        }
+        setReportData(nextData);
       } else {
         setError(response.error?.message || 'Có lỗi xảy ra khi tải điểm.');
       }
@@ -444,6 +534,39 @@ const FeedbackReport = ({ submissionId, type }) => {
       setLoading(false);
     }
   }, [submissionId, type]);
+
+  const retrySpeaking = useCallback(async () => {
+    setRetrying(true);
+    setRetryError(null);
+    try {
+      await gradingService.retrySpeakingGrading(submissionId);
+      await fetchFeedback();
+    } catch (retryFailure) {
+      setRetryError(
+        retryFailure.response?.data?.error?.message
+        || retryFailure.message
+        || 'Không thể gửi yêu cầu chấm lại.'
+      );
+    } finally {
+      setRetrying(false);
+    }
+  }, [fetchFeedback, submissionId]);
+
+  const retryWritingTask = useCallback(async (taskSubmissionId) => {
+    setWritingRetryTaskId(taskSubmissionId);
+    setWritingRetryErrors((current) => ({ ...current, [taskSubmissionId]: null }));
+    try {
+      await gradingService.requestAiGrading(taskSubmissionId);
+      await fetchFeedback();
+    } catch (retryFailure) {
+      const message = retryFailure.response?.data?.error?.message
+        || retryFailure.message
+        || 'Không thể chấm lại Writing bằng AI.';
+      setWritingRetryErrors((current) => ({ ...current, [taskSubmissionId]: message }));
+    } finally {
+      setWritingRetryTaskId(null);
+    }
+  }, [fetchFeedback]);
 
   // EARS[Event]: WHEN component mounts THEN fetch feedback report initially (Fallback mechanism)
   useEffect(() => {
@@ -483,14 +606,24 @@ const FeedbackReport = ({ submissionId, type }) => {
     };
   }, [socket, submissionId, fetchFeedback]);
 
-  // UI/UX Chuẩn Bootstrap 5 - Trạng thái Pending
-  if (loading) {
+  // Polling fallback
+  useEffect(() => {
+    if (reportData?.aiStatus === 'pending' || reportData?.status === 'pending') {
+      const interval = setInterval(() => {
+        fetchFeedback();
+      }, 10000);
+      return () => clearInterval(interval);
+    }
+    return undefined;
+  }, [reportData?.aiStatus, reportData?.status, fetchFeedback]);
+
+  if (loading && !reportData) {
     return (
       <div className="d-flex flex-column justify-content-center align-items-center py-5">
         <div className="spinner-border text-primary mb-3" role="status">
           <span className="visually-hidden">Loading...</span>
         </div>
-        <p className="text-muted fw-bold">Bài làm của bạn đang được chấm...</p>
+        <p className="text-muted fw-bold">Đang tải dữ liệu...</p>
       </div>
     );
   }
@@ -506,11 +639,25 @@ const FeedbackReport = ({ submissionId, type }) => {
   }
 
   if (type === 'writing' && Array.isArray(reportData?.tasks)) {
-    return <WritingFeedbackDetail data={reportData} />;
+    return (
+      <WritingFeedbackDetail
+        data={reportData}
+        onRetryTask={retryWritingTask}
+        retryingTaskId={writingRetryTaskId}
+        retryErrors={writingRetryErrors}
+      />
+    );
   }
 
   if (type === 'speaking' && Array.isArray(reportData?.parts)) {
-    return <SpeakingFeedbackDetail data={reportData} />;
+    return (
+      <SpeakingFeedbackDetail
+        data={reportData}
+        onRetry={retrySpeaking}
+        retrying={retrying}
+        retryError={retryError}
+      />
+    );
   }
 
   if (!reportData || (!reportData.ai_report && !reportData.tutor_report)) {
