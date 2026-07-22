@@ -10,11 +10,13 @@
  * - TC-002-05: Verifies boundary error cases when inserting invalid enum values (EARS[Unwanted])
  */
 
+const { configureDisposableDatabase } = require('../../helpers/requireDisposableDatabase');
+const describeDatabase = configureDisposableDatabase() ? describe : describe.skip;
 const { pool } = require('../../../src/db/pool');
 const fs = require('fs');
 const path = require('path');
 
-describe('Migration: 001_create_enums', () => {
+describeDatabase('Migration: 001_create_enums', () => {
   let client;
 
   beforeAll(async () => {
