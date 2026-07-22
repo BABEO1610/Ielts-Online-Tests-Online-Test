@@ -6,11 +6,13 @@
  * - [State-driven]: v_active_sessions only returns valid, active sessions
  */
 
+const { configureDisposableDatabase } = require('../../helpers/requireDisposableDatabase');
+const describeDatabase = configureDisposableDatabase() ? describe : describe.skip;
 const { pool } = require('../../../src/db/pool');
 const fs = require('fs');
 const path = require('path');
 
-describe('T004 - Migration: Bảng user_sessions', () => {
+describeDatabase('T004 - Migration: Bảng user_sessions', () => {
   let client;
   let testUserId;
 
