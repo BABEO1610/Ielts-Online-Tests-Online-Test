@@ -21,7 +21,7 @@ description: "Danh sách công việc triển khai production-safe cho AI Writin
 **Mục đích**: Chặn thao tác nguy hiểm, cố định cấu hình và chuẩn bị process worker trước khi thay đổi runtime.
 
 - [x] T001 Đồng bộ trạng thái triển khai và release gate trong `.sdd/specs/ai-fast-grading/spec.md`, `.sdd/specs/ai-fast-grading/plan.md`, `.sdd/specs/ai-fast-grading/research.md`, `.sdd/specs/ai-fast-grading/contracts/` và `.sdd/specs/ai-fast-grading/quickstart.md`.
-- [x] T002 [P] Thêm cấu hình feature flag, idempotency TTL, storage/provider/model pin và fail-closed defaults tại `backend/src/config/aiGrading.config.js` cùng biến mẫu không chứa secret trong `backend/.env.example`.
+- [x] T002 [P] Thêm cấu hình feature flag, idempotency TTL, storage/provider/model pin và fail-closed defaults tại `backend/src/config/aiGrading.config.js` cùng biến mẫu không chứa secret trong `.env.example` ở root repository.
 - [x] T003 [P] Bổ sung script `worker`, dependency runtime thực sự cần và dependency lint còn thiếu trong `backend/package.json`/`backend/package-lock.json`; không đưa API key vào source.
 - [x] T004 Harden migration runner bằng history/checksum/advisory lock/non-zero exit và cơ chế baseline có xác nhận tại `backend/scripts/migrate.js`, `backend/scripts/baseline-migrations.js` cùng test `backend/tests/unit/scripts/migrate.test.js`.
 - [x] T005 Thêm guard để test phá dữ liệu chỉ chạy khi có database disposable được xác nhận tại `backend/tests/helpers/requireDisposableDatabase.js` và các test migration hiện có dưới `backend/tests/unit/migrations/`.
@@ -57,7 +57,7 @@ description: "Danh sách công việc triển khai production-safe cho AI Writin
 - [x] T017 [US1] Tích hợp quota advisory-lock convention cho original Writing group tại `backend/src/services/aiQuota.service.js` và `backend/src/services/submission.service.js`, giữ retry/replay không tính thêm.
 - [x] T018 [US1] Chuẩn hóa kết quả mới/cache và lỗi Writing về `{ success, data, error, meta }` tại `backend/src/controllers/aiGrading.controller.js` và `backend/src/middleware/errorHandler.js`.
 
-**Điểm kiểm tra**: Writing regression test đạt trước khi bật route Speaking async.
+**Điểm kiểm tra bắt buộc**: Writing regression phải đạt trước phát hành. Ở lần đối chiếu ngày 2026-07-22, backend còn 1 fail về envelope và frontend còn 1 fail về Overall; Phase 11 theo dõi tại T070–T071.
 
 ---
 
@@ -88,9 +88,9 @@ description: "Danh sách công việc triển khai production-safe cho AI Writin
 
 **Kiểm thử độc lập**: Mock media/STT/speech/calibration cho ba mode và xác minh transcript-only/partial không thể sinh Overall.
 
-- [x] T029 [P] [US3] Tạo structured transcriber và speech-evidence interfaces do `grading.service.js` điều phối tại `backend/src/ai/transcriber.adapter.js`, `backend/src/ai/speechEvidence.adapter.js` và sửa `backend/src/ai/grading.service.js`.
+- [x] T029 [P] [US3] Tạo transcriber interface với các trường structured tùy chọn và speech-evidence interface do `grading.service.js` điều phối tại `backend/src/ai/transcriber.adapter.js`, `backend/src/ai/speechEvidence.adapter.js` và sửa `backend/src/ai/grading.service.js`; adapter Gemini hiện chỉ điền plain transcript, còn `words`/`segments`/`uncertainty` là `null`.
 - [x] T030 [P] [US3] Tạo media validator/normalizer dùng spawn args an toàn, timeout/resource limit và workspace cleanup tại `backend/src/media/audioNormalizer.service.js` cùng unit test `backend/tests/unit/media/audioNormalizer.service.test.js`.
-- [x] T031 [P] [US3] Tạo schema/loader cho immutable signed scoring-config và calibration bundle, mặc định không bundle thì fail closed tại `backend/src/ai/calibration/calibration-bundle.schema.json`, `backend/src/ai/calibration/calibration.loader.js` và `backend/tests/unit/ai/calibration.loader.test.js`.
+- [x] T031 [P] [US3] Tạo schema/loader cho immutable signed calibration bundle tại `backend/src/ai/calibration/calibration-bundle.schema.json`, `backend/src/ai/calibration/calibration.loader.js` và `backend/tests/unit/ai/calibration.loader.test.js`: nhánh đã hiệu chuẩn fail-closed nếu bundle/signature/binding sai; nhánh `AI Estimated Band` dùng cờ riêng và cho phép không có bundle.
 - [x] T032 [US3] Tạo evidence orchestration theo từng Part và lưu artifact terminal có fencing tại `backend/src/services/speakingEvidence.service.js` cùng unit test `backend/tests/unit/services/speakingEvidence.service.test.js`.
 - [x] T033 [US3] Tạo validator/result builder cho `full_audio`, `partial_audio`, `transcript_only`, criterion nullable và decimal half-up tại `backend/src/ai/speakingResult.validator.js` cùng unit test `backend/tests/unit/ai/speakingResult.validator.test.js`.
 - [x] T034 [US3] Tạo report finalizer allowlist, bỏ provider Overall/raw reliability, transaction `completed|failed` và reader/finalizer `needs_review` chỉ để tương thích legacy tại `backend/src/services/speakingGrading.service.js` cùng unit test.
@@ -144,7 +144,9 @@ description: "Danh sách công việc triển khai production-safe cho AI Writin
 
 **Mục đích**: Các task dưới đây cố ý để mở sau khi foundation hoàn tất. Chỉ đánh dấu `[x]` khi có artifact đo được hoặc phê duyệt chính thức; không thay bằng mock hay suy đoán.
 
-- [ ] T055 Chạy fresh/legacy migration, concurrency và backup/restore rehearsal trên PostgreSQL disposable hoặc staging đã xác nhận; lưu log/checksum không chứa secret làm bằng chứng cho CHK011/G-05.
+**Quan hệ với Giai đoạn 10**: Giai đoạn 9 là cổng phát hành/production được giữ theo thứ tự lịch sử, không chặn việc triển khai và kiểm thử nội bộ nhánh `AI Estimated Band` ở Giai đoạn 10. Nó vẫn chặn mọi tuyên bố “đã hiệu chuẩn” hoặc “production-ready”.
+
+- [ ] T055 Chạy fresh/legacy migration, concurrency và backup/restore rehearsal trên PostgreSQL disposable hoặc staging đã xác nhận; lưu log/checksum không chứa secret làm bằng chứng cho `checklist.md#CHK011`/G-05.
 - [ ] T056 Đo coverage cho business logic mới, bổ sung nhánh happy/error còn thiếu và đặt gate CI tối thiểu 80%; không dùng tổng coverage của code legacy để che phần feature chưa được kiểm thử.
 - [ ] T057 Chạy benchmark/load/chaos trên staging ở baseline 30 enqueue/phút, ít nhất 10 job đồng thời và 2× forecast đã duyệt; xác nhận p95 enqueue dưới 500 ms cùng queue recovery/watchdog.
 - [ ] T058 Hoàn tất RFC/approval cho React, provider, private storage, audio format, retention/KMS, calibration/fairness và forecast/cost; đồng bộ mirror `.specify/memory/constitution.md` với `.sdd/constitution.md`; giữ public Speaking band OFF cho tới khi mọi quyết định liên quan được ký.
@@ -154,13 +156,16 @@ description: "Danh sách công việc triển khai production-safe cho AI Writin
 
 **Mục đích**: Thực hiện quyết định nghiệp vụ ngày 2026-07-22 mà không thêm bảng: learner AI nhận đủ điểm luyện tập; lỗi giữ ở luồng AI; tutor chỉ nhận bài được chọn tutor và có bản nháp AI để chỉnh.
 
-- [x] T060 [P] Viết unit test cho Gemini audio evidence và rubric scorer đủ Fluency & Coherence, Lexical Resource, Grammatical Range & Accuracy, Pronunciation tại `backend/tests/unit/ai/speechEvidence.adapter.test.js` và `backend/tests/unit/ai/speakingRubricScorer.adapter.test.js`.
-- [x] T061 Tích hợp audio thật + transcript ASR vào Gemini qua `backend/src/ai/speechEvidence.adapter.js`, `backend/src/ai/speakingRubricScorer.adapter.js`, prompt/schema và provider gateway hiện có; không suy luận Pronunciation chỉ từ transcript.
-- [x] T062 Chuyển worker learner sang semantics đủ bốn tiêu chí hoặc retry/failed, không gọi `finalizeReview`/đổi `grader=tutor`; thêm cờ riêng cho AI estimate và version audit tại config/worker/finalizer.
-- [x] T063 [P] Thêm tutor AI prelim đọc ba audio private, trả bản nháp bốn tiêu chí nhưng không persist tại `backend/src/services/speakingTutorPrelim.service.js`, `backend/src/services/tutor.service.js` và route/controller hiện có; thêm unit test.
-- [x] T064 [P] Chuẩn hóa UX: nút “Chấm lại” chỉ hiện ở `failed + can_retry`, còn tutor thấy nút “AI chấm nháp để tutor chỉnh sửa”; giữ regression test frontend xanh.
-- [x] T065 Bổ sung cấu hình mẫu không chứa secret, hỗ trợ đường dẫn `ffmpeg`/`ffprobe`, và xác minh smoke test provider thật trên ba audio private trả `completed/full_audio` đủ bốn tiêu chí.
-- [x] T066 Đồng bộ `spec.md`, `plan.md`, `research.md`, `data-model.md`, quickstart, contract/OpenAPI, checklist và review guide với semantics mới; chạy contract/unit/frontend/build/lint trước bàn giao.
+- [x] T060 [P] [US3] Viết unit test cho Gemini audio evidence và rubric scorer đủ Fluency & Coherence, Lexical Resource, Grammatical Range & Accuracy, Pronunciation tại `backend/tests/unit/ai/speechEvidence.adapter.test.js` và `backend/tests/unit/ai/speakingRubricScorer.adapter.test.js`.
+- [x] T061 [US3] Tích hợp audio thật + transcript ASR vào Gemini qua `backend/src/ai/speechEvidence.adapter.js`, `backend/src/ai/speakingRubricScorer.adapter.js`, prompt/schema và provider gateway hiện có; không suy luận Pronunciation chỉ từ transcript.
+- [x] T062 [US3] Chuyển worker learner sang semantics đủ bốn tiêu chí hoặc retry/failed, không gọi `finalizeReview`/đổi `grader=tutor`; thêm cờ riêng cho AI estimate và version audit tại config/worker/finalizer.
+- [x] T063 [P] [US5] Thêm tutor AI prelim đọc ba audio private, trả bản nháp bốn tiêu chí nhưng không persist tại `backend/src/services/speakingTutorPrelim.service.js`, `backend/src/services/tutor.service.js` và route/controller hiện có; thêm unit test.
+- [x] T064 [P] [US4] Chuẩn hóa UX: nút “Chấm lại” chỉ hiện ở `failed + can_retry`, còn tutor thấy nút “AI chấm nháp để tutor chỉnh sửa”; giữ regression Speaking liên quan xanh. Regression Writing Detail còn mở riêng tại T071.
+- [x] T065 Bổ sung validation/default cấu hình runtime và hỗ trợ đường dẫn `ffmpeg`/`ffprobe`; automated test tiếp tục dùng provider mock/fake. File cấu hình mẫu an toàn ở root được hoàn tất riêng tại T072.
+- [x] T066 Đồng bộ `spec.md`, `plan.md`, `research.md`, `data-model.md`, quickstart, contract/OpenAPI, checklist và review guide với semantics mới; chạy các lệnh contract/unit/frontend/build/lint phù hợp và ghi đúng các regression còn mở thay vì tuyên bố toàn bộ suite xanh.
+- [ ] T067 [US3] Chạy lại smoke test provider thật bằng ba audio private sau khi model/project còn quota; lưu bằng chứng không chứa secret cho chuỗi `queued → running → completed/full_audio`, đủ transcript, bốn criterion band và Overall. Không đánh dấu hoàn tất khi chỉ có mock test hoặc job dừng ở quota/`failed`.
+- [ ] T068 [US3] Nâng adapter transcription từ plain transcript lên structured words/segments/timestamp/uncertainty nếu hội đồng yêu cầu bằng chứng ASR chi tiết; pin riêng transcription model và từ chối alias `latest` trong production.
+- [ ] T069 [US3] Chỉ bổ sung xử lý song song có giới hạn và chunk/deduplicate/rebase timestamp khi load test hoặc giới hạn payload provider chứng minh cần thiết; hiện worker xử lý ba Part tuần tự và normalizer xử lý nguyên từng Part.
 
 ## Phụ thuộc và thứ tự
 
@@ -168,7 +173,7 @@ description: "Danh sách công việc triển khai production-safe cho AI Writin
 - Giai đoạn 2 chặn US2–US5; T010–T013 có thể làm song song sau T007/T008 được chốt.
 - US1 có thể kiểm song song với nền tảng nhưng phải đạt trước rollout.
 - US2 tạo job trước US3 xử lý job; US4 phụ thuộc state/query của US2–US3; US5 áp dụng riêng cho bài được nộp với `grader=tutor`, không phụ thuộc lỗi/handoff của US3.
-- `AI Estimated Band` luyện tập đã được triển khai; nhãn/kết quả đã hiệu chuẩn vẫn phụ thuộc T055–T059 và external calibration/RFC gate dù code test xanh.
+- `AI Estimated Band` luyện tập đã được triển khai ở mức code/test mô phỏng; bằng chứng provider end-to-end phụ thuộc T067. Nhãn/kết quả đã hiệu chuẩn vẫn phụ thuộc T055–T059 và external calibration/RFC gate dù code test xanh.
 
 ## Cơ hội song song
 
@@ -180,7 +185,7 @@ description: "Danh sách công việc triển khai production-safe cho AI Writin
 ## Chiến lược MVP
 
 1. Hoàn tất Setup + database/job/private upload.
-2. Giữ Writing regression xanh.
+2. Khôi phục rồi giữ Writing regression xanh.
 3. Bật Speaking async fail-closed toàn phiên: đủ transcript + audio evidence thì trả `AI Estimated Band`, lỗi thì retry/failed.
 4. Hoàn thiện retry/watchdog và tutor authorization/AI prelim cho bài learner chủ động chọn tutor.
 5. Chỉ quảng bá kết quả là đã hiệu chuẩn/chính thức sau khi calibration/RFC/retention gate có bằng chứng và được duyệt.
@@ -192,3 +197,53 @@ description: "Danh sách công việc triển khai production-safe cho AI Writin
 - Không chạy `npm test` toàn backend cho tới khi destructive migration tests có DB disposable guard.
 - Không dùng “file tồn tại” làm bằng chứng task đạt; phải có check/test tương ứng.
 - Không sửa/xóa dữ liệu legacy để làm migration pass.
+
+---
+
+## Giai đoạn 11: Convergence
+
+**Mục đích**: Khép các sai lệch được phát hiện khi đối chiếu lại implementation ngày 2026-07-22. Chỉ đánh dấu hoàn thành khi test nêu trong từng task đạt trên code hiện tại.
+
+- [ ] T070 [US1] Chuẩn hóa lỗi Writing ngắn theo envelope `{ success, data, error, meta }`: đặt `word_count`/`required_words` trong `error.details`, đặt `request_id` trong `meta`, đồng bộ controller với middleware và làm xanh `backend/tests/integration/submissions/writingAiGrading.test.js` theo FR-019 và US1/AC2 (`contradicts`).
+- [ ] T071 [P] [US1] Khôi phục phần tổng hợp Writing trong `frontend/src/components/grading/FeedbackReport.jsx` để hiển thị `Overall Writing Band` theo trọng số Task 1/Task 2 là 33%/67%, đồng thời làm xanh `frontend/tests/components/grading/FeedbackReport.writingDetail.test.jsx` theo FR-002 và US1/AC1 (`partial`).
+- [x] T072 [P] Tạo `.env.example` ở root repository chỉ chứa tên biến và giá trị mẫu không bí mật, bao phủ cấu hình chatbot, Writing/Speaking grading, worker và private storage; đã xác minh không có key trùng, trailing whitespace hoặc mẫu credential thật trước khi chia sẻ cho thành viên theo Constitution III và quyết định cấu hình trong plan (`missing` đã được khép).
+- [ ] T073 [US5] Sửa `backend/src/controllers/tutor.controller.js` để truyền requester đã xác thực (`req.user`) vào `TutorService.getSubmissionDetail()` và giữ kiểm quyền ở `backend/src/services/tutor.service.js`; đồng thời chuẩn hóa `meta` thành object theo envelope canonical cho detail/grade/transcribe liên quan. Bổ sung controller/HTTP test cho assigned tutor, tutor khác và admin để detail không trả 403 sai, vẫn chặn IDOR và không trả `meta:null` (`contradicts`).
+- [ ] T074 [US3] Hoàn thiện nhánh Speaking đã hiệu chuẩn từ đầu đến cuối: khởi tạo scorer đúng khi cờ publish/calibration bật, truyền và thực sự áp dụng mapping/threshold/reliability trong calibration bundle tại `backend/src/jobs/aiGrading.worker.js` và `backend/src/ai/speakingRubricScorer.adapter.js`, không chỉ đổi `calibration_version`/nhãn; thêm unit/integration test chứng minh output thay đổi theo bundle hợp lệ, bundle sai binding fail-closed và giữ `AI_SPEAKING_PUBLISH_BANDS=false` cho tới khi cổng này cùng approval đạt (`missing`).
+- [ ] T075 [P] [US4] Sửa nội dung tại `frontend/src/components/grading/SpeakingSummaryScreen.jsx` để lỗi/thiếu evidence của bài `grader=ai` được mô tả là retry/failed và **không** tự chuyển tutor; bổ sung regression test khóa đúng thông điệp và điều kiện nút “Chấm lại” chỉ ở `failed + can_retry=true` (`contradicts`).
+- [ ] T076 [US3] Xây dựng bộ audio L2 English có transcript thủ công/gold-set và policy fidelity có thể đo, sau đó thực thi gate này cho nhánh Speaking đã hiệu chuẩn tại adapter/scorer/validator; chứng minh ứng dụng không sửa ASR, xác định rõ điều kiện abstain cho Lexical/Grammar/Coherence và không tuyên bố runtime estimate hiện tại đã có verbatim-fidelity threshold (`missing`).
+- [ ] T077 [US3] Bảo toàn phân loại lỗi provider 5xx/retryable xuyên suốt `backend/src/services/ai.service.js`, `backend/src/ai/grading.service.js` và worker để các lỗi 502/503/504 thực sự vào `retry_wait` theo policy thay vì bị đổi thành `INTERNAL_ERROR/AIGRADE_003` rồi fail ngay; bổ sung test theo chuỗi adapter → grading service → worker và ghi rõ xử lý `Retry-After` nếu quyết định hỗ trợ (`contradicts`).
+
+## Ma trận truy vết yêu cầu
+
+Ma trận này ánh xạ yêu cầu/tiêu chí trong `spec.md` tới task có bằng chứng hoặc task còn mở. Việc xuất hiện trong ma trận không tự đổi trạng thái task; đặc biệt T055–T059, T067–T071 và T073–T077 vẫn là các cổng chưa đạt.
+
+| Yêu cầu | Task triển khai/kiểm chứng |
+|---|---|
+| FR-001 | T012, T022, T043–T048, T073 |
+| FR-002 | T015–T018, T052, T070–T071 |
+| FR-003 | T012–T013, T019, T024–T025, T046, T049 |
+| FR-004, FR-005 | T019–T023 |
+| FR-006 | T010, T014, T020–T022 |
+| FR-007 | T010–T011, T032–T036, T038–T039 |
+| FR-008 | T025, T030, T032, T036 |
+| FR-009, FR-010 | T029, T032–T036, T060–T062, T068, T076 |
+| FR-011, FR-012, FR-013 | T033–T037, T060–T062, T074, T076 |
+| FR-014 | T034, T037, T041–T042, T062, T064, T075 |
+| FR-015 | T035, T038–T042, T077 |
+| FR-016 | T043–T048, T062–T064, T073 |
+| FR-017 | T043–T048, T063, T073 |
+| FR-018 | T002, T029–T036, T050, T060–T063 |
+| FR-019 | T018–T019, T022, T040, T045–T046, T051, T070 |
+| FR-020 | T023, T034, T037 |
+| FR-021 | T014, T017, T021, T038–T040 |
+| FR-022 | T031, T034, T037, T058, T060–T062, T065–T067, T074, T076 |
+| FR-023 | T043–T048, T063–T064 |
+| SC-001, SC-002 | T029–T037, T060–T062, T067, T074, T076 |
+| SC-003 | T010, T014, T020–T022 |
+| SC-004 | T010, T035, T038–T039 |
+| SC-005 | T025, T030, T032, T036 |
+| SC-006 | T043–T048, T073 |
+| SC-007 | T021–T022, T035, T056–T057, T077 |
+| SC-008 | T009, T020, T036, T038, T043, T051–T052, T056 |
+| SC-009 | T015–T018, T052, T070–T071 |
+| SC-010 | T038–T042, T062, T064, T075 |
