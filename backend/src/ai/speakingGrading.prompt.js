@@ -23,7 +23,7 @@ const buildSpeakingSystemPrompt = () => [
   '- Do NOT wrap JSON in code blocks.',
 ].join('\n');
 
-const buildSpeakingSchema = () => JSON.stringify({
+const SPEAKING_SCHEMA = {
   partNumber: 'null for full Speaking session',
   overallBand: 'number 0-9',
   criteria: {
@@ -41,7 +41,7 @@ const buildSpeakingSchema = () => JSON.stringify({
     },
     pronunciation: {
       band: 'number',
-      feedback: '2-4 Vietnamese sentences explaining the transcript-based estimate',
+      feedback: '2-4 Vietnamese sentences explaining the audio-based estimate',
     },
   },
   summary: '4-6 Vietnamese sentences',
@@ -68,7 +68,8 @@ const buildSpeakingSchema = () => JSON.stringify({
   nextStudyAdvice: 'string in Vietnamese',
   transcriptNotes: 'string in Vietnamese',
   disclaimer: 'string',
-}, null, 2);
+};
+const buildSpeakingSchema = () => JSON.stringify(SPEAKING_SCHEMA, null, 2);
 
 const buildSpeakingUserPrompt = ({
   partNumber,
@@ -108,8 +109,88 @@ const buildSpeakingSessionUserPrompt = ({
   buildSpeakingSchema(),
 ].join('\n');
 
+const buildSpeakingEvidenceSystemPrompt = () => [
+  'You are an IELTS Speaking examiner assistant producing a practice estimate.',
+  'Assess one complete three-part session against the four public IELTS Speaking criteria.',
+  'Use the ASR transcript for wording, grammar, vocabulary, relevance, and coherence.',
+  'Use fluency_metrics and pronunciation_evidence extracted from the actual audio for delivery and pronunciation.',
+  'Never infer pronunciation from spelling or transcript text.',
+  'Do not silently correct ASR grammar before grading. Treat uncertain transcript spans cautiously.',
+  'Return criterion bands from 0 to 9 in 0.5 increments; the backend computes Overall independently.',
+  'All feedback fields must be concise Vietnamese, while quoted learner language stays in English.',
+  'Return ONLY valid JSON matching the requested schema, without markdown.',
+].join('\n');
+
+const buildSpeakingEvidenceSessionUserPrompt = ({ parts, testTitle }) => [
+  `Test: ${testTitle || '(Không có tên bài)'}`,
+  'Dưới đây là transcript ASR chưa sửa cùng evidence đã phân tích từ audio thật.',
+  JSON.stringify({ parts }, null, 2),
+  'REQUIRED OUTPUT FORMAT (JSON only):',
+  buildSpeakingSchema(),
+].join('\n\n');
+
+const buildAudioEvidenceSystemPrompt = () => [
+  'Analyze the supplied English learner audio for delivery evidence only.',
+  'Listen to the actual waveform. The ASR transcript is a reference and may contain recognition errors.',
+  'Do not assign IELTS bands or numeric scores. Do not infer acoustic facts from transcript spelling.',
+  'Assess observable pace, pauses, hesitation, repair, repetition, intelligibility, segmental clarity,',
+  'word stress, rhythm, intonation, and connected speech across this audio part.',
+  'Mark a component insufficient only when the recording truly prevents a defensible observation.',
+  'Return ONLY JSON matching the response schema. Summary strings must be Vietnamese.',
+].join('\n');
+
+const buildAudioEvidenceUserPrompt = ({ asrTranscript, languageCode = 'en' }) => [
+  `Language: ${languageCode}`,
+  'ASR transcript (untrusted reference; do not correct it):',
+  asrTranscript || '(trống)',
+  'Analyze the attached audio now.',
+].join('\n\n');
+
+const audioEvidenceResponseSchema = {
+  type: 'object',
+  required: [
+    'fluency_sufficient',
+    'pronunciation_sufficient',
+    'fluency_metrics',
+    'pronunciation_evidence',
+  ],
+  properties: {
+    fluency_sufficient: { type: 'boolean' },
+    pronunciation_sufficient: { type: 'boolean' },
+    fluency_metrics: {
+      type: 'object',
+      required: ['speech_rate', 'hesitation', 'pause_control', 'repetition_and_repair', 'delivery_summary'],
+      properties: {
+        speech_rate: { type: 'string' },
+        hesitation: { type: 'string' },
+        pause_control: { type: 'string' },
+        repetition_and_repair: { type: 'string' },
+        delivery_summary: { type: 'string' },
+      },
+    },
+    pronunciation_evidence: {
+      type: 'object',
+      required: ['intelligibility', 'segmental_accuracy', 'word_stress', 'rhythm', 'intonation', 'connected_speech', 'evidence_summary'],
+      properties: {
+        intelligibility: { type: 'string' },
+        segmental_accuracy: { type: 'string' },
+        word_stress: { type: 'string' },
+        rhythm: { type: 'string' },
+        intonation: { type: 'string' },
+        connected_speech: { type: 'string' },
+        evidence_summary: { type: 'string' },
+      },
+    },
+  },
+};
+
 module.exports = {
   buildSpeakingSystemPrompt,
   buildSpeakingUserPrompt,
   buildSpeakingSessionUserPrompt,
+  buildSpeakingEvidenceSystemPrompt,
+  buildSpeakingEvidenceSessionUserPrompt,
+  buildAudioEvidenceSystemPrompt,
+  buildAudioEvidenceUserPrompt,
+  audioEvidenceResponseSchema,
 };
