@@ -11,6 +11,8 @@
  * 3. Boundary Case (Unwanted): Should remain locked and keep incrementing if attempts > 5.
  */
 
+const { configureDisposableDatabase } = require('../../helpers/requireDisposableDatabase');
+const describeDatabase = configureDisposableDatabase() ? describe : describe.skip;
 const { Pool } = require('pg');
 const fs = require('fs');
 const path = require('path');
@@ -50,7 +52,7 @@ beforeEach(async () => {
     await pool.query('TRUNCATE TABLE users CASCADE;');
 });
 
-describe('Migration: 007_create_fail_login', () => {
+describeDatabase('Migration: 007_create_fail_login', () => {
     
     it('Happy Path: Should increment failed_login_attempts if attempts < 5', async () => {
         // EARS[Unwanted]: WHERE a User inputs an incorrect password, THE system SHALL call the DB function handle_failed_login()
