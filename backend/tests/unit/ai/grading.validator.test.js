@@ -6,6 +6,8 @@ jest.mock('../../../src/utils/logger', () => ({
 const {
   normalizeBand,
   validateGradingResponse,
+  validateWritingWordThreshold,
+  sanitizeWritingText,
 } = require('../../../src/ai/grading.validator');
 
 const buildResponse = (overrides = {}) => JSON.stringify({
@@ -110,5 +112,14 @@ describe('grading.validator', () => {
     expect(result.data.vocabularySuggestions).toHaveLength(1);
     expect(result.data.grammarCorrections).toHaveLength(1);
     expect(result.data.actionPlan).toEqual(['Plan before writing']);
+  });
+
+  it('shares the 50/100-word production thresholds without correcting learner grammar', () => {
+    expect(() => validateWritingWordThreshold('word '.repeat(49), 'task1'))
+      .toThrow('quá ngắn');
+    expect(() => validateWritingWordThreshold('word '.repeat(99), 'task2'))
+      .toThrow('quá ngắn');
+    expect(validateWritingWordThreshold('word '.repeat(50), 'task1').wordCount).toBe(50);
+    expect(sanitizeWritingText('I has\r\na idea.')).toBe('I has\na idea.');
   });
 });
