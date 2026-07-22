@@ -19,6 +19,12 @@ describe('Error Handler Middleware', () => {
   let mockRes;
   let mockNext;
   let originalEnv;
+  const envelope = (code, message) => ({
+    success: false,
+    data: null,
+    error: { code, message, details: null },
+    meta: { request_id: null },
+  });
 
   beforeEach(() => {
     mockReq = {};
@@ -42,13 +48,7 @@ describe('Error Handler Middleware', () => {
     errorHandler(err, mockReq, mockRes, mockNext);
 
     expect(mockRes.status).toHaveBeenCalledWith(400);
-    expect(mockRes.json).toHaveBeenCalledWith({
-      success: false,
-      error: {
-        code: 'AUTH_REG_001',
-        message: 'Registration failed. Please try again.',
-      },
-    });
+    expect(mockRes.json).toHaveBeenCalledWith(envelope('AUTH_REG_001', 'Registration failed. Please try again.'));
     expect(logger.warn).toHaveBeenCalledWith('Operational Error [AUTH_REG_001]: Registration failed. Please try again.');
   });
 
@@ -59,31 +59,18 @@ describe('Error Handler Middleware', () => {
     errorHandler(err, mockReq, mockRes, mockNext);
 
     expect(mockRes.status).toHaveBeenCalledWith(500);
-    expect(mockRes.json).toHaveBeenCalledWith({
-      success: false,
-      error: {
-        code: 'INTERNAL_ERROR',
-        message: 'Some unexpected system failure',
-      },
-    });
+    expect(mockRes.json).toHaveBeenCalledWith(envelope('INTERNAL_ERROR', 'Đã xảy ra lỗi hệ thống.'));
     expect(logger.error).toHaveBeenCalledWith('Unhandled Exception:', err);
   });
 
-  it('should include stack trace in development mode', () => {
+  it('should not expose a stack trace even in development API responses', () => {
     process.env.NODE_ENV = 'development';
     const err = new Error('Test Dev Error');
 
     errorHandler(err, mockReq, mockRes, mockNext);
 
     expect(mockRes.status).toHaveBeenCalledWith(500);
-    expect(mockRes.json).toHaveBeenCalledWith({
-      success: false,
-      error: {
-        code: 'INTERNAL_ERROR',
-        message: 'Test Dev Error',
-        stack: expect.any(String),
-      },
-    });
+    expect(mockRes.json).toHaveBeenCalledWith(envelope('INTERNAL_ERROR', 'Đã xảy ra lỗi hệ thống.'));
   });
 
   it('should handle SyntaxError (JSON Parse Error)', () => {
@@ -94,13 +81,7 @@ describe('Error Handler Middleware', () => {
     errorHandler(err, mockReq, mockRes, mockNext);
 
     expect(mockRes.status).toHaveBeenCalledWith(400);
-    expect(mockRes.json).toHaveBeenCalledWith({
-      success: false,
-      error: {
-        code: 'BAD_REQUEST_JSON',
-        message: 'Invalid JSON payload',
-      },
-    });
+    expect(mockRes.json).toHaveBeenCalledWith(envelope('BAD_REQUEST_JSON', 'Invalid JSON payload'));
   });
 
   it('should handle JsonWebTokenError', () => {
@@ -111,13 +92,7 @@ describe('Error Handler Middleware', () => {
     errorHandler(err, mockReq, mockRes, mockNext);
 
     expect(mockRes.status).toHaveBeenCalledWith(401);
-    expect(mockRes.json).toHaveBeenCalledWith({
-      success: false,
-      error: {
-        code: 'AUTH_SES_001',
-        message: 'Invalid token',
-      },
-    });
+    expect(mockRes.json).toHaveBeenCalledWith(envelope('AUTH_SES_001', 'Invalid token'));
   });
 
   it('should handle TokenExpiredError', () => {
@@ -128,12 +103,6 @@ describe('Error Handler Middleware', () => {
     errorHandler(err, mockReq, mockRes, mockNext);
 
     expect(mockRes.status).toHaveBeenCalledWith(401);
-    expect(mockRes.json).toHaveBeenCalledWith({
-      success: false,
-      error: {
-        code: 'AUTH_SES_001',
-        message: 'Session expired.',
-      },
-    });
+    expect(mockRes.json).toHaveBeenCalledWith(envelope('AUTH_SES_001', 'Session expired.'));
   });
 });
