@@ -14,6 +14,7 @@ const ENV_KEYS = [
   'GOOGLE_AI_API_KEY',
   'GOOGLE_API_KEY',
   'OPENAI_API_KEY',
+  'AI_TRANSCRIPTION_TIMEOUT_MS',
 ];
 const originalEnv = Object.fromEntries(ENV_KEYS.map((key) => [key, process.env[key]]));
 const originalFetch = global.fetch;
@@ -149,5 +150,80 @@ describe('AI provider configuration', () => {
     expect(classifierInput).toContain('scanning là gì');
     expect(classifierInput).toContain('kết hợp 2 cái này');
     expect(classifierInput).toContain('"previousSkill":"reading"');
+  });
+
+  it('aborts a hanging Gemini transcription within the configured timeout', async () => {
+    jest.useFakeTimers();
+    process.env.GEMINI_API_KEY = 'test-key';
+    process.env.AI_TRANSCRIPTION_TIMEOUT_MS = '5000';
+    global.fetch = jest.fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        arrayBuffer: jest.fn().mockResolvedValue(Buffer.from('audio')),
+        headers: { get: jest.fn(() => 'audio/wav') },
+      })
+      // Simulate a provider/socket that ignores AbortSignal entirely.
+      .mockImplementationOnce(() => new Promise(() => {}));
+
+    const transcription = expect(
+      aiService.generateTranscript('data:audio/wav;base64,YXVkaW8=')
+    ).rejects.toMatchObject({
+      code: 'TRANSCRIPTION_TIMEOUT',
+      retryable: true,
+    });
+    await jest.advanceTimersByTimeAsync(5000);
+    await transcription;
+    jest.useRealTimers();
+  });
+
+  it('hard-times-out JSON grading even when provider fetch ignores abort', async () => {
+    jest.useFakeTimers();
+    global.fetch = jest.fn().mockImplementation(() => new Promise(() => {}));
+    const grading = expect(aiService.generateGeminiJsonAnswer({
+      model: 'gemini-3.6-flash',
+      apiKey: 'test-key',
+      systemPrompt: 'Return JSON.',
+      userPrompt: 'Return {"ok":true}.',
+      timeoutMs: 5000,
+    })).rejects.toMatchObject({ name: 'AbortError', code: 'AI_REQUEST_TIMEOUT' });
+
+    await jest.advanceTimersByTimeAsync(5000);
+    await grading;
+    jest.useRealTimers();
+  });
+
+  it('sends inline audio and a response schema for multimodal JSON analysis', async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      json: jest.fn().mockResolvedValue({
+        candidates: [{ content: { parts: [{ text: '{"ok":true}' }] } }],
+      }),
+    });
+    const responseSchema = {
+      type: 'object',
+      required: ['ok'],
+      properties: { ok: { type: 'boolean' } },
+    };
+
+    await aiService.generateGeminiJsonAnswer({
+      model: 'gemini-3.6-flash',
+      apiKey: 'test-key',
+      systemPrompt: 'Analyze audio.',
+      userPrompt: 'Fallback text.',
+      contentParts: [
+        { text: 'Analyze this clip.' },
+        { inlineData: { mimeType: 'audio/wav', data: 'YXVkaW8=' } },
+      ],
+      responseSchema,
+    });
+
+    const body = JSON.parse(global.fetch.mock.calls[0][1].body);
+    expect(body.contents[0].parts[1]).toEqual({
+      inlineData: { mimeType: 'audio/wav', data: 'YXVkaW8=' },
+    });
+    expect(body.generationConfig).toMatchObject({
+      responseMimeType: 'application/json',
+      responseSchema,
+    });
   });
 });

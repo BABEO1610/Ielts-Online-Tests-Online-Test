@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import gradingService from '../../services/grading.service';
 
@@ -114,8 +114,16 @@ const TutorQueuePage = () => {
     return () => clearTimeout(timeoutId);
   }, [skillFilter, search]);
 
-  const handleGrade = (item) => {
-    navigate(`/grading/tutor/grade/${item.submissionType}/${item.submissionId}`);
+  const handleGrade = async (item) => {
+    try {
+      const targetId = item.submissionType === 'speaking'
+        ? (item.speakingGroupId || item.submissionId)
+        : item.submissionId;
+      if (item.submissionType === 'speaking') await gradingService.claimSpeakingGroup(targetId);
+      navigate(`/grading/tutor/grade/${item.submissionType}/${targetId}`);
+    } catch (claimError) {
+      setError(claimError.response?.data?.error?.message || 'Không thể claim bài Speaking này.');
+    }
   };
 
   // Tính toán dynamic STATS dựa trên dữ liệu thật
@@ -295,7 +303,7 @@ const TutorQueuePage = () => {
                 // Tính toán deadline hiển thị
                 const submittedTime = new Date(item.submittedAt);
                 const hoursWait = (new Date() - submittedTime) / (1000 * 60 * 60);
-                let deadlineStr = '';
+                let deadlineStr;
                 let deadlineUrgent = false;
                 let deadlineOverdue = false;
                 

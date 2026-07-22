@@ -4,12 +4,6 @@ import StudentNavbar from '../../components/layout/StudentNavbar';
 import FeedbackReport from '../../components/grading/FeedbackReport';
 import gradingService from '../../services/grading.service';
 
-const MOCK_STATS = {
-  targetBand: 7.0,
-  currentAvg: 6.75,
-  quotaRemaining: 7
-};
-
 const formatDate = (dateString) => {
   return new Date(dateString).toLocaleString('vi-VN', {
     day: '2-digit',
@@ -25,7 +19,12 @@ const StatusBadge = ({ status }) => {
     pending: { bg: '#efefef', color: '#5e5e5e', label: 'Đang chấm' },
     ai_graded: { bg: '#000', color: '#fff', label: 'Đã chấm (AI)' },
     tutor_graded: { bg: '#000', color: '#fff', label: 'Đã chấm (GV)' },
-    failed: { bg: '#e2e2e2', color: '#5e5e5e', label: 'Chấm thất bại' }
+    failed: { bg: '#e2e2e2', color: '#5e5e5e', label: 'Chấm thất bại' },
+    queued: { bg: '#efefef', color: '#5e5e5e', label: 'Đã xếp hàng' },
+    running: { bg: '#fff3cd', color: '#664d03', label: 'AI đang phân tích' },
+    retry_wait: { bg: '#fff3cd', color: '#664d03', label: 'Đang chờ thử lại' },
+    completed: { bg: '#000', color: '#fff', label: 'AI đã hoàn tất' },
+    needs_review: { bg: '#cff4fc', color: '#055160', label: 'Chờ tutor xác nhận' },
   };
   const { bg, color, label } = config[status] || { bg: '#efefef', color: '#5e5e5e', label: status };
   return (
@@ -48,6 +47,15 @@ const StudentHistoryPage = () => {
   const [error, setError] = useState(null);
   const [refreshKey, setRefreshKey] = useState(0);
   const [aiGradingIds, setAiGradingIds] = useState({});
+  const [retryIds, setRetryIds] = useState({});
+  const scoredBands = history
+    .map((submission) => submission.band_score)
+    .filter((band) => band !== null && band !== undefined && band !== '')
+    .map(Number)
+    .filter((band) => Number.isFinite(band) && band >= 0 && band <= 9);
+  const currentAverage = scoredBands.length > 0
+    ? scoredBands.reduce((sum, band) => sum + band, 0) / scoredBands.length
+    : null;
 
   useEffect(() => {
     const fetchHistory = async () => {
@@ -94,6 +102,19 @@ const StudentHistoryPage = () => {
     }
   };
 
+  const handleSpeakingRetry = async (submission) => {
+    setRetryIds((current) => ({ ...current, [submission.id]: true }));
+    setError(null);
+    try {
+      await gradingService.retrySpeakingGrading(submission.id);
+      setRefreshKey((key) => key + 1);
+    } catch (retryError) {
+      setError(retryError.response?.data?.error?.message || 'Không thể retry bài Speaking.');
+    } finally {
+      setRetryIds((current) => ({ ...current, [submission.id]: false }));
+    }
+  };
+
   const openDetailPage = (submission) => {
     navigate(`/student/profile/practice-history/${submission.id}?type=${submission.type}`, {
       state: { type: submission.type },
@@ -124,7 +145,7 @@ const StudentHistoryPage = () => {
                 MỤC TIÊU BAND
               </p>
               <p className="mb-0 fw-bold" style={{ fontSize: '48px', fontFamily: 'UberMove, system-ui, sans-serif', lineHeight: 1 }}>
-                {MOCK_STATS.targetBand.toFixed(1)}
+                Chưa đặt
               </p>
               <p className="mt-2 mb-0" style={{ fontSize: '14px', color: '#afafaf', fontFamily: 'UberMoveText, system-ui, sans-serif' }}>
                 Mục tiêu IELTS Overall
@@ -137,7 +158,7 @@ const StudentHistoryPage = () => {
                 ĐIỂM TRUNG BÌNH HIỆN TẠI
               </p>
               <p className="mb-0 fw-bold text-dark" style={{ fontSize: '48px', fontFamily: 'UberMove, system-ui, sans-serif', lineHeight: 1 }}>
-                {MOCK_STATS.currentAvg.toFixed(2)}
+                {currentAverage === null ? 'Chưa có' : currentAverage.toFixed(2)}
               </p>
               <p className="mt-2 mb-0" style={{ fontSize: '14px', color: '#5e5e5e', fontFamily: 'UberMoveText, system-ui, sans-serif' }}>
                 Tính trên các bài đã chấm xong
@@ -147,13 +168,13 @@ const StudentHistoryPage = () => {
           <div className="col-md-4">
             <div className="p-4 rounded-4" style={{ backgroundColor: '#efefef' }}>
               <p className="mb-1 fw-medium" style={{ fontSize: '14px', fontFamily: 'UberMoveText, system-ui, sans-serif', color: '#5e5e5e' }}>
-                LƯỢT CHẤM AI CÒN LẠI
+                HẠN MỨC CHẤM AI
               </p>
               <p className="mb-0 fw-bold text-dark" style={{ fontSize: '48px', fontFamily: 'UberMove, system-ui, sans-serif', lineHeight: 1 }}>
-                {MOCK_STATS.quotaRemaining}
+                10
               </p>
               <p className="mt-2 mb-0" style={{ fontSize: '14px', color: '#5e5e5e', fontFamily: 'UberMoveText, system-ui, sans-serif' }}>
-                Tháng này · Reset ngày 01
+                Bài mới/ngày UTC · lượt còn lại do máy chủ kiểm tra
               </p>
             </div>
           </div>
@@ -231,7 +252,10 @@ const StudentHistoryPage = () => {
                       {sub.task_number || sub.part_number ? (sub.type === 'writing' ? `Task ${sub.task_number}` : `Part ${sub.part_number}`) : 'Full Test'}
                     </td>
                     <td className="py-3 px-4 border-0">
-                      <StatusBadge status={sub.status} />
+                      <StatusBadge status={sub.gradingStatus || sub.status} />
+                      {sub.gradingStage && !['completed', 'needs_review', 'failed'].includes(sub.gradingStatus) && (
+                        <div className="text-muted mt-1" style={{ fontSize: '11px' }}>{sub.gradingStage}</div>
+                      )}
                     </td>
                     <td className="py-3 px-4 border-0 text-center">
                       {sub.band_score ? (
@@ -257,7 +281,7 @@ const StudentHistoryPage = () => {
                           Xem chi tiết
                         </button>
                       )}
-                      {sub.status === 'pending' && sub.type === 'writing' && sub.grader === 'ai' && (
+                      {(sub.gradingStatus || sub.status) === 'pending' && sub.type === 'writing' && sub.grader === 'ai' && (
                         <button
                           className="btn btn-dark rounded-pill px-3 py-1 fw-medium"
                           style={{ fontSize: '13px' }}
@@ -270,11 +294,20 @@ const StudentHistoryPage = () => {
                           {aiGradingIds[sub.id] ? 'Đang chấm...' : 'AI Chấm điểm'}
                         </button>
                       )}
-                      {sub.status === 'pending' && !(sub.type === 'writing' && sub.grader === 'ai') && (
+                      {(sub.gradingStatus || sub.status) === 'pending' && !(sub.type === 'writing' && sub.grader === 'ai') && (
                         <span className="text-muted fw-medium" style={{ fontSize: '13px' }}>Đang xử lý...</span>
                       )}
-                      {sub.status === 'failed' && (
-                        <span className="text-muted fw-medium" style={{ fontSize: '13px' }}>AI lỗi</span>
+                      {(sub.gradingStatus || sub.status) === 'failed' && (
+                        sub.type === 'speaking' && sub.canRetry ? (
+                          <button
+                            className="btn btn-outline-dark rounded-pill px-3 py-1 fw-medium"
+                            style={{ fontSize: '13px' }}
+                            disabled={!!retryIds[sub.id]}
+                            onClick={(event) => { event.stopPropagation(); handleSpeakingRetry(sub); }}
+                          >
+                            {retryIds[sub.id] ? 'Đang retry...' : 'Thử lại một lần'}
+                          </button>
+                        ) : <span className="text-muted fw-medium" style={{ fontSize: '13px' }}>AI lỗi</span>
                       )}
                     </td>
                   </tr>

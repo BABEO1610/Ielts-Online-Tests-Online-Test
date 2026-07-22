@@ -1,5 +1,17 @@
 # Agents Changelog
 
+## [2026-07-22] | Codex | Triển khai migration và storage AI grading
+
+- Sau khi người dùng cho phép rõ ràng, đã tạo và verify backup schema `public`, baseline
+  34 migration lịch sử rồi apply `025`–`026` trên database hiện tại.
+- Preflight sau migration không có blocker; số dòng users/speaking/writing/report giữ
+  nguyên. Lịch sử migration có 36 checksum và các khóa ngoại mới đã được xác minh.
+- Tạo bucket private `speaking-audio-private`; giữ nguyên bucket public legacy để không
+  phá dữ liệu/demo đang có. `.env` dùng bucket private và bật async Speaking ở chế độ
+  fail-closed; publication band vẫn tắt.
+- Cài FFmpeg/FFprobe 8.1.2 cho tài khoản hiện tại. Chưa gọi provider thật, restore
+  rehearsal, load/chaos test hoặc calibration release; các cổng production này vẫn mở.
+
 ## [2026-06-19] | Kiro/Claude | Listening Test Audio Fix
 
 ### Context
@@ -270,4 +282,202 @@ Khi admin phân công giảng viên, trang "Nhật ký duyệt & thay đổi" hi
 - Read-only DB preflight xác nhận session/history selection mới cùng chọn đúng
   conversation gần nhất. Nodemon đã tự restart backend và health trả HTTP 200;
   migration 024 vẫn chưa apply.
+
+---
+
+## [2026-07-21] | Codex | Chuẩn hóa tài liệu Global IELTS Virtual Assistant theo Speckit
+
+### Thay đổi
+
+- Chuẩn hóa `spec.md`, `plan.md`, `tasks.md`, `checklist.md`, `CONTEXT.md` theo template
+  và đối chiếu trực tiếp với source/test hiện có; không thay đổi mã nguồn.
+- Đổi tên bộ test production thành `production-test-suite.md`, giữ đủ 561 ID duy nhất
+  từ TC-001 đến TC-561 trong 21 nhóm và sửa các case cuối theo hành vi thực tế.
+- Ghi rõ các khác biệt đang tồn tại: React 19, response assistant dạng phẳng, auth/error
+  xử lý inline, pseudo-stream SSE, intent không reachable và migration 024 chưa được apply.
+- Bổ sung các gate chưa đạt/chưa chứng minh về vị trí custom CSS, branch/spec naming và
+  coverage 80%; làm rõ persistence là best-effort trước khi phát application SSE.
+- Tách 53 task đã có bằng chứng source/test, hai task tài liệu/regression vừa hoàn tất và
+  sáu task hardening/live-environment còn mở.
+
+### Verification
+
+- Backend focused Jest: PASS — 15 suites, 261 tests; không skip.
+- Frontend focused Vitest: PASS — 3 files, 7 tests; assistant ESLint và build PASS.
+- Backend syntax: PASS — 22 file JavaScript. Backend ESLint bị chặn do thiếu dependency
+  `@eslint/js`; không cài dependency trong lượt chuẩn hóa tài liệu này.
+- Document contracts: PASS — 561 testcase, 61 task, 30 checklist item và không còn
+  placeholder template; 28 FR và 8 SC đều map được tới task. Không chạy migration,
+  live AI/DB, commit hoặc push.
+
+---
+
+## [2026-07-21] | Codex | Việt hóa tài liệu Trợ lý ảo IELTS toàn cục
+
+### Thay đổi
+
+- Việt hóa và hiệu đính toàn bộ phần diễn giải phục vụ học tập, thuyết trình và phản
+  biện trong 9 tệp tại `.sdd/specs/global-ielts-virtual-assistant/`.
+- Chuẩn hóa thuật ngữ tiếng Việt về xác thực, truyền luồng SSE, quyền sở hữu hội thoại,
+  dữ liệu có căn cứ, phương án dự phòng và tệp di trú; sửa các câu dịch máy móc trong
+  bộ kiểm thử 561 ca.
+- Đồng bộ phần mô tả RFC với hiện trạng hỗ trợ Gemini/OpenAI, một lần thử lại phản hồi
+  tri thức không hợp lệ và các nhánh dự phòng Skimming/Scanning.
+- Giữ nguyên ID yêu cầu/nhiệm vụ/ca kiểm thử, đường dẫn, lệnh, tên trường/hàm, mã trạng
+  thái/ý định, đầu vào kiểm thử tiếng Anh/song ngữ và đầu ra lịch sử cần thiết.
+
+### Kiểm chứng
+
+- Hợp đồng tài liệu: ĐẠT — 9 tệp, 28 FR, 8 SC, 61 nhiệm vụ (55 hoàn tất/6 còn mở),
+  30 mục kiểm tra (29 hoàn tất/1 còn mở) và 115 dòng dữ liệu đánh giá.
+- Bộ kiểm thử vận hành: ĐẠT — 561 ID duy nhất, liên tục từ TC-001 đến TC-561 trong 21
+  nhóm; mọi hàng giữ đúng 8 cột.
+- Hàng rào Markdown: ĐẠT — các khối mã cân bằng và `git diff --check` trong phạm vi
+  tài liệu không có lỗi; chỉ có cảnh báo quy ước xuống dòng LF/CRLF.
+- Không thay đổi `backend/` hoặc `frontend/`; không chạy tệp di trú, AI/CSDL thật,
+  commit hoặc push. Các thay đổi có sẵn ngoài phạm vi được giữ nguyên.
+
+---
+
+## [2026-07-21] | Codex | Đối chiếu và chuẩn hóa tài liệu AI Fast Grading
+
+### Thay đổi
+
+- Đọc đối chiếu mã nguồn, migration, route, frontend và test hiện tại rồi viết lại
+  `spec.md`, `plan.md`, `tasks.md`, `checklist.md` trong
+  `.sdd/specs/ai-fast-grading/` theo cấu trúc Speckit bằng tiếng Việt.
+- Thay trạng thái “hoàn tất” không có bằng chứng bằng trạng thái đạt/một phần/chưa đạt;
+  bổ sung truy vết yêu cầu → task và ghi rõ các khoảng trống về Constitution, trạng
+  thái lỗi, idempotency đồng thời, validation, transaction, Socket.IO và coverage.
+- Chỉ sửa tài liệu; không thay đổi mã nguồn, dependency, migration, cấu hình hoặc dữ
+  liệu môi trường.
+
+### Kiểm chứng
+
+- Backend mục tiêu: ĐẠT — 5 suite, 17/17 test.
+- Frontend hook Socket: ĐẠT ở mức unit — 8/8 test, nhưng hợp đồng mock đang dùng tên
+  sự kiện lệch backend nên không được coi là bằng chứng tích hợp.
+- Nhóm test frontend liên quan: 15 test đạt, 10 test lỗi; test FeedbackReport đặt dưới
+  `frontend/src/tests/` không được cấu hình Vitest thu thập.
+- Hợp đồng tài liệu: 16 FR, 6 SC, 47 task và 44 checklist ID duy nhất; UTF-8 hợp lệ,
+  liên kết nội bộ tương đối. `.specify/feature.json` tạm không còn tồn tại.
+
+---
+
+## [2026-07-22] | Codex | Lập kế hoạch production cho AI Speaking Grading
+
+### Thay đổi
+
+- Chạy workflow `speckit-plan` cho feature `.sdd/specs/ai-fast-grading/` và viết lại
+  `plan.md` dựa trên code, migration và runtime hiện tại; chưa triển khai source code.
+- Bổ sung `research.md`, `data-model.md`, hợp đồng Markdown/OpenAPI 3.1 và
+  `quickstart.md` để mô tả evidence audio/transcript, worker bất đồng bộ, conditional
+  nullable criteria, retry/idempotency, private signed upload và calibration gate.
+- Chốt phương án tận dụng `speaking_submissions`, `ai_grading_reports`,
+  `ai_usage_logs`, `tutor_feedback_reports`, `assigned_tutor_id` và
+  `speaking_group_id`; chỉ đề xuất hai bảng feature mới là `ai_grading_jobs` và
+  `speaking_analysis_artifacts` (migration metadata, nếu cần, dùng một platform table
+  chung thay vì bảng riêng cho AI).
+- Ghi rõ không dùng/dual-write các bảng legacy `speaking_attempts`,
+  `speaking_attempt_answers`, `tutor_grading_reports`; không tạo các bảng riêng cho
+  audio asset, transcript, fluency, pronunciation, job attempt hoặc idempotency key.
+- Đặt cổng bắt buộc trước implementation: sửa spec để transcript-only không sinh bất
+  kỳ IELTS criterion band/Overall và partial audio fail closed theo evidence; phê duyệt
+  RFC provider/storage/React/audio format, ngưỡng calibration/scale; harden migration.
+- Sau audit chéo, khóa thêm thứ tự idempotency trước quota, `prompt_id` chính thức,
+  hai expiry upload riêng, tutor claim/assignment nguyên tử, Overall từ
+  `computed_band`, ASR-fidelity cho cả Coherence và calibration bundle/registry bất biến.
+- Bỏ phương án tạo artifact/job giả cho transcript legacy; giữ dual-read chỉ để hiển
+  thị. Quy định audio đủ file nhưng uncertainty/OOD không đạt vẫn là
+  `partial_audio/needs_review`, còn rollback trở về tutor/manual với feedback chữ chỉ
+  dành cho reviewer/shadow.
+
+### Kiểm chứng
+
+- Đối chiếu read-only các migration `013`–`024`, route/service/grader/validator,
+  Storage upload, tutor feedback và package scripts liên quan.
+- Các tài liệu mới dùng UTF-8; 27/27 hàng rào Markdown cân bằng và 17/17 liên kết nội
+  bộ tồn tại. OpenAPI 3.1 có 6 path/operation, 35 schema, 95/95 local `$ref` resolve;
+  12/12 ví dụ API khớp schema và 720 tổ hợp state/result được kiểm (26 hợp lệ đúng
+  thiết kế), không cho trạng thái trái hợp đồng lọt qua. Plan cố ý giữ
+  `BLOCKED FOR IMPLEMENTATION`.
+- Không chạy migration, provider thật, database thật, test code, commit hoặc push.
+- Không thay đổi `backend/` hoặc `frontend/` trong lượt lập kế hoạch này; mọi thay đổi
+  có sẵn ngoài phạm vi được giữ nguyên.
+
+---
+
+## [2026-07-22] | Codex | Triển khai nền tảng AI Fast Grading fail-closed
+
+### Thay đổi
+
+- Triển khai private signed upload, opaque upload token, submit Speaking bất đồng bộ,
+  PostgreSQL job queue, worker/heartbeat/watchdog, idempotency, quota dùng chung và
+  quarantine cleanup; API không còn chờ provider trong request.
+- Chỉ thêm hai bảng nghiệp vụ `ai_grading_jobs` và `speaking_analysis_artifacts`;
+  tái sử dụng submission/report/usage/tutor/assignment hiện có và harden migration
+  runner bằng history, checksum, advisory lock cùng baseline có xác nhận.
+- Tạo evidence pipeline tách ASR/display transcript, kiểm chất lượng audio, pin
+  provider/model/config, xác minh calibration bundle và mặc định fail-closed. Khi
+  chưa đủ speech evidence/calibration, learner nhận `result=null` và bài chuyển tutor,
+  không sinh Fluency, Pronunciation hoặc Overall giả từ transcript.
+- Giữ ổn định Writing bằng validator 50/100 từ, sanitizer không sửa ngữ pháp,
+  idempotency, cache replay, quota và Overall 33%/67%.
+- Bổ sung atomic tutor claim, assignment-scoped detail/reference/audio/grade, signed
+  audio ngắn hạn, soft-delete report và lọc row đã xóa trong history/export/stats.
+- Cập nhật frontend signed upload/polling/retry, learner redaction, tutor claim và
+  không persist signed URL; đồng bộ OpenAPI, checklist, tasks và `REVIEW_GUIDE.md`.
+- Hardening lượt cuối: kiểm magic byte và từ chối video stream, allowlist projection
+  kết quả AI, bind đúng transcription provider/model vào manifest, ngăn auto-submit
+  lặp vô hạn, chuẩn hóa `meta` thành object, thêm watchdog backoff/jitter và khử dữ
+  liệu nhạy cảm trong lỗi usage log.
+- Khóa thêm invariant production cho replay/fingerprint/prompt snapshot, manual retry,
+  report DB projection và evidence fencing; frontend chỉ khôi phục polling AI hợp lệ
+  sau refresh, không mở microphone khi MIME chưa được duyệt.
+
+### Kiểm chứng
+
+- Backend feature-targeted: ĐẠT — 29 suite, 141/141 test; `008a` được khóa bằng test
+  để chỉ bootstrap schema `library_resources` legacy giống migration `012`, không gọi
+  provider thật.
+- Frontend feature-targeted: ĐẠT — 7 file, 32/32 test; production build ĐẠT
+  (2.883,70 kB, gzip 813,64 kB; cảnh báo bundle lớn được giữ ở T059).
+- ESLint mục tiêu backend/frontend: ĐẠT; `node --check`: ĐẠT cho 82 file JavaScript
+  thay đổi/mới. OpenAPI 3.1 parse/ref/state/header contract: ĐẠT.
+- Không chạy migration/database production, provider thật, load test hoặc calibration
+  fairness. Public Speaking band tiếp tục bị khóa bởi RFC, calibration, retention,
+  disposable-DB và scale/cost gate; các thay đổi có sẵn ngoài feature được giữ nguyên.
+- T001–T054 đã hoàn tất bằng code/test/tài liệu; T055–T059 được để mở có chủ ý cho
+  disposable DB, coverage, load/chaos, RFC và refactor/code-splitting frontend legacy.
+
+---
+
+## [2026-07-22] | Codex | Hoàn thiện AI Estimated Speaking và tutor AI prelim
+
+### Thay đổi
+
+- Chuyển Speaking learner sang kết quả toàn phiên: transcript ASR cung cấp evidence
+  Coherence/Lexical/Grammar, audio Gemini cung cấp Fluency/Pronunciation; chỉ hoàn tất
+  khi đủ bốn criterion band và Overall dưới nhãn `AI Estimated Band`.
+- Loại bỏ đường worker tự handoff tutor. Lỗi provider/evidence giữ `grader=ai`, đi theo
+  `retry_wait/failed`; nút chấm lại chỉ hiển thị khi backend trả `failed + can_retry`.
+- Bổ sung AI prelim tạm thời cho bài được học viên chọn tutor; tutor đã claim nhận bản
+  nháp bốn tiêu chí để chỉnh, chưa lưu thì không tạo report hoặc đổi trạng thái.
+- Tái sử dụng nguyên schema hiện có, không thêm migration hoặc bảng cho thay đổi này.
+- Pin model grading/transcription `gemini-3.6-flash`, cấu hình ffmpeg/ffprobe local và
+  cập nhật `.env.example` an toàn không chứa credential.
+- Sửa hai lỗi chặn runtime phát hiện khi kiểm tra: hàm Writing bị đặt sai trong class,
+  route claim thiếu controller, và dòng văn bản thừa cuối `FeedbackReport.jsx`.
+- Đồng bộ spec/plan/tasks/data-model/quickstart/contract/OpenAPI/checklist/review guide
+  với semantics mới; `needs_review` chỉ còn cho reader dữ liệu lịch sử.
+
+### Kiểm chứng
+
+- Backend mục tiêu: 29 suite, 130/130 test đạt; frontend: 6 file, 32/32 test đạt.
+- ESLint mục tiêu và `node --check` đạt; frontend production build đạt. Lint toàn repo
+  còn nợ legacy (backend 27, frontend 344), không thuộc thay đổi feature và không bị che.
+- Smoke Gemini thật: Speaking ba audio private hoàn tất khoảng 34 giây với đủ bốn
+  tiêu chí; Writing mẫu vô danh hoàn tất khoảng 11 giây bằng `gemini-3.6-flash`.
+- API health trả 200; một API process và một worker process đang chạy. Không xóa/sửa
+  dữ liệu lịch sử, không chạy migration mới và không thêm bảng.
 

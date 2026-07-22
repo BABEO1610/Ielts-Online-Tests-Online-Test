@@ -1,9 +1,9 @@
 const { pool } = require('../db/pool');
-const { gradeSpeakingSession } = require('../ai/grading.service');
+const { gradeSpeakingSession, transcribeSpeakingAudio } = require('../ai/grading.service');
 const { REPORT_STATUS } = require('../ai/aiGrading.constants');
-const { generateTranscript } = require('./ai.service');
 const AppError = require('../utils/AppError');
 const logger = require('../utils/logger');
+const { aiGradingConfig } = require('../config/aiGrading.config');
 
 const AI_REPORT_INSERT_ORDER = [
   'submission_id',
@@ -65,7 +65,7 @@ const getSpeakingGroupParts = async (submissionIdOrGroupId) => {
     `WITH target AS (
        SELECT COALESCE(speaking_group_id, id) AS group_id
        FROM speaking_submissions
-       WHERE id::text = $1 OR speaking_group_id::text = $1
+       WHERE (id::text = $1 OR speaking_group_id::text = $1) AND deleted_at IS NULL
        ORDER BY part_number ASC NULLS LAST
        LIMIT 1
      )
@@ -73,6 +73,7 @@ const getSpeakingGroupParts = async (submissionIdOrGroupId) => {
      FROM speaking_submissions ss
      JOIN target t ON COALESCE(ss.speaking_group_id, ss.id) = t.group_id
      LEFT JOIN mock_tests mt ON mt.id = ss.test_id
+     WHERE ss.deleted_at IS NULL
      ORDER BY ss.part_number ASC`,
     [submissionIdOrGroupId]
   );
@@ -94,6 +95,7 @@ const getLatestCompletedReports = async (partIds) => {
      WHERE submission_type = 'speaking'
        AND submission_id = ANY($1::uuid[])
        AND band_score IS NOT NULL
+       AND deleted_at IS NULL
        ${statusPredicate}
      ORDER BY submission_id, generated_at DESC`,
     [partIds]
@@ -116,7 +118,7 @@ const ensureTranscript = async (part, usageContext = null) => {
   if (!part.audio_url) {
     throw new AppError('Speaking transcript is required before AI grading.', 422, 'SPEAKING_TRANSCRIPT_REQUIRED');
   }
-  const transcript = await generateTranscript(part.audio_url, usageContext || {
+  const { transcript } = await transcribeSpeakingAudio(part.audio_url, usageContext || {
     userId: part.user_id,
     feature: 'speaking_grading',
     entityType: 'speaking_submission',
@@ -179,6 +181,13 @@ const saveFailedReport = (part, error) => insertAiReport(pool, {
 });
 
 const gradeSpeakingGroup = async (submissionIdOrGroupId, { force = false, usageContext = null } = {}) => {
+  if (aiGradingConfig.enabled) {
+    throw new AppError(
+      'Đường chấm Speaking đồng bộ cũ bị khóa khi async grading được bật.',
+      409,
+      'AI_SPEAKING_ASYNC_REQUIRED'
+    );
+  }
   const parts = await getSpeakingGroupParts(submissionIdOrGroupId);
   if (parts.length !== 3) {
     throw new AppError('Speaking AI grading requires exactly 3 parts.', 400, 'SPEAKING_PARTS_REQUIRED');

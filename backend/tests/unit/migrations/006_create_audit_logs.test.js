@@ -11,6 +11,8 @@
  * 5. Boundary/Constraint: Should set created_at automatically.
  */
 
+const { configureDisposableDatabase } = require('../../helpers/requireDisposableDatabase');
+const describeDatabase = configureDisposableDatabase() ? describe : describe.skip;
 const { Pool } = require('pg');
 const fs = require('fs');
 const path = require('path');
@@ -51,7 +53,7 @@ beforeEach(async () => {
     await pool.query('TRUNCATE TABLE users CASCADE;');
 });
 
-describe('Migration: 006_create_audit_logs', () => {
+describeDatabase('Migration: 006_create_audit_logs', () => {
     
     it('Happy Path: Should insert a valid audit log record successfully', async () => {
         // EARS[Event]: WHEN an Admin changes the Role or Status of another User, THE system SHALL update the users record and log the action into audit_logs

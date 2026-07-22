@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ieltszone.local/schemas/speaking-calibration-bundle-v1.json",
+  "title": "IELTSZone Speaking calibration bundle",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "version",
+    "scoring_config_sha256",
+    "population",
+    "approved_at",
+    "approved_by",
+    "criteria"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "version": { "type": "string", "minLength": 1, "maxLength": 80 },
+    "scoring_config_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "population": { "type": "string", "minLength": 1 },
+    "approved_at": { "type": "string", "format": "date-time" },
+    "approved_by": { "type": "array", "minItems": 2, "items": { "type": "string", "minLength": 1 } },
+    "criteria": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["fluency_coherence", "lexical_resource", "grammatical_range_accuracy", "pronunciation"],
+      "properties": {
+        "fluency_coherence": { "$ref": "#/$defs/criterionGate" },
+        "lexical_resource": { "$ref": "#/$defs/criterionGate" },
+        "grammatical_range_accuracy": { "$ref": "#/$defs/criterionGate" },
+        "pronunciation": { "$ref": "#/$defs/criterionGate" }
+      }
+    }
+  },
+  "$defs": {
+    "criterionGate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["minimum_speakers", "minimum_lower_95_ci"],
+      "properties": {
+        "minimum_speakers": { "type": "integer", "minimum": 1 },
+        "minimum_lower_95_ci": { "type": "number", "minimum": 0, "maximum": 1 }
+      }
+    }
+  }
+}

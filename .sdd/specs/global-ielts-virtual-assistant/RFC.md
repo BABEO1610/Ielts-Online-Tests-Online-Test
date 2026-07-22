@@ -14,8 +14,7 @@ Chatbot giúp:
 - Điều hướng trang web.
 - Xem lại bài thi đã nộp.
 
-Chatbot **tách biệt hoàn toàn** khỏi hệ thống chấm điểm Writing/Speaking bằng AI.
-Chatbot không chấm điểm và không đưa ra band điểm cá nhân.
+Chatbot **độc lập về nghiệp vụ, API và dữ liệu kết quả** với hệ thống chấm điểm Writing/Speaking bằng AI. Hai tính năng chỉ dùng chung cổng gọi provider trong `ai.service.js` và bảng metadata `ai_usage_logs`; chatbot không đọc/ghi `ai_grading_reports`, không chấm điểm và không đưa ra band điểm cá nhân.
 
 ## 2. Vì sao cần chatbot?
 
@@ -86,8 +85,7 @@ Chatbot không chấm điểm và không đưa ra band điểm cá nhân.
 9. **Nhà cung cấp AI** (Gemini hoặc OpenAI theo cấu hình) tạo câu trả lời nếu cần.
 10. **Bộ tự kiểm tra** bảo đảm: không đưa ra band điểm cá nhân, không bịa đề/tài liệu, không
     trả đáp án khi không có ngữ cảnh.
-11. Siêu dữ liệu được ghi vào `ai_usage_logs`, tin nhắn được ghi vào
-    `chatbot_messages`.
+11. Nếu có gọi provider, siêu dữ liệu được ghi vào `ai_usage_logs`; lượt trao đổi thành công được cố gắng ghi vào `chatbot_messages` khi migration/schema khả dụng.
 12. Phản hồi được trả về qua các sự kiện SSE hoặc JSON.
 
 ## 5. Bảo mật và rào chắn an toàn
@@ -138,12 +136,13 @@ vẫn không hợp lệ:
 
 | Tiêu chí | Chatbot (Trợ lý ảo) | Chấm điểm bằng AI |
 |---|---|---|
-| Mục đích | Hỗ trợ học, điều hướng, giải thích | Chấm điểm Writing/Speaking chính thức |
+| Mục đích | Hỗ trợ học, điều hướng, giải thích | Ước tính band luyện tập cho Writing/Speaking; không phải điểm IELTS chính thức |
 | Đầu vào | Tin nhắn trò chuyện + ngữ cảnh trang | Bài nộp Writing/Speaking |
 | Đầu ra | Văn bản trả lời + liên kết gợi ý | Điểm band + điểm tiêu chí + nhận xét |
 | Lưu trữ | `chatbot_messages` | `ai_grading_reports` |
 | Điểm cuối API | `/api/v1/assistant/chat` | `/api/v1/submissions/writing/:id/ai-grade` |
-| Rào chắn | Không cho chấm điểm | Không liên quan chatbot |
+| Cấu hình model | `AI_PROVIDER` + `AI_MODEL` | `AI_GRADING_PROVIDER` + `AI_GRADING_MODEL` và model transcription/evidence riêng |
+| Rào chắn | Không cho chấm điểm cá nhân trong chat | Không gọi chatbot; chỉ xử lý submission đã xác thực |
 
 ## 9. Các giới hạn đã biết
 
@@ -174,9 +173,11 @@ vẫn không hợp lệ:
 > Sau đó hệ thống phát hiện **ý định** của câu hỏi — ví dụ tìm đề hay hỏi kiến thức
 > — rồi chèn **ngữ cảnh phù hợp** vào lời nhắc trước khi gọi AI.
 >
-> Điểm quan trọng cần nhấn mạnh: chatbot này **hoàn toàn tách biệt** khỏi hệ thống
-> chấm điểm Writing/Speaking bằng AI. Chatbot không chấm điểm, không dự đoán điểm
-> band và không bịa ra đề thi hay đáp án không tồn tại trong cơ sở dữ liệu.
+> Điểm quan trọng cần nhấn mạnh: chatbot **độc lập về nghiệp vụ, API và dữ liệu kết
+> quả** với hệ thống chấm điểm Writing/Speaking bằng AI. Hai tính năng chỉ dùng chung
+> cổng gọi nhà cung cấp trong `ai.service.js` và bảng nhật ký siêu dữ liệu
+> `ai_usage_logs`. Chatbot không đọc/ghi báo cáo chấm điểm, không chấm điểm, không dự
+> đoán band cá nhân và không bịa ra đề thi hay đáp án không tồn tại trong cơ sở dữ liệu.
 >
 > Về bảo mật, chỉ học viên đã đăng nhập mới được trò chuyện, hệ thống có giới hạn
 > tần suất chống lạm dụng, và khi đang làm bài thi thì chatbot bị chặn cả ở giao

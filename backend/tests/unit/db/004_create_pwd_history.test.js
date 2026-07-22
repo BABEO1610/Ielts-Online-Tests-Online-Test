@@ -5,11 +5,13 @@
  * - EARS[Event]: WHEN a Guest submits a new password via a valid reset link or user changes password, THE system SHALL record the hash, reason, and IP.
  */
 
+const { configureDisposableDatabase } = require('../../helpers/requireDisposableDatabase');
+const describeDatabase = configureDisposableDatabase() ? describe : describe.skip;
 const { pool } = require('../../../src/db/pool');
 const fs = require('fs');
 const path = require('path');
 
-describe('Migration: 004_create_pwd_history.sql', () => {
+describeDatabase('Migration: 004_create_pwd_history.sql', () => {
   let testUserId;
 
   beforeAll(async () => {

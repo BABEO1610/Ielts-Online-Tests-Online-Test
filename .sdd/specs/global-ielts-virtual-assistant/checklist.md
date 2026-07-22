@@ -4,7 +4,11 @@
 
 **Ngày tạo**: 2026-07-21
 
-**Đặc tả**: [spec.md](./spec.md) | **Kế hoạch**: [plan.md](./plan.md) | **Nhiệm vụ**: [tasks.md](./tasks.md)
+**Đặc tả**: [spec.md](./spec.md) | **Kế hoạch**: [plan.md](./plan.md) |
+**Nghiên cứu**: [research.md](./research.md) | **Mô hình dữ liệu**:
+[data-model.md](./data-model.md) | **Hợp đồng**: [contracts/](./contracts/) |
+**Xác minh nhanh**: [quickstart.md](./quickstart.md) | **Nhiệm vụ**:
+[tasks.md](./tasks.md)
 
 **Quy tắc trạng thái**: `[x]` nghĩa là đã tìm thấy bằng chứng trong mã nguồn/tài liệu hiện tại. `[ ]` vẫn để mở khi chưa hoàn tất việc xác thực tích hợp, môi trường thực tế hoặc phát hành.
 
@@ -50,15 +54,21 @@
 
 ## Kiểm thử và mức độ sẵn sàng phát hành
 
-- [x] CHK026 Kiểm thử Jest tập trung cho các mô-đun phía máy chủ của trợ lý, nhà cung cấp AI và ghi nhận mức sử dụng đã vượt qua: 15 bộ, 261 ca, 0 bị bỏ qua, 0 thất bại.
+- [x] CHK026 Kiểm thử Jest tập trung ngày 2026-07-22 cho các mô-đun phía máy chủ của trợ lý, nhà cung cấp AI và ghi nhận mức sử dụng đã vượt qua: 15 bộ, 265 ca, 0 bị bỏ qua, 0 thất bại.
 - [x] CHK027 Ba tệp Vitest tập trung cho trợ lý phía giao diện đã vượt qua (3 tệp, 7 ca, 0 bị bỏ qua), ESLint phần trợ lý phía giao diện vượt qua và bản dựng cho môi trường thực tế vượt qua, chỉ có cảnh báo kích thước phân đoạn đã tồn tại.
 - [x] CHK028 `production-test-suite.md` chứa chính xác 561 ID duy nhất, liên tục (`TC-001`–`TC-561`), 21 nhóm chủ đề, tổng số được nêu rõ và không còn tham chiếu cũ “500 ca kiểm thử”.
 - [ ] CHK029 Áp dụng tệp di trú 024 trong từng môi trường được cấp quyền và hoàn tất các ca kiểm tra nhanh HTTP có xác thực/cơ sở dữ liệu thực/nhà cung cấp thực mà không làm lộ bí mật hoặc PII.
-- [x] CHK030 `plan.md` ghi nhận các điểm sai lệch hiện tại so với hiến chương dự án (phiên bản React, vị trí CSS tùy chỉnh, cấu trúc bao phản hồi, xác thực/xử lý lỗi trực tiếp, cách dùng bộ ghi nhật ký, kích thước tệp/hàm, bằng chứng độ bao phủ và cách đặt tên nhánh/đặc tả) thay vì đánh dấu sai rằng cổng kiểm tra đã đạt.
+- [x] CHK030 Bộ tạo tác Speckit gồm `spec.md`, `plan.md`, `research.md`,
+  `data-model.md`, `contracts/`, `quickstart.md` và `tasks.md`; `plan.md` ghi nhận các
+  sai lệch Hiến chương hiện tại (React, CSS, bao phản hồi, xác thực/xử lý lỗi, logger,
+  kích thước tệp/hàm, coverage và quy ước nhánh/đặc tả) thay vì đánh dấu sai rằng cổng
+  đã đạt.
 
 ## Ghi chú
 
-- `eval-set.md`, `RFC.md` và `archive/implementation-approach.legacy.md` được giữ lại dưới dạng các tài liệu lịch sử/QA riêng biệt.
-- ESLint phần trợ lý phía máy chủ vẫn bị chặn vì `eslint.config.js` nhập gói phụ thuộc phát triển `@eslint/js` còn thiếu; không có thao tác cài gói hoặc thay đổi mã nguồn nào được cấp quyền trong lượt cập nhật tài liệu này.
+- `RFC.md` là tài liệu giải thích kiến trúc hiện hành; `eval-set.md` là tài liệu QA có
+  các snapshot lịch sử được dán nhãn; `archive/implementation-approach.legacy.md` chỉ
+  là tài liệu lưu trữ và không phải nguồn sự thật hiện hành.
+- ESLint phần trợ lý phía máy chủ không còn bị chặn do thiếu dependency. Lần đối chiếu 2026-07-22 chạy được và còn 1 lỗi `no-useless-escape` tại `backend/src/api/assistant/assistant.response.js:24`; lượt này chỉ sửa tài liệu nên chưa sửa code.
 - Các mục còn mở được ánh xạ tới T056–T061 trong [tasks.md](./tasks.md).
 - Danh sách kiểm tra này không cấp quyền thực thi di trú, gọi nhà cung cấp thực, gửi lưu lượng thực đã xác thực, tạo commit hoặc đẩy mã.

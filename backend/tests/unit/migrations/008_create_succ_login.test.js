@@ -10,6 +10,8 @@
  * 3. Boundary Case (No-op): Should not change status if it is 'pending' or 'banned'.
  */
 
+const { configureDisposableDatabase } = require('../../helpers/requireDisposableDatabase');
+const describeDatabase = configureDisposableDatabase() ? describe : describe.skip;
 const { Pool } = require('pg');
 const fs = require('fs');
 const path = require('path');
@@ -51,7 +53,7 @@ beforeEach(async () => {
     await pool.query('TRUNCATE TABLE users CASCADE;');
 });
 
-describe('Migration: 008_create_succ_login', () => {
+describeDatabase('Migration: 008_create_succ_login', () => {
     
     it('Happy Path: Should reset failed_login_attempts to 0 and update last_login_at', async () => {
         // 1. Tạo user giả, đang có failed_login_attempts > 0 nhưng vẫn active

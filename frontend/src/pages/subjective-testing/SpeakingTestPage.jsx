@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useLocation, useNavigate } from 'react-router-dom';
 import TimerBar from '../../components/objective-testing/TimerBar';
 import SpeakingIntroScreen from '../../components/grading/SpeakingIntroScreen';
@@ -6,9 +6,10 @@ import Part2Screen from '../../components/grading/Part2Screen';
 import SpeakingSummaryScreen from '../../components/grading/SpeakingSummaryScreen';
 import SpeakingProgressBar from '../../components/grading/SpeakingProgressBar';
 import ExamRecorder from '../../components/grading/ExamRecorder';
-import FeedbackReport from '../../components/grading/FeedbackReport';
 import { testService } from '../../services/test.service';
 import gradingService from '../../services/grading.service';
+import useSpeakingGrading from '../../hooks/useSpeakingGrading';
+import { buildSpeakingParts, restorePendingSpeakingSubmission } from './speakingTest.utils';
 
 const PART1_PER_Q = 40;  // 40s/câu → ~4 phút cho 6 câu (chuẩn IELTS Part 1)
 const PART3_PER_Q = 60;  // 60s/câu → ~4 phút cho 4 câu (chuẩn IELTS Part 3)
@@ -73,6 +74,7 @@ const Part13Screen = ({ part, phase, onComplete }) => {
             <p className="fw-bold text-uppercase text-danger mb-4" style={{ fontSize: '13px', letterSpacing: '1px' }}>Recording</p>
             <ExamRecorder 
               ref={recorderRef}
+              partNumber={phase === 'part1' ? 1 : 3}
               maxDuration={questions.length * perQ + 30}
               hideTimer
               hideStopButton
@@ -125,11 +127,13 @@ const Part13Screen = ({ part, phase, onComplete }) => {
 const SpeakingTestScreen = ({ exam, practiceMode, customTimeLimit }) => {
   const navigate = useNavigate();
   // State: 'intro' | 'part1' | 'part2' | 'part3' | 'summary' | 'result'
-  const [phase, setPhase] = useState('intro');
-  const [attemptId, setAttemptId] = useState(null);
-  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+  const [submission, setSubmission] = useState(() => restorePendingSpeakingSubmission());
+  const [phase, setPhase] = useState(() => (submission ? 'result' : 'intro'));
   const [answers, setAnswers] = useState([]); // [{ part_number, question_index, temp_s3_key }]
-  const [globalError, setGlobalError] = useState(null);
+  const submittingRef = useRef(false);
+  const grading = useSpeakingGrading(submission?.speaking_group_id, {
+    enabled: Boolean(submission?.job_id),
+  });
 
   const durationMinutes = exam.duration || 15;
 
@@ -139,7 +143,7 @@ const SpeakingTestScreen = ({ exam, practiceMode, customTimeLimit }) => {
     setPhase('part1');
   };
 
-  const saveAnswerAndAdvance = (partNumber, tempS3Key, durationSeconds) => {
+  const saveAnswerAndAdvance = (partNumber, uploadToken, durationSeconds) => {
     const activePart = exam.parts[partNumber - 1];
     let promptText = '';
     if (partNumber === 2) {
@@ -148,7 +152,16 @@ const SpeakingTestScreen = ({ exam, practiceMode, customTimeLimit }) => {
       promptText = activePart.questions ? activePart.questions.map(q => q.text).join('\n') : '';
     }
 
-    setAnswers(prev => [...prev, { part_number: partNumber, temp_s3_key: tempS3Key, prompt_text: promptText }]);
+    setAnswers(prev => [
+      ...prev.filter((answer) => answer.part_number !== partNumber),
+      {
+        part_number: partNumber,
+        prompt_id: activePart.promptId,
+        upload_token: uploadToken,
+        duration_seconds: durationSeconds,
+        prompt_text: promptText,
+      },
+    ].sort((a, b) => a.part_number - b.part_number));
     
     if (partNumber === 1) {
       setPhase('part2');
@@ -160,15 +173,22 @@ const SpeakingTestScreen = ({ exam, practiceMode, customTimeLimit }) => {
   };
 
   const handleFinalSubmit = async (grader) => {
+    if (submittingRef.current) return;
+    const complete = answers.length === 3
+      && answers.every((answer, index) => answer.part_number === index + 1 && answer.prompt_id && answer.upload_token);
+    if (!complete) throw new Error('Cần upload thành công đủ ba Part trước khi nộp.');
+    submittingRef.current = true;
     try {
-      await gradingService.submitFullSpeaking({
+      const response = await gradingService.submitFullSpeaking({
         test_id: exam.id.toString(),
         grader,
-        parts: answers
+        parts: answers.map(({ part_number, prompt_id, upload_token }) => ({ part_number, prompt_id, upload_token })),
       });
+      setSubmission(response.data);
       setPhase('result');
     } catch (err) {
-      alert('Nộp bài thất bại. Vui lòng thử lại.');
+      submittingRef.current = false;
+      throw err;
     }
   };
 
@@ -181,19 +201,6 @@ const SpeakingTestScreen = ({ exam, practiceMode, customTimeLimit }) => {
   };
 
   // ===== Renders =====
-
-  if (globalError) {
-    return (
-      <div className="bg-white min-vh-100 d-flex align-items-center justify-content-center">
-        <div className="text-center">
-          <h4 className="text-danger mb-3">{globalError}</h4>
-          <button className="btn btn-dark rounded-pill px-4" onClick={() => navigate('/speaking')}>
-            Quay lại
-          </button>
-        </div>
-      </div>
-    );
-  }
 
   if (phase === 'intro') {
     return <SpeakingIntroScreen exam={exam} onStart={handleStart} />;
@@ -218,8 +225,16 @@ const SpeakingTestScreen = ({ exam, practiceMode, customTimeLimit }) => {
             Bài Speaking của bạn đã được gửi thành công.
           </p>
           <p className="mb-5" style={{ fontSize: '15px', fontFamily: 'UberMoveText, system-ui, sans-serif', color: '#767676' }}>
-            Kết quả sẽ hiển thị trong lịch sử bài làm sau khi giáo viên hoặc AI hoàn tất chấm điểm.
+            {submission?.job_id
+              ? `Trạng thái AI: ${grading.data?.status || submission.status || 'queued'}. Bạn có thể đóng trang; job vẫn tiếp tục chạy.`
+              : 'Bài đã được chuyển vào hàng chờ giáo viên.'}
           </p>
+          {grading.data?.status === 'needs_review' && (
+            <div className="alert alert-warning mb-4">AI chưa đủ bằng chứng để phát band; bài đã được chuyển cho tutor.</div>
+          )}
+          {grading.data?.status === 'failed' && (
+            <div className="alert alert-danger mb-4">Chấm AI thất bại. Hãy mở lịch sử bài làm để xem tùy chọn retry.</div>
+          )}
 
           {/* Divider mỏng */}
           <div style={{ width: '100%', height: '1px', backgroundColor: '#e2e2e2', marginBottom: '28px' }}></div>
@@ -247,7 +262,6 @@ const SpeakingTestScreen = ({ exam, practiceMode, customTimeLimit }) => {
 
   // --- Render Part 1, 2, 3 ---
   
-  const examinerImage = 'https://images.unsplash.com/photo-1560250097-0b93528c311a?q=80&w=800&auto=format&fit=crop';
   const currentPartIndex = phase === 'part1' ? 0 : phase === 'part2' ? 1 : 2;
   const activePart = exam.parts[currentPartIndex];
 
@@ -275,58 +289,6 @@ const SpeakingTestScreen = ({ exam, practiceMode, customTimeLimit }) => {
   );
 };
 
-const parseSpeakingQuestions = (content) => {
-  if (!content) return [];
-  if (Array.isArray(content)) {
-    return content.map((item, idx) => (
-      typeof item === 'string' ? { id: `q${idx + 1}`, text: item } : item
-    ));
-  }
-
-  return content
-    .split('\n')
-    .map(line => line.trim())
-    .filter(Boolean)
-    .map((text, idx) => ({ id: `q${idx + 1}`, text }));
-};
-
-const buildSpeakingParts = (passages = []) => passages.map((passage, idx) => {
-  if (idx === 0) {
-    return {
-      partName: passage.title || 'Part 1: Introduction and Interview',
-      description: passage.instruction || 'Answer questions about yourself and familiar topics.',
-      questions: parseSpeakingQuestions(passage.content),
-      duration: '4-5 phút'
-    };
-  }
-  if (idx === 1) {
-    return {
-      partName: passage.title || 'Part 2: Long Turn',
-      description: passage.instruction || 'Cue card bullet points',
-      prompt: passage.title && passage.title !== 'Speaking Part 2' ? passage.title : passage.content || '',
-      bulletPoints: passage.content || '',
-      preparationTime: 60,
-      speakingTime: 120,
-      duration: '3-4 phút'
-    };
-  }
-  if (idx === 2) {
-    return {
-      partName: passage.title || 'Part 3: Discussion',
-      description: passage.instruction || 'Follow-up discussion',
-      questions: parseSpeakingQuestions(passage.content),
-      duration: '4-5 phút'
-    };
-  }
-  return {
-    partName: passage.title || `Part ${idx + 1}`,
-    description: passage.instruction || '',
-    prompt: passage.content || '',
-    questions: parseSpeakingQuestions(passage.content),
-    duration: '4-5 phút'
-  };
-});
-
 export default function SpeakingTestPage() {
   const { id } = useParams();
   const location = useLocation();
@@ -334,8 +296,10 @@ export default function SpeakingTestPage() {
   const practiceMode = location.state?.practiceMode || false;
   const customTimeLimit = location.state?.customTimeLimit || null;
   const initialExam = location.state?.exam || null;
-  const [exam, setExam] = useState(initialExam);
-  const [loading, setLoading] = useState(!initialExam);
+  const hasAuthoritativePrompts = initialExam?.parts?.length === 3
+    && initialExam.parts.every((part) => part.promptId);
+  const [exam, setExam] = useState(hasAuthoritativePrompts ? initialExam : null);
+  const [loading, setLoading] = useState(!hasAuthoritativePrompts);
   const [error, setError] = useState(null);
 
   useEffect(() => {
@@ -355,17 +319,17 @@ export default function SpeakingTestPage() {
         } else {
           setError(res.error?.message || 'Không thể tải đề thi Speaking.');
         }
-      } catch (err) {
+      } catch {
         setError('Không thể tải đề thi Speaking.');
       } finally {
         setLoading(false);
       }
     };
 
-    if (!initialExam || initialExam.id.toString() !== id) {
+    if (!hasAuthoritativePrompts || initialExam.id.toString() !== id) {
       loadExam();
     }
-  }, [id, initialExam]);
+  }, [id, initialExam, hasAuthoritativePrompts]);
 
   if (loading) {
     return (

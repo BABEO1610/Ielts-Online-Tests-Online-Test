@@ -172,7 +172,7 @@ describe('TutorGradingPanel Component', () => {
       });
 
       renderPanel();
-      fireEvent.click(screen.getByText('Run AI Prelim Check'));
+      fireEvent.click(screen.getByText('AI chấm nháp để tutor chỉnh sửa'));
 
       await waitFor(() => {
         expect(gradingService.runPrelimCheck).toHaveBeenCalledWith('writing', mockSubmissionId, 1);
@@ -223,7 +223,7 @@ describe('TutorGradingPanel Component', () => {
         </MemoryRouter>
       );
 
-      fireEvent.click(screen.getByText('Run AI Prelim Check'));
+      fireEvent.click(screen.getByText('AI chấm nháp để tutor chỉnh sửa'));
 
       await waitFor(() => {
         expect(screen.getByText('Grading Panel - Speaking Session')).toBeInTheDocument();

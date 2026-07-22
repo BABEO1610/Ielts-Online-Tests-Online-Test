@@ -9,6 +9,8 @@
  */
 
 const gradingQueries = require('../db/queries/grading.queries');
+const AppError = require('../utils/AppError');
+const { aiGradingConfig } = require('../config/aiGrading.config');
 
 const GradingOversightService = {
   /**
@@ -42,6 +44,13 @@ const GradingOversightService = {
     }
 
     if (type === 'speaking') {
+      if (aiGradingConfig.enabled) {
+        throw new AppError(
+          'Không thể đặt lại trực tiếp trạng thái Speaking async; hãy dùng endpoint retry có idempotency.',
+          409,
+          'SPEAKING_RETRY_USE_CANONICAL_ENDPOINT'
+        );
+      }
       const result = await gradingQueries.resetSpeakingSubmissionStatus(id);
       if (!result) {
         throw new Error(`Speaking submission ${id} not found`);

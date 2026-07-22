@@ -508,7 +508,7 @@ const handleGradingError = async (err, submissionId, requestId) => {
 const emitGradingCompleted = (req, submissionId, userId, result) => {
   const io = req.app.get('io');
   if (!io) return;
-  io.to(userId).emit('grading_completed', {
+  io.to(userId).emit('grading_complete', {
     submissionId,
     studentId: userId,
     grader: 'ai',

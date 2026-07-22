@@ -24,7 +24,7 @@ const AI_GRADE_ERRORS = {
   },
   AIGRADE_003: {
     code: 'AIGRADE_003',
-    message: 'AI provider timeout',
+    message: 'Nhà cung cấp AI phản hồi quá thời gian',
     status: 504,
   },
   AIGRADE_004: {
@@ -49,7 +49,7 @@ const AI_GRADE_ERRORS = {
   },
   AIGRADE_008: {
     code: 'AIGRADE_008',
-    message: 'AI provider quota exceeded',
+    message: 'Nhà cung cấp AI đã vượt hạn mức',
     status: 429,
   },
   AIGRADE_009: {

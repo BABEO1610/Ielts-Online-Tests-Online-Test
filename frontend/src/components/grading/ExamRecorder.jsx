@@ -1,5 +1,5 @@
-import React, { useState, useRef, useEffect, forwardRef, useImperativeHandle } from 'react';
-import api from '../../services/api';
+import { useState, useRef, useEffect, forwardRef, useImperativeHandle } from 'react';
+import gradingService from '../../services/grading.service';
 
 /**
  * ExamRecorder - Component ghi âm đơn giản, tự động chạy.
@@ -7,7 +7,7 @@ import api from '../../services/api';
  * @param {Function} onUploadComplete - Callback khi upload xong: (tempS3Key, durationSeconds) => void
  * @param {Function} onUploadError - Callback khi lỗi upload
  */
-const ExamRecorder = forwardRef(({ maxDuration = 45, onUploadComplete, onUploadError, hideTimer = false, hideStopButton = false }, ref) => {
+const ExamRecorder = forwardRef(({ partNumber, maxDuration = 45, onUploadComplete, onUploadError, hideTimer = false, hideStopButton = false }, ref) => {
   const [status, setStatus] = useState('initializing'); // initializing, recording, uploading, done, error
   const [timeLeft, setTimeLeft] = useState(maxDuration);
   
@@ -16,23 +16,29 @@ const ExamRecorder = forwardRef(({ maxDuration = 45, onUploadComplete, onUploadE
   const timerRef = useRef(null);
   const streamRef = useRef(null);
   const durationRef = useRef(0);
+  const startedAtRef = useRef(0);
+  const mountedRef = useRef(false);
+  const uploadOnStopRef = useRef(true);
 
   // Auto-start recording on mount
   useEffect(() => {
     let mounted = true;
+    mountedRef.current = true;
+    uploadOnStopRef.current = true;
     const initRecording = async () => {
       try {
+        const mimeType = typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported('audio/mp4')
+          ? 'audio/mp4'
+          : null;
+        if (!mimeType) {
+          throw new Error('UNSUPPORTED_RECORDER_MIME');
+        }
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         if (!mounted) {
           stream.getTracks().forEach(t => t.stop());
           return;
         }
         streamRef.current = stream;
-        
-        let mimeType = 'audio/webm';
-        if (typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported('audio/mp4')) {
-          mimeType = 'audio/mp4';
-        }
         
         const mediaRecorder = new MediaRecorder(stream, { mimeType });
         mediaRecorderRef.current = mediaRecorder;
@@ -44,11 +50,14 @@ const ExamRecorder = forwardRef(({ maxDuration = 45, onUploadComplete, onUploadE
         };
 
         mediaRecorder.onstop = async () => {
+          if (!uploadOnStopRef.current) return;
           const finalBlob = new Blob(audioChunksRef.current, { type: mimeType });
-          await uploadAudio(finalBlob);
+          const measuredMs = Math.max(1, Math.round(performance.now() - startedAtRef.current));
+          await uploadAudio(finalBlob, measuredMs);
         };
 
         mediaRecorder.start();
+        startedAtRef.current = performance.now();
         setStatus('recording');
         
         timerRef.current = setInterval(() => {
@@ -64,9 +73,14 @@ const ExamRecorder = forwardRef(({ maxDuration = 45, onUploadComplete, onUploadE
           });
         }, 1000);
       } catch (err) {
+        streamRef.current?.getTracks().forEach((track) => track.stop());
+        streamRef.current = null;
         if (!mounted) return;
         setStatus('error');
-        if (onUploadError) onUploadError('Không thể truy cập microphone. Vui lòng kiểm tra quyền truy cập.');
+        const message = err.message === 'UNSUPPORTED_RECORDER_MIME'
+          ? 'Trình duyệt chưa hỗ trợ audio/mp4 đã được phê duyệt; không thể âm thầm đổi WebM thành M4A.'
+          : 'Không thể truy cập microphone. Vui lòng kiểm tra quyền truy cập.';
+        if (onUploadError) onUploadError(message);
       }
     };
 
@@ -74,6 +88,8 @@ const ExamRecorder = forwardRef(({ maxDuration = 45, onUploadComplete, onUploadE
 
     return () => {
       mounted = false;
+      mountedRef.current = false;
+      uploadOnStopRef.current = false;
       cleanup();
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -100,23 +116,20 @@ const ExamRecorder = forwardRef(({ maxDuration = 45, onUploadComplete, onUploadE
     }
   };
 
-  const uploadAudio = async (blob) => {
-    setStatus('uploading');
+  const uploadAudio = async (blob, durationMs) => {
+    if (mountedRef.current) setStatus('uploading');
     try {
-      const formData = new FormData();
-      formData.append('audio_file', blob, 'recording.m4a'); 
-
-      const response = await api.post('/submissions/speaking/upload', formData);
-      if (response.data?.success && response.data?.data?.temp_s3_key) {
-        setStatus('done');
+      const response = await gradingService.uploadAudio(blob, { partNumber, durationMs });
+      if (response?.success && response?.data?.upload_token) {
+        if (mountedRef.current) setStatus('done');
         if (onUploadComplete) {
-          onUploadComplete(response.data.data.temp_s3_key, durationRef.current);
+          onUploadComplete(response.data.upload_token, Math.ceil(durationMs / 1000));
         }
       } else {
         throw new Error('Invalid response format');
       }
     } catch (error) {
-      setStatus('error');
+      if (mountedRef.current) setStatus('error');
       const msg = error.response?.data?.error?.message || 'Upload failed. Please try again.';
       if (onUploadError) onUploadError(msg);
     } finally {

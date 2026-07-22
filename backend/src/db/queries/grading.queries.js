@@ -10,6 +10,34 @@
 
 const { pool } = require('../pool');
 
+const lockSpeakingGroupForClaim = async (db, groupId) => {
+  const { rows } = await db.query(
+    `SELECT id, assigned_tutor_id, assigned_tutor_at, status, grader, part_number
+     FROM speaking_submissions
+     WHERE speaking_group_id = $1 AND deleted_at IS NULL
+     ORDER BY part_number
+     FOR UPDATE`,
+    [groupId]
+  );
+  return rows;
+};
+
+const getSpeakingAssignmentScope = async (db, submissionIdOrGroupId, tutorId) => {
+  const { rows } = await db.query(
+    `WITH target AS (
+       SELECT speaking_group_id FROM speaking_submissions
+       WHERE (id::text = $1 OR speaking_group_id::text = $1) AND deleted_at IS NULL
+       LIMIT 1
+     )
+     SELECT COUNT(*)::integer AS part_count,
+            BOOL_AND(assigned_tutor_id = $2) AS assigned
+     FROM speaking_submissions
+     WHERE speaking_group_id = (SELECT speaking_group_id FROM target) AND deleted_at IS NULL`,
+    [submissionIdOrGroupId, tutorId]
+  );
+  return rows[0] || { part_count: 0, assigned: false };
+};
+
 /**
  * Lấy toàn bộ danh sách bài nộp (writing + speaking) cho trang Giám sát chấm bài.
  * Mỗi row được normalize về cùng một shape để frontend dùng được.
@@ -55,7 +83,7 @@ const listSubmissionsRaw = async ({ status, limit = 50, offset = 0 } = {}) => {
         MIN(ss.submitted_at)                   AS submitted_at
       FROM speaking_submissions ss
       JOIN users u ON u.id = ss.user_id
-      ${status ? `WHERE ss.status::text = $1` : ''}
+      WHERE ss.deleted_at IS NULL ${status ? `AND ss.status::text = $1` : ''}
       GROUP BY COALESCE(ss.speaking_group_id, ss.id), u.full_name
     ) combined
     ORDER BY submitted_at DESC
@@ -75,7 +103,7 @@ const countSubmissionsByStatus = async () => {
     SELECT status::text, COUNT(*)::int AS count FROM (
       SELECT MIN(status) as status FROM writing_submissions GROUP BY COALESCE(writing_group_id, id)
       UNION ALL
-      SELECT MIN(status) as status FROM speaking_submissions GROUP BY COALESCE(speaking_group_id, id)
+      SELECT MIN(status) as status FROM speaking_submissions WHERE deleted_at IS NULL GROUP BY COALESCE(speaking_group_id, id)
     ) combined
     GROUP BY status;
   `;
@@ -107,7 +135,7 @@ const resetSpeakingSubmissionStatus = async (id) => {
   const query = `
     UPDATE speaking_submissions
     SET status = 'pending'
-    WHERE speaking_group_id = $1 OR id = $1
+    WHERE (speaking_group_id = $1 OR id = $1) AND deleted_at IS NULL
     RETURNING id, status, submitted_at;
   `;
   const { rows } = await pool.query(query, [id]);
@@ -118,5 +146,7 @@ module.exports = {
   listSubmissionsRaw,
   countSubmissionsByStatus,
   resetWritingSubmissionStatus,
-  resetSpeakingSubmissionStatus
+  resetSpeakingSubmissionStatus,
+  lockSpeakingGroupForClaim,
+  getSpeakingAssignmentScope,
 };

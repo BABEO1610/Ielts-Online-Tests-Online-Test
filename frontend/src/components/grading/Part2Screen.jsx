@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import ExamRecorder from './ExamRecorder';
 
 const Part2Screen = ({ part, onComplete }) => {
@@ -62,6 +62,7 @@ const Part2Screen = ({ part, onComplete }) => {
               <>
                 <p className="fw-bold text-uppercase text-danger mb-4" style={{ fontSize: '13px', letterSpacing: '1px' }}>Speaking Time</p>
                 <ExamRecorder 
+                  partNumber={2}
                   maxDuration={120} 
                   onUploadComplete={onComplete}
                 />

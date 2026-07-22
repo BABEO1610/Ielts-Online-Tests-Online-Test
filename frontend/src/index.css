@@ -194,11 +194,11 @@ body {
   font-size: 16px;
   font-weight: 500;
   line-height: 20px;
-  border-radius: var(--rounded-pill);
-  padding: var(--spacing-md) var(--spacing-md);
+  border-radius: var(--rounded-md);
+  padding: 14px 16px;
   border: none;
   cursor: pointer;
-  transition: background-color 0.2s;
+  transition: background-color 0.2s, transform 0.1s, box-shadow 0.2s;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -206,6 +206,12 @@ body {
 }
 .button-primary:hover:not(:disabled) {
   background-color: var(--black-elevated);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-pill);
+}
+.button-primary:active:not(:disabled) {
+  transform: translateY(1px);
+  box-shadow: none;
 }
 .button-primary:disabled {
   opacity: 0.5;
@@ -219,18 +225,24 @@ body {
   font-size: 16px;
   font-weight: 500;
   line-height: 20px;
-  border-radius: var(--rounded-pill);
-  padding: var(--spacing-md) var(--spacing-md);
-  border: none;
+  border-radius: var(--rounded-md);
+  padding: 14px 16px;
+  border: 1px solid var(--surface-pressed);
   cursor: pointer;
-  transition: background-color 0.2s;
+  transition: background-color 0.2s, transform 0.1s, box-shadow 0.2s;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   width: 100%;
 }
 .button-secondary:hover:not(:disabled) {
-  background-color: var(--surface-pressed);
+  background-color: var(--canvas-soft);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-pill);
+}
+.button-secondary:active:not(:disabled) {
+  transform: translateY(1px);
+  box-shadow: none;
 }
 
 /* Inputs */
@@ -242,11 +254,11 @@ body {
   font-weight: 400;
   line-height: 24px;
   border-radius: var(--rounded-md);
-  padding: var(--spacing-lg);
-  border: 1px solid transparent; /* Instead of border, the spec says mostly soft background */
+  padding: 14px 16px;
+  border: 1px solid var(--surface-pressed);
   width: 100%;
   box-sizing: border-box;
-  transition: background-color 0.2s, border-color 0.2s;
+  transition: background-color 0.2s, border-color 0.2s, box-shadow 0.2s;
   outline: none;
 }
 .text-input:focus {
