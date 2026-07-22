@@ -1,4 +1,3 @@
-import React from 'react';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
@@ -25,6 +24,12 @@ vi.mock('../../../src/context/AuthContext', () => ({
     user: { id: 'stu-1', role: 'student', full_name: 'John Doe' },
     logout: vi.fn(),
   }),
+}));
+
+// Keep this page test focused on history behavior; the navbar has its own
+// ThemeProvider integration tests.
+vi.mock('../../../src/components/layout/StudentNavbar', () => ({
+  default: () => <nav data-testid="student-navbar" />,
 }));
 
 // Mock FeedbackReport
@@ -181,5 +186,27 @@ describe('StudentHistoryPage', () => {
     await waitFor(() => {
       expect(screen.queryByTestId('mock-feedback-report')).not.toBeInTheDocument();
     });
+  });
+
+  it('shows learner-redacted needs-review state and only offers retry when canRetry is true', async () => {
+    gradingService.getSubmissionHistory.mockResolvedValue({
+      success: true,
+      data: [
+        {
+          id: 'group-review', type: 'speaking', submitted_at: '2026-07-22T00:00:00Z',
+          gradingStatus: 'needs_review', status: 'pending', band_score: null, canRetry: false,
+        },
+        {
+          id: 'group-failed', type: 'speaking', submitted_at: '2026-07-22T01:00:00Z',
+          gradingStatus: 'failed', status: 'grading_failed', band_score: null, canRetry: true,
+        },
+      ],
+    });
+    gradingService.retrySpeakingGrading.mockResolvedValue({ success: true });
+    render(<MemoryRouter><StudentHistoryPage /></MemoryRouter>);
+    expect(await screen.findByText('Chờ tutor xác nhận')).toBeInTheDocument();
+    expect(screen.getAllByText('—')).toHaveLength(2);
+    fireEvent.click(screen.getByRole('button', { name: 'Thử lại một lần' }));
+    await waitFor(() => expect(gradingService.retrySpeakingGrading).toHaveBeenCalledWith('group-failed'));
   });
 });
