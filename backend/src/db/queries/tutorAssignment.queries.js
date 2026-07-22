@@ -5,6 +5,17 @@
 
 const { pool } = require('../pool');
 
+const SUBMISSION_TARGETS = Object.freeze({
+  speaking: { table: 'speaking_submissions', idCol: 'speaking_group_id' },
+  writing: { table: 'writing_submissions', idCol: 'writing_group_id' },
+});
+
+const getSubmissionTarget = (type) => {
+  const target = SUBMISSION_TARGETS[type];
+  if (!target) throw new Error('Invalid submission type');
+  return target;
+};
+
 /**
  * Gets all active tutors.
  * @returns {Promise<Array>}
@@ -56,7 +67,7 @@ const getPendingSubmissions = async (limit = 10, offset = 0) => {
     FROM speaking_submissions ss
     JOIN users u ON ss.user_id = u.id
     LEFT JOIN mock_tests mt ON ss.test_id = mt.id
-    WHERE ss.status = 'pending'
+    WHERE ss.status = 'pending' AND ss.deleted_at IS NULL
     GROUP BY ss.speaking_group_id, u.full_name, u.email, u.target_band_score
     
     ORDER BY submitted_at DESC
@@ -74,7 +85,7 @@ const getPendingSubmissionsCount = async () => {
     SELECT (
       (SELECT COUNT(DISTINCT writing_group_id) FROM writing_submissions WHERE status = 'pending')
       +
-      (SELECT COUNT(DISTINCT speaking_group_id) FROM speaking_submissions WHERE status = 'pending')
+      (SELECT COUNT(DISTINCT speaking_group_id) FROM speaking_submissions WHERE status = 'pending' AND deleted_at IS NULL)
     ) as total
   `);
   return Number(result.rows[0].total);
@@ -88,19 +99,19 @@ const getPendingSubmissionsCount = async () => {
  * @returns {Promise<Object>}
  */
 const assignTutorToSubmission = async (submissionId, type, tutorId) => {
-  let table = '';
-  let idCol = '';
-  if (type === 'writing') { table = 'writing_submissions'; idCol = 'writing_group_id'; }
-  else if (type === 'speaking') { table = 'speaking_submissions'; idCol = 'speaking_group_id'; }
-  else throw new Error('Invalid submission type');
+  const { table, idCol } = getSubmissionTarget(type);
+  const assignmentSet = type === 'speaking'
+    ? 'assigned_tutor_id = $2, assigned_tutor_at = CASE WHEN $2::uuid IS NULL THEN NULL ELSE NOW() END'
+    : 'assigned_tutor_id = $2';
+  const activePredicate = type === 'speaking' ? 'AND deleted_at IS NULL' : '';
 
   // CTE để lấy thêm thông tin tutor mới sau UPDATE,
   // tránh phải thực hiện query riêng chỉ để resolve UUID → tên người.
   const result = await pool.query(
     `WITH updated AS (
        UPDATE ${table}
-       SET assigned_tutor_id = $2
-       WHERE ${idCol} = $1
+       SET ${assignmentSet}
+       WHERE ${idCol} = $1 ${activePredicate}
        RETURNING *
      )
      SELECT
@@ -124,11 +135,8 @@ const assignTutorToSubmission = async (submissionId, type, tutorId) => {
  * @returns {Promise<Object>}
  */
 const getSubmissionByIdAndType = async (submissionId, type) => {
-  let table = '';
-  let idCol = '';
-  if (type === 'writing') { table = 'writing_submissions'; idCol = 'writing_group_id'; }
-  else if (type === 'speaking') { table = 'speaking_submissions'; idCol = 'speaking_group_id'; }
-  else throw new Error('Invalid submission type');
+  const { table, idCol } = getSubmissionTarget(type);
+  const activePredicate = type === 'speaking' ? 'AND s.deleted_at IS NULL' : '';
 
   // JOIN users để lấy tên tutor đang được phân công (nếu có) — cần thiết
   // để ghi old_value có nghĩa vào audit log thay vì lưu UUID thô.
@@ -142,7 +150,7 @@ const getSubmissionByIdAndType = async (submissionId, type) => {
      FROM ${table} s
      LEFT JOIN users tutor   ON tutor.id   = s.assigned_tutor_id
      LEFT JOIN users student ON student.id = s.user_id
-     WHERE s.${idCol} = $1
+     WHERE s.${idCol} = $1 ${activePredicate}
      LIMIT 1`,
     [submissionId]
   );
