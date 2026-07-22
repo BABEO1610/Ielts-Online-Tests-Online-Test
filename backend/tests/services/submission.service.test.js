@@ -282,39 +282,63 @@ describe('SubmissionService', () => {
   });
 
   describe('getSpeakingAudioUrl', () => {
-    it('should return the stored public URL for tutors', async () => {
+    const submissionId = '11111111-1111-4111-8111-111111111111';
+
+    it('should return the legacy URL only to the assigned tutor while the feature is disabled', async () => {
       const url = 'https://supabase.test/storage/v1/object/public/speaking-audio/speaking/user-1/uuid.webm';
       pool.query.mockResolvedValueOnce({
-        rows: [{ id: 'sub-1', user_id: 'user-1', audio_url: url }]
+        rows: [{ id: submissionId, user_id: 'user-1', assigned_tutor_scope: true, audio_url: url }]
       });
 
-      const result = await SubmissionService.getSpeakingAudioUrl('sub-1', {
+      const result = await SubmissionService.getSpeakingAudioUrl(submissionId, {
         id: 'tutor-1',
         role: 'tutor'
       });
 
-      expect(result).toBe(url);
+      expect(result).toEqual({ url, expires_at: null, legacy_public_url: true });
       expect(pool.query).toHaveBeenCalledWith(
-        'SELECT id, user_id, audio_url FROM speaking_submissions WHERE id = $1',
-        ['sub-1']
+        expect.stringContaining('BOOL_AND(group_part.assigned_tutor_id = $2::uuid)'),
+        [submissionId, 'tutor-1']
       );
     });
 
     it('should scope student audio lookup to the current student', async () => {
       pool.query.mockResolvedValueOnce({
-        rows: [{ id: 'sub-1', user_id: 'user-1', audio_url: 'speaking/user-1/uuid.webm' }]
+        rows: [{ id: submissionId, user_id: 'user-1', audio_url: 'speaking/user-1/uuid.webm' }]
       });
 
-      const result = await SubmissionService.getSpeakingAudioUrl('sub-1', {
+      const result = await SubmissionService.getSpeakingAudioUrl(submissionId, {
         id: 'user-1',
         role: 'student'
       });
 
-      expect(result).toBe('https://supabase.test/storage/v1/object/public/speaking-audio/speaking/user-1/uuid.webm');
+      expect(result).toEqual({
+        url: 'https://supabase.test/storage/v1/object/public/speaking-audio/speaking/user-1/uuid.webm',
+        expires_at: null,
+        legacy_public_url: true
+      });
       expect(pool.query).toHaveBeenCalledWith(
-        'SELECT id, user_id, audio_url FROM speaking_submissions WHERE id = $1 AND user_id = $2',
-        ['sub-1', 'user-1']
+        expect.stringContaining('WHERE part.id = $1 AND part.deleted_at IS NULL'),
+        [submissionId, null]
       );
+    });
+
+    it('rejects a tutor when assignment is not consistent across all three Parts', async () => {
+      pool.query.mockResolvedValueOnce({
+        rows: [{ id: submissionId, user_id: 'user-1', assigned_tutor_scope: false, audio_url: 'private' }]
+      });
+      await expect(SubmissionService.getSpeakingAudioUrl(submissionId, {
+        id: 'tutor-1',
+        role: 'tutor'
+      })).rejects.toMatchObject({ statusCode: 403, errorCode: 'AUTH_PERM_001' });
+    });
+
+    it('rejects an invalid submission UUID before querying the database', async () => {
+      await expect(SubmissionService.getSpeakingAudioUrl('not-a-uuid', {
+        id: 'user-1',
+        role: 'student',
+      })).rejects.toMatchObject({ statusCode: 400, errorCode: 'INVALID_FIELD' });
+      expect(pool.query).not.toHaveBeenCalled();
     });
 
     it('should reject unsupported roles', async () => {
