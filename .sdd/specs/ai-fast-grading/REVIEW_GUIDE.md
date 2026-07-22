@@ -73,7 +73,7 @@ Mã nguồn/migration cốt lõi:
 - `frontend/src/hooks/useSpeakingGrading.js`, `frontend/src/pages/subjective-testing/speakingTest.utils.js` và các file grading/recorder/history/tutor đã thay đổi trong diff.
 - Toàn bộ test mới dưới `backend/tests/{contract,integration,unit}` và các test frontend liên quan.
 
-Nên giữ `.env.example` ở root để hội đồng biết tên biến, nhưng tuyệt đối không nộp `.env` thật.
+Giữ `.env.example` ở root để hội đồng biết đầy đủ tên biến và fail-closed defaults; T072 đã kiểm tra file này không chứa credential thật. Tuyệt đối không nộp `.env` thật.
 
 ## 5. File/dữ liệu không được đưa vào gói review
 
@@ -82,20 +82,20 @@ Nên giữ `.env.example` ở root để hội đồng biết tên biến, nhưn
 - Audio/ngữ liệu calibration có dữ liệu cá nhân nếu chưa ẩn danh và chưa có quyền sử dụng.
 - Baseline SQL sinh từ production, database snapshot thật hoặc signed URL còn hiệu lực.
 - Các thay đổi ngoài feature nếu hội đồng chỉ review `ai-fast-grading`; nên tách diff/commit để tránh nhiễu.
+- Các artifact phục hồi ở root như `recovered_FeedbackReport.jsx`, `recovered_FeedbackReport.txt`, `recovered_outputs.json`; đây không phải source runtime và không được đưa vào gói review.
 
 ## 6. Bằng chứng hiện có
 
-- Backend mục tiêu: 29 suite, 130/130 test đạt.
-- Frontend mục tiêu: 6 file, 32/32 test đạt.
-- Feature-targeted ESLint: backend và frontend đạt, không có warning/error.
-- `node --check`: toàn bộ JavaScript mục tiêu của feature đạt.
+- Lần đối chiếu docs ngày 2026-07-22 đúng phạm vi AI Fast Grading: tập Speaking/OpenAPI tái lập trong `quickstart.md` đạt backend 6 suite, 23/23 test; frontend Speaking grading đạt 2 file, 6/6 test.
+- Writing regression chưa xanh: backend còn 1 fail vì envelope lỗi ngắn chưa đặt `word_count`/`required_words` trong `error.details` và `request_id` trong `meta` (T070); frontend Writing Detail còn 1 fail vì thiếu `Overall Writing Band` tổng hợp 33%/67% (T071).
+- Các số liệu full-suite 29 suite/130 test backend và 6 file/32 test frontend là bản ghi lịch sử của lượt kiểm tra trước; cần chạy lại nếu dùng làm bằng chứng hội đồng.
+- Kết quả lint của chatbot thuộc feature `global-ielts-virtual-assistant`, không được dùng làm bằng chứng đạt cho AI Fast Grading. Lượt chuẩn hóa tài liệu này không tuyên bố lint/coverage toàn feature xanh; các cổng tương ứng vẫn được giữ mở trong T056 và rehearsal phát hành.
+- `node --check`/build ghi nhận trước cần chạy lại trong release rehearsal nếu dùng làm bằng chứng cuối.
 - Giới hạn Constitution 300 dòng/file và 40 dòng/hàm đạt cho backend feature mới cùng hook polling/summary mới; các màn hình frontend kế thừa còn nợ refactor được giữ ở T059.
 - Frontend production build đạt; bundle 2.886,27 kB (gzip 814,40 kB) còn cảnh báo lớn, không chặn tính đúng nhưng phải code-split ở T059 trước production.
 - OpenAPI parse được, local refs resolve và các nhánh AI/tutor/cache-control/response envelope được contract test.
 
-Đã chạy smoke test provider thật, đọc ba audio private và trả `completed/full_audio` đủ bốn tiêu chí trong khoảng 34 giây; test này không sửa report/job lịch sử. Chưa chạy load/chaos test và chưa có calibration/fairness approval. Migration đã chạy trên database hiện tại có backup, nhưng không thay thế restore rehearsal/staging.
-
-Smoke test Writing vô danh cũng đạt trong khoảng 11 giây bằng `gemini-3.6-flash`, trả đủ bốn tiêu chí; lỗi 404 do model `gemini-2.5-flash` cũ không còn trong cấu hình grading. Lint mục tiêu sạch; lint toàn repository vẫn có lỗi legacy ngoài feature (backend 27, frontend 344) và không được ghi nhận là gate đã đạt.
+Chưa có bằng chứng provider end-to-end có thể tái lập cho Speaking ba Part: các lần demo gần nhất dừng ở lỗi quota và job `failed`. Code/test mô phỏng đã chứng minh shape `completed/full_audio`, nhưng không được thay cho smoke test audio thật. Writing từng hoạt động trong demo nhưng không được coi là regression hiện tại đang xanh cho tới khi T070–T071 đạt; lần rehearsal cuối phải ghi model, thời gian và response đã làm sạch thay vì dùng số liệu cũ không tái lập.
 
 ## 7. Cổng còn mở trước production
 
@@ -106,5 +106,6 @@ Smoke test Writing vô danh cũng đạt trong khoảng 11 giây bằng `gemini-
 - **G-05 Database/reliability**: chạy migration, concurrency, restore, load/chaos test trên môi trường disposable/staging.
 - **G-06 Cost/scale**: duyệt forecast traffic, quota provider, storage và ngưỡng cảnh báo.
 - **G-07 Frontend maintainability**: tách các màn hình legacy vượt giới hạn và code-split bundle 2.883,70 kB theo T059.
+- **G-08 Runtime evidence detail**: Gemini transcription hiện là plain transcript, ba Part chạy tuần tự và chưa có chunk/deduplicate; chỉ tuyên bố structured ASR/bounded parallel/chunking sau T068–T069.
 
 Cho tới khi các cổng này đóng, cấu hình phù hợp để demo/review là `AI Estimated Band` đủ bốn tiêu chí với disclaimer. Không quảng bá nó là điểm IELTS chính thức/đã hiệu chuẩn và không tự handoff tutor khi AI lỗi.
