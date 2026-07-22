@@ -54,7 +54,8 @@ const TutorGradingPage = () => {
             partNumber: p.partNumber,
             name: type === 'writing' ? `Task ${p.taskNumber}` : `Part ${p.partNumber}`,
             prompt: p.promptText,
-            audioUrl: p.audioUrl,
+            audioUrl: null,
+            audioAvailable: p.audioAvailable,
             transcript: p.transcript,
             fileType: p.fileUrl ? 'image' : 'text',
             originalFileUrl: p.fileUrl,
@@ -82,6 +83,22 @@ const TutorGradingPage = () => {
     };
     fetchDetail();
   }, [type, submissionId, refreshKey, mode]);
+
+  useEffect(() => {
+    if (type !== 'speaking' || !activeTask?.id || !activeTask.audioAvailable || activeTask.audioUrl) return undefined;
+    let active = true;
+    gradingService.getAudioUrl(activeTask.id).then((response) => {
+      const url = response.data?.url || response.data?.presigned_url;
+      if (!active || !url) return;
+      setSubmissionData((current) => ({
+        ...current,
+        tasks: current.tasks.map((task) => task.id === activeTask.id ? { ...task, audioUrl: url } : task),
+      }));
+    }).catch((requestError) => {
+      if (active) setError(requestError.response?.data?.error?.message || 'Không thể cấp quyền nghe audio.');
+    });
+    return () => { active = false; };
+  }, [type, activeTask?.id, activeTask?.audioAvailable, activeTask?.audioUrl]);
 
   if (isLoading) return <div className="p-4 text-center mt-5" style={{fontFamily: 'UberMoveText, system-ui, sans-serif'}}>Đang tải dữ liệu bài thi...</div>;
   if (error) return <div className="p-4 text-center text-danger mt-5" style={{fontFamily: 'UberMoveText, system-ui, sans-serif'}}>{error}</div>;
