@@ -1,152 +1,131 @@
-/**
- * Traceability Matrix:
- * - Test uploadAudio: Maps to SPEC §6 (upload endpoint), ERR-01 (File Size limit simulation)
- * - Test submitWriting: Maps to FR-01, AC-07 (Idempotency simulation)
- * - Test getFeedback: Maps to FR-06
- * - Test getAudioUrl: Maps to AC-06 (IDOR Prevent simulation)
- * - Test claimSubmission: Maps to AC-05 equivalent / Tutor claim lock
- * - Test gradeSubmission: Maps to FR-04, FR-05
- */
-
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import gradingService from '../../src/services/grading.service';
 import api from '../../src/services/api';
 
-// Mock the api module
-vi.mock('../../src/services/api', () => {
-  return {
-    default: {
-      post: vi.fn(),
-      get: vi.fn(),
-    },
-  };
-});
+vi.mock('../../src/services/api', () => ({
+  default: { post: vi.fn(), get: vi.fn() },
+}));
 
-describe('Grading Service', () => {
+describe('grading service', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    window.sessionStorage.clear();
+    globalThis.fetch = vi.fn();
   });
 
-  describe('uploadAudio', () => {
-    it('should upload audio and return temp_s3_key on happy path', async () => {
-      // EARS[Event]: WHEN file is uploaded THEN it calls the API with multipart/form-data
-      const mockBlob = new Blob(['mock audio content'], { type: 'audio/mp3' });
-      const mockResponse = { data: { success: true, data: { temp_s3_key: 'temp/123/456.mp3' } } };
-      api.post.mockResolvedValueOnce(mockResponse);
+  it('uses signed upload without cookies and returns only the opaque token', async () => {
+    api.post.mockResolvedValueOnce({ data: { data: {
+      upload_url: 'https://storage.example/upload',
+      upload_token: 'opaque-upload-token',
+      required_headers: { 'content-type': 'audio/mp4', 'x-checksum': 'value' },
+    } } });
+    globalThis.fetch.mockResolvedValueOnce({ ok: true, status: 200 });
+    const blob = new Blob(['audio'], { type: 'audio/mp4' });
+    const result = await gradingService.uploadAudio(blob, { partNumber: 2, durationMs: 1200 });
 
-      const result = await gradingService.uploadAudio(mockBlob);
-
-      expect(api.post).toHaveBeenCalledWith('/submissions/speaking/upload', expect.any(FormData), {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      });
-      expect(result).toEqual(mockResponse.data);
-    });
-
-    it('should propagate error when upload fails (e.g. ERR-01 File too large)', async () => {
-      // EARS[Unwanted]: IF file > 10MB THEN API returns 413
-      const mockError = new Error('Payload Too Large');
-      mockError.response = { status: 413, data: { success: false, error: { message: 'File too large' } } };
-      api.post.mockRejectedValueOnce(mockError);
-
-      await expect(gradingService.uploadAudio(new Blob())).rejects.toThrow('Payload Too Large');
-    });
+    expect(api.post).toHaveBeenCalledWith('/submissions/speaking/audio-uploads', expect.objectContaining({
+      part_number: 2,
+      content_type: 'audio/mp4',
+      size_bytes: blob.size,
+      duration_ms: 1200,
+      sha256: expect.stringMatching(/^[0-9a-f]{64}$/),
+    }));
+    expect(globalThis.fetch).toHaveBeenCalledWith('https://storage.example/upload', expect.objectContaining({
+      method: 'PUT',
+      credentials: 'omit',
+      body: blob,
+    }));
+    expect(result).toEqual({ success: true, data: { upload_token: 'opaque-upload-token', part_number: 2 } });
   });
 
-  describe('submitWriting', () => {
-    it('should submit writing data successfully', async () => {
-      // EARS[Event]: WHEN user submits writing THEN return submission_id
-      const payload = { test_id: 't1', task_number: 1, response_text: 'Hello', grader: 'ai' };
-      const mockResponse = { data: { success: true, data: { submission_id: 's1' } } };
-      api.post.mockResolvedValueOnce(mockResponse);
-
-      const result = await gradingService.submitWriting(payload);
-
-      expect(api.post).toHaveBeenCalledWith('/submissions/writing', payload);
-      expect(result).toEqual(mockResponse.data);
-    });
-
-    it('should handle quota exhausted error (403)', async () => {
-      // EARS[Unwanted]: IF AI quota is 0 THEN API returns 403
-      const mockError = new Error('Forbidden');
-      mockError.response = { status: 403, data: { success: false, error: { code: 'GRD_QUO_001' } } };
-      api.post.mockRejectedValueOnce(mockError);
-
-      await expect(gradingService.submitWriting({ grader: 'ai' })).rejects.toThrow('Forbidden');
-    });
+  it('rejects an unapproved recorder MIME before contacting the API', async () => {
+    await expect(gradingService.uploadAudio(
+      new Blob(['audio'], { type: 'audio/webm' }),
+      { partNumber: 1, durationMs: 1000 },
+    )).rejects.toThrow('định dạng audio');
+    expect(api.post).not.toHaveBeenCalled();
   });
 
-  describe('createAttempt', () => {
-    it('should omit dummy numeric mock ids when creating a speaking attempt', async () => {
-      const mockResponse = { data: { success: true, data: { id: 'attempt-1' } } };
-      api.post.mockResolvedValueOnce(mockResponse);
-
-      const result = await gradingService.createAttempt('2');
-
-      expect(api.post).toHaveBeenCalledWith('/submissions/speaking/attempt', {});
-      expect(result).toEqual(mockResponse.data);
+  it('persists one idempotency key until async submission is accepted', async () => {
+    const first = gradingService.getOrCreateSpeakingIdempotencyKey('test-1');
+    expect(gradingService.getOrCreateSpeakingIdempotencyKey('test-1')).toBe(first);
+    api.post.mockResolvedValueOnce({ data: { success: true, data: {
+      speaking_group_id: 'group-1', job_id: 'job-1', status: 'queued',
+    } } });
+    const payload = { test_id: 'test-1', grader: 'ai', parts: [] };
+    const response = await gradingService.submitFullSpeaking(payload);
+    expect(api.post).toHaveBeenCalledWith('/submissions/speaking/full', payload, {
+      headers: { 'Idempotency-Key': first },
     });
-
-    it('should send real UUID test ids when creating a speaking attempt', async () => {
-      const testId = '11111111-1111-4111-8111-111111111111';
-      const mockResponse = { data: { success: true, data: { id: 'attempt-1' } } };
-      api.post.mockResolvedValueOnce(mockResponse);
-
-      await gradingService.createAttempt(testId);
-
-      expect(api.post).toHaveBeenCalledWith('/submissions/speaking/attempt', { test_id: testId });
-    });
+    expect(response.data.status).toBe('queued');
+    expect(window.sessionStorage.getItem('speaking:pending-group')).toBe('group-1');
+    expect(window.sessionStorage.getItem('speaking:idempotency:test-1')).toBeNull();
   });
 
-  describe('getFeedback', () => {
-    it('should fetch feedback report correctly (FR-06)', async () => {
-      // EARS[Event]: WHEN feedback is requested THEN it calls GET with type param
-      const mockResponse = { data: { success: true, data: { submission: {}, ai_report: {} } } };
-      api.get.mockResolvedValueOnce(mockResponse);
-
-      const result = await gradingService.getFeedback('sub1', 'writing');
-
-      expect(api.get).toHaveBeenCalledWith('/submissions/sub1/feedback', { params: { type: 'writing' } });
-      expect(result).toEqual(mockResponse.data);
-    });
-
-    it('should handle IDOR forbidden error (AC-06)', async () => {
-      const mockError = new Error('Forbidden');
-      mockError.response = { status: 403, data: { success: false, error: { code: 'FORBIDDEN' } } };
-      api.get.mockRejectedValueOnce(mockError);
-
-      await expect(gradingService.getFeedback('sub2', 'writing')).rejects.toThrow('Forbidden');
-    });
+  it('does not persist a tutor-only group as an AI polling session', async () => {
+    api.post.mockResolvedValueOnce({ data: { success: true, data: {
+      speaking_group_id: 'group-tutor', status: 'pending',
+    } } });
+    await gradingService.submitFullSpeaking({ test_id: 'test-1', grader: 'tutor', parts: [] });
+    expect(window.sessionStorage.getItem('speaking:pending-group')).toBeNull();
   });
 
-  describe('Tutor endpoints', () => {
-    it('should fetch tutor queue', async () => {
-      const mockResponse = { data: { success: true, data: { items: [], total: 0 } } };
-      api.get.mockResolvedValueOnce(mockResponse);
-      const result = await gradingService.getTutorQueue({ page: 1, limit: 10 });
-      expect(api.get).toHaveBeenCalledWith('/tutors/queue', { params: { page: 1, limit: 10 } });
-      expect(result).toEqual(mockResponse.data);
-    });
+  it('reads async status with an abort signal', async () => {
+    const signal = new AbortController().signal;
+    api.get.mockResolvedValueOnce({ data: { success: true, data: { status: 'running' } } });
+    await expect(gradingService.getSpeakingGradingStatus('group-1', { signal }))
+      .resolves.toMatchObject({ data: { status: 'running' } });
+    expect(api.get).toHaveBeenCalledWith('/submissions/speaking/group-1/grading-status', { signal });
+  });
 
-    it('should claim submission and handle race condition (409 GRD_TUT_001)', async () => {
-      // EARS[Unwanted]: IF submission already claimed THEN API returns 409
-      const mockError = new Error('Conflict');
-      mockError.response = { status: 409, data: { success: false, error: { code: 'GRD_TUT_001' } } };
-      api.post.mockRejectedValueOnce(mockError);
+  it('keeps one retry idempotency key across a lost response and clears it after acceptance', async () => {
+    api.post.mockRejectedValueOnce(new Error('network lost'));
+    await expect(gradingService.retrySpeakingGrading('group-1')).rejects.toThrow('network lost');
+    const stored = window.sessionStorage.getItem('speaking:retry-idempotency:group-1');
+    expect(stored).toBeTruthy();
 
-      await expect(gradingService.claimSubmission('sub1', 'writing')).rejects.toThrow('Conflict');
-    });
+    api.post.mockResolvedValueOnce({ data: { success: true, data: { job_id: 'retry-job-1' } } });
+    await gradingService.retrySpeakingGrading('group-1');
+    expect(api.post).toHaveBeenLastCalledWith(
+      '/submissions/speaking/group-1/retry-grading',
+      { reason: 'user_requested_retry' },
+      { headers: { 'Idempotency-Key': stored } }
+    );
+    expect(window.sessionStorage.getItem('speaking:retry-idempotency:group-1')).toBeNull();
+  });
 
-    it('should grade submission successfully (FR-04)', async () => {
-      const payload = { type: 'writing', band_score: 7.0 };
-      const mockResponse = { data: { success: true, data: { report_id: 'r1' } } };
-      api.post.mockResolvedValueOnce(mockResponse);
+  it('claims a whole Speaking group before tutor navigation', async () => {
+    api.post.mockResolvedValueOnce({ data: { success: true, data: { assignment_status: 'claimed' } } });
+    await expect(gradingService.claimSpeakingGroup('group-1'))
+      .resolves.toMatchObject({ data: { assignment_status: 'claimed' } });
+    expect(api.post).toHaveBeenCalledWith('/tutors/submissions/speaking/group-1/claim');
+  });
 
-      const result = await gradingService.gradeSubmission('sub1', payload);
+  it('keeps existing Writing and feedback calls compatible', async () => {
+    api.post.mockResolvedValueOnce({ data: { success: true, data: { writing_group_id: 'writing-1' } } });
+    await gradingService.submitFullWriting({ grader: 'ai', tasks: [] });
+    expect(api.post).toHaveBeenCalledWith(
+      '/submissions/writing/full',
+      { grader: 'ai', tasks: [] },
+      { headers: { 'Idempotency-Key': expect.any(String) } }
+    );
+    api.get.mockResolvedValueOnce({ data: { success: true, data: {} } });
+    await gradingService.getFeedback('writing-1', 'writing');
+    expect(api.get).toHaveBeenCalledWith('/submissions/writing-1/feedback', { params: { type: 'writing' } });
+  });
 
-      expect(api.post).toHaveBeenCalledWith('/tutors/submissions/sub1/grade', payload);
-      expect(result).toEqual(mockResponse.data);
-    });
+  it('persists the Writing retry key until an individual grading request is acknowledged', async () => {
+    api.post.mockRejectedValueOnce(new Error('lost response'));
+    await expect(gradingService.requestAiGrading('task-1')).rejects.toThrow('lost response');
+    const key = window.sessionStorage.getItem('writing:grade-idempotency:task-1');
+    expect(key).toBeTruthy();
+    api.post.mockResolvedValueOnce({ data: { success: true, data: {} } });
+    await gradingService.requestAiGrading('task-1');
+    expect(api.post).toHaveBeenLastCalledWith(
+      '/submissions/writing/task-1/ai-grade',
+      null,
+      { headers: { 'Idempotency-Key': key } }
+    );
+    expect(window.sessionStorage.getItem('writing:grade-idempotency:task-1')).toBeNull();
   });
 });
