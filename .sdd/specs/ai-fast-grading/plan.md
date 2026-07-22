@@ -1,10 +1,8 @@
 # Kế hoạch triển khai: Production hóa chấm Writing và Speaking bằng AI
 
-**Ngữ cảnh Speckit**: `ai-fast-grading` | **Ngày**: 2026-07-22 | **Đặc tả**: [spec.md](./spec.md)
+**Nhánh**: `feature-global-ielts-virtual-assistant/Datnt` | **Ngày**: 2026-07-22 | **Đặc tả**: [spec.md](./spec.md)
 
-**Nhánh Git hiện tại**: `feature-global-ielts-virtual-assistant/Datnt` — lượt triển khai không tự tạo hoặc chuyển nhánh.
-
-**Trạng thái**: `AI ESTIMATED SPEAKING IMPLEMENTED — VALIDATION IN PROGRESS` — learner AI trả đủ bốn tiêu chí từ transcript + audio; lỗi AI không tự handoff tutor. Calibration vẫn là cổng để nâng độ tin cậy và không được dùng để tuyên bố điểm IELTS chính thức.
+**Trạng thái**: `AI ESTIMATED SPEAKING CÓ CODE/TEST MÔ PHỎNG — CỔNG PHÁT HÀNH CÒN MỞ` — đường estimate trả đủ bốn tiêu chí từ transcript + audio trong test mock; smoke test ba Part qua provider thật chưa có bằng chứng thành công có thể tái lập do các lần demo gần nhất gặp quota. Lỗi AI không tự handoff tutor theo service policy, nhưng UI còn câu chữ trái policy (T075). Nhánh calibrated/publish chưa nối end-to-end (T074), fidelity gate chưa tồn tại (T076), retry provider 5xx còn mất phân loại (T077), Writing còn T070–T071 và tutor detail/envelope còn T073.
 
 **Đồng bộ tài liệu**: `tasks.md`, `checklist.md`, contract và `REVIEW_GUIDE.md` đã được đối chiếu lại với implementation fail-closed; các cổng môi trường/approval chưa có bằng chứng vẫn để mở.
 
@@ -26,7 +24,7 @@ Phần này thay thế mọi mô tả handoff tự động còn sót lại bên 
 
 Giữ kiến trúc React + Express + PostgreSQL hiện tại, đặt private object storage sau một adapter (production theo S3 đã khóa trong Constitution; Supabase chỉ dùng khi RFC cho phép), chuyển AI grading sang worker bất đồng bộ và tách rõ ba loại bằng chứng:
 
-1. Output ASR ít hậu xử lý nhất kèm timestamp/uncertainty cho Lexical Resource, Grammatical Range & Accuracy và phần Coherence; đây không được coi là bản chép lời nguyên văn tuyệt đối.
+1. Output ASR ít hậu xử lý nhất cho Lexical Resource, Grammatical Range & Accuracy và phần Coherence; đây không được coi là bản chép lời nguyên văn tuyệt đối. Schema hỗ trợ timestamp/uncertainty tùy chọn, nhưng adapter Gemini hiện tại mới trả plain transcript và để `words/segments/uncertainty=null`.
 2. Tín hiệu audio cho Fluency, Pronunciation và chất lượng bản ghi.
 3. Rubric scorer hợp nhất bằng chứng và chỉ công bố Overall khi đủ bốn tiêu chí; kết quả chưa có calibration bundle phải mang nhãn AI estimate.
 
@@ -70,8 +68,8 @@ Ngoại lệ hạ tầng có điều kiện: nếu không dùng migration histor
 
 - Backend: Express `5.2.1`, `pg` `8.21.0`, Supabase SDK, `ioredis`, `multer`, `file-type`, Winston.
 - Frontend: React `19.2.6`, Vite `8.0.12`, Bootstrap `5.3.8`, Axios.
-- AI: REST `fetch` tới Gemini/OpenAI; grading hiện dùng Gemini, STT ưu tiên `whisper-1` khi có khóa.
-- Media worker đích: `ffprobe`/`ffmpeg` phiên bản pin trong container để decode, magic/container verification, normalize và chunk; chạy với timeout/resource limit, không shell-interpolate input.
+- AI runtime hiện tại: rubric scoring và speech evidence dùng Gemini. Transcription đi qua adapter provider hiện có; cấu hình demo không có OpenAI key dùng Gemini và trả plain transcript với `words/segments/uncertainty=null`. Structured ASR/model pin riêng là nâng cấp T068.
+- Media worker hiện tại: `ffprobe`/`ffmpeg` decode, kiểm magic/container và normalize nguyên từng Part thành WAV PCM16 mono 16 kHz trong workspace tạm; chạy với timeout/resource limit, không shell-interpolate input. Chunk/deduplicate/rebase timestamp chưa được triển khai và chỉ là mục tiêu có điều kiện của T069.
 
 **Lưu trữ hiện tại**: PostgreSQL raw SQL có tham số; Supabase Storage đang chứa audio. **Đích production**: private S3 theo Constitution hoặc Supabase sau RFC chấp nhận rõ TTL/ACL/compatibility; contract không phụ thuộc hãng.
 
@@ -84,11 +82,11 @@ Ngoại lệ hạ tầng có điều kiện: nếu không dùng migration histor
 - API không-AI và API enqueue: p95 dưới 500 ms, không tính thời gian upload file.
 - `POST /speaking/full` trả `202 Accepted` sau khi commit submission + job, không chờ provider.
 - Job không có SLO “15 giây”; mục tiêu ban đầu p95 dưới 5 phút và phải được xác nhận bằng load test.
-- Mỗi Part được phân tích song song trong giới hạn rate limit của provider.
+- Worker hiện phân tích ba Part tuần tự để tránh dồn rate limit. Xử lý song song có giới hạn chỉ là tối ưu tương lai sau load test, không phải hành vi runtime hiện tại.
 
 **Scale/scope baseline để load test**:
 
-- Một phiên có đúng ba Part; mỗi object tối đa 50 MB theo constraint sản phẩm, nhưng adapter phải chunk/transcode theo giới hạn thấp hơn của provider.
+- Một phiên có đúng ba Part; mỗi object tối đa 50 MB và tối đa 15 phút theo runtime hiện tại. Normalizer xử lý nguyên từng Part; nếu giới hạn payload provider hoặc load test chứng minh cần, T069 mới bổ sung chunk/deduplicate/rebase timestamp.
 - Quota 10 original AI-grading submissions/user/ngày UTC; retry hệ thống/manual generation hợp lệ không tính thêm.
 - Baseline staging ban đầu: 30 enqueue/phút, 10 job đồng thời và benchmark ở 2× forecast thực tế trước production. Đây là sizing target, không phải số liệu traffic đã được xác nhận.
 - Submission/feedback giữ theo retention policy hiện có; object upload mồ côi dọn sau 24 giờ. Forecast audio phút/ngày/chi phí và ngưỡng calibration cụ thể vẫn cần hội đồng chốt nên rollout công bố band production tiếp tục bị block.
@@ -144,13 +142,13 @@ Private object storage (S3 production; adapter khác cần RFC)
 Node grading worker
   ├── claim job bằng FOR UPDATE SKIP LOCKED
   ├── validate magic bytes/codec/duration/ownership
-  ├── chạy song song theo từng Part
-  │     ├── output ASR trước hậu xử lý ứng dụng + timestamps/uncertainty
-  │     ├── audio quality + fluency metrics
-  │     └── pronunciation assessment
+  ├── xử lý tuần tự từng Part (runtime hiện tại)
+  │     ├── plain ASR trước hậu xử lý ứng dụng
+  │     │     └── words/segments/timestamps/uncertainty hiện là null
+  │     └── Gemini audio evidence cho quality/fluency/pronunciation
   ├── lưu speaking_analysis_artifacts
   ├── LLM chấm text/coherence và tổng hợp feedback
-  ├── calibrator tính bốn criterion-band/uncertainty
+  ├── rubric scorer + validator tạo AI Estimated Band
   └── transaction: report + trạng thái submissions + job
         ├── completed
         └── failed
@@ -173,8 +171,10 @@ Khi status = running, stage tiến qua:
 validating_audio → analyzing → scoring → calibrating → finalizing
 ```
 
+Schema cho phép stage `calibrating`, nhưng runtime hiện chỉ có loader/xác minh bundle và scorer estimate. Worker chỉ khởi tạo scorer khi cờ estimate bật; bật publish/bundle riêng không tạo được nhánh calibrated, còn bật cả estimate vẫn không làm scorer áp dụng mapping. T074 phải triển khai và kiểm thử đường này trước khi dùng stage/nhãn đã hiệu chuẩn.
+
 - Worker claim job bằng lease; job có lease hết hạn được watchdog thu hồi.
-- Chỉ retry lỗi timeout, `429`, `5xx` hoặc lỗi mạng; không retry file sai, audio im lặng hoặc schema nghiệp vụ sai.
+- Policy đích retry timeout, `429`, `502/503/504` hoặc lỗi mạng; không retry file sai, audio im lặng hoặc schema nghiệp vụ sai. Hiện gateway có thể đổi provider 5xx thành `INTERNAL_ERROR/AIGRADE_003` trước worker, nên T077 phải khép sai lệch này; backoff hiện là mũ + jitter nội bộ và chưa đọc `Retry-After` của provider.
 - Retry nội bộ không tiêu thụ thêm quota người học.
 - Khi một nguồn evidence thiếu, không cho nguồn khác tự bịa tiêu chí đó.
 
@@ -189,7 +189,7 @@ Chi tiết cột và quan hệ nằm trong [data-model.md](./data-model.md).
 | `speaking_submissions` | Giữ làm nguồn sự thật cho ba Part | Thêm storage key/checksum/duration, `source_prompt_id`, prompt snapshot hash, `assigned_tutor_at`, `updated_at`, `deleted_at`; giữ `transcript` làm trường tương thích trong giai đoạn chuyển đổi |
 | `ai_grading_reports` | Giữ làm báo cáo tổng hợp duy nhất của phiên | Thêm `speaking_group_id`, `grading_job_id`, pipeline/calibration version, evidence mode và cờ human review; reliability nội bộ có thể nằm trong `criteria_json`, còn bundle digest truy qua job để không lặp dữ liệu; không trả learner |
 | `ai_usage_logs` | Giữ để log từng provider attempt | Không tạo bảng attempt; dùng `feature`, `entity_type`, `entity_id`, provider/model/latency/error hiện có theo convention mới |
-| `tutor_feedback_reports` | Giữ cho tutor review/override | Bổ sung `deleted_at`, thay hard-delete; handoff dùng lại `status=pending`, `grader=tutor`, `assigned_tutor_id` |
+| `tutor_feedback_reports` | Giữ cho bài học viên chủ động chọn tutor | Bổ sung `deleted_at`, thay hard-delete; nhánh tutor dùng `status=pending`, `grader=tutor`, `assigned_tutor_id`; lỗi AI không ghi vào bảng này |
 | `assigned_tutor_id` | Giữ cho phân quyền người chấm | Không tạo bảng assignment mới |
 | `speaking_group_id` | Giữ làm khóa nhóm ba Part | Backfill dữ liệu cũ và thêm unique index `(speaking_group_id, part_number)` |
 
@@ -220,11 +220,9 @@ Các bảng legacy được giữ nguyên để tránh xóa nhầm dữ liệu. 
 
 ### Chế độ `full_audio`
 
-- Chỉ được gắn `full_audio` khi cả ba Part có artifact `complete`, hash/quality đạt và mọi evidence `sufficient`. Nếu chưa có calibration bundle, response vẫn được phép dưới nhãn `AI Estimated Band` và version estimation đã pin.
-- Lexical Resource, Grammatical Range & Accuracy **và phần Coherence trong Fluency & Coherence** dùng output ASR trước hậu xử lý của ứng dụng. ASR uncertainty thấp không chứng minh provider không sửa theo “ý định”; ba criterion-band liên quan chỉ được bật sau verbatim-fidelity gate trên L2 English audio cho đúng cấu hình.
-- Fluency & Coherence kết hợp timing/pause/repair/repetition với coherence nội dung. Criterion kết hợp này chỉ `sufficient` khi cả evidence âm thanh cho Fluency lẫn fidelity/evidence transcript cho Coherence đều đạt; thiếu một vế làm band F&C bằng `null`. Filler/discourse marker phải được phân loại theo chức năng/ngữ cảnh, không trừ điểm bằng raw count và không đặt trọng số thủ công.
-- Pronunciation dùng acoustic proxies về segmental accuracy, stress, rhythm, intonation và chunking/connected speech. Intelligibility/listener effort chỉ đến từ mapping đã validate với người chấm, không lấy trực tiếp từ Azure score hoặc ASR uncertainty.
-- Calibrator tạo riêng bốn criterion-band. Backend bỏ mọi Overall provider, dùng số học decimal tính `mean=sum(4 bands)/4`, rồi làm tròn về `0.5` gần nhất với tie `.25/.75` hướng lên (`floor(mean*2+0.5)/2`); không dùng floating binary. Vì input nửa band tạo fraction `.000/.125/.250/.375/.500/.625/.750/.875`, test phải phủ đủ tám trường hợp và biên 0/9. `computed_band` là nguồn API; `band_score` chỉ mirror cho Speaking job-backed. Quy tắc này đã được chốt trong `spec.md`; thiếu một band thì Overall `null`.
+- **Runtime estimate hiện tại** gắn `full_audio` khi ba artifact hoàn tất, quality/hash hợp lệ và scorer trả đủ bốn evidence status/band. Transcript là plain ASR trước hậu xử lý ứng dụng; ứng dụng không sửa ngữ pháp, nhưng chưa có gold-set hoặc threshold chứng minh provider giữ nguyên lỗi/filler/repair. Scorer hiện đánh dấu evidence đủ khi adapter hoàn tất, vì vậy không được mô tả estimate này là đã qua fidelity/calibration gate.
+- **Đích calibrated/production sau T074 và T076** mới được yêu cầu verbatim-fidelity gate cho Lexical, Grammar và vế Coherence; thiếu fidelity phải abstain theo policy đã duyệt. Fluency phải kết hợp timing/pause/repair/repetition với Coherence, còn Pronunciation phải dựa trên audio/acoustic evidence và mapping đã validate với người chấm, không suy từ transcript hay confidence của provider.
+- Ở cả estimate và calibrated, backend bỏ mọi Overall provider, dùng số học decimal tính `mean=sum(4 bands)/4`, rồi làm tròn về `0.5` gần nhất với tie `.25/.75` hướng lên (`floor(mean*2+0.5)/2`); không dùng floating binary. Vì input nửa band tạo fraction `.000/.125/.250/.375/.500/.625/.750/.875`, test phải phủ đủ tám trường hợp và biên 0/9. `computed_band` là nguồn API; `band_score` chỉ mirror cho Speaking job-backed. Thiếu một band thì Overall `null`.
 
 ### Chế độ `partial_audio` *(audit/legacy; không phải terminal learner mới)*
 
@@ -253,10 +251,10 @@ Trước khi bật band Speaking production:
 - Theo dõi MAE, quadratic weighted kappa, exact/adjacent agreement và sai lệch theo accent/thiết bị/noise.
 - Mapping score của provider sang band phải có `calibration_version`; không quy đổi tuyến tính 0–100 thành 0–9.
 - Calibration chỉ hợp lệ cho đúng feature schema, provider/model/config và population đã đánh giá; thay đổi bất kỳ thành phần nào phải quay về shadow.
-- Reliability chỉ dùng nội bộ cho abstention/audit, không xuất API. Event đích là `abs(system_band - adjudicated_human_band) <= 0.5`. Mỗi kết quả vào bucket khóa trước; lưu point estimate, speaker-cluster bootstrap 95% CI, `speaker_count/session_count` và dùng cận dưới CI. Bucket thiếu minimum speaker count đã duyệt trả `null`/handoff; không dùng self-rating/provider score.
+- Reliability chỉ dùng nội bộ cho abstention/audit, không xuất API. Event đích là `abs(system_band - adjudicated_human_band) <= 0.5`. Mỗi kết quả vào bucket khóa trước; lưu point estimate, speaker-cluster bootstrap 95% CI, `speaker_count/session_count` và dùng cận dưới CI. Bucket thiếu minimum speaker count đã duyệt làm toàn phiên learner `failed` theo policy; chỉ bài đã chọn `grader=tutor` mới tiếp tục ở nhánh tutor. Không dùng self-rating/provider score.
 - Release gate phải đồng thời đạt chất lượng và minimum automation coverage/maximum human-review rate trên toàn cohort cùng subgroup; không được “đạt” bằng cách abstain gần hết. Các ngưỡng này, inter-rater threshold và drift-audit cadence cần hội đồng ký.
-- Source of truth là bundle bất biến và registry version-controlled. Lúc enqueue, service resolve rồi pin `scoring_config_sha256` + `calibration_bundle_sha256` trên job; manifest gồm prompt hash/schema, exact provider/model/locale/SDK/config, decoder/ffmpeg/normalizer, local feature schema và calibrator. Worker load digest đã pin, không dùng registry mới giữa job/retry; thiếu/lệch chữ ký, digest hay binding thì fail closed.
-- Report lưu `calibration_version` để query và dùng `grading_job_id` truy `calibration_bundle_sha256` đã pin để tái lập; không lặp digest trong `criteria_json` và không tạo bảng calibration mới. Đổi registry active là một release có audit, không phải cập nhật chuỗi tùy ý trong DB.
+- Runtime hiện tại tạo manifest từ cấu hình môi trường lúc process khởi động rồi luôn pin `scoring_config_sha256`; `calibration_bundle_sha256` có thể `null` cho nhánh `AI Estimated Band`. Với job có calibration digest, worker load đúng bundle/đường dẫn đã pin và fail closed khi thiếu hoặc lệch chữ ký, digest hay binding. Tuy nhiên `GeminiSpeakingRubricScorer.score()` hiện bỏ qua đối số bundle và vẫn trả `assessment_type='estimated'`; việc thực sự áp dụng mapping/threshold/reliability thuộc T074. Registry version-controlled là thiết kế production tương lai, chưa có file `calibration-registry.json` trong repository.
+- Report lưu `calibration_version` để query và dùng `grading_job_id` truy `calibration_bundle_sha256` đã pin để tái lập; không lặp digest trong `criteria_json` và không tạo bảng calibration mới. Khi bổ sung registry sau này, đổi active digest phải là một release có audit.
 - Job ngoài phân phối, uncertainty cao hoặc nguồn evidence bất đồng phải đánh dấu evidence bị ảnh hưởng `insufficient`; worker learner retry/failed toàn phiên, không tạo điểm một phần và không chuyển tutor.
 
 ## Hợp đồng API
@@ -305,7 +303,7 @@ Các thay đổi chính:
 - Dùng advisory lock theo user + ngày UTC trên cả Writing/Speaking. Trong lock phải lookup/replay idempotency key rồi kiểm unique fingerprint **trước** phép đếm quota; key khác/fingerprint trùng trả `409` với canonical IDs, không tạo alias table. Chỉ request hoàn toàn mới mới reserve quota; không thêm quota ledger nếu hai entrypoint cùng tuân thủ convention.
 - Resolve `prompt_id` bằng join `test_passages/mock_tests`: đúng Speaking, published/accessible và đúng Part; lưu source UUID không FK cùng snapshot/hash server-side vì authoring hiện delete/reinsert passage.
 - Worker tính SHA-256 từ bytes thật; checksum client chỉ là hint. Kiểm magic bytes, codec, kích thước, duration, silence, clipping và ownership trước provider.
-- Giữ limit sản phẩm 50 MB nhưng normalize/chunk tại ranh giới im lặng theo provider-specific limit, có overlap/dedup và rebase timestamp; derivative nằm trong workspace tạm, bị dọn sau job.
+- Runtime hiện giới hạn 50 MB và 15 phút cho mỗi Part, xác minh/normalize nguyên file thành WAV PCM16 mono 16 kHz trong workspace tạm rồi dọn sau job. Chunk tại ranh giới im lặng, overlap/dedup và rebase timestamp chưa được triển khai; chỉ bổ sung khi giới hạn payload provider hoặc load test chứng minh cần.
 - Cleanup reconciler quét object quarantine quá 24 giờ theo batch và chỉ xóa khi `audio_storage_key` không tồn tại trong submission chưa hard-delete; không dùng blind lifecycle có thể xóa nhầm object đã bind. Object tag/metadata chỉ là tối ưu, DB vẫn là nguồn kiểm tra. Không cần bảng asset khi không yêu cầu revoke/audit upload trước bind.
 
 ### Bước 3 — Job worker bất đồng bộ
@@ -318,11 +316,11 @@ Các thay đổi chính:
 
 ### Bước 4 — Evidence pipeline
 
-- STT structured, lưu output ASR trước hậu xử lý ứng dụng/display transcript, words/segments/timestamps/uncertainty và provider version; đánh giá fidelity với manual verbatim transcript trên gold set. Gate này áp dụng cho Lexical, GRA và vế Coherence của F&C.
+- Lưu output ASR trước hậu xử lý ứng dụng/display transcript và provider version. Interface đã dành chỗ cho words/segments/timestamps/uncertainty, nhưng adapter Gemini hiện trả plain transcript và các trường này là `null`; structured ASR thuộc T068, còn gold-set/policy verbatim-fidelity thuộc T076.
 - Tích hợp speech assessment/audio metrics qua adapter.
-- Chạy ba Part song song trong giới hạn provider, sau đó chấm cả phiên một lần.
+- Hiện chạy ba Part tuần tự, sau đó chấm cả phiên một lần. Chỉ chuyển sang bounded parallelism sau khi T057/T069 có số liệu quota và load.
 - Pin full scoring-config digest gồm model/prompt/media/feature/calibrator; cache evidence theo verified audio hash + digest.
-- Load scoring-config/calibration **theo digest đã pin lúc enqueue**, xác minh chữ ký/exact binding; artifact lưu scoring-config digest, report tham chiếu job pin calibration digest; registry đổi giữa job hoặc retry không đổi chain.
+- Load scoring-config/calibration **theo digest đã pin lúc enqueue**, xác minh chữ ký/exact binding; artifact lưu scoring-config digest, report tham chiếu job pin calibration digest. Hiện digest được resolve từ cấu hình process; registry active chưa được triển khai.
 
 ### Bước 5 — Scoring, UI và tutor draft
 
@@ -330,15 +328,17 @@ Các thay đổi chính:
 - Learner UI chỉ hiển thị AI report khi `completed/ai_graded`; nút retry chỉ xuất hiện ở `failed` và `can_retry=true`.
 - Tutor UI chỉ nhận bài `grader=tutor`; nút AI prelim tạo bản nháp từ transcript + audio, điền bốn tiêu chí nhưng không thay đổi status/report cho tới khi tutor lưu.
 - Không hiển thị `raw_ai_response` hoặc intermediate results.
-- Reuse tutor queue hiện có bằng handoff `pending/tutor`; report giữ `requires_human_review` để UI/tutor thấy nguyên nhân. Revoke tutor feedback chuyển sang soft-delete.
+- Reuse tutor queue hiện có cho submission được tạo ngay từ đầu với `pending/tutor`; không handoff bài AI lỗi. `requires_human_review` chỉ còn phục vụ dữ liệu legacy/audit. Revoke tutor feedback chuyển sang soft-delete.
 - Mount audio URL route và sửa authorization query: owner, assigned tutor hoặc admin scope; không cho mọi tutor đọc theo UUID.
+- Khoảng trống hiện tại: `TutorController.getSubmissionDetail()` chưa truyền `req.user` vào `TutorService.getSubmissionDetail()`, nên detail Speaking bị từ chối cả với tutor đã claim/admin. T073 phải sửa controller và thêm HTTP happy/error-path test trước khi đánh dấu luồng tutor đạt.
 
 ### Bước 6 — Calibration và phát hành
 
+- Hiện chỉ có loader/chữ ký/binding gate; worker chưa có nhánh scorer calibrated hoàn chỉnh và scorer chưa dùng bundle để biến output estimate thành kết quả đã hiệu chuẩn. T074 là task triển khai bắt buộc, không được đóng chỉ bằng việc có file bundle hợp lệ hoặc đổi `calibration_version`.
 - Shadow-run pipeline trên dữ liệu có điểm người chấm.
 - Có thể mở `AI Estimated Band` cho luyện tập khi đủ transcript + audio evidence và cờ estimation bật; giao diện bắt buộc ghi rõ đây không phải điểm IELTS chính thức.
 - Chỉ nâng lên kết quả đã hiệu chuẩn/công bố theo chuẩn chất lượng khi calibration gate đạt. Mọi thay đổi feature schema/provider/model/config làm calibration cũ hết hiệu lực nhưng không tự chuyển submission AI sang tutor.
-- Đóng gói mapping/threshold/metrics/approval thành bundle bất biến; CI kiểm schema, SHA-256/chữ ký. Registry chỉ chọn digest cho job mới, worker đang chạy dùng digest persisted.
+- Đóng gói mapping/threshold/metrics/approval thành bundle bất biến; CI kiểm schema, SHA-256/chữ ký. Nếu bổ sung registry trong tương lai, registry chỉ chọn digest cho job mới; worker đang chạy tiếp tục dùng digest persisted.
 - Rollout theo tỷ lệ; audit ngẫu nhiên cả bucket reliability nội bộ cao để phát hiện blind spot/drift.
 - Rollback bằng feature flag sẽ dừng nhận yêu cầu AI mới hoặc làm job thất bại rõ ràng; không được âm thầm đổi lựa chọn của học viên sang tutor.
 
@@ -347,7 +347,7 @@ Các thay đổi chính:
 - Mỗi job có request ID, stage, provider/model, latency và mã lỗi; không log nội dung audio/transcript.
 - Chỉ tái sử dụng artifact khi verified `audio_sha256 + scoring_config_sha256` không đổi; nhãn pipeline không đủ làm cache key.
 - Một lần gọi text grader cho toàn bộ ba Part, không gọi riêng ba lần.
-- Provider thứ hai chỉ dùng khi evidence uncertainty cao hoặc trong shadow evaluation; không tự động coi đồng thuận giữa hai provider là ground truth.
+- Runtime hiện không tự chuyển sang provider thứ hai. Nếu bổ sung shadow provider sau này, chỉ dùng cho evaluation/audit và không tự động coi đồng thuận giữa hai provider là ground truth.
 - Dashboard theo dõi queue depth, tuổi job lâu nhất, success/retry/failure rate, latency từng stage, chi phí theo provider và tỷ lệ human review.
 
 ## Đối chiếu Constitution sau triển khai foundation
@@ -358,12 +358,13 @@ Các thay đổi chính:
 | React 18 | Không đạt do code dùng React 19 | RFC hoặc hạ phiên bản; không giải quyết ngầm trong feature này |
 | AI Grading = Claude | Không đạt do code dùng Gemini | RFC hoặc thay provider trước rollout production |
 | Mọi AI call qua grading service | Đạt cho đường grading mới | Worker/transcriber gọi adapter do `grading.service.js` điều phối; chatbot ngoài grading không thuộc feature này |
-| Production storage S3 | Đạt ở mức adapter private; rollout còn gate | Có S3/Supabase private adapter, không trả public object key; cần RFC chọn backend và backfill audio public legacy |
+| Production storage S3 | **Một phần/không đạt cho rollout** | Có adapter private S3/Supabase và không trả public object key, nhưng runtime demo dùng Supabase; phải chọn S3 theo Constitution hoặc có RFC chấp nhận Supabase trước production |
 | Upload magic bytes ≤ 50 MB, mp3/m4a/wav | Đạt cho format đang khóa; WebM chưa được phép | Backend kiểm magic byte/size/duration/checksum; browser không có MIME được duyệt phải bị chặn cho tới RFC G-03 |
-| `grading_failed`, retry, idempotency | Đạt trong code/schema | Job state, enum, unique constraint, fencing, watchdog và retry policy có test |
+| `grading_failed`, retry, idempotency | **Một phần** | Job state, enum, unique constraint, fencing và watchdog có test; phân loại provider 5xx xuyên gateway/worker còn mở ở T077 |
 | Soft-delete/timestamps | Đạt trong phạm vi reader đã audit | Submission/report/artifact/job và `tutor_feedback_reports` có soft-delete; history/detail/export/stats bỏ row đã xóa |
-| API envelope, auth, centralized errors | Đạt cho contract mới | Contract, role guard, IDOR và cache-control có integration/contract test |
-| Tổ chức code ≤300 dòng/file, ≤40 dòng/hàm | Đạt cho backend feature mới và hook/summary mới | Một số màn hình frontend kế thừa vẫn vượt giới hạn; theo dõi bằng T059, không tuyên bố đã đóng toàn repository |
+| API envelope, auth, centralized errors | **Một phần** | Speaking contract/role guard có test, nhưng lỗi Writing ngắn chưa đúng envelope (T070) và tutor detail controller chưa truyền requester context (T073) |
+| Tổ chức code ≤300 dòng/file, ≤40 dòng/hàm | **Một phần** | Backend feature mới và hook/summary mới đạt, nhưng các màn hình frontend kế thừa đã tích hợp feature vẫn vượt giới hạn; T059 còn mở |
+| Tên nhánh/tạo tác Speckit | **Chưa đạt governance** | Nhánh hiện tại và tên `spec.md` kế thừa khác quy ước Hiến chương; phải đồng bộ bằng thay đổi phối hợp hoặc RFC, không tự đổi trong lượt tài liệu này |
 | Coverage ≥80%, mock AI | Provider mock đạt; coverage chưa đo | Đo coverage nghiệp vụ mới và đặt gate CI bằng T056 trước production |
 
 ## Các cổng Constitution/release còn mở
@@ -412,7 +413,6 @@ backend/
 │   │   ├── speakingGrading.validator.js
 │   │   └── calibration/
 │   │       ├── calibration-bundle.schema.json
-│   │       ├── calibration-registry.json
 │   │       └── calibration.loader.js
 │   ├── storage/
 │   │   └── objectStorage.adapter.js
@@ -455,7 +455,7 @@ frontend/
 | Thêm `ai_grading_jobs` | HTTP request không thể giữ an toàn qua nhiều provider; cần retry/lease/idempotency bền vững | Dùng `ai_grading_reports` làm queue làm trộn state mutable với kết quả bất biến |
 | Thêm `speaking_analysis_artifacts` | Cần evidence từng Part có phiên bản và không ghi đè transcript | Thêm JSONB trực tiếp vào `speaking_submissions` làm mất lịch sử khi regrade/model đổi |
 | Worker process riêng | Tách timeout/provider khỏi request nhưng vẫn dùng cùng codebase | `setImmediate` hoặc xử lý nền trong API process mất job khi process restart |
-| Speech assessment provider | Transcript không chứa pronunciation/prosody | Gemini/transcript-only không có bằng chứng âm vị được hiệu chuẩn |
+| Adapter phân tích audio | Transcript không chứa pronunciation/prosody | Runtime Gemini nhận audio + ASR để tạo evidence luyện tập; nhãn đã hiệu chuẩn vẫn cần gold set, bundle và approval |
 
 ## Tạo tác thiết kế và cổng tiếp theo
 
@@ -464,4 +464,4 @@ frontend/
 - Hợp đồng API/state/result: [contracts/speaking-grading-api.md](./contracts/speaking-grading-api.md) và [OpenAPI 3.1](./contracts/speaking-grading.openapi.yaml)
 - Hướng dẫn kiểm chứng implementation: [quickstart.md](./quickstart.md)
 
-`spec.md`, `tasks.md`, checklist và contract được đối chiếu với implementation hiện tại. T001–T054 là foundation; T060–T066 ghi nhận phần chấm đủ bốn tiêu chí, tutor prelim và retry-only-after-failure. T055–T059 vẫn là cổng production/staging chưa được tự nhận là hoàn tất. `AI Estimated Band` có thể dùng cho luyện tập; chỉ kết quả đã hiệu chuẩn mới được mô tả như mức chất lượng production/chính thức.
+`spec.md`, `tasks.md`, checklist và contract được đối chiếu với implementation hiện tại. T001–T054 là foundation; T060–T066 ghi nhận phần code/test mô phỏng cho bốn tiêu chí, tutor prelim và semantics retry-only-after-failure. T055–T059 cùng T067–T069 là cổng môi trường/production hoặc nâng cấp còn mở. Phase 11 giữ T070–T071 mở cho Writing, T073 cho tutor detail/envelope, T074 cho calibrated branch thật, T075 cho nội dung UI, T076 cho fidelity gate và T077 cho phân loại retry provider; T072 đã khép bằng `.env.example` an toàn ở root. Không được tuyên bố toàn bộ regression xanh trước khi các test tương ứng đạt. `AI Estimated Band` chỉ nên demo sau provider smoke thành công; kết quả chỉ được gọi là đã hiệu chuẩn sau khi T074/T076 cùng calibration/RFC gate có bằng chứng.
