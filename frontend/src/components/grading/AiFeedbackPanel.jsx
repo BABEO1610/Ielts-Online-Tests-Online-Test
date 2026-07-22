@@ -308,11 +308,15 @@ const ListSection = ({ title, items }) => {
   );
 };
 
-const EmptyPanel = ({ showDisclaimer }) => (
+const EmptyPanel = ({ showDisclaimer, isPending }) => (
   <div style={styles.panel}>
     {showDisclaimer && <div style={styles.disclaimer}>{DISCLAIMER}</div>}
     <div style={styles.body}>
-      <p style={styles.text}>Chưa có AI feedback cho bài này.</p>
+      <p style={styles.text}>
+        {isPending
+          ? 'Bài làm đang được AI chấm. Quá trình này có thể mất khoảng 1-2 phút, vui lòng chờ...'
+          : 'Chưa có AI feedback cho bài này.'}
+      </p>
     </div>
   </div>
 );
@@ -427,8 +431,8 @@ const FeedbackSections = ({ data }) => (
   </>
 );
 
-const AiFeedbackPanel = ({ report, showDisclaimer = true }) => {
-  if (!report) return <EmptyPanel showDisclaimer={showDisclaimer} />;
+const AiFeedbackPanel = ({ report, showDisclaimer = true, isPending = false }) => {
+  if (!report) return <EmptyPanel showDisclaimer={showDisclaimer} isPending={isPending} />;
   const data = normalizeReport(report);
   const isFailed = data.status === 'failed' || data.errorMessage;
   return (
