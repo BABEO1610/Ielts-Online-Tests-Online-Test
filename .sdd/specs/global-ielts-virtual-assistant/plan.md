@@ -74,6 +74,12 @@ Tính năng sử dụng kiến thức tĩnh dạng JSON và các truy vấn Post
 .sdd/specs/global-ielts-virtual-assistant/
 ├── spec.md
 ├── plan.md
+├── research.md
+├── data-model.md
+├── quickstart.md
+├── contracts/
+│   ├── assistant-api.md
+│   └── assistant.openapi.yaml
 ├── tasks.md
 ├── checklist.md
 ├── CONTEXT.md
@@ -84,7 +90,10 @@ Tính năng sử dụng kiến thức tĩnh dạng JSON và các truy vấn Post
     └── implementation-approach.legacy.md
 ```
 
-RFC, bản ghi đánh giá và kho lưu trữ cũ hiện có được giữ nguyên. `production-test-suite.md` là hợp đồng hành vi đã được đổi tên và mở rộng.
+`research.md`, `data-model.md`, `contracts/` và `quickstart.md` là đầu ra Giai đoạn
+0/1 theo Speckit. RFC, bản ghi đánh giá và kho lưu trữ cũ là tài liệu giải thích/QA bổ
+sung; `production-test-suite.md` là hợp đồng hành vi mở rộng. Các snapshot cũ trong
+`eval-set.md` không được dùng làm kết quả hiện hành.
 
 ### Mã nguồn (thư mục gốc của kho mã)
 
@@ -202,14 +211,14 @@ frontend/
 5. Chạy ESLint tập trung cho trợ lý, bản dựng (build) production của frontend, kiểm tra cú pháp backend, kiểm tra tính nhất quán Markdown và `git diff --check`.
 6. Không chạy migration 024, kiểm thử nhanh có xác thực trên môi trường thật hoặc lời gọi nhà cung cấp thật khi chưa có ủy quyền riêng cho môi trường.
 
-## Kết quả kiểm chứng — 2026-07-21
+## Kết quả kiểm chứng — test/lint cập nhật 2026-07-22
 
-- Jest tập trung cho backend: ĐẠT — 15 bộ kiểm thử, 261 bài kiểm thử, 0 bỏ qua, 0 thất bại.
-- Vitest tập trung cho frontend: ĐẠT — 3 tệp, 7 bài kiểm thử, 0 bỏ qua, 0 thất bại.
-- ESLint tập trung cho trợ lý ở frontend: ĐẠT.
-- Bản dựng (build) production của frontend: ĐẠT với Vite 8.0.16; gói mã (bundle) được tạo vẫn có cảnh báo không chặn về kích thước phân đoạn (chunk).
-- Xác thực cú pháp backend: ĐẠT cho toàn bộ 22 tệp JavaScript của trợ lý/AI dùng chung.
-- ESLint tập trung cho trợ lý ở backend: BỊ CHẶN trước bước kiểm tra lint vì `eslint.config.js` nhập (import) phụ thuộc phát triển `@eslint/js` còn thiếu. Không cài thêm phụ thuộc trong lượt chỉ làm tài liệu này.
+- Jest tập trung cho backend ngày 2026-07-22: ĐẠT — 15 bộ kiểm thử, 265 bài kiểm thử, 0 bỏ qua, 0 thất bại.
+- Vitest tập trung cho frontend ngày 2026-07-22: ĐẠT — 3 tệp, 7 bài kiểm thử, 0 bỏ qua, 0 thất bại.
+- ESLint tập trung cho trợ lý ở frontend ngày 2026-07-22: ĐẠT.
+- Bản dựng (build) production của frontend ngày 2026-07-22: ĐẠT với Vite 8.0.16; bundle JavaScript 2.886,27 kB (gzip 814,40 kB) vẫn có cảnh báo không chặn về kích thước phân đoạn (chunk).
+- Xác thực cú pháp backend ngày 2026-07-22: ĐẠT cho toàn bộ 22 tệp JavaScript của trợ lý/AI dùng chung.
+- ESLint tập trung cho trợ lý ở backend hiện đã chạy được vì `@eslint/js` đã có; lần đối chiếu 2026-07-22 còn 1 lỗi `no-useless-escape` tại `backend/src/api/assistant/assistant.response.js:24`, nên cổng lint vẫn CHƯA ĐẠT.
 - Khả năng truy vết chéo giữa các tạo tác (artifact): ĐẠT — toàn bộ 28 yêu cầu chức năng và 8 tiêu chí thành công được ánh xạ tới một hoặc nhiều nhiệm vụ trong tổng số 61 nhiệm vụ, không còn mâu thuẫn hành vi chưa giải quyết giữa đặc tả/kế hoạch/nhiệm vụ. Cổng Hiến chương được liệt kê riêng vẫn KHÔNG ĐẠT.
 - Kiểm tra hợp đồng tài liệu: ĐẠT — 561 trường hợp production duy nhất và liên tục trong 21 nhóm, 61 nhiệm vụ duy nhất, 30 mục trong danh sách kiểm tra (checklist) duy nhất, không còn chỗ giữ chỗ (placeholder) của mẫu và tất cả đường dẫn được tham chiếu bởi nhiệm vụ đã hoàn thành đều tồn tại. Thư mục đích của T060 đang mở là `backend/tests/integration/assistant/` chưa tồn tại; đích `frontend/src/styles/custom.css` bắt buộc theo Hiến chương cũng chưa tồn tại và đã được ghi nhận ở trên như một sai lệch.
 - Việc áp dụng migration 024, kiểm thử nhanh HTTP có xác thực/cơ sở dữ liệu thật/nhà cung cấp thật và PM-01–PM-18 vẫn CHƯA CHẠY vì cần quyền môi trường và thông tin xác thực.
