@@ -34,9 +34,10 @@ const getProfile = async (userId) => {
  * @param {string} profileData.fullName - The user's full name.
  * @param {string} [profileData.avatarUrl] - The user's avatar URL.
  * @param {number} [profileData.targetBandScore] - The user's target band score.
+ * @param {string} [profileData.targetTestDate] - The user's target test date.
  * @returns {Promise<Object>} The updated user object.
  */
-const updateProfile = async (userId, { fullName, avatarUrl, targetBandScore }) => {
+const updateProfile = async (userId, { fullName, avatarUrl, targetBandScore, targetTestDate }) => {
   // Validate targetBandScore if provided
   if (targetBandScore !== undefined && targetBandScore !== null) {
     const numScore = Number(targetBandScore);
@@ -46,7 +47,7 @@ const updateProfile = async (userId, { fullName, avatarUrl, targetBandScore }) =
       isNaN(numScore) ||
       numScore < 0.0 ||
       numScore > 9.0 ||
-      numScore % 0.5 !== 0
+      (numScore * 10) % 5 !== 0
     ) {
       const error = new Error('Target Band Score must be between 0 and 9, in 0.5 increments.');
       error.code = 'AUTH_PROF_001';
@@ -68,6 +69,7 @@ const updateProfile = async (userId, { fullName, avatarUrl, targetBandScore }) =
     full_name: fullName,
     avatar_url: avatarUrl,
     target_band_score: targetBandScore,
+    target_test_date: targetTestDate ? new Date(targetTestDate).toISOString().split('T')[0] : null,
   });
 
   const { password_hash, ...safeUser } = updatedUser;

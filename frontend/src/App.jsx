@@ -133,6 +133,7 @@ function App() {
 
         <Route element={<ProfileLayout />}>
           <Route path="/profile" element={<ProtectedRoute><UserProfilePage /></ProtectedRoute>} />
+          <Route path="/security" element={<ProtectedRoute><UserProfilePage /></ProtectedRoute>} />
           <Route path="/practice-history" element={<ProtectedRoute><UserProfilePage /></ProtectedRoute>} />
           <Route path="/study-plan" element={<ProtectedRoute><UserProfilePage /></ProtectedRoute>} />
           <Route path="/student/profile/practice-history/:submissionId" element={<ProtectedRoute><StudentFeedbackDetailPage /></ProtectedRoute>} />
