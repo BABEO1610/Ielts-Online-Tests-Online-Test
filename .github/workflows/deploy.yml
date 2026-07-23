@@ -17,7 +17,7 @@ jobs:
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USERNAME }}
-          key: ${{ secrets.VPS_SSH_KEY }}
+          password: ${{ secrets.VPS_PASSWORD }}
           script: |
             # Di chuyển vào thư mục dự án trên VPS
             # Thay đổi đường dẫn này thành thư mục chứa code thật trên VPS của bạn
@@ -28,7 +28,8 @@ jobs:
             
             # Khởi động lại Docker Compose với bản build mới
             # Nó sẽ tự động dùng file .env.production đã cấu hình trên VPS
-            docker compose -f docker-compose.prod.yml up -d --build
+            docker compose --env-file .env.production -f docker-compose.prod.yml build --no-cache frontend
+            docker compose --env-file .env.production -f docker-compose.prod.yml up -d --build
             
             # Xóa các image rác cũ để giải phóng dung lượng
             docker image prune -f
