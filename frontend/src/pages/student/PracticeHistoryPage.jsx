@@ -50,7 +50,7 @@ function calcSummary(history) {
 
   const validBands = history.filter(h => h.bandScore && !isNaN(h.bandScore));
   const avgBand = validBands.length
-    ? (validBands.reduce((s, h) => s + parseFloat(h.bandScore), 0) / validBands.length).toFixed(1)
+    ? (Math.round((validBands.reduce((s, h) => s + parseFloat(h.bandScore), 0) / validBands.length) * 2) / 2).toFixed(1)
     : '—';
 
   // Accuracy = tỉ lệ câu đúng trên tổng câu (chỉ tính bài objective test có totalQuestions > 0)

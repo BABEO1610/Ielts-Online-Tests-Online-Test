@@ -7,7 +7,7 @@ const getUserStats = async (pool, userId) => {
   const query = `
     SELECT 
       COUNT(id) as total_tests,
-      COALESCE(SUM(time_spent), 0) as total_time_minutes
+      COALESCE(SUM(EXTRACT(EPOCH FROM (submitted_at - started_at)) / 60), 0) as total_time_minutes
     FROM test_attempts
     WHERE user_id = $1 AND status = 'completed'
   `;
