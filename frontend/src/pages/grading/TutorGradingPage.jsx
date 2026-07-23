@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import TutorGradingPanel from '../../components/grading/TutorGradingPanel';
 import SubmissionViewer from '../../components/grading/SubmissionViewer';
@@ -19,6 +19,7 @@ const TutorGradingPage = () => {
   const [isGeneratingTranscript, setIsGeneratingTranscript] = useState(false);
   const [gradedData, setGradedData] = useState(null);
   const [refreshKey, setRefreshKey] = useState(0);
+  const prevSubmissionIdRef = useRef(submissionId);
   const mode = searchParams.get('mode');
 
   // Safely define activeTask first so it can be used in the handler
@@ -43,7 +44,10 @@ const TutorGradingPage = () => {
   useEffect(() => {
     const fetchDetail = async () => {
       try {
-        setIsLoading(true);
+        if (prevSubmissionIdRef.current !== submissionId || !submissionData) {
+          setIsLoading(true);
+          prevSubmissionIdRef.current = submissionId;
+        }
         const res = await gradingService.getSubmissionDetail(type, submissionId);
         if (res.success && res.data) {
           // Format API response into internal structure that components expect
@@ -100,7 +104,7 @@ const TutorGradingPage = () => {
     return () => { active = false; };
   }, [type, activeTask?.id, activeTask?.audioAvailable, activeTask?.audioUrl]);
 
-  if (isLoading) return <div className="p-4 text-center mt-5" style={{fontFamily: 'UberMoveText, system-ui, sans-serif'}}>Đang tải dữ liệu bài thi...</div>;
+  if (isLoading && !submissionData) return <div className="p-4 text-center mt-5" style={{fontFamily: 'UberMoveText, system-ui, sans-serif'}}>Đang tải dữ liệu bài thi...</div>;
   if (error) return <div className="p-4 text-center text-danger mt-5" style={{fontFamily: 'UberMoveText, system-ui, sans-serif'}}>{error}</div>;
   if (!submissionData) return <div className="p-4 text-center mt-5" style={{fontFamily: 'UberMoveText, system-ui, sans-serif'}}>Không có dữ liệu</div>;
 

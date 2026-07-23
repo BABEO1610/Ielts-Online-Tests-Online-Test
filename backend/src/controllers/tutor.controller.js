@@ -172,7 +172,11 @@ class TutorController {
 
       res.status(200).json({
         success: true,
-        data: { message: 'Grade submitted successfully' },
+        data: {
+          message: 'Grade submitted successfully',
+          tutorStatus: result.tutorStatus,
+          overallTutorBand: result.overallTutorBand,
+        },
         error: null,
         meta: null
       });

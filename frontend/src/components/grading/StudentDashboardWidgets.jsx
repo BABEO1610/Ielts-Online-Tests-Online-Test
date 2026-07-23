@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import gradingService from '../../services/grading.service';
+import { formatIeltsBandScore } from '../../utils/ieltsScoring';
 
 const StudentDashboardWidgets = () => {
   const [stats, setStats] = useState(null);
@@ -72,7 +73,7 @@ const StudentDashboardWidgets = () => {
             </div>
             <div>
               <h6 className="card-subtitle mb-1 text-muted text-uppercase fw-bold" style={{ fontSize: '0.8rem' }}>Mục tiêu IELTS</h6>
-              <h3 className="card-title mb-0 fw-bold">{stats.target_band_score ? stats.target_band_score.toFixed(1) : 'N/A'}</h3>
+              <h3 className="card-title mb-0 fw-bold">{stats.target_band_score ? formatIeltsBandScore(stats.target_band_score) : 'N/A'}</h3>
             </div>
           </div>
         </div>
@@ -89,7 +90,7 @@ const StudentDashboardWidgets = () => {
             </div>
             <div>
               <h6 className="card-subtitle mb-1 text-muted text-uppercase fw-bold" style={{ fontSize: '0.8rem' }}>Điểm trung bình</h6>
-              <h3 className="card-title mb-0 fw-bold">{stats.avg_band_score ? stats.avg_band_score.toFixed(1) : 'N/A'}</h3>
+              <h3 className="card-title mb-0 fw-bold">{stats.avg_band_score ? formatIeltsBandScore(stats.avg_band_score) : 'N/A'}</h3>
             </div>
           </div>
         </div>
