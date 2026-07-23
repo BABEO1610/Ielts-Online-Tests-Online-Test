@@ -1,18 +1,19 @@
-import React, { useState, useRef, useEffect, forwardRef, useImperativeHandle } from 'react';
-import api from '../../services/api';
+import { useState, useRef, useEffect, forwardRef, useImperativeHandle } from 'react';
 import gradingService from '../../services/grading.service';
 
-const AudioRecorder = forwardRef(({ testId, partNumber, onUploadComplete, onSubmitSuccess, maxDuration = 300, practiceMode = false, examMode = false }, ref) => {
+const AudioRecorder = forwardRef(({ partNumber, onUploadComplete, maxDuration = 300, practiceMode = false, examMode = false }, ref) => {
   const [status, setStatus] = useState('idle'); // idle, recording, uploading, done, error
   const [submitStatus, setSubmitStatus] = useState('idle');
   const [grader, setGrader] = useState('tutor');
-  const [tempS3Key, setTempS3Key] = useState(null);
+  const [uploadToken, setUploadToken] = useState(null);
   const [errorMsg, setErrorMsg] = useState(null);
   const [timeLeft, setTimeLeft] = useState(maxDuration);
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
   const timerRef = useRef(null);
   const streamRef = useRef(null);
+  const startedAtRef = useRef(0);
+  const uploadOnStopRef = useRef(true);
 
   useImperativeHandle(ref, () => ({
     stopRecording: () => {
@@ -24,6 +25,7 @@ const AudioRecorder = forwardRef(({ testId, partNumber, onUploadComplete, onSubm
 
   useEffect(() => {
     return () => {
+      uploadOnStopRef.current = false;
       cleanup();
     };
   }, []);
@@ -45,7 +47,7 @@ const AudioRecorder = forwardRef(({ testId, partNumber, onUploadComplete, onSubm
   };
 
   const getSupportedMimeType = () => {
-    const types = ['audio/mp4', 'audio/webm', 'audio/ogg'];
+    const types = ['audio/mp4'];
     for (const t of types) {
       if (typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported(t)) {
         return t;
@@ -58,11 +60,11 @@ const AudioRecorder = forwardRef(({ testId, partNumber, onUploadComplete, onSubm
     setErrorMsg(null);
     setSubmitStatus('idle');
     try {
+      const mimeType = getSupportedMimeType();
+      if (!mimeType) throw new Error('UNSUPPORTED_RECORDER_MIME');
       // EARS[Event]: WHEN user starts recording, THE system SHALL request microphone permission
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
-      
-      const mimeType = getSupportedMimeType();
       const options = mimeType ? { mimeType } : undefined;
       const mediaRecorder = new MediaRecorder(stream, options);
       
@@ -76,12 +78,14 @@ const AudioRecorder = forwardRef(({ testId, partNumber, onUploadComplete, onSubm
       };
 
       mediaRecorder.onstop = async () => {
+        if (!uploadOnStopRef.current) return;
         // EARS[Event]: WHEN recording stops, THE system SHALL process the audio chunks
         const finalBlob = new Blob(audioChunksRef.current, { type: mimeType });
-        await uploadAudio(finalBlob);
+        await uploadAudio(finalBlob, Math.max(1, Math.round(performance.now() - startedAtRef.current)));
       };
 
       mediaRecorder.start();
+      startedAtRef.current = performance.now();
       setStatus('recording');
       setTimeLeft(maxDuration);
 
@@ -102,9 +106,13 @@ const AudioRecorder = forwardRef(({ testId, partNumber, onUploadComplete, onSubm
       }
       
     } catch (err) {
+      streamRef.current?.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
       // EARS[Unwanted]: WHERE browser denies microphone permission, THE system SHALL show error
       setStatus('error');
-      setErrorMsg('Microphone access denied or not available.');
+      setErrorMsg(err.message === 'UNSUPPORTED_RECORDER_MIME'
+        ? 'Trình duyệt không hỗ trợ audio/mp4 đã được phê duyệt; không thể giả đuôi M4A.'
+        : 'Microphone access denied or not available.');
     }
   };
 
@@ -115,24 +123,15 @@ const AudioRecorder = forwardRef(({ testId, partNumber, onUploadComplete, onSubm
     }
   };
 
-  const uploadAudio = async (blob) => {
+  const uploadAudio = async (blob, durationMs) => {
     setStatus('uploading');
     try {
-      const formData = new FormData();
-      // EARS[Event]: WHEN user submits audio, THE system SHALL upload the file
-      formData.append('audio_file', blob, 'recording.m4a'); 
-
-      const response = await api.post('/submissions/speaking/upload', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      });
-
-      if (response.data?.success && response.data?.data?.temp_s3_key) {
+      const response = await gradingService.uploadAudio(blob, { partNumber, durationMs });
+      if (response?.success && response?.data?.upload_token) {
         setStatus('done');
-        setTempS3Key(response.data.data.temp_s3_key);
+        setUploadToken(response.data.upload_token);
         if (onUploadComplete) {
-          onUploadComplete(response.data.data.temp_s3_key);
+          onUploadComplete(response.data.upload_token);
         }
       } else {
         throw new Error('Invalid response format');
@@ -168,18 +167,8 @@ const AudioRecorder = forwardRef(({ testId, partNumber, onUploadComplete, onSubm
       setSubmitStatus('submitting');
       setErrorMsg(null);
       
-      const payload = {
-        test_id: testId,
-        part_number: partNumber,
-        temp_s3_key: tempS3Key,
-        grader: grader
-      };
-      
-      const response = await gradingService.submitSpeaking(payload);
-      setSubmitStatus('success');
-      if (onSubmitSuccess) {
-        onSubmitSuccess(response);
-      }
+      if (!uploadToken) throw new Error('Audio chưa upload xong.');
+      throw new Error('Speaking chỉ được nộp sau khi hoàn tất đủ ba Part trong màn hình bài thi.');
     } catch (error) {
       setSubmitStatus('error');
       setErrorMsg(error.response?.data?.error?.message || 'Nộp bài thất bại. Vui lòng thử lại.');
@@ -281,7 +270,7 @@ const AudioRecorder = forwardRef(({ testId, partNumber, onUploadComplete, onSubm
                   disabled={submitStatus === 'submitting' || submitStatus === 'success'}
                 />
                 <label className="form-check-label" htmlFor="graderAi">
-                  AI Chấm điểm <span className="badge bg-info text-dark ms-1">Không giới hạn</span>
+                  AI Chấm điểm <span className="badge bg-info text-dark ms-1">Tối đa 10 lượt/ngày</span>
                 </label>
               </div>
             </div>

@@ -10,8 +10,7 @@ const GoogleLoginButton = () => {
   return (
     <button
       type="button"
-      className="btn btn-light btn-lg rounded-pill fw-bold d-flex align-items-center justify-content-center border-0 shadow-sm"
-      style={{ backgroundColor: '#ffffff', color: '#000000', fontSize: '16px' }}
+      className="button-secondary"
       onClick={handleGoogleLogin}
       data-testid="google-login-btn"
     >

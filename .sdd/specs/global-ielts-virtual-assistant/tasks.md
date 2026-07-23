@@ -5,7 +5,14 @@ description: "Bản ghi nhiệm vụ theo hiện trạng, được sắp xếp t
 
 # Nhiệm vụ: Trợ lý ảo IELTS toàn cục
 
-**Đầu vào**: [spec.md](./spec.md), [plan.md](./plan.md), [CONTEXT.md](./CONTEXT.md), [production-test-suite.md](./production-test-suite.md)
+**Đầu vào**: [spec.md](./spec.md), [plan.md](./plan.md), [research.md](./research.md),
+[data-model.md](./data-model.md), [contracts/](./contracts/),
+[quickstart.md](./quickstart.md), [CONTEXT.md](./CONTEXT.md) và
+[production-test-suite.md](./production-test-suite.md)
+
+**Điều kiện tiên quyết**: `plan.md` và `spec.md` là bắt buộc; các tạo tác Giai đoạn
+0/1 gồm `research.md`, `data-model.md`, `contracts/` và `quickstart.md` đã được đối
+chiếu theo code hiện tại.
 
 **Kiểm thử**: Được đưa vào vì đặc tả xác định kiểm thử hồi quy và xác thực hành vi là tiêu chí phát hành.
 
@@ -155,9 +162,9 @@ description: "Bản ghi nhiệm vụ theo hiện trạng, được sắp xếp t
 
 **Mục đích**: Giữ hợp đồng theo hiện trạng ở trạng thái có thể tái lập và công khai thay vì che giấu các khoảng trống còn lại.
 
-- [X] T051 [P] Giữ nguyên bản ghi đánh giá đã tuyển chọn và RFC trong `.sdd/specs/global-ielts-virtual-assistant/eval-set.md` và `RFC.md`
+- [X] T051 [P] Chuẩn hóa ranh giới tính năng trong `.sdd/specs/global-ielts-virtual-assistant/RFC.md` và gắn các lần chạy cũ trong `.sdd/specs/global-ielts-virtual-assistant/eval-set.md` là snapshot lịch sử, không thay thế trạng thái hiện hành
 - [X] T052 Mở rộng và đổi tên hợp đồng hành vi thành 561 trường hợp liên tục trong `.sdd/specs/global-ielts-virtual-assistant/production-test-suite.md`
-- [X] T053 Chuẩn hóa câu chuyện người dùng, yêu cầu, kiến trúc và nhiệm vụ theo thứ tự phụ thuộc trong `.sdd/specs/global-ielts-virtual-assistant/spec.md`, `plan.md` và `tasks.md`
+- [X] T053 Chuẩn hóa câu chuyện người dùng, yêu cầu, kiến trúc và nhiệm vụ theo thứ tự phụ thuộc trong `.sdd/specs/global-ielts-virtual-assistant/spec.md`, `plan.md` và `tasks.md`; bổ sung đầu ra Speckit Giai đoạn 0/1 trong `research.md`, `data-model.md`, `contracts/` và `quickstart.md`
 - [X] T054 Tạo và hoàn thành danh sách kiểm tra xem xét theo hiện trạng trong `.sdd/specs/global-ielts-virtual-assistant/checklist.md`
 - [X] T055 Chạy tập bài Jest tập trung cho trợ lý/nhà cung cấp/mức sử dụng ở backend từ `backend/tests/unit/api/` và `backend/tests/unit/services/`, rồi ghi lại kết quả có thể tái lập
 - [ ] T056 [P] Chạy ba tệp Vitest của trợ lý ở frontend, ESLint tập trung cho trợ lý, bản dựng frontend, kiểm tra cú pháp backend, kiểm tra Markdown và `git diff --check`
@@ -241,8 +248,39 @@ Nhiệm vụ T037: các bài kiểm thử cô lập cho bộ nhớ/bộ phân gi
 ## Ghi chú
 
 - `[X]` nghĩa là đã có bằng chứng từ mã nguồn/bài kiểm thử; không có nghĩa mọi trường hợp trực tiếp/thủ công trên môi trường production đều đã chạy.
-- T056 còn mở vì ESLint trợ lý ở backend không thể nạp cấu hình kho mã cho tới khi phụ thuộc phát triển `@eslint/js` còn thiếu được khôi phục; kiểm tra lint tập trung cho frontend, dựng ứng dụng, kiểm thử, kiểm tra cú pháp backend và kiểm tra tài liệu đều đạt.
-- Mục lịch sử ngày 2026-07-21 trong `eval-set.md` được giữ nguyên. Lần kiểm chứng hiện tại phải báo cáo riêng lệnh chính xác và số lượng đạt/bỏ qua.
+- T056 còn mở: dependency `@eslint/js` hiện đã có và lint backend chạy được, nhưng lần đối chiếu 2026-07-22 còn 1 lỗi `no-useless-escape` tại `backend/src/api/assistant/assistant.response.js:24`. Frontend assistant lint, build, 22 tệp `node --check` và các test trọng yếu đang đạt; kiểm tra tài liệu/diff cuối vẫn phải tái lập sau mọi chỉnh sửa và backend lint phải xanh mới được đóng task.
+- Các mục ngày 2026-07-09, 2026-07-20 và 2026-07-21 trong `eval-set.md` được gắn rõ
+  là snapshot lịch sử không hiện hành. Lần kiểm chứng hiện tại phải báo cáo riêng lệnh
+  chính xác và số lượng đạt/bỏ qua.
 - Các sai lệch Hiến chương hiện tại được ghi lại trong `plan.md`; chúng không mặc nhiên được miễn trừ bởi các nhiệm vụ tính năng đã hoàn thành.
 - Số lượng bài kiểm thử đạt không chứng minh cổng độ bao phủ 80% của Hiến chương; T057 tiếp tục để mở việc tạo bằng chứng đó và mọi khoảng trống kiểm thử phát sinh.
 - Việc triển khai tài liệu này không bao gồm migration, lời gọi AI thật, yêu cầu HTTP thật có xác thực, commit hoặc push.
+
+## Ma trận truy vết yêu cầu
+
+Ma trận này làm rõ ánh xạ từ `spec.md` sang task thay vì chỉ suy luận từ tên giai đoạn. Task mở trong một hàng vẫn giữ nguyên là cổng chưa đạt.
+
+| Yêu cầu | Task triển khai/kiểm chứng |
+|---|---|
+| FR-001, FR-002 | T005, T038, T043, T060 |
+| FR-003 | T002, T037, T039, T044, T048–T050 |
+| FR-004 | T008, T040, T043, T060 |
+| FR-005 | T006, T010, T043, T060 |
+| FR-006 | T003, T041, T057 |
+| FR-007, FR-008, FR-009 | T011, T014, T018–T020 |
+| FR-010, FR-011, FR-012 | T012–T020 |
+| FR-013, FR-014, FR-015 | T021–T026 |
+| FR-016 | T027–T031, T060 |
+| FR-017, FR-018, FR-028 | T008, T017–T020, T038–T043 |
+| FR-019, FR-020 | T004, T009, T018, T034, T045, T050, T058, T060 |
+| FR-021, FR-022 | T032–T037 |
+| FR-023, FR-024 | T005, T018, T045, T050, T057, T059–T060 |
+| FR-025, FR-026 | T016, T020 |
+| FR-027 | T042–T043, T057, T060 |
+| SC-001, SC-002 | T005, T008, T038–T043, T060 |
+| SC-003 | T021–T026, T061 |
+| SC-004 | T027–T031, T060–T061 |
+| SC-005 | T016–T020, T061 |
+| SC-006 | T032–T037, T061 |
+| SC-007 | T037, T044–T050, T060–T061 |
+| SC-008 | T052, T055–T061 |

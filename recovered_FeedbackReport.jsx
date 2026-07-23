@@ -1,0 +1,789 @@
+1: import { useState, useEffect, useCallback } from 'react';
+2: import gradingService from '../../services/grading.service';
+3: import useGradingSocket from '../../hooks/useGradingSocket';
+4: import AiFeedbackPanel from './AiFeedbackPanel';
+5: import {
+6:   calculateOverallWritingBand,
+7:   formatBand,
+8:   getScoreBadge,
+9:   getWritingCriterionLabel,
+10: } from './writingFeedback.helpers';
+11: 
+const STATUS_LABELS = {
+  completed: 'AI đã hoàn thành',
+  pending: 'AI đang chấm',
+  failed: 'AI chấm lỗi',
+  queued: 'Đã xếp hàng',
+  running: 'AI đang phân tích audio',
+  retry_wait: 'Đang chờ thử lại',
+  needs_review: 'Đã chuyển tutor xác nhận',
+20:   graded: 'Đã chấm',
+21:   tutor_graded: 'Đã chấm',
+22: };
+23: 
+24: const getAiStatusText = (task, submission) => {
+25:   if (task?.aiFeedback?.status === 'completed') return STATUS_LABELS.completed;
+26:   if (task?.aiFeedback?.status === 'failed') return STATUS_LABELS.failed;
+27:   if (task?.aiFeedback?.status === 'pending') return STATUS_LABELS.pending;
+28:   if (submission?.aiStatus === 'completed') return STATUS_LABELS.completed;
+29:   if (submission?.aiStatus === 'failed') return STATUS_LABELS.failed;
+30:   return task?.aiFeedback ? STATUS_LABELS.pending : 'Chưa có AI feedback';
+31: };
+32: 
+33: const badgeToneClasses = {
+34:   good: 'text-success',
+35:   average: 'text-warning-emphasis',
+36:   weak: 'text-danger',
+37:   muted: 'text-secondary',
+38: };
+39: 
+40: const badgeToneStyles = {
+41:   good: { backgroundColor: '#e9f6df', color: '#2f6b14' },
+42:   average: { backgroundColor: '#fff2dc', color: '#935b00' },
+43:   weak: { backgroundColor: '#ffe8e6', color: '#b42318' },
+44:   muted: { backgroundColor: '#f1f1f1', color: '#666' },
+45: };
+46: 
+47: const normalizeCriterionValue = (value) => {
+48:   if (value && typeof value === 'object') {
+49:     return value.band ?? value.score ?? value.value ?? null;
+50:   }
+51:   return value ?? null;
+52: };
+53: 
+54: const getCriterionValue = (scores, key) => {
+55:   if (!scores) return null;
+56:   if (key === 'grammarRangeAccuracy') {
+57:     return normalizeCriterionValue(scores.grammarRangeAccuracy ?? scores.grammaticalRangeAccuracy);
+58:   }
+59:   return normalizeCriterionValue(scores[key]);
+60: };
+61: 
+62: const getTutorCriterionRows = (tutorGrade, taskNumber) => {
+63:   const scores = tutorGrade?.criterionScores || {};
+64:   return [
+65:     {
+66:       key: 'taskAchievementOrResponse',
+67:       label: getWritingCriterionLabel(taskNumber, 'taskAchievementOrResponse'),
+68:       score: getCriterionValue(scores, 'taskAchievementOrResponse'),
+69:     },
+70:     {
+71:       key: 'coherenceCohesion',
+72:       label: getWritingCriterionLabel(taskNumber, 'coherenceCohesion'),
+73:       score: getCriterionValue(scores, 'coherenceCohesion'),
+74:     },
+75:     {
+76:       key: 'lexicalResource',
+77:       label: getWritingCriterionLabel(taskNumber, 'lexicalResource'),
+78:       score: getCriterionValue(scores, 'lexicalResource'),
+79:     },
+80:     {
+81:       key: 'grammarRangeAccuracy',
+82:       label: getWritingCriterionLabel(taskNumber, 'grammarRangeAccuracy'),
+83:       score: getCriterionValue(scores, 'grammarRangeAccuracy'),
+84:     },
+85:   ];
+86: };
+87: 
+88: const CriterionScoreCards = ({ rows }) => (
+89:   <div className="row g-3 mb-3">
+90:     {rows.map(row => {
+91:       const badge = getScoreBadge(row.score);
+92:       return (
+93:         <div className="col-sm-6" key={row.key}>
+94:           <div className="border rounded-3 p-3 h-100 bg-white">
+95:             <div className="text-muted fw-medium mb-2">{row.label}</div>
+96:             <div className="d-flex align-items-center gap-2 flex-wrap">
+97:               <span className="fs-2 fw-bold text-dark">{formatBand(row.score)}</span>
+98:               <span
+99:                 className={`badge rounded-pill ${badgeToneClasses[badge.tone] || ''}`}
+100:                 style={badgeToneStyles[badge.tone]}
+101:               >
+102:                 {badge.label}
+103:               </span>
+104:             </div>
+105:           </div>
+106:         </div>
+107:       );
+108:     })}
+109:   </div>
+110: );
+111: 
+112: const TutorFeedbackBox = ({ tutorGrade, taskNumber }) => {
+113:   if (!tutorGrade) {
+114:     return (
+115:       <div className="alert alert-light border mb-0">
+116:         Chưa có tutor feedback cho task này.
+117:       </div>
+118:     );
+119:   }
+120: 
+121:   return (
+122:     <div className="card border shadow-none">
+123:       <div className="card-body">
+124:         <div className="d-flex justify-content-between gap-3 flex-wrap mb-3">
+125:           <h5 className="fw-bold mb-0">Tutor feedback</h5>
+126:           <span className="badge bg-dark rounded-pill">Band {formatBand(tutorGrade.overallBand)}</span>
+127:         </div>
+128:         <CriterionScoreCards rows={getTutorCriterionRows(tutorGrade, taskNumber)} />
+129:         <p className="mb-0" style={{ whiteSpace: 'pre-wrap', lineHeight: 1.7 }}>
+130:           {tutorGrade.writtenFeedback || 'Không có nhận xét.'}
+131:         </p>
+132:       </div>
+133:     </div>
+134:   );
+135: };
+136: 
+137: const getPrimaryGradingSource = (data) => {
+138:   if (data?.grader === 'tutor') return 'tutor';
+139:   if (data?.grader === 'ai') return 'ai';
+140:   if (data?.tutorStatus === 'graded') return 'tutor';
+141:   return 'ai';
+142: };
+143: 
+144: const getTaskBandForSource = (task, source) => {
+145:   if (source === 'tutor') {
+146:     return task?.tutorGrade?.overallBand
+147:       ?? task?.tutorGrade?.bandScore
+148:       ?? task?.tutorGrade?.band_score
+149:       ?? null;
+150:   }
+151:   return task?.aiFeedback?.overallBand
+152:     ?? task?.aiFeedback?.bandScore
+153:     ?? task?.aiFeedback?.band_score
+154:     ?? null;
+155: };
+156: 
+157: const OverallWritingBandCard = ({ tasks, source }) => {
+158:   const task1 = tasks.find(task => Number(task.taskNumber) === 1);
+159:   const task2 = tasks.find(task => Number(task.taskNumber) === 2);
+160:   const task1Band = getTaskBandForSource(task1, source);
+161:   const task2Band = getTaskBandForSource(task2, source);
+162:   const overall = calculateOverallWritingBand(task1Band, task2Band);
+163:   const badge = getScoreBadge(overall);
+164: 
+165:   return (
+166:     <div className="card border shadow-none mt-4">
+167:       <div className="card-body p-4">
+168:         <div className="d-flex justify-content-between align-items-start gap-3 flex-wrap">
+169:           <div>
+170:             <h4 className="fw-bold mb-1">Overall Writing Band</h4>
+171:             <p className="text-muted mb-0">
+172:               Task 1 × 33% + Task 2 × 67% — chuẩn IELTS Academic
+173:             </p>
+174:           </div>
+175:           {overall !== null && (
+176:             <div className="d-flex align-items-center gap-3">
+177:               <span className="display-5 fw-bold text-dark mb-0">{formatBand(overall)}</span>
+178:               <span
+179:                 className={`badge rounded-pill px-3 py-2 ${badgeToneClasses[badge.tone] || ''}`}
+180:                 style={badgeToneStyles[badge.tone]}
+181:               >
+182:                 {badge.label}
+183:               </span>
+184:             </div>
+185:           )}
+186:         </div>
+187: 
+188:         {overall === null ? (
+189:           <div className="alert alert-light border mt-3 mb-0">
+190:             Chưa đủ dữ liệu để tính Overall Writing Band.
+191:           </div>
+192:         ) : (
+193:           <div className="mt-3 border-top">
+194:             <div className="d-flex justify-content-between py-3 border-bottom">
+195:               <span>Task 1 <span className="text-muted fw-semibold">(trọng số 33%)</span></span>
+196:               <span className="fw-bold">{formatBand(task1Band)}</span>
+197:             </div>
+198:             <div className="d-flex justify-content-between pt-3">
+199:               <span>Task 2 <span className="text-muted fw-semibold">(trọng số 67%)</span></span>
+200:               <span className="fw-bold">{formatBand(task2Band)}</span>
+201:             </div>
+202:           </div>
+203:         )}
+204:       </div>
+205:     </div>
+206:   );
+207: };
+208: 
+209: const getSpeakingCriterionRows = (aiFeedback) => {
+210:   const scores = aiFeedback?.criterionScores || {};
+211:   return [
+212:     {
+213:       key: 'fluencyCoherence',
+214:       label: 'Fluency & Coherence',
+215:       score: getCriterionValue(scores, 'fluencyCoherence'),
+216:     },
+217:     {
+218:       key: 'lexicalResource',
+219:       label: 'Lexical Resource',
+220:       score: getCriterionValue(scores, 'lexicalResource'),
+221:     },
+222:     {
+223:       key: 'pronunciation',
+224:       label: 'Pronunciation',
+225:       score: getCriterionValue(scores, 'pronunciation'),
+226:     },
+227:     {
+228:       key: 'grammaticalRangeAccuracy',
+229:       label: 'Grammatical Range & Accuracy',
+230:       score: getCriterionValue(scores, 'grammaticalRangeAccuracy'),
+231:     },
+232:   ];
+233: };
+234: 
+235: const SpeakingPartCard = ({ part }) => (
+236:   <div className="card border shadow-none mb-3">
+237:     <div className="card-header bg-white fw-bold">Part {part.partNumber}</div>
+238:     <div className="card-body">
+239:       <div className="mb-3">
+240:         <div className="fw-semibold mb-2">Đề bài</div>
+241:         <p className="mb-0" style={{ whiteSpace: 'pre-wrap', lineHeight: 1.7 }}>
+242:           {part.prompt || 'Không có đề bài.'}
+243:         </p>
+244:       </div>
+245:       {part.audioUrl && (
+246:         <div className="mb-3">
+247:           <div className="fw-semibold mb-2">Bản ghi âm</div>
+248:           <audio controls src={part.audioUrl} className="w-100" />
+249:         </div>
+250:       )}
+251:       <div className="mb-3">
+252:         <div className="fw-semibold mb-2">Script / transcript</div>
+253:         <p className="mb-0 bg-light rounded-3 p-3" style={{ whiteSpace: 'pre-wrap', lineHeight: 1.8 }}>
+254:           {part.transcript || 'Chưa có transcript.'}
+255:         </p>
+256:       </div>
+257:       {part.aiPartFeedback && (
+258:         <div>
+259:           <div className="fw-semibold mb-2">Nhận xét AI cho Part {part.partNumber}</div>
+260:           <p className="mb-2" style={{ whiteSpace: 'pre-wrap', lineHeight: 1.7 }}>
+261:             {part.aiPartFeedback.summary || 'Chưa có nhận xét riêng cho part này.'}
+262:           </p>
+263:           {!!part.aiPartFeedback.strengths?.length && (
+264:             <p className="mb-1"><strong>Điểm mạnh:</strong> {part.aiPartFeedback.strengths.join('; ')}</p>
+265:           )}
+266:           {!!part.aiPartFeedback.weaknesses?.length && (
+267:             <p className="mb-0"><strong>Cần cải thiện:</strong> {part.aiPartFeedback.weaknesses.join('; ')}</p>
+268:           )}
+269:         </div>
+270:       )}
+271:     </div>
+272:   </div>
+273: );
+274: 
+export const SpeakingFeedbackDetail = ({ data, onRetry, retrying = false, retryError = null }) => {
+  const aiFeedback = data.aiFeedback;
+  const overall = data.overallSpeakingBand ?? aiFeedback?.overallBand ?? null;
+  const badge = getScoreBadge(overall);
+  const isAsync = Boolean(data.gradingStatus);
+  const isPublishable = !isAsync || (
+    data.gradingStatus === 'completed'
+    && aiFeedback?.evidenceMode === 'full_audio'
+    && overall !== null
+  );
+  const statusNotice = {
+    queued: 'Bài đã vào hàng đợi. Hệ thống chưa công bố điểm.',
+    running: 'Hệ thống đang kiểm tra audio và evidence. Hệ thống chưa công bố điểm.',
+    retry_wait: 'Lỗi tạm thời; worker sẽ tự thử lại. Hệ thống chưa công bố điểm.',
+    needs_review: 'Evidence hiện tại chưa đủ để công bố band Speaking. Bài đã được chuyển cho tutor nghe audio và xác nhận.',
+    failed: data.canRetry
+      ? 'Chấm tự động thất bại sau các lần thử. Bạn còn một lần yêu cầu retry thủ công.'
+      : 'Chấm tự động thất bại. Bài vẫn được giữ lại để hỗ trợ xử lý.',
+  }[data.gradingStatus];
+294: 
+295:   return (
+296:     <div className="feedback-report mt-4" style={{ fontFamily: 'UberMoveText, system-ui, sans-serif' }}>
+297:       <div className="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-3">
+298:         <div>
+299:           <h3 className="fw-bold mb-1">Speaking Feedback Detail</h3>
+300:           <p className="text-muted mb-0">{data.testTitle || 'IELTS Speaking'}</p>
+301:         </div>
+302:         <span className="badge text-bg-light border">AI: {STATUS_LABELS[data.aiStatus] || data.aiStatus || 'Chưa có AI feedback'}</span>
+      </div>
+
+      {statusNotice && (
+        <div className="alert alert-info border" role="status">
+          {statusNotice}
+        </div>
+      )}
+
+      {data.gradingStatus === 'failed' && data.canRetry && onRetry && (
+        <div className="d-flex align-items-center gap-3 flex-wrap mb-4">
+          <button
+            type="button"
+            className="btn btn-dark rounded-pill px-4"
+            disabled={retrying}
+            onClick={onRetry}
+          >
+            {retrying ? 'Đang gửi yêu cầu...' : 'Chấm lại bằng AI'}
+          </button>
+          {retryError && <span className="text-danger" role="alert">{retryError}</span>}
+        </div>
+      )}
+
+      <div className="card border shadow-none mb-4">
+326:         <div className="card-body p-4">
+327:           <div className="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-3">
+328:             <div>
+              <h4 className="fw-bold mb-1">Overall Speaking Band</h4>
+              <p className="text-muted mb-0">
+                {isPublishable
+                  ? 'Kết quả chỉ được công bố khi đủ evidence audio cho cả 4 tiêu chí và qua calibration gate.'
+                  : 'Chưa có band hợp lệ. Transcript đơn thuần không đủ để chấm Fluency & Coherence hoặc Pronunciation.'}
+              </p>
+            </div>
+            {isPublishable && (
+337:               <div className="d-flex align-items-center gap-3">
+338:                 <span className="display-5 fw-bold text-dark mb-0">{formatBand(overall)}</span>
+339:                 <span
+340:                   className={`badge rounded-pill px-3 py-2 ${badgeToneClasses[badge.tone] || ''}`}
+341:                   style={badgeToneStyles[badge.tone]}
+342:                 >
+343:                   {badge.label}
+344:                 </span>
+345:               </div>
+346:             )}
+347:           </div>
+          {isPublishable && <CriterionScoreCards rows={getSpeakingCriterionRows(aiFeedback)} />}
+          {isPublishable && aiFeedback?.summary && (
+350:             <p className="mb-0" style={{ whiteSpace: 'pre-wrap', lineHeight: 1.8 }}>
+351:               {aiFeedback.summary}
+352:             </p>
+353:           )}
+          {isPublishable && aiFeedback?.transcriptNotes && (
+355:             <div className="alert alert-light border mt-3 mb-0">{aiFeedback.transcriptNotes}</div>
+356:           )}
+357:         </div>
+358:       </div>
+359: 
+360:       <div className="row g-4">
+361:         <div className="col-lg-5">
+362:           {(data.parts || []).map(part => (
+363:             <SpeakingPartCard key={part.submissionId || part.partNumber} part={part} />
+364:           ))}
+365:         </div>
+        <div className="col-lg-7">
+          {isPublishable ? (
+            <AiFeedbackPanel report={{ ...aiFeedback, submissionType: 'speaking' }} />
+          ) : (
+            <div className="alert alert-light border">
+              Không hiển thị điểm hoặc nhận xét suy diễn khi evidence chưa đạt điều kiện công bố.
+            </div>
+          )}
+        </div>
+375:       </div>
+376:     </div>
+377:   );
+378: };
+379: 
+export const WritingFeedbackDetail = ({
+  data,
+  onRetryTask,
+  retryingTaskId = null,
+  retryErrors = {},
+}) => {
+386:   const [activeTaskNumber, setActiveTaskNumber] = useState(1);
+387:   const tasks = data.tasks || [];
+388:   const activeTask = tasks.find(task => task.taskNumber === activeTaskNumber) || tasks[0];
+389:   const gradingSource = getPrimaryGradingSource(data);
+390:   const isTutorContext = gradingSource === 'tutor';
+  const shouldShowAiPanel = gradingSource === 'ai' || Boolean(activeTask?.aiFeedback);
+  const activeTaskFailed = activeTask?.aiFeedback?.status === 'failed'
+    || Boolean(activeTask?.aiFeedback?.errorMessage);
+394: 
+395:   if (!activeTask) {
+396:     return <div className="alert alert-info">Chưa có dữ liệu Writing task.</div>;
+397:   }
+398: 
+399:   return (
+400:     <div className="feedback-report mt-4" style={{ fontFamily: 'UberMoveText, system-ui, sans-serif' }}>
+401:       <div className="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-3">
+402:         <div>
+403:           <h3 className="fw-bold mb-1">Writing Feedback Detail</h3>
+404:           <p className="text-muted mb-0">{data.testTitle || 'IELTS Writing'}</p>
+405:         </div>
+406:         <div className="d-flex gap-2 flex-wrap justify-content-end">
+407:           <span className="badge text-bg-light border">AI: {STATUS_LABELS[data.aiStatus] || data.aiStatus || 'Chưa có AI feedback'}</span>
+408:           {isTutorContext && (
+409:             <span className="badge text-bg-light border">
+410:               Tutor: {data.tutorStatus === 'graded' ? 'Đã chấm' : 'Đang chờ chấm'}
+411:             </span>
+412:           )}
+413:         </div>
+414:       </div>
+415: 
+416:       <ul className="nav nav-tabs mb-4">
+417:         {[1, 2].map(taskNumber => (
+418:           <li className="nav-item" key={taskNumber}>
+419:             <button
+420:               type="button"
+421:               className={`nav-link ${activeTaskNumber === taskNumber ? 'active' : ''}`}
+422:               onClick={() => setActiveTaskNumber(taskNumber)}
+423:             >
+424:               Task {taskNumber}
+425:             </button>
+426:           </li>
+427:         ))}
+428:       </ul>
+429: 
+430:       <div className="row g-4">
+431:         <div className="col-lg-5">
+432:           <div className="card border shadow-none mb-4">
+433:             <div className="card-header bg-white fw-bold">Prompt</div>
+434:             <div className="card-body">
+435:               <p className="mb-0" style={{ whiteSpace: 'pre-wrap', lineHeight: 1.7 }}>
+436:                 {activeTask.prompt || 'Không có đề bài.'}
+437:               </p>
+438:             </div>
+439:           </div>
+440:           <div className="card border shadow-none">
+441:             <div className="card-header bg-white d-flex justify-content-between">
+442:               <span className="fw-bold">Student response</span>
+443:               <span className="text-muted small">{activeTask.wordCount || 0} words</span>
+444:             </div>
+445:             <div className="card-body">
+446:               <p className="mb-0" style={{ whiteSpace: 'pre-wrap', lineHeight: 1.8 }}>
+447:                 {activeTask.studentResponse || 'Không có bài làm.'}
+448:               </p>
+449:             </div>
+450:           </div>
+451:         </div>
+452:         <div className="col-lg-7">
+453:           {shouldShowAiPanel && (
+454:             <>
+              <div className="mb-3">
+                <span className="badge text-bg-light border">{getAiStatusText(activeTask, data)}</span>
+              </div>
+              {activeTaskFailed && onRetryTask && (
+                <div className="mb-3">
+                  <button
+                    type="button"
+                    className="btn btn-dark rounded-pill px-4"
+                    disabled={retryingTaskId === activeTask.submissionId}
+                    onClick={() => onRetryTask(activeTask.submissionId)}
+                  >
+                    {retryingTaskId === activeTask.submissionId
+                      ? 'Đang chấm lại...'
+                      : `Chấm lại Task ${activeTask.taskNumber} bằng AI`}
+                  </button>
+                  {retryErrors[activeTask.submissionId] && (
+                    <div className="text-danger mt-2" role="alert">
+                      {retryErrors[activeTask.submissionId]}
+                    </div>
+                  )}
+                </div>
+              )}
+              <AiFeedbackPanel
+478:                 report={activeTask.aiFeedback ? { ...activeTask.aiFeedback, taskNumber: activeTask.taskNumber } : null}
+479:               />
+480:             </>
+481:           )}
+482:           {isTutorContext && (
+483:             <div className={shouldShowAiPanel ? 'mt-4' : ''}>
+484:               <TutorFeedbackBox
+485:                 tutorGrade={activeTask.tutorGrade}
+486:                 taskNumber={activeTask.taskNumber}
+487:               />
+488:             </div>
+489:           )}
+490:         </div>
+491:       </div>
+492: 
+493:       <OverallWritingBandCard tasks={tasks} source={gradingSource} />
+494:     </div>
+495:   );
+496: };
+497: 
+498: const FeedbackReport = ({ submissionId, type }) => {
+499:   const [reportData, setReportData] = useState(null);
+500:   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [retrying, setRetrying] = useState(false);
+  const [retryError, setRetryError] = useState(null);
+  const [writingRetryTaskId, setWritingRetryTaskId] = useState(null);
+  const [writingRetryErrors, setWritingRetryErrors] = useState({});
+506:   const { socket } = useGradingSocket();
+507: 
+508:   const fetchFeedback = useCallback(async () => {
+509:     try {
+      setLoading(true);
+      setError(null);
+      const response = await gradingService.getFeedback(submissionId, type);
+      if (response.success) {
+        let nextData = response.data;
+        if (type === 'speaking' && Array.isArray(nextData?.parts)) {
+          const parts = await Promise.all(nextData.parts.map(async (part) => {
+            try {
+              const audioResponse = await gradingService.getAudioUrl(part.submissionId, 'speaking');
+              return { ...part, audioUrl: audioResponse.data?.url || '' };
+            } catch {
+              return part;
+            }
+          }));
+          nextData = { ...nextData, parts };
+        }
+        setReportData(nextData);
+527:       } else {
+528:         setError(response.error?.message || 'Có lỗi xảy ra khi tải điểm.');
+529:       }
+530:     } catch (err) {
+531:       setError(err.response?.data?.error?.message || err.message || 'Không thể kết nối đến server.');
+532:     } finally {
+533:       setLoading(false);
+534:     }
+  }, [submissionId, type]);
+
+  const retrySpeaking = useCallback(async () => {
+    setRetrying(true);
+    setRetryError(null);
+    try {
+      await gradingService.retrySpeakingGrading(submissionId);
+      await fetchFeedback();
+    } catch (retryFailure) {
+      setRetryError(
+        retryFailure.response?.data?.error?.message
+        || retryFailure.message
+        || 'Không thể gửi yêu cầu chấm lại.'
+      );
+    } finally {
+      setRetrying(false);
+    }
+  }, [fetchFeedback, submissionId]);
+
+  const retryWritingTask = useCallback(async (taskSubmissionId) => {
+    setWritingRetryTaskId(taskSubmissionId);
+    setWritingRetryErrors((current) => ({ ...current, [taskSubmissionId]: null }));
+    try {
+      await gradingService.requestAiGrading(taskSubmissionId);
+      await fetchFeedback();
+    } catch (retryFailure) {
+      const message = retryFailure.response?.data?.error?.message
+        || retryFailure.message
+        || 'Không thể chấm lại Writing bằng AI.';
+      setWritingRetryErrors((current) => ({ ...current, [taskSubmissionId]: message }));
+    } finally {
+      setWritingRetryTaskId(null);
+    }
+  }, [fetchFeedback]);
+569: 
+570:   // EARS[Event]: WHEN component mounts THEN fetch feedback report initially (Fallback mechanism)
+571:   useEffect(() => {
+572:     if (submissionId) {
+573:       const timer = window.setTimeout(fetchFeedback, 0);
+574:       return () => window.clearTimeout(timer);
+575:     }
+576:     return undefined;
+577:   }, [fetchFeedback, submissionId]);
+578: 
+579:   // EARS[Event]: WHEN socket emits grading_complete or grading_failed THEN refetch or update state
+580:   useEffect(() => {
+581:     if (!socket) return;
+582: 
+583:     const handleGradingComplete = (data) => {
+584:       const eventSubmissionId = data.submission_id || data.submissionId;
+585:       if (eventSubmissionId === submissionId) {
+586:         fetchFeedback();
+587:       }
+588:     };
+589: 
+590:     const handleGradingFailed = (data) => {
+591:       const eventSubmissionId = data.submission_id || data.submissionId;
+592:       if (eventSubmissionId === submissionId) {
+593:         setError('Chấm bài thất bại, quota đã được hoàn trả.');
+594:         setLoading(false);
+595:       }
+596:     };
+597: 
+598:     socket.on('grading_complete', handleGradingComplete);
+599:     socket.on('grading_failed', handleGradingFailed);
+600: 
+601:     return () => {
+602:       // EARS[Event]: WHEN component unmounts THEN clean up socket listeners to prevent memory leaks and duplicate events
+603:       socket.off('grading_complete', handleGradingComplete);
+604:       socket.off('grading_failed', handleGradingFailed);
+605:     };
+606:   }, [socket, submissionId, fetchFeedback]);
+607: 
+608:   // UI/UX Chuẩn Bootstrap 5 - Trạng thái Pending
+609:   if (loading) {
+610:     return (
+611:       <div className="d-flex flex-column justify-content-center align-items-center py-5">
+612:         <div className="spinner-border text-primary mb-3" role="status">
+613:           <span className="visually-hidden">Loading...</span>
+614:         </div>
+615:         <p className="text-muted fw-bold">Bài làm của bạn đang được chấm...</p>
+616:       </div>
+617:     );
+618:   }
+619: 
+620:   if (error) {
+621:     return (
+622:       <div className="alert alert-danger" role="alert">
+623:         <h4 className="alert-heading">Lỗi!</h4>
+624:         <p>{error}</p>
+625:         <button className="btn btn-outline-danger mt-2" onClick={fetchFeedback}>Thử lại</button>
+626:       </div>
+627:     );
+628:   }
+629: 
+  if (type === 'writing' && Array.isArray(reportData?.tasks)) {
+    return (
+      <WritingFeedbackDetail
+        data={reportData}
+        onRetryTask={retryWritingTask}
+        retryingTaskId={writingRetryTaskId}
+        retryErrors={writingRetryErrors}
+      />
+    );
+639:   }
+640: 
+  if (type === 'speaking' && Array.isArray(reportData?.parts)) {
+    return (
+      <SpeakingFeedbackDetail
+        data={reportData}
+        onRetry={retrySpeaking}
+        retrying={retrying}
+        retryError={retryError}
+      />
+    );
+  }
+651: 
+652:   if (!reportData || (!reportData.ai_report && !reportData.tutor_report)) {
+653:     return (
+654:       <div className="alert alert-info" role="alert">
+655:         <p className="mb-0">Chưa có kết quả chấm điểm cho bài làm này.</p>
+656:       </div>
+657:     );
+658:   }
+659: 
+660:   const report = reportData.tutor_report || reportData.ai_report;
+661:   const isTutor = !!reportData.tutor_report;
+662: 
+663:   if (!isTutor && reportData.ai_report) {
+664:     return (
+665:       <div className="feedback-report mt-4">
+666:         <AiFeedbackPanel report={reportData.ai_report} />
+667:       </div>
+668:     );
+669:   }
+670: 
+671:   const formatScore = (score) => {
+672:     if (score === null || score === undefined) return 'N/A';
+673:     const num = parseFloat(score);
+674:     return isNaN(num) ? 'N/A' : num.toFixed(1);
+675:   };
+676: 
+677:   // UI/UX Minimalist Black & White Theme (Uber-like)
+678:   return (
+679:     <div className="feedback-report mt-4" style={{ fontFamily: 'UberMoveText, system-ui, sans-serif' }}>
+680:       {/* Nổi bật Điểm Overall */}
+681:       <div className="card shadow-none border mb-4 rounded-4" style={{ borderColor: '#e2e2e2' }}>
+682:         <div className="card-body text-center py-5 bg-white rounded-4">
+683:           <h2 className="text-uppercase fw-bold text-dark mb-2" style={{ fontSize: '16px', letterSpacing: '1px' }}>Overall Band Score</h2>
+684:           <div className="display-1 fw-bold text-dark mb-4" style={{ fontFamily: 'UberMove, system-ui, sans-serif', fontSize: '80px' }}>
+685:             {formatScore(report.band_score)}
+686:           </div>
+687:           <span className="badge bg-dark text-white rounded-pill fs-6 px-4 py-2 fw-medium">
+688:             Graded by {isTutor ? 'Tutor' : 'AI'}
+689:           </span>
+690:         </div>
+691:       </div>
+692: 
+693:       {/* 4 tiêu chí thành phần hiển thị dạng Grid */}
+694:       <div className="row g-4 mb-4">
+695:         {type === 'writing' ? (
+696:           <>
+697:             <div className="col-6 col-lg-3">
+698:               <div className="card h-100 border shadow-none rounded-4" style={{ borderColor: '#e2e2e2', backgroundColor: '#fdfdfd' }}>
+699:                 <div className="card-body p-3 p-lg-4 text-center">
+700:                   <h6 className="card-title text-muted fw-medium mb-2 mb-lg-3" style={{ fontSize: '13px' }}>Task Achievement / Response</h6>
+701:                   <h3 className="card-text fw-bold text-dark mb-0" style={{ fontFamily: 'UberMove, system-ui, sans-serif', fontSize: '28px' }}>{formatScore(report.task_achievement_score || report.task_response_score)}</h3>
+702:                 </div>
+703:               </div>
+704:             </div>
+705:             <div className="col-6 col-lg-3">
+706:               <div className="card h-100 border shadow-none rounded-4" style={{ borderColor: '#e2e2e2', backgroundColor: '#fdfdfd' }}>
+707:                 <div className="card-body p-3 p-lg-4 text-center">
+708:                   <h6 className="card-title text-muted fw-medium mb-2 mb-lg-3" style={{ fontSize: '13px' }}>Coherence & Cohesion</h6>
+709:                   <h3 className="card-text fw-bold text-dark mb-0" style={{ fontFamily: 'UberMove, system-ui, sans-serif', fontSize: '28px' }}>{formatScore(report.coherence_score)}</h3>
+710:                 </div>
+711:               </div>
+712:             </div>
+713:           </>
+714:         ) : (
+715:           <>
+716:             <div className="col-6 col-lg-3">
+717:               <div className="card h-100 border shadow-none rounded-4" style={{ borderColor: '#e2e2e2', backgroundColor: '#fdfdfd' }}>
+718:                 <div className="card-body p-3 p-lg-4 text-center">
+719:                   <h6 className="card-title text-muted fw-medium mb-2 mb-lg-3" style={{ fontSize: '13px' }}>Fluency & Coherence</h6>
+720:                   <h3 className="card-text fw-bold text-dark mb-0" style={{ fontFamily: 'UberMove, system-ui, sans-serif', fontSize: '28px' }}>{formatScore(report.fluency_score)}</h3>
+721:                 </div>
+722:               </div>
+723:             </div>
+724:             <div className="col-6 col-lg-3">
+725:               <div className="card h-100 border shadow-none rounded-4" style={{ borderColor: '#e2e2e2', backgroundColor: '#fdfdfd' }}>
+726:                 <div className="card-body p-3 p-lg-4 text-center">
+727:                   <h6 className="card-title text-muted fw-medium mb-2 mb-lg-3" style={{ fontSize: '13px' }}>Pronunciation</h6>
+728:                   <h3 className="card-text fw-bold text-dark mb-0" style={{ fontFamily: 'UberMove, system-ui, sans-serif', fontSize: '28px' }}>{formatScore(report.pronunciation_score)}</h3>
+729:                 </div>
+730:               </div>
+731:             </div>
+732:           </>
+733:         )}
+734:         <div className="col-6 col-lg-3">
+735:           <div className="card h-100 border shadow-none rounded-4" style={{ borderColor: '#e2e2e2', backgroundColor: '#fdfdfd' }}>
+736:             <div className="card-body p-3 p-lg-4 text-center">
+737:               <h6 className="card-title text-muted fw-medium mb-2 mb-lg-3" style={{ fontSize: '13px' }}>Lexical Resource</h6>
+738:               <h3 className="card-text fw-bold text-dark mb-0" style={{ fontFamily: 'UberMove, system-ui, sans-serif', fontSize: '28px' }}>{formatScore(report.lexical_score)}</h3>
+739:             </div>
+740:           </div>
+741:         </div>
+742:         <div className="col-6 col-lg-3">
+743:           <div className="card h-100 border shadow-none rounded-4" style={{ borderColor: '#e2e2e2', backgroundColor: '#fdfdfd' }}>
+744:             <div className="card-body p-3 p-lg-4 text-center">
+745:               <h6 className="card-title text-muted fw-medium mb-2 mb-lg-3" style={{ fontSize: '13px' }}>Grammatical Range & Accuracy</h6>
+746:               <h3 className="card-text fw-bold text-dark mb-0" style={{ fontFamily: 'UberMove, system-ui, sans-serif', fontSize: '28px' }}>{formatScore(report.grammar_score)}</h3>
+747:             </div>
+748:           </div>
+749:         </div>
+750:       </div>
+751: 
+752:       {/* Error Highlights */}
+753:       {report.error_highlights && report.error_highlights.length > 0 && (
+754:         <div className="card shadow-none mb-4 rounded-4 border" style={{ borderColor: '#e2e2e2' }}>
+755:           <div className="card-header bg-dark text-white rounded-top-4 py-3 border-0">
+756:             <h5 className="mb-0 fw-bold" style={{ fontFamily: 'UberMove, system-ui, sans-serif' }}><i className="bi bi-exclamation-triangle-fill me-2 text-warning"></i>Error Highlights</h5>
+757:           </div>
+758:           <div className="card-body p-0">
+759:             <ul className="list-group list-group-flush rounded-bottom-4">
+760:               {report.error_highlights.map((err, idx) => (
+761:                 <li key={idx} className="list-group-item px-4 py-4 border-bottom" style={{ borderColor: '#e2e2e2' }}>
+762:                   <div className="mb-2">
+763:                     <span className="badge bg-secondary rounded-pill px-3 py-1 fw-medium">{err.type || 'Error'}</span>
+764:                   </div>
+765:                   <div className="fst-italic text-muted mb-2 text-decoration-line-through" style={{ fontSize: '15px' }}>"{err.text}"</div>
+766:                   <div className="fw-bold text-dark" style={{ fontSize: '15px' }}>&rarr; {err.suggestion}</div>
+767:                 </li>
+768:               ))}
+769:             </ul>
+770:           </div>
+771:         </div>
+772:       )}
+773: 
+774:       {/* Feedback chi tiết */}
+775:       <div className="card shadow-none rounded-4 border" style={{ borderColor: '#e2e2e2' }}>
+776:         <div className="card-header bg-white border-bottom py-3 rounded-top-4" style={{ borderColor: '#e2e2e2' }}>
+777:           <h5 className="mb-0 fw-bold text-dark" style={{ fontFamily: 'UberMove, system-ui, sans-serif' }}>Detailed Feedback</h5>
+778:         </div>
+779:         <div className="card-body p-4 bg-white rounded-bottom-4" style={{ whiteSpace: 'pre-wrap', lineHeight: '1.8', fontSize: '15px' }}>
+780:           {report.written_feedback || report.feedback_text || 'Không có nhận xét chi tiết.'}
+781:         </div>
+782:       </div>
+783:     </div>
+784:   );
+785: };
+786: 
+787: export default FeedbackReport;
+
+The above content shows the entire, complete file contents of the requested file.

@@ -31,6 +31,11 @@ const errorHandler = (err, req, res, next) => {
     message = 'Session expired.';
   }
 
+  if (statusCode >= 500 && err.isOperational !== true) {
+    errorCode = 'INTERNAL_ERROR';
+    message = 'Đã xảy ra lỗi hệ thống.';
+  }
+
   // EARS[Event]: WHEN an error occurs, THE system SHALL log it using winston.
   if (statusCode === 500) {
     logger.error('Unhandled Exception:', err);
@@ -40,16 +45,16 @@ const errorHandler = (err, req, res, next) => {
 
   const response = {
     success: false,
+    data: null,
     error: {
       code: errorCode,
-      message: message,
+      message,
+      details: err.details || null,
+    },
+    meta: {
+      request_id: req.id || null,
     },
   };
-
-  // Ẩn stack trace trên môi trường production
-  if (process.env.NODE_ENV !== 'production') {
-    response.error.stack = err.stack;
-  }
 
   res.status(statusCode).json(response);
 };

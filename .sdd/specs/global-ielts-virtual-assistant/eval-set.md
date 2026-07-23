@@ -1,10 +1,22 @@
 # eval-set.md — Bộ kiểm thử: Trợ lý ảo IELTS toàn cục
 
+**Trạng thái hiện hành (2026-07-22)**: Toàn bộ ca trực tiếp trong bảng vẫn được xem là
+`PENDING_MANUAL_RUN`. Cột `Kết quả thật` đang giữ các chuỗi output của lần chạy cũ để
+truy vết, không phải kết quả đã được tái xác nhận. Chưa có ca nào được xác nhận lại
+bằng CSDL, cookie học viên và nhà cung cấp thật trên môi trường được ủy quyền.
+
+**Đường cơ sở tự động hiện hành**: backend ĐẠT 15 bộ/265 ca; frontend ĐẠT 3 tệp/7
+ca. ESLint backend còn 1 lỗi `no-useless-escape` tại
+`backend/src/api/assistant/assistant.response.js:24`, vì vậy chưa đạt cổng phát hành.
+Các nhật ký sau bảng ca kiểm thử là snapshot lịch sử, chỉ phục vụ truy vết và không
+được dùng thay cho trạng thái hiện hành nêu trên.
+
 Mục đích: Đánh giá chatbot có định tuyến ý định đúng, dùng đúng nguồn ngữ cảnh, từ chối
 yêu cầu không an toàn, và không bịa dữ liệu.
 
 Ghi chú: `PENDING_MANUAL_RUN` nghĩa là ca kiểm thử phải được chạy trên trang web/API
-thật với trạng thái xác thực và cơ sở dữ liệu thật, rồi ghi lại kết quả thực tế.
+thật với trạng thái xác thực và cơ sở dữ liệu thật, rồi thay chuỗi snapshot cũ trong
+cột `Kết quả thật` bằng kết quả mới kèm thời điểm/môi trường đã làm sạch.
 
 ---
 
@@ -190,7 +202,12 @@ thật với trạng thái xác thực và cơ sở dữ liệu thật, rồi gh
 
 ---
 
-## Nhật ký xác minh tự động — 2026-07-09
+## Snapshot lịch sử — 2026-07-09 *(không phải kết quả hiện hành)*
+
+> Snapshot này từng chạy chung chatbot và AI grading để kiểm tra hồi quy dùng chung.
+> Đây không phải đặc tả của AI grading; nguồn sự thật hiện hành cho luồng chấm nằm tại
+> `../ai-fast-grading/`. Số liệu bên dưới đã hết hiệu lực làm bằng chứng hiện hành,
+> không cập nhật cột `Kết quả thật` và không thay thế test/release gate ngày 2026-07-22.
 
 Mục đích: ghi trực tiếp kết quả kiểm thử liên quan đến phần trình bày trước hội đồng
 của chatbot AI và chức năng chấm điểm nhanh bằng AI cho Writing/Speaking. Lần kiểm
@@ -229,7 +246,7 @@ Nhận xét nhanh:
   vụ trợ lý hiện có.
 - Các kiểm thử này không gọi nhà cung cấp AI thật và không ghi/xóa cơ sở dữ liệu.
 
-### 2. Chấm điểm nhanh bằng AI cho Writing/Speaking
+### 2. Kiểm tra chéo lịch sử: chấm điểm nhanh bằng AI cho Writing/Speaking
 
 Lệnh đã chạy:
 
@@ -276,7 +293,10 @@ quả dựa trên cơ sở dữ liệu/API thật. Lần kiểm thử này chỉ
 
 ---
 
-## Nhật ký xác minh tự động — 2026-07-20
+## Snapshot lịch sử — 2026-07-20 *(không phải kết quả hiện hành)*
+
+> Số liệu trong mục này là ảnh chụp tại thời điểm chạy, đã được thay thế bởi đường cơ
+> sở ngày 2026-07-22 ở đầu tài liệu. Không suy ra rằng các ca `PF-*`/`PM-*` đã chạy.
 
 Phạm vi: xác định nhà cung cấp/mô hình, thử lại tri thức, quyền sở hữu hội thoại, bộ
 nhớ cách xưng hô ưa thích, chuỗi câu hỏi tiếp nối và tính liên tục của hội thoại trên
@@ -302,7 +322,10 @@ bộ kiểm thử hồi quy về trợ lý/nhà cung cấp/chấm điểm đư�
 
 ---
 
-## Nhật ký xác minh tự động — 2026-07-21
+## Snapshot lịch sử — 2026-07-21 *(không phải kết quả hiện hành)*
+
+> Số liệu trong mục này là ảnh chụp tại thời điểm chạy, đã được thay thế bởi đường cơ
+> sở ngày 2026-07-22 ở đầu tài liệu. Không suy ra rằng các ca `PF-*`/`PM-*` đã chạy.
 
 Phạm vi: bộ nhớ chủ đề/tham chiếu qua nhiều lượt, gợi ý đề thi theo ngữ cảnh, lịch
 sử giới hạn theo cuộc hội thoại và tiếp tục theo hoạt động tin nhắn.

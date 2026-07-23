@@ -6,19 +6,21 @@
 
 Tài liệu này giải quyết các điểm chưa rõ của kế hoạch. Người dùng đã cho phép triển khai foundation/shadow/fail-closed ngày 2026-07-22; tài liệu vẫn không thay thế RFC hoặc quyền bật band Speaking production.
 
-## Quyết định 1: Dùng pipeline bằng chứng lai, không dùng một model end-to-end
+## Quyết định 1: Dùng pipeline nhiều bước, không tin một output điểm end-to-end
 
-**Quyết định**: Tách pipeline thành ba lớp độc lập:
+**Quyết định**: Tách pipeline thành ba bước có contract riêng, dù runtime hiện tại có thể dùng cùng nhà cung cấp Gemini:
 
-1. Output ASR trước mọi hậu xử lý của ứng dụng, kèm timestamp/uncertainty.
-2. Phân tích audio cho quality, fluency và pronunciation.
-3. Text grader tổng hợp rubric; calibrator tạo riêng bốn criterion-band, còn backend bỏ Overall provider, tính trung bình bằng decimal và làm tròn nửa band với tie `.25/.75` hướng lên. Quy tắc này là proposal phải được hội đồng duyệt và test đủ tám fraction có thể sinh từ bốn half-band.
+1. Transcription trả output ASR trước mọi hậu xử lý của ứng dụng. Adapter Gemini hiện chỉ trả plain transcript; `words/segments/uncertainty` là `null` và structured ASR thuộc T068.
+2. Gemini nhận audio đã normalize cùng ASR transcript để tạo evidence Fluency và Pronunciation có schema/allowlist.
+3. Gemini rubric scorer tổng hợp transcript + audio evidence thành bốn criterion-band; backend bỏ Overall do provider khai, tính trung bình bằng decimal và làm tròn nửa band với tie `.25/.75` hướng lên.
+
+Nhánh luyện tập dùng version scorer và nhãn `AI Estimated Band`; không cần calibration bundle khi cờ estimate bật. Calibrator/bundle chỉ bắt buộc khi muốn nâng kết quả thành mức đã hiệu chuẩn/công bố production.
 
 **Lý do**: IELTS Speaking yêu cầu đánh giá hesitation, repetition, self-correction, tốc độ, rhythm, stress, intonation và intelligibility. Transcript thuần không giữ đủ các tín hiệu này. Bốn tiêu chí Speaking có trọng số bằng nhau; Overall không phải giá trị để LLM tự đặt. [IELTS Speaking Band Descriptors](https://ielts.org/cdn/ielts-guides/ielts-speaking-band-descriptors.pdf), [IELTS scoring in detail](https://ielts.org/take-a-test/your-results/ielts-scoring-in-detail)
 
 **Các phương án đã cân nhắc**:
 
-- Gemini audio chấm toàn bộ trong một request: tích hợp ngắn nhưng không có mapping IELTS hoặc phoneme score được công bố; chỉ phù hợp làm second opinion/feedback định tính.
+- Tin nguyên một response Gemini gồm cả criterion và Overall: tích hợp ngắn nhưng không kiểm được evidence/Overall; bị loại. Runtime vẫn dùng Gemini nhưng tách adapter, validate schema/evidence và tự tính Overall ở backend.
 - Transcript-only: chỉ đủ cho feedback chữ có cảnh báo; không đủ để cấp bất kỳ IELTS criterion band hoặc Overall nếu chưa có fidelity/calibration evidence.
 - Full local ML ngay từ đầu: giảm lock-in nhưng cần dữ liệu, GPU/MLOps và calibration vượt phạm vi hiện tại.
 
@@ -28,9 +30,9 @@ Tài liệu này giải quyết các điểm chưa rõ của kế hoạch. Ngư�
 
 - `asr_transcript`: output nguyên bản do provider trả về trước mọi hậu xử lý của ứng dụng. Đây không phải ground truth/verbatim và không chứng minh filler, lỗi phát âm hoặc lỗi ngữ pháp đã được giữ.
 - `display_transcript`: thêm dấu câu/làm sạch chỉ để hiển thị.
-- `words_json`/`segments_json`: timestamp, provider uncertainty/log probability và alternative khi có.
+- `words_json`/`segments_json`/`asr_uncertainty_json`: cột dự phòng nullable. Runtime Gemini hiện ghi `null`; chỉ có dữ liệu khi T068 bổ sung adapter structured và test tương ứng.
 
-**Lý do**: ASR có thể chuẩn hóa lời nói hoặc suy ra từ người học định nói. Nếu chỉ lưu một chuỗi cuối, hệ thống không thể biết lỗi grammar/pronunciation đã bị che hay chưa. Provider uncertainty cao giúp phát hiện vùng đáng ngờ, nhưng uncertainty thấp không loại trừ intent bias/over-correction. `whisper-1` hỗ trợ verbose output và timestamp ở mức từ, phù hợp với adapter hiện có hơn việc chỉ lấy `data.text`. [OpenAI Speech-to-Text — timestamps](https://developers.openai.com/api/docs/guides/speech-to-text#timestamps)
+**Lý do**: ASR có thể chuẩn hóa lời nói hoặc suy ra từ điều người học định nói. Tách ASR/display ngăn ứng dụng tự sửa grammar rồi dùng bản sửa để chấm. Tuy nhiên, plain transcript hiện tại không chứng minh filler/lỗi đã được giữ; structured timestamp/uncertainty chỉ là khả năng nâng cấp, không phải bằng chứng runtime đang có.
 
 **Các phương án đã cân nhắc**:
 
@@ -38,27 +40,24 @@ Tài liệu này giải quyết các điểm chưa rõ của kế hoạch. Ngư�
 - Chỉ lưu transcript display: dễ đọc nhưng phá hủy bằng chứng dùng để chấm.
 - Lưu raw provider payload không giới hạn: khó kiểm soát PII/schema; chỉ lưu các trường đã whitelist.
 
-## Quyết định 3: Provider production là adapter có version, không khóa nghiệp vụ vào hãng
+## Quyết định 3: Provider đi qua adapter có version; runtime hiện tại dùng Gemini
 
-**Quyết định**: Thiết kế ba interface `Transcriber`, `SpeechEvidenceProvider`, `RubricScorer`. Cấu hình khởi đầu được đề xuất:
+**Quyết định**: Giữ ba interface `Transcriber`, `SpeechEvidenceProvider`, `RubricScorer` để nghiệp vụ không phụ thuộc trực tiếp vào hãng. Implementation hiện tại là:
 
-- `whisper-1` structured output cho transcript/timestamps vì code đã có nhánh OpenAI.
-- Azure Pronunciation Assessment `unscripted` cho Accuracy/Fluency/Prosody và word/phoneme evidence.
-- Text scorer được pin model stable: Claude nếu tuân thủ Constitution hiện tại; Gemini chỉ khi RFC cho phép.
-
-Azure unscripted dùng recognition stream riêng, không phải transcript Whisper. Adapter phải chạy continuous recognition cho audio dài hơn 30 giây, pin `en-US`/SDK/config/segmentation, chỉ lưu provider-local words/timestamps/phoneme đã whitelist và align theo thời gian/token với ASR chính. Alignment coverage/disagreement là evidence gate; dưới ngưỡng calibration làm Pronunciation/F&C liên quan `insufficient`, không âm thầm chọn transcript thuận lợi hơn.
+- `ExistingProviderTranscriberAdapter` gọi gateway hiện có. Khi không có OpenAI key, cấu hình dùng Gemini; output chỉ có `asrTranscript`, `displayTranscript` và manifest `plain_transcript`, còn words/segments/uncertainty là `null`.
+- `GeminiSpeechEvidenceAdapter` nhận audio WAV của từng Part cùng ASR transcript, trả evidence Fluency/Pronunciation đã whitelist và trạng thái `sufficient|insufficient`.
+- `GeminiSpeakingRubricScorer` chấm cả phiên từ ba artifact và luôn gắn `assessment_type=estimated`; Overall do backend kiểm tra/tính lại.
+- Worker xử lý Part 1, 2, 3 tuần tự. Không có Azure adapter, continuous recognition hoặc alignment hai transcript trong code hiện tại.
 
 Tất cả lời gọi đi qua `backend/src/ai/grading.service.js`; provider/model/config/pipeline được lưu cùng artifact/report.
 
-**Lý do**: Azure có chế độ unscripted dành cho speaking và trả accuracy, fluency, prosody; prosody bao gồm stress, intonation, speaking speed và rhythm. Các điểm này chỉ là feature, không phải IELTS band. Prosody hiện có giới hạn locale, vì vậy bắt buộc kiểm tra bias và có human review. [Microsoft Pronunciation Assessment](https://learn.microsoft.com/en-us/azure/ai-services/speech-service/how-to-pronunciation-assessment)
-
-Gemini có thể hiểu audio, transcribe và tham chiếu timestamp, nhưng Google định vị đây là audio understanding và khuyến nghị dịch vụ STT chuyên dụng cho use case STT chuyên biệt. [Gemini Audio Understanding](https://ai.google.dev/gemini-api/docs/audio)
+**Lý do**: Đây là đúng ranh giới code đang chạy và cho phép thay adapter sau này mà không đổi API/database. Gemini audio evidence phù hợp cho feedback luyện tập nhưng không tự chứng minh mapping IELTS chính thức; calibration/fairness gate vẫn bắt buộc cho nhãn đã hiệu chuẩn.
 
 **Các phương án đã cân nhắc**:
 
-- Đổi toàn bộ sang một provider: giảm số integration nhưng tăng lock-in và không chứng minh được tính hợp lệ của Pronunciation.
-- Azure score 0–100 quy đổi tuyến tính sang IELTS 0–9: không có cơ sở calibration, bị loại.
-- Alias model `latest`: có thể thay đổi âm thầm và làm mất khả năng lặp lại; production phải pin model stable. [Gemini model version patterns](https://ai.google.dev/gemini-api/docs/models#model-version-name-patterns)
+- Bổ sung Azure/phoneme provider ngay: có thể tạo evidence chi tiết hơn nhưng chưa có adapter, SDK, alignment hoặc test; chỉ được xem là phương án tương lai sau RFC/calibration, không phải runtime hiện tại.
+- Quy đổi tuyến tính score provider sang IELTS 0–9: không có cơ sở calibration, bị loại.
+- Alias model `latest`: grading model đã bị chặn ở production; transcription model chưa có validation tương đương và được theo dõi ở T068.
 
 **Quản trị**: Constitution khóa `claude-sonnet-4-20250514` và S3 production; code hiện dùng Gemini/Supabase. Plan không tự hợp thức hóa sai lệch này. Phải có RFC được toàn đội duyệt hoặc implementation quay lại stack đã khóa.
 
@@ -128,20 +127,27 @@ Direct upload tránh giữ toàn bộ file tới 50 MB trong RAM của Express. 
 
 - Coherence/relevance được đánh giá từ logical sequencing, relevance và cách dùng cohesive/discourse devices trong nội dung transcript. Vì ASR có thể bỏ/sửa discourse marker, repair hoặc nội dung logic, vế này phụ thuộc cùng verbatim-fidelity gate với Lexical/GRA; nếu gate không đạt thì band Fluency & Coherence kết hợp phải `null` dù timing audio vẫn có.
 - Fluency features gồm speech/articulation rate, timing, pause, repair, repetition, false start, self-correction và mean length of run. Filler/discourse marker phải được phân loại theo chức năng/ngữ cảnh; không trừ điểm theo raw count.
-- Calibrator học cách hợp nhất thành một band Fluency & Coherence; không đặt trọng số 50/50 tùy ý.
-- Pronunciation dùng acoustic proxies về segmental accuracy, stress, rhythm, intonation, chunking/connected speech. Intelligibility/listener effort chỉ được suy ra qua mapping đã validate bằng human listener ratings, không coi là output trực tiếp của Azure hoặc ASR uncertainty.
+- Nhánh estimate để Gemini rubric scorer hợp nhất evidence thành một band Fluency & Coherence và luôn gắn disclaimer; không đặt trọng số 50/50 tùy ý trong code.
+- Pronunciation hiện dựa trên evidence định tính do Gemini phân tích trực tiếp từ audio (`intelligibility`, segmental accuracy, word stress, rhythm, intonation, connected speech). Đây là AI estimate; chỉ được gọi là đã hiệu chuẩn sau khi mapping được validate bằng human ratings và bundle/approval đạt gate.
 
 **Lý do**: Band descriptor đánh giá cụm tín hiệu qua toàn bộ ba Part; không một metric riêng lẻ nào đại diện đầy đủ. Điểm provider chỉ là input feature.
 
 **Các phương án đã cân nhắc**:
 
-- LLM tự chọn band cuối: thiếu lặp lại và khó audit.
+- Tin band/Overall tự do từ LLM mà không schema/evidence/backend validation: thiếu lặp lại và khó audit.
 - Trung bình trực tiếp các score provider: khác thang đo và chưa hiệu chuẩn.
 - Chấm/average từng Part: không đúng mục tiêu đánh giá cả phiên; giữ feature từng Part nhưng calibrate session-level.
 
-## Quyết định 8: Calibration và abstention là cổng phát hành
+## Quyết định 8: Calibration là cổng nâng cấp nhãn chất lượng, không chặn AI estimate
 
-**Quyết định**: Thu dữ liệu đủ ba Part từ người Việt. Mỗi phiên có ít nhất hai giám khảo đạt chuẩn, chấm độc lập và mù với AI/provider output; dùng anchor, inter-rater gate, adjudication và drift audit. Tách train/calibration/locked holdout theo speaker. Hiệu chuẩn riêng từng tiêu chí. Kết quả có band ghi `estimated`; transcript-only không được chấm, còn evidence/uncertainty không đạt làm job retry/failed và không chuyển tutor.
+**Quyết định đích**: Có hai mức phát hành tách biệt:
+
+- **Luyện tập AI estimate**: khi `AI_SPEAKING_ESTIMATED_BANDS_ENABLED=true`, đủ transcript + audio evidence thì trả `AI Estimated Band` với version scorer và disclaimer; `calibration_bundle_sha256` có thể `null`.
+- **Đã hiệu chuẩn/công bố production**: yêu cầu calibration bundle hợp lệ, scorer thực sự áp dụng mapping/threshold/reliability từ bundle, `AI_SPEAKING_PUBLISH_BANDS=true`, RFC/approval và gold-set gate. Thu dữ liệu đủ ba Part từ người Việt; mỗi phiên có ít nhất hai giám khảo đạt chuẩn, chấm độc lập và mù với output AI, rồi đánh giá trên split theo speaker.
+
+Ở cả hai mức, transcript-only không được chấm và evidence bắt buộc không đủ làm job retry/failed; không tự chuyển tutor.
+
+**Hiện trạng code**: Worker đã load/xác minh bundle và kiểm gate, nhưng `GeminiSpeakingRubricScorer.score()` chỉ nhận `{artifacts, parts, job}` và bỏ qua `calibrationBundle`; các band vẫn là output estimate của Gemini, `assessment_type` vẫn là `estimated`. Worker chỉ gán `calibration_version` theo version bundle, thao tác này không phải calibration. Vì vậy nhánh đã hiệu chuẩn chưa tồn tại ở runtime, `AI_SPEAKING_PUBLISH_BANDS` phải giữ `false` và T074 phải bổ sung mapping cùng test chống “đổi nhãn nhưng không đổi phép chấm”.
 
 **Lý do**: Không provider nào trong kiến trúc cung cấp mapping IELTS chính thức cho dữ liệu người Việt. Tính hợp lệ phải được đo với gold set nội bộ thay vì suy ra từ WER hoặc điểm phát âm 0–100.
 
@@ -153,25 +159,25 @@ Direct upload tránh giữ toàn bộ file tới 50 MB trong RAM của Express. 
 - Calibration error và reliability nội bộ cho event adjacent agreement `abs(system_band - adjudicated_human_band) <= 0.5`.
 - Sai lệch theo accent vùng miền, giới, thiết bị, noise và band range.
 
-Calibration chỉ hợp lệ cho đúng feature schema/provider/model/locale/SDK/media/feature config và population. Threshold không chọn trên locked holdout. Bundle khóa event đích, bucket, point estimate, **speaker-cluster bootstrap** 95% CI, speaker/session count, slice, dataset hash và approval; per-result dùng cận dưới CI. Bucket thiếu minimum speaker count trả `null`/handoff. Release còn phải đạt minimum automation coverage và maximum review rate toàn cohort/từng subgroup, tránh đạt metric bằng abstain gần hết. Giá trị reliability chỉ lưu nội bộ, không thay bằng self-confidence/provider score.
+Calibration chỉ hợp lệ cho đúng feature schema/provider/model/locale/SDK/media/feature config và population. Threshold không chọn trên locked holdout. Bundle khóa event đích, bucket, point estimate, **speaker-cluster bootstrap** 95% CI, speaker/session count, slice, dataset hash và approval; per-result dùng cận dưới CI. Bucket thiếu minimum speaker count chỉ chặn nhánh đã hiệu chuẩn/công bố production, không biến mất nhánh AI estimate đã được bật riêng. Giá trị reliability chỉ lưu nội bộ, không thay bằng self-confidence/provider score.
 
-Source of truth không cần bảng mới: bundle/manifest bất biến nằm trong build artifact hoặc private object store, có schema, SHA-256 và chữ ký release. Enqueue resolve registry rồi pin scoring-config/calibration digest trên job; manual child copy nguyên digest và worker không chuyển sang registry mới. Manifest pin prompt hash, provider/model/locale/SDK, ffmpeg/normalizer, local feature và calibrator. Report lưu version/digest để audit/replay.
+Source of truth đích không cần bảng mới: bundle/manifest bất biến nằm trong build artifact hoặc private object store, có schema, SHA-256 và chữ ký release. Runtime hiện tạo manifest từ cấu hình process rồi pin scoring-config/calibration digest trên job; manual child copy nguyên digest và loader kiểm binding. Registry version-controlled là phương án production tương lai, chưa có artifact registry trong repository. Sau T074, manifest phải pin cả calibrator/mapping thực sự được scorer sử dụng; report truy bundle digest qua job để audit/replay.
 
 **Các phương án đã cân nhắc**:
 
-- Release ngay với disclaimer: không đủ cho production và khó bảo vệ trước hội đồng.
+- Gọi AI estimate có disclaimer là kết quả đã hiệu chuẩn/production-ready: bị loại. AI estimate vẫn được phép cho luyện tập khi evidence đạt.
 - Chỉ audit bài empirical reliability thấp: không phát hiện drift ở nhóm cao; cần thêm random audit.
 
 ## Quyết định 9: Evidence sufficiency theo từng tiêu chí và transcript-only phải fail closed
 
 **Quyết định**:
 
-- `full_audio` chỉ hợp lệ khi cả ba Part có artifact `complete`, hash khớp, quality đủ, evidence bắt buộc của mọi tiêu chí là `sufficient` và provider/model/config khớp exact calibration bundle/digest đã pin trên job.
+- `full_audio` chỉ hợp lệ khi cả ba Part có artifact `complete`, hash khớp, quality đủ, evidence bắt buộc của mọi tiêu chí là `sufficient` và provider/model/config khớp scoring-config digest đã pin trên job. Nhánh đã hiệu chuẩn còn phải khớp calibration bundle digest; nhánh estimate cho phép digest bundle `null`.
 - Đủ ba file audio nhưng uncertainty cao, ngoài phân phối hoặc bất đồng evidence vẫn không phải `full_audio`: worker mới retry/failed toàn phiên. `partial_audio` chỉ còn là representation legacy/audit.
-- Nếu có audio nhưng thiếu bất kỳ Part/component/calibration nào, dùng `partial_audio`; tiêu chí bị ảnh hưởng có band `null` và Overall luôn `null` nếu còn một band thiếu.
+- `partial_audio` chỉ là representation legacy/audit khi có audio nhưng thiếu Part/component/evidence hoặc binding bắt buộc của nhánh đã hiệu chuẩn; việc không có calibration bundle tự nó không làm nhánh estimate thành partial. Worker learner mới không persist report này mà fail toàn phiên khi evidence bắt buộc không đủ.
 - Với `transcript_only`, cả bốn `criteria.*.band` và `overall_band` đều `null`. Chỉ lưu `text_based_feedback`, không trình bày nó như IELTS criterion score; khi group còn `pending/tutor`, learner không được xem reviewer reference theo IELTS-07.
 - Mỗi tiêu chí ghi `evidence_status = sufficient | insufficient | unavailable` và evidence refs; validator từ chối `band != null` khi status khác `sufficient`.
-- `is_partial_assessment=true` và `requires_human_review=true` khi người học cần đủ band.
+- `is_partial_assessment=true` và `requires_human_review=true` chỉ còn ý nghĩa tương thích legacy/audit, không tự tạo assignment tutor.
 
 **Lý do**: “Có audio” không đồng nghĩa đủ evidence, và “ASR output chưa qua hậu xử lý của ứng dụng” không đồng nghĩa verbatim. Hệ thống production phải từ chối chấm tiêu chí không đủ bằng chứng thay vì làm đầy schema bằng số giả.
 
@@ -182,28 +188,28 @@ Source of truth không cần bảng mới: bundle/manifest bất biến nằm tr
 
 ## Quyết định 10: Migration production cần version history và lock
 
-**Quyết định**: Không dùng trực tiếp `backend/scripts/migrate.js` hiện tại cho production vì script chạy lại toàn bộ SQL, không ghi version/checksum và nuốt lỗi ở process level. Dùng migration history của nền tảng hoặc harden runner với advisory lock, version/checksum và exit code khác 0.
+**Baseline lịch sử và quyết định**: Trước phần hardening, `backend/scripts/migrate.js` chạy lại toàn bộ SQL, không ghi version/checksum và có thể không báo lỗi process đúng cách, nên không phù hợp production. Runtime repository hiện đã có migration history/checksum, advisory lock, baseline có xác nhận và exit code khác 0; vẫn chỉ được phát hành sau rehearsal trên PostgreSQL disposable/staging và restore test ở T055.
 
-**Lý do**: Schema mới có backfill và unique index; chạy đồng thời hoặc chạy lặp không được kiểm soát có thể tạo trạng thái dở dang.
+**Lý do**: Schema mới có backfill và unique index; hardening runner xử lý rủi ro kỹ thuật trong code, nhưng không thay thế bằng chứng rehearsal/restore trên môi trường đích.
 
 **Các phương án đã cân nhắc**:
 
 - Chỉ viết mọi migration `IF NOT EXISTS`: không phát hiện file đã bị sửa sau khi áp dụng và không bảo vệ hai deploy đồng thời.
 - Tạo thêm bảng feature-specific để tracking: không cần; dùng cơ chế migration dùng chung của nền tảng.
 
-## Quyết định 11: Chuẩn hóa/chunk audio tại worker boundary
+## Quyết định 11: Runtime normalize nguyên từng Part; chunking là mục tiêu có điều kiện
 
-**Quyết định**: Giữ product limit 50 MB nhưng không gửi nguyên file một cách mù quáng cho provider. Worker dùng `ffprobe`/`ffmpeg` phiên bản pin để validate/decode và tạo derivative chuẩn hóa trong workspace tạm. Nếu vượt giới hạn provider, cắt tại ranh giới im lặng có overlap, ghép/deduplicate transcript và rebase timestamp về timeline Part gốc.
+**Quyết định hiện tại**: Worker nhận tối đa 50 MiB và 15 phút cho mỗi Part, dùng `ffprobe`/`ffmpeg` để validate/decode, normalize toàn bộ Part thành WAV PCM16 mono 16 kHz trong workspace tạm rồi dọn dẹp. Ba Part được xử lý tuần tự. Code chưa cắt chunk, ghép/deduplicate transcript hoặc rebase timestamp.
 
-Fluency/audio-quality metrics phải chạy trên timeline toàn Part trước khi chunk để không làm mất pause hoặc đếm overlap hai lần; chunk chỉ là transport boundary cho provider có file-size limit.
+**Mục tiêu tương lai T069**: Chỉ thêm bounded parallelism và chunk tại ranh giới im lặng có overlap khi load test hoặc giới hạn payload provider chứng minh cần. Khi đó fluency/audio-quality phải tính trên timeline toàn Part trước chunk và phải có test deduplicate/rebase; không được mô tả đây là runtime đã có trước khi T069 hoàn tất.
 
-**Lý do**: Browser hiện có thể tạo WebM/Opus, trong khi constraint G-03 khóa mp3/m4a/wav; provider STT cũng có giới hạn file thấp hơn 50 MB. Audio normalization là ranh giới duy nhất để kiểm codec, duration và timestamp nhất quán. OpenAI Speech-to-Text hiện nêu giới hạn upload 25 MB. [OpenAI Speech-to-Text](https://developers.openai.com/api/docs/guides/speech-to-text)
+**Lý do**: Đây là đúng hành vi code hiện tại và tránh tuyên bố một cơ chế transport chưa được triển khai. Audio normalization vẫn là ranh giới kiểm codec, duration và chất lượng; nếu provider áp giới hạn thấp hơn policy sản phẩm, hệ thống phải từ chối rõ ràng hoặc hoàn tất T069 trước rollout tương ứng.
 
 **Các phương án đã cân nhắc**:
 
 - Hạ toàn bộ product limit xuống 25 MB: đơn giản nhưng thay constraint sản phẩm và vẫn không giải quyết browser codec.
 - Transcode trong browser: tăng CPU/battery, hành vi khác nhau theo thiết bị và khó audit.
-- Gửi 50 MB trực tiếp rồi chờ provider lỗi: không production-safe.
+- Gửi payload vượt giới hạn đã biết rồi chờ provider lỗi: không production-safe; phải thu hẹp policy hoặc hoàn tất T069 trước khi chấp nhận input đó.
 
 **Quản trị**: Cho tới khi G-03 được sửa/RFC duyệt, contract chỉ chấp nhận mp3/m4a/wav. WebM ingress trong plan là đề xuất bị block, không phải format đã được phép.
 

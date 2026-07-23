@@ -308,7 +308,7 @@ Khối `partial_audio/needs_review` dưới đây chỉ là hình dạng tương
     "fluency_coherence": { "band": 6.5, "evidence_status": "sufficient", "feedback": "..." },
     "lexical_resource": { "band": 6.5, "evidence_status": "sufficient", "feedback": "..." },
     "grammatical_range_accuracy": { "band": 6.0, "evidence_status": "sufficient", "feedback": "..." },
-    "pronunciation": { "band": null, "evidence_status": "insufficient", "feedback": "Thiếu evidence đã hiệu chuẩn ở Part 3." }
+    "pronunciation": { "band": null, "evidence_status": "insufficient", "feedback": "Thiếu evidence âm thanh hợp lệ ở Part 3." }
   },
   "text_based_feedback": null,
   "disclaimer": "Tham chiếu nội bộ cho người chấm; không phải điểm IELTS chính thức.",
@@ -484,7 +484,7 @@ failed retryable --một manual retry hợp lệ--> job mới queued
 - Bucket audio là private; public bucket/public URL bị cấm cho dữ liệu mới.
 - Upload token opaque AEAD ràng buộc user + object + declared hash/metadata + expiry bằng key tách khỏi access token; vì stateless nên không cam kết revoke/consume trước atomic DB bind.
 - Worker đọc object bằng service credential chỉ sau khi DB ownership đã được xác nhận.
-- Worker tự tính checksum, kiểm magic bytes/container/codec/decode/duration/silence/clipping rồi normalize/chunk theo provider limit trước khi gọi AI.
+- Worker tự tính checksum, kiểm magic bytes/container/codec/decode/duration/silence/clipping rồi normalize nguyên từng Part trước khi gọi AI. Chunk/deduplicate theo provider limit chưa được triển khai; input vượt policy phải bị từ chối rõ ràng.
 - Prompt/transcript/audio không xuất hiện trong access log, error log hoặc `ai_usage_logs`.
 - API result chỉ chứa display transcript; ASR transcript/evidence chi tiết chỉ có thể mở cho audit role qua contract riêng sau này.
 - Endpoint phải chống IDOR bằng query có `user_id`/assignment scope, không chỉ kiểm UUID có tồn tại.

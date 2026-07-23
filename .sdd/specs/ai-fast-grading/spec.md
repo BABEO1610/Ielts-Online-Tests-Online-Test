@@ -6,7 +6,7 @@
 
 **Ngày cập nhật**: 2026-07-22
 
-**Trạng thái**: Đã duyệt triển khai AI Estimated Band cho Speaking; calibration tiếp tục là cổng nâng độ tin cậy, không tự động chuyển bài AI sang tutor
+**Trạng thái**: Đã triển khai code/test mô phỏng cho AI Estimated Band; smoke test provider thật đủ ba Part vẫn chưa có bằng chứng thành công có thể tái lập. Calibration tiếp tục là cổng nâng độ tin cậy, không tự động chuyển bài AI sang tutor; scorer hiện chưa áp dụng mapping trong calibration bundle nên nhánh “đã hiệu chuẩn” chưa được triển khai và `AI_SPEAKING_PUBLISH_BANDS` phải giữ tắt (T074). Regression Writing còn T070–T071; tutor Speaking detail còn thiếu requester context ở controller (T073) và nội dung lựa chọn AI trên màn hình tổng kết còn nói sai về handoff tutor (T075), nên toàn feature chưa đạt cổng phát hành.
 
 **Đầu vào**: Giữ nguyên luồng Writing đang hoạt động; luồng Speaking AI chấm bất đồng bộ từ transcript kết hợp audio và trả đủ bốn tiêu chí. Hàng đợi tutor chỉ dùng khi học viên chủ động chọn tutor.
 
@@ -66,7 +66,7 @@ Là học viên chọn AI, tôi muốn nhận đủ Fluency & Coherence, Lexical
 1. **Cho trước** cả ba Part có audio đạt chất lượng và transcript ASR, **khi** pipeline hoàn tất, **thì** hệ thống công bố bốn criterion band cùng Overall dưới nhãn `AI Estimated Band` và không đưa phiên vào hàng đợi tutor.
 2. **Cho trước** một hoặc nhiều Part không đủ evidence audio, **khi** pipeline kết thúc, **thì** job thất bại an toàn, không sinh điểm một phần và không tự đổi `grader` sang tutor.
 3. **Cho trước** chỉ có transcript nhưng không có audio evidence, **khi** chấm Speaking AI, **thì** hệ thống từ chối sinh Fluency/Pronunciation/Overall thay vì tạo điểm giả.
-4. **Cho trước** nhà cung cấp trả Overall, **khi** hệ thống lưu kết quả, **thì** giá trị đó bị bỏ; Overall chỉ được tính từ đúng bốn criterion band đã hiệu chuẩn và đủ evidence.
+4. **Cho trước** nhà cung cấp trả Overall, **khi** hệ thống lưu kết quả, **thì** giá trị đó bị bỏ; backend chỉ tính Overall từ đúng bốn criterion band đã được kiểm tra hợp lệ, đủ evidence và gắn với scoring-config đã pin. Nhánh `AI Estimated Band` không bắt buộc có calibration bundle; nhánh đã hiệu chuẩn bắt buộc có bundle/approval hợp lệ.
 
 ---
 
@@ -126,7 +126,7 @@ Là gia sư, tôi muốn claim nguyên tử phiên mà học viên chọn `grade
 - **FR-009**: Pipeline PHẢI lưu riêng output ASR trước hậu xử lý ứng dụng và transcript hiển thị; không có bước sửa ngữ pháp rồi dùng bản sửa làm evidence chấm.
 - **FR-010**: Fluency & Coherence PHẢI dùng evidence thời gian/độ trôi chảy cùng nội dung transcript; Pronunciation PHẢI dùng evidence âm thanh. Transcript đơn thuần không được dùng để suy ra hai tiêu chí âm thanh này.
 - **FR-011**: Kết quả Speaking AI thành công PHẢI có đủ bốn criterion band; thiếu evidence bắt buộc làm job thất bại, không công bố band một phần và không tự handoff tutor.
-- **FR-012**: `full_audio` PHẢI có đủ bốn band và Overall; `partial_audio` PHẢI có Overall `null`; `transcript_only` PHẢI có cả bốn band và Overall `null`.
+- **FR-012**: `full_audio` PHẢI có đủ bốn band và Overall; `partial_audio` PHẢI có Overall `null`; `transcript_only` PHẢI có cả bốn criterion band và Overall đều là `null`.
 - **FR-013**: Overall Speaking PHẢI bỏ giá trị provider, tính trung bình bằng nhau của bốn band hợp lệ và làm tròn nửa band theo quy tắc half-up tại các tie `.25/.75`.
 - **FR-014**: Học viên chỉ được nhận AI result khi job `completed` và phiên `ai_graded`; bài chọn AI không được tự chuyển thành bài tutor.
 - **FR-015**: Lỗi tạm thời chỉ được retry theo ngân sách tối đa ba pipeline run cho một chain; lỗi dữ liệu không retry; không tạo failed report giả và không để submission kẹt `pending` vô thời hạn.
@@ -136,14 +136,14 @@ Là gia sư, tôi muốn claim nguyên tử phiên mà học viên chọn `grade
 - **FR-019**: Mọi API PHẢI dùng envelope `{ success, data, error, meta }`, lỗi máy ổn định và thông báo người dùng bằng tiếng Việt; không trả stack trace, object key, raw AI response hoặc reliability nội bộ.
 - **FR-020**: Dữ liệu legacy chỉ được đọc fallback để hiển thị; không tạo synthetic job/artifact và không dùng transcript legacy để sinh band mới.
 - **FR-021**: Writing và Speaking submission mới PHẢI dùng cùng luật quota 10 original submissions mỗi người mỗi ngày UTC; replay và retry hợp lệ không tính thêm.
-- **FR-022**: Band Speaking công bố cho học viên PHẢI mang nhãn `AI Estimated Band` và disclaimer không phải điểm IELTS chính thức. Calibration bundle là phiên bản nâng độ tin cậy/audit; không phải điều kiện để tự động chuyển bài AI sang tutor.
+- **FR-022**: Hệ thống PHẢI tách hai mức công bố. Khi `AI_SPEAKING_ESTIMATED_BANDS_ENABLED=true`, kết quả đủ evidence có thể được trả dưới nhãn `AI Estimated Band`, kèm version scorer và disclaimer, ngay cả khi không có calibration bundle. Chỉ khi calibration bundle hợp lệ, `AI_SPEAKING_PUBLISH_BANDS=true` và approval/RFC liên quan đã đạt mới được mô tả kết quả là đã hiệu chuẩn hoặc sẵn sàng công bố production. Calibration không phải điều kiện định tuyến và không được tự động chuyển bài AI sang tutor.
 - **FR-023**: Tutor AI prelim PHẢI là bản nháp không làm thay đổi `grader`, `status`, assignment hoặc báo cáo tutor cho tới khi tutor chủ động lưu.
 
 ### Thực thể chính
 
 - **Bài nộp Speaking**: Ba Part thuộc một phiên, chứa tham chiếu đề chính thức và metadata object audio riêng tư.
 - **Công việc chấm AI**: Trạng thái bất đồng bộ, khóa idempotency, cấu hình đã pin, lease, số lần thử và lỗi cuối của một lần chấm.
-- **Artifact phân tích Speaking**: Evidence có phiên bản của một Part gồm ASR, timestamp, chất lượng audio, fluency metrics và pronunciation evidence đã whitelist.
+- **Artifact phân tích Speaking**: Evidence có phiên bản của một Part gồm ASR, chất lượng audio, fluency metrics và pronunciation evidence đã whitelist; words/segments/timestamp/uncertainty là dữ liệu tùy chọn theo khả năng adapter. Adapter Gemini hiện tại chỉ trả plain transcript nên các trường structured này đang là `null`.
 - **Báo cáo AI**: Kết quả tổng hợp cấp phiên; chỉ là kết quả công bố hoặc tham chiếu reviewer, không dùng làm hàng đợi.
 - **Báo cáo gia sư**: Kết quả human review hiện có, neo vào phiên Speaking qua Part đại diện và được soft-delete khi thu hồi.
 
@@ -167,7 +167,7 @@ Là gia sư, tôi muốn claim nguyên tử phiên mà học viên chọn `grade
 - Yêu cầu bắt đầu implementation ngày 2026-07-22 được coi là phê duyệt hướng nghiệp vụ của đặc tả này; không được coi là tự động phê duyệt thay đổi Constitution.
 - Cổng provider và storage được thiết kế qua adapter. Production phải tuân thủ provider/storage đã được Constitution hoặc RFC toàn đội cho phép; Gemini/Supabase hiện có chỉ được dùng ở môi trường được phê duyệt.
 - Quy tắc Overall được chốt cho implementation là decimal round-half-up tại tie `.25/.75`.
-- Cửa sổ replay idempotency và retention audio là cấu hình bắt buộc theo môi trường; nếu chưa có giá trị đã duyệt, feature flag công bố band giữ tắt và hệ thống fail-closed.
+- Cửa sổ replay idempotency và retention audio là cấu hình bắt buộc theo môi trường. Khi các giá trị production chưa được duyệt, `AI_SPEAKING_PUBLISH_BANDS` phải giữ tắt; cờ `AI_SPEAKING_ESTIMATED_BANDS_ENABLED` vẫn có thể bật riêng cho luyện tập nếu đủ evidence và luôn có disclaimer.
 - Không có calibration bundle hợp lệ trong repository tại thời điểm cập nhật spec. Vì vậy kết quả hiện tại phải ghi rõ là AI estimate; không tự tạo reliability hoặc tuyên bố tương đương giám khảo chính thức.
 - Browser chỉ được dùng định dạng audio nằm trong policy đã phê duyệt. WebM không được âm thầm đổi đuôi thành M4A.
 
@@ -178,4 +178,4 @@ Là gia sư, tôi muốn claim nguyên tử phiên mà học viên chọn `grade
 - Tuyên bố điểm IELTS chính thức hoặc thay thế giám khảo.
 - Xóa bảng/cột legacy trong cùng release.
 - Tạo regrade bằng cấu hình mới cho cùng audio; đó là operation audit riêng.
-- Công bố band khi chưa có gold set, approval và calibration bundle đạt gate.
+- Mô tả hoặc công bố band như kết quả đã hiệu chuẩn/chính thức khi chưa có gold set, approval và calibration bundle đạt gate. Nhánh `AI Estimated Band` luyện tập có disclaimer vẫn thuộc phạm vi FR-022.

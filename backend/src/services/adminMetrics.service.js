@@ -152,7 +152,7 @@ const getReports = async (params = {}) => {
     speaking_submissions_by_day AS (
       SELECT (MIN(submitted_at) AT TIME ZONE '${TZ}')::date AS day, 1::int AS count
       FROM speaking_submissions
-      WHERE submitted_at IS NOT NULL AND ${rangeSql('submitted_at')}
+      WHERE submitted_at IS NOT NULL AND deleted_at IS NULL AND ${rangeSql('submitted_at')}
       GROUP BY COALESCE(speaking_group_id, id)
     ),
     submissions AS (

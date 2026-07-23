@@ -14,10 +14,21 @@ jest.mock('../../src/services/audit.service', () => ({
   logAction: jest.fn(),
 }));
 
+jest.mock('../../src/services/speakingSubmission.service', () => ({
+  getSpeakingSubmissionService: jest.fn(),
+}));
+
+jest.mock('../../src/db/queries/grading.queries', () => ({
+  ...jest.requireActual('../../src/db/queries/grading.queries'),
+  getSpeakingAssignmentScope: jest.fn(),
+}));
+
 const TutorService = require('../../src/services/tutor.service');
 const { pool } = require('../../src/db/pool');
 const { gradeSpeakingSession } = require('../../src/ai/grading.service');
 const AuditLogService = require('../../src/services/audit.service');
+const { getSpeakingSubmissionService } = require('../../src/services/speakingSubmission.service');
+const gradingQueries = require('../../src/db/queries/grading.queries');
 
 const rowsForColumns = (columns) => ({
   rows: columns.map(column_name => ({ column_name })),
@@ -29,6 +40,12 @@ describe('TutorService schema compatibility', () => {
     pool.connect.mockReset();
     gradeSpeakingSession.mockReset();
     AuditLogService.logAction.mockReset();
+    getSpeakingSubmissionService.mockReset();
+    gradingQueries.getSpeakingAssignmentScope.mockReset();
+    gradingQueries.getSpeakingAssignmentScope.mockResolvedValue({
+      part_count: 3,
+      assigned: true,
+    });
   });
 
   it('submits tutor writing grade without requiring tutor_feedback_reports.task_number', async () => {
@@ -132,9 +149,9 @@ describe('TutorService schema compatibility', () => {
       })
       .mockResolvedValueOnce({
         rows: [
-          { id: 'part-1', status: 'pending', grader: 'tutor' },
-          { id: 'part-2', status: 'pending', grader: 'tutor' },
-          { id: 'part-3', status: 'pending', grader: 'tutor' },
+          { id: 'part-1', status: 'pending', grader: 'tutor', assigned_tutor_id: 'tutor-1' },
+          { id: 'part-2', status: 'pending', grader: 'tutor', assigned_tutor_id: 'tutor-1' },
+          { id: 'part-3', status: 'pending', grader: 'tutor', assigned_tutor_id: 'tutor-1' },
         ],
       })
       .mockResolvedValueOnce({ rows: [{ id: 'part-1' }] })
@@ -244,104 +261,42 @@ describe('TutorService schema compatibility', () => {
     }));
   });
 
-  it('runs Speaking AI prelim from a single part id by loading all group parts', async () => {
-    const reportColumns = [
-      'submission_id',
-      'submission_type',
-      'band_score',
-      'computed_band',
-      'fluency_score',
-      'lexical_score',
-      'grammar_score',
-      'pronunciation_score',
-      'criteria_json',
-      'feedback_json',
-      'raw_ai_response',
-      'status',
-      'error_message',
-    ];
-
-    gradeSpeakingSession.mockResolvedValueOnce({
-      partNumber: null,
-      overallBand: 6.5,
-      computedBand: 6.5,
-      criteria: {
-        fluencyCoherence: { band: 6.5, feedback: 'Good flow.' },
-        lexicalResource: { band: 6.5, feedback: 'Enough range.' },
-        grammaticalRangeAccuracy: { band: 6, feedback: 'Some errors.' },
-        pronunciation: { band: 6.5, feedback: 'Generally clear.' },
+  it('reuses a completed async Speaking estimate as the tutor draft', async () => {
+    const getStatus = jest.fn().mockResolvedValueOnce({
+      speaking_group_id: '11111111-1111-4111-8111-111111111111',
+      status: 'completed',
+      result: {
+        evidence_mode: 'full_audio',
+        overall_band: 6.5,
+        criteria: {
+          fluency_coherence: { band: 6.5, feedback: 'Ổn.' },
+          lexical_resource: { band: 6.5, feedback: 'Khá.' },
+          grammatical_range_accuracy: { band: 6, feedback: 'Cần sửa.' },
+          pronunciation: { band: 6.5, feedback: 'Dễ hiểu.' },
+        },
       },
-      summary: 'Tutor reference summary.',
-      strengths: ['Clear answers'],
-      weaknesses: ['Some grammar slips'],
-      majorErrors: [],
-      detailedFeedback: {},
-      actionPlan: ['Review grammar'],
-      nextStudyAdvice: 'Practice linking ideas.',
-      transcriptNotes: 'Transcript-based pronunciation estimate.',
-      partFeedback: [],
-      disclaimer: 'Tutor should verify audio.',
-      rawResponse: '{}',
-      modelName: 'test-model',
-      promptVersion: 'test-prompt',
-      bandValidationWarning: null,
     });
+    getSpeakingSubmissionService.mockReturnValueOnce({ getStatus });
 
-    pool.query
-      .mockResolvedValueOnce({
-        rows: [
-          { id: 'part-1', speaking_group_id: 'group-1', part_number: 1, transcript: 'Part one answer.', test_title: 'Speaking Test' },
-          { id: 'part-2', speaking_group_id: 'group-1', part_number: 2, transcript: 'Part two answer.', test_title: 'Speaking Test' },
-          { id: 'part-3', speaking_group_id: 'group-1', part_number: 3, transcript: 'Part three answer.', test_title: 'Speaking Test' },
-        ],
-      })
-      .mockResolvedValueOnce(rowsForColumns(reportColumns))
-      .mockResolvedValueOnce({
-        rows: [{
-          id: 'report-1',
-          submission_id: 'part-1',
-          submission_type: 'speaking',
-          part_number: null,
-          band_score: '6.5',
-          computed_band: '6.5',
-          fluency_score: '6.5',
-          lexical_score: '6.5',
-          grammar_score: '6.0',
-          pronunciation_score: '6.5',
-          criteria_json: JSON.stringify({
-            fluencyCoherence: { band: 6.5, feedback: 'Good flow.' },
-            lexicalResource: { band: 6.5, feedback: 'Enough range.' },
-            grammaticalRangeAccuracy: { band: 6, feedback: 'Some errors.' },
-            pronunciation: { band: 6.5, feedback: 'Generally clear.' },
-          }),
-          feedback_json: JSON.stringify({
-            summary: 'Tutor reference summary.',
-            weaknesses: ['Some grammar slips'],
-            actionPlan: ['Review grammar'],
-          }),
-          raw_ai_response: '{}',
-          status: 'completed',
-          error_message: null,
-        }],
-      });
-
-    const result = await TutorService.runAiPrelimCheck('speaking', 'part-1', { partNumber: 1 });
-
-    expect(pool.query.mock.calls[0][0]).toContain('COALESCE(speaking_group_id, id) AS group_id');
-    expect(gradeSpeakingSession).toHaveBeenCalledWith(
-      expect.arrayContaining([
-        expect.objectContaining({ part_number: 1, transcript: 'Part one answer.' }),
-        expect.objectContaining({ part_number: 2, transcript: 'Part two answer.' }),
-        expect.objectContaining({ part_number: 3, transcript: 'Part three answer.' }),
-      ]),
-      { testTitle: 'Speaking Test' }
+    const result = await TutorService.runAiPrelimCheck(
+      'speaking',
+      '22222222-2222-4222-8222-222222222222',
+      { usageContext: { userId: 'tutor-1', requesterRole: 'tutor' } }
     );
-    expect(result.suggestedOverallBand).toBe(6.5);
-    expect(result.suggestedCriteria).toEqual(expect.objectContaining({
-      fluencyScore: 6.5,
-      lexicalScore: 6.5,
-      grammarScore: 6,
-      pronunciationScore: 6.5,
+
+    expect(getStatus).toHaveBeenCalledWith(
+      '22222222-2222-4222-8222-222222222222',
+      { id: 'tutor-1', role: 'tutor' }
+    );
+    expect(gradeSpeakingSession).not.toHaveBeenCalled();
+    expect(pool.query).not.toHaveBeenCalled();
+    expect(result).toEqual(expect.objectContaining({
+      suggestedOverallBand: 6.5,
+      suggestedCriteria: expect.objectContaining({
+        fluencyScore: 6.5,
+        grammarScore: 6,
+        pronunciationScore: 6.5,
+      }),
     }));
   });
 });

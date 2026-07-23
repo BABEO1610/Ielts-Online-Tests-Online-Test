@@ -308,7 +308,7 @@ const TutorGradingPanel = ({
                     Đang phân tích...
                   </>
                 ) : (
-                  'Run AI Prelim Check'
+                  'AI chấm nháp để tutor chỉnh sửa'
                 )}
               </button>
             </div>

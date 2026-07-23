@@ -6,11 +6,13 @@
  * - [SPEC §6]: DB Schema for users table, Enum `user_role`, Enum `account_status`.
  */
 
+const { configureDisposableDatabase } = require('../../helpers/requireDisposableDatabase');
+const describeDatabase = configureDisposableDatabase() ? describe : describe.skip;
 const { pool } = require('../../../src/db/pool');
 const fs = require('fs');
 const path = require('path');
 
-describe('T003 - Migration: Bảng users', () => {
+describeDatabase('T003 - Migration: Bảng users', () => {
   let client;
 
   beforeAll(async () => {

@@ -9,6 +9,48 @@ const GEMINI_GENERATE_CONTENT_URL = 'https://generativelanguage.googleapis.com/v
 const DEFAULT_OPENAI_MODEL = 'gpt-4o-mini';
 const DEFAULT_GEMINI_MODEL = 'gemini-flash-lite-latest';
 const GEMINI_PROVIDERS = new Set(['gemini', 'google', 'google-ai-studio']);
+const DEFAULT_TRANSCRIPTION_TIMEOUT_MS = 45000;
+
+const getTranscriptionTimeoutMs = () => {
+  const configured = Number.parseInt(process.env.AI_TRANSCRIPTION_TIMEOUT_MS, 10);
+  return Number.isInteger(configured) && configured >= 5000 && configured <= 90000
+    ? configured
+    : DEFAULT_TRANSCRIPTION_TIMEOUT_MS;
+};
+
+const fetchTranscription = async (url, options = {}) => {
+  const controller = new AbortController();
+  let timeout;
+  const timeoutPromise = new Promise((_, reject) => {
+    timeout = setTimeout(() => {
+      controller.abort();
+      const timeoutError = new Error('AI transcription provider timed out');
+      timeoutError.code = 'TRANSCRIPTION_TIMEOUT';
+      timeoutError.errorCode = 'TRANSCRIPTION_TIMEOUT';
+      timeoutError.retryable = true;
+      reject(timeoutError);
+    }, getTranscriptionTimeoutMs());
+    timeout.unref?.();
+  });
+  try {
+    return await Promise.race([
+      fetch(url, { ...options, signal: controller.signal }),
+      timeoutPromise,
+    ]);
+  } catch (error) {
+    if (error?.code === 'TRANSCRIPTION_TIMEOUT') throw error;
+    if (error?.name === 'AbortError') {
+      const timeoutError = new Error('AI transcription provider timed out');
+      timeoutError.code = 'TRANSCRIPTION_TIMEOUT';
+      timeoutError.errorCode = 'TRANSCRIPTION_TIMEOUT';
+      timeoutError.retryable = true;
+      throw timeoutError;
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
+};
 
 const normalizeProvider = (provider) => String(provider || 'openai').trim().toLowerCase();
 const isGeminiProvider = (provider) => GEMINI_PROVIDERS.has(normalizeProvider(provider));
@@ -219,6 +261,15 @@ const generateGeminiAnswer = async ({
   }
 
   const geminiModel = normalizeGeminiModel(model);
+  const generationConfig = {
+    maxOutputTokens: 2048,
+    ...(jsonMode ? { responseMimeType: 'application/json' } : {}),
+  };
+  if (!/^gemini-3\.(?:5|6)(?:-|$)/i.test(geminiModel)) {
+    generationConfig.temperature = 0.2;
+  } else {
+    generationConfig.thinkingConfig = { thinkingLevel: 'minimal' };
+  }
   const prompts = resolvePrompts({ mode, message, officialContext, systemPrompt, userPrompt });
   const startedAt = Date.now();
   const response = await fetch(
@@ -233,11 +284,7 @@ const generateGeminiAnswer = async ({
         systemInstruction: {
           parts: [{ text: prompts.systemPrompt }],
         },
-        generationConfig: {
-          temperature: 0.2,
-          maxOutputTokens: 2048,
-          ...(jsonMode ? { responseMimeType: 'application/json' } : {}),
-        },
+        generationConfig,
         contents: [
           {
             role: 'user',
@@ -292,35 +339,68 @@ const generateGeminiAnswer = async ({
 };
 
 const generateGeminiJsonAnswer = async ({
-  model, apiKey, systemPrompt, userPrompt, timeoutMs = 30000, usageContext,
+  model,
+  apiKey,
+  systemPrompt,
+  userPrompt,
+  contentParts,
+  responseSchema,
+  maxOutputTokens = 2048,
+  timeoutMs = 30000,
+  usageContext,
 }) => {
   if (!apiKey) {
     throw createAssistantError(ERROR_CODES.AI_NOT_CONFIGURED);
   }
 
   const geminiModel = normalizeGeminiModel(model);
+  const generationConfig = {
+    maxOutputTokens,
+    responseMimeType: 'application/json',
+    ...(responseSchema ? { responseSchema } : {}),
+  };
+  if (!/^gemini-3\.(?:5|6)(?:-|$)/i.test(geminiModel)) {
+    generationConfig.temperature = 0.15;
+  } else {
+    generationConfig.thinkingConfig = { thinkingLevel: 'low' };
+  }
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  let timeout;
+  const timeoutPromise = new Promise((_, reject) => {
+    timeout = setTimeout(() => {
+      controller.abort();
+      const timeoutError = new Error('AI grading provider timed out');
+      timeoutError.name = 'AbortError';
+      timeoutError.code = 'AI_REQUEST_TIMEOUT';
+      timeoutError.retryable = true;
+      reject(timeoutError);
+    }, timeoutMs);
+    timeout.unref?.();
+  });
   const startedAt = Date.now();
 
   try {
-    const response = await fetch(
-      `${GEMINI_GENERATE_CONTENT_URL}/${encodeURIComponent(geminiModel)}:generateContent`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
-        signal: controller.signal,
-        body: JSON.stringify({
-          systemInstruction: { parts: [{ text: systemPrompt }] },
-          generationConfig: {
-            temperature: 0.15,
-            maxOutputTokens: 2048,
-            responseMimeType: 'application/json',
-          },
-          contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
-        }),
-      }
-    );
+    const response = await Promise.race([
+      fetch(
+        `${GEMINI_GENERATE_CONTENT_URL}/${encodeURIComponent(geminiModel)}:generateContent`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
+          signal: controller.signal,
+          body: JSON.stringify({
+            systemInstruction: { parts: [{ text: systemPrompt }] },
+            generationConfig,
+            contents: [{
+              role: 'user',
+              parts: Array.isArray(contentParts) && contentParts.length > 0
+                ? contentParts
+                : [{ text: userPrompt }],
+            }],
+          }),
+        }
+      ),
+      timeoutPromise,
+    ]);
 
     if (!response.ok) {
       const error = buildProviderError({
@@ -768,7 +848,7 @@ const streamAssistantAnswer = async ({ mode, message, officialContext, systemPro
 };
 
 const generateTranscript = async (audioUrl, usageContext = {}) => {
-  const { openaiApiKey, geminiApiKey } = getAiConfig();
+  const { openaiApiKey, geminiApiKey, geminiModel: configuredGeminiModel } = getAiConfig();
   
   if (!openaiApiKey && !geminiApiKey) {
     throw createAssistantError(ERROR_CODES.AI_NOT_CONFIGURED, "Không tìm thấy OPENAI_API_KEY hay GEMINI_API_KEY.");
@@ -791,10 +871,13 @@ const generateTranscript = async (audioUrl, usageContext = {}) => {
     const blob = new Blob([arrayBuffer], { type: contentType });
     const formData = new FormData();
     formData.append('file', blob, `audio.${ext}`);
-    formData.append('model', 'whisper-1');
+    const transcriptionModel = process.env.AI_TRANSCRIPTION_MODEL?.startsWith('whisper')
+      ? process.env.AI_TRANSCRIPTION_MODEL
+      : 'whisper-1';
+    formData.append('model', transcriptionModel);
 
     const startedAt = Date.now();
-    const whisperResponse = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+    const whisperResponse = await fetchTranscription('https://api.openai.com/v1/audio/transcriptions', {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${openaiApiKey}`
@@ -807,7 +890,7 @@ const generateTranscript = async (audioUrl, usageContext = {}) => {
       const error = buildProviderError({
         provider: 'OpenAI Whisper',
         status: whisperResponse.status,
-        model: 'whisper-1',
+        model: transcriptionModel,
         body: errorText,
       });
       await recordProviderUsage({
@@ -825,7 +908,7 @@ const generateTranscript = async (audioUrl, usageContext = {}) => {
     await recordProviderUsage({
       usageContext,
       provider: 'openai',
-      model: 'whisper-1',
+      model: transcriptionModel,
       data,
       success: true,
       latencyMs: Date.now() - startedAt,
@@ -835,15 +918,24 @@ const generateTranscript = async (audioUrl, usageContext = {}) => {
 
   // Fallback to Gemini
   const base64Audio = Buffer.from(arrayBuffer).toString('base64');
-  const geminiModel = 'gemini-flash-lite-latest';
+  const configuredTranscriptionModel = process.env.AI_TRANSCRIPTION_MODEL;
+  const geminiModel = normalizeGeminiModel(
+    configuredTranscriptionModel?.startsWith('gemini')
+      ? configuredTranscriptionModel
+      : (process.env.AI_GRADING_MODEL || configuredGeminiModel)
+  );
   
   const startedAt = Date.now();
-  const geminiResponse = await fetch(
+  const geminiResponse = await fetchTranscription(
     `${GEMINI_GENERATE_CONTENT_URL}/${encodeURIComponent(geminiModel)}:generateContent`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-goog-api-key': geminiApiKey },
       body: JSON.stringify({
+        generationConfig: {
+          maxOutputTokens: 4096,
+          thinkingConfig: { thinkingLevel: 'minimal' },
+        },
         contents: [{
           parts: [
             { text: "Please transcribe the following audio into text exactly as it is spoken. Do not add any extra commentary, translations, or formatting. Just output the pure transcription of what you hear." },

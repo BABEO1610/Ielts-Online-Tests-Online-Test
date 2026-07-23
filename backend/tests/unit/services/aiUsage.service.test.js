@@ -1,4 +1,4 @@
-const { normalizeAiUsageMetadata } = require('../../../src/services/aiUsage.service');
+const { normalizeAiUsageMetadata, sanitizeDiagnostic } = require('../../../src/services/aiUsage.service');
 
 describe('aiUsage.service', () => {
   describe('normalizeAiUsageMetadata', () => {
@@ -30,5 +30,16 @@ describe('aiUsage.service', () => {
         cachedContentTokenCount: 2,
       }).total_tokens).toBe(37);
     });
+  });
+
+  it('redacts signed URLs, private object keys and transcript values from diagnostics', () => {
+    const value = sanitizeDiagnostic(
+      'audio=https://signed.example/a?token=secret transcript: hello world prompt=secret essay quarantine/speaking/user/file.mp3'
+    );
+    expect(value).not.toContain('signed.example');
+    expect(value).not.toContain('hello world');
+    expect(value).not.toContain('secret essay');
+    expect(value).not.toContain('quarantine/speaking');
+    expect(value).toContain('[redacted');
   });
 });

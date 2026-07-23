@@ -96,13 +96,33 @@ class TutorController {
   }
 
   /**
+   * POST /api/v1/tutors/submissions/speaking/:speakingGroupId/claim
+   */
+  static async claimSpeakingGroup(req, res, next) {
+    try {
+      const data = await TutorService.claimSpeakingGroup(
+        req.params.speakingGroupId,
+        req.user.id
+      );
+      res.status(200).set('Cache-Control', 'private, no-store').json({
+        success: true,
+        data,
+        error: null,
+        meta: {},
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
    * GET /api/v1/tutors/submissions/:type/:submissionId
    */
   static async getSubmissionDetail(req, res, next) {
     try {
       const { type, submissionId } = req.params;
       if (!['writing', 'speaking'].includes(type)) {
-        return res.status(400).json({ success: false, error: { message: 'Invalid type' }, data: null, meta: null });
+        return res.status(400).json({ success: false, error: { message: 'Invalid type' }, data: null, meta: {} });
       }
 
       const detail = await TutorService.getSubmissionDetail(type, submissionId);
@@ -169,24 +189,25 @@ class TutorController {
     try {
       const { type, submissionId } = req.params;
       if (!['writing', 'speaking'].includes(type)) {
-        return res.status(400).json({ success: false, error: { message: 'Invalid type' }, data: null, meta: null });
+        return res.status(400).json({ success: false, error: { message: 'Invalid type' }, data: null, meta: {} });
       }
 
       const result = await TutorService.runAiPrelimCheck(type, submissionId, {
         ...req.body,
         usageContext: {
           userId: req.user.id,
+          requesterRole: req.user.role,
           feature: 'tutor_ai_reference',
           entityType: type === 'speaking' ? 'speaking_submission' : 'writing_submission',
           entityId: submissionId,
         },
       });
 
-      res.status(200).json({
+      res.status(200).set('Cache-Control', 'private, no-store').json({
         success: true,
         data: result,
         error: null,
-        meta: null
+        meta: {}
       });
     } catch (error) {
       next(error);

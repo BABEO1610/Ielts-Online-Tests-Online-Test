@@ -5,6 +5,33 @@
  */
 
 const logger = require('../utils/logger');
+const AppError = require('../utils/AppError');
+const { WORD_COUNT_THRESHOLDS } = require('./aiGrading.constants');
+
+const sanitizeWritingText = (value, maxLength = 50000) => String(value || '')
+  .split(String.fromCharCode(0)).join('')
+  .replace(/\r\n?/g, '\n')
+  .slice(0, maxLength)
+  .trim();
+
+const countWritingWords = (value) => sanitizeWritingText(value)
+  .split(/\s+/u)
+  .filter(Boolean).length;
+
+const validateWritingWordThreshold = (responseText, taskType) => {
+  if (!Object.prototype.hasOwnProperty.call(WORD_COUNT_THRESHOLDS, taskType)) {
+    throw new AppError('Loại Writing task không được hỗ trợ.', 400, 'AIGRADE_009');
+  }
+  const text = sanitizeWritingText(responseText);
+  const wordCount = countWritingWords(text);
+  const threshold = WORD_COUNT_THRESHOLDS[taskType];
+  if (wordCount < threshold.systemMin) {
+    const error = new AppError('Bài viết quá ngắn để chấm AI.', 422, 'AIGRADE_001');
+    error.details = { word_count: wordCount, required_words: threshold.systemMin };
+    throw error;
+  }
+  return { text, wordCount, threshold };
+};
 
 /**
  * Round a number to the nearest 0.5 step.
@@ -124,7 +151,7 @@ const validateGradingResponse = (rawText) => {
   };
 
   // Check for fatal band errors (outside 0-9 or unparseable)
-  for (const [key, result] of Object.entries(bands)) {
+  for (const result of Object.values(bands)) {
     if (result.error) errors.push(result.error);
   }
   if (errors.length > 0) {
@@ -212,4 +239,7 @@ module.exports = {
   normalizeBand,
   computeBandFromCriteria,
   extractJson,
+  sanitizeWritingText,
+  countWritingWords,
+  validateWritingWordThreshold,
 };

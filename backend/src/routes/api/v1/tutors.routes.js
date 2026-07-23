@@ -74,7 +74,13 @@ router.patch(
   TutorController.updateGradingResult
 );
 
-// GET /api/v1/tutors/submissions/:type/:submissionId
+// POST /api/v1/tutors/submissions/speaking/:speakingGroupId/claim
+router.post(
+  '/submissions/speaking/:speakingGroupId/claim',
+  authorize(['tutor']),
+  TutorController.claimSpeakingGroup
+);
+
 router.get(
   '/submissions/:type/:submissionId',
   authorize(['tutor', 'admin']),

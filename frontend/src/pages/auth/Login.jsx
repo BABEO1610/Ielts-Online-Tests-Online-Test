@@ -32,11 +32,11 @@ const Login = () => {
 
   return (
     <AuthLayout>
-      <div className="text-center mb-4">
-        <h2 className="fw-bold mb-2" style={{ fontFamily: 'UberMove, UberMoveText, system-ui, Helvetica Neue, Arial, sans-serif' }}>
+      <div className="text-center mb-2xl">
+        <h2 className="display-md mb-xs">
           Đăng nhập
         </h2>
-        <p className="text-muted" style={{ fontSize: '16px' }}>
+        <p className="body-md text-muted">
           Chào mừng trở lại! Vui lòng đăng nhập vào tài khoản của bạn.
         </p>
       </div>

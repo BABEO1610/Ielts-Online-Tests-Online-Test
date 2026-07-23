@@ -81,8 +81,6 @@ class TestService {
     // Tutors cannot publish directly. Admin must approve.
     const isPublished = false; 
     const isDraft = !publishAt;
-    const reviewStatus = isDraft ? 'pending' : 'pending'; // Drafts also stay pending for now (or we could use 'draft' if DB allowed, but enum only has pending, approved, rejected)
-    const submittedAt = isDraft ? null : new Date().toISOString();
 
     let missingAnswer = false;
     for (const passage of passages) {
@@ -94,7 +92,9 @@ class TestService {
               try {
                 const opts = typeof q.options === 'string' ? JSON.parse(q.options) : (q.options || block.options || {});
                 requiresManualAnswer = opts.requiresManualAnswer === true;
-              } catch(e) {}
+              } catch {
+                // Malformed legacy options are treated as having no manual-answer flag.
+              }
               
               // For MCQ single vs multi
               const hasCorrectStr = typeof q.correctAnswer === 'string' && q.correctAnswer.trim() !== '';
@@ -216,7 +216,7 @@ class TestService {
    * @param {string|null} skill - Optional filter: 'reading' | 'listening' | etc.
    */
   static async getTests(options = {}) {
-    const { skill, isPublished, tutor, all } = options;
+    const { skill, isPublished } = options;
     let whereClause = 'WHERE 1=1';
     const params = [];
 
@@ -246,7 +246,7 @@ class TestService {
         (
           COALESCE((SELECT COUNT(DISTINCT user_id) FROM test_attempts WHERE test_id = mt.id), 0) +
           COALESCE((SELECT COUNT(DISTINCT user_id) FROM writing_submissions WHERE test_id = mt.id), 0) +
-          COALESCE((SELECT COUNT(DISTINCT user_id) FROM speaking_submissions WHERE test_id = mt.id), 0)
+          COALESCE((SELECT COUNT(DISTINCT user_id) FROM speaking_submissions WHERE test_id = mt.id AND deleted_at IS NULL), 0)
         ) as participant_count
       FROM mock_tests mt
       LEFT JOIN questions q ON mt.id = q.test_id
@@ -324,7 +324,7 @@ class TestService {
           if (p.instruction) {
             instructionData = JSON.parse(p.instruction);
           }
-        } catch (e) {
+        } catch {
           // ignore parsing error
         }
         
@@ -429,7 +429,7 @@ class TestService {
     const sections = test.skill === 'listening'
       ? passages.map((p, idx) => {
           // Parse instruction JSONB for listening metadata
-          let metadata = {};
+          let metadata;
           try {
             metadata = typeof p.instruction === 'string' ? JSON.parse(p.instruction) : (p.instruction || {});
           } catch {
@@ -504,9 +504,6 @@ class TestService {
     // However, if an admin is updating, we might want to keep it published?
     // For now, any update resets it to pending review unless it's just a draft.
     const isPublished = false; 
-    const isDraft = !publishAt;
-    const reviewStatus = 'pending';
-    const submittedAt = isDraft ? null : new Date().toISOString();
 
     let missingAnswer = false;
     for (const passage of passages) {
@@ -518,7 +515,9 @@ class TestService {
               try {
                 const opts = typeof q.options === 'string' ? JSON.parse(q.options) : (q.options || block.options || {});
                 requiresManualAnswer = opts.requiresManualAnswer === true;
-              } catch(e) {}
+              } catch {
+                // Malformed legacy options are treated as having no manual-answer flag.
+              }
               
               const hasCorrectStr = typeof q.correctAnswer === 'string' && q.correctAnswer.trim() !== '';
               const hasCorrectArr = Array.isArray(q.correctAnswers) && q.correctAnswers.length > 0;

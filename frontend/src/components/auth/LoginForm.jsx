@@ -63,30 +63,17 @@ const LoginForm = () => {
   return (
     <form onSubmit={handleSubmit} data-testid="login-form">
       {errorMsg && (
-        <div 
-          className="d-flex align-items-center mb-4 shadow-sm" 
-          style={{ 
-            backgroundColor: '#efefef', 
-            color: '#000000', 
-            padding: '16px 20px', 
-            borderRadius: '16px',
-            fontFamily: 'UberMoveText, system-ui, Helvetica Neue, Arial, sans-serif',
-            fontSize: '16px',
-            fontWeight: '500'
-          }}
-          role="alert" 
-          data-testid="error-message"
-        >
-          <i className="bi bi-exclamation-triangle-fill me-3" style={{ fontSize: '20px' }}></i>
+        <div className="api-error-message d-flex align-items-center justify-content-center" role="alert" data-testid="error-message">
+          <i className="bi bi-exclamation-triangle-fill me-2"></i>
           <div>{errorMsg}</div>
         </div>
       )}
 
-      <div className="mb-3">
-        <label htmlFor="emailInput" className="form-label fw-medium text-dark">Email</label>
+      <div className="mb-xl">
+        <label htmlFor="emailInput" className="form-label">Email</label>
         <input
           type="email"
-          className="form-control form-control-lg rounded-3 bg-white border-0 shadow-sm"
+          className="text-input"
           id="emailInput"
           placeholder="name@example.com"
           value={email}
@@ -95,13 +82,13 @@ const LoginForm = () => {
         />
       </div>
 
-      <div className="mb-4">
-        <div className="d-flex justify-content-between align-items-center mb-1">
-          <label htmlFor="passwordInput" className="form-label fw-medium text-dark mb-0">Mật khẩu</label>
+      <div className="mb-xl">
+        <div className="d-flex justify-content-between align-items-center mb-xs">
+          <label htmlFor="passwordInput" className="form-label mb-0">Mật khẩu</label>
         </div>
         <input
           type="password"
-          className="form-control form-control-lg rounded-3 bg-white border-0 shadow-sm"
+          className="text-input"
           id="passwordInput"
           placeholder="••••••••"
           value={password}
@@ -110,36 +97,36 @@ const LoginForm = () => {
         />
       </div>
 
-      <div className="d-grid gap-2 mb-4">
+      <div className="mb-xl">
         <button
           type="submit"
-          className="btn btn-dark btn-lg rounded-pill fw-bold text-white shadow-sm"
+          className="button-primary"
           disabled={isLoading}
-          style={{ backgroundColor: '#000000' }}
         >
           {isLoading ? 'Đang xử lý...' : 'Đăng nhập'}
         </button>
       </div>
 
-      <div className="d-flex align-items-center mb-4">
-        <hr className="flex-grow-1 border-secondary opacity-25" />
-        <span className="mx-3 text-muted small fw-medium" style={{ fontSize: '14px', color: '#5e5e5e' }}>HOẶC</span>
-        <hr className="flex-grow-1 border-secondary opacity-25" />
+      <div className="d-flex align-items-center mb-xl">
+        <hr className="flex-grow-1" />
+        <span className="mx-3 caption text-muted">HOẶC</span>
+        <hr className="flex-grow-1" />
       </div>
 
-      <div className="d-grid gap-2">
+      <div className="mb-xl">
         <GoogleLoginButton />
       </div>
       
-      <div className="text-center mt-4">
-        <span className="text-muted" style={{ fontSize: '14px' }}>Chưa có tài khoản? </span>
-        <Link to="/register" className="text-decoration-none fw-bold" style={{ color: '#000000', fontSize: '14px' }}>
+      <div className="text-center mt-xl">
+        <span className="body-sm text-muted">Chưa có tài khoản? </span>
+        <Link to="/register" className="body-sm-strong link-blue" style={{ color: 'var(--ink)' }}>
           Đăng ký ngay
         </Link>
-        <br />
-        <Link to="/forgot-password" className="text-decoration-none fw-medium mt-2 d-inline-block" style={{ color: '#0000ee', fontSize: '14px' }}>
-          Quên mật khẩu?
-        </Link>
+        <div className="mt-md">
+          <Link to="/forgot-password" className="body-sm link-blue">
+            Quên mật khẩu?
+          </Link>
+        </div>
       </div>
     </form>
   );

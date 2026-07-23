@@ -22,6 +22,8 @@ Các bảng `speaking_submissions`, `ai_grading_reports`, `ai_usage_logs` và `t
 - Job learner thiếu evidence/provider lỗi đi theo `retry_wait/failed`; giữ `grader=ai`, không tạo report rỗng và không tự đưa vào tutor queue.
 - `needs_review`, `partial_audio` và `transcript_only` được giữ trong schema/reader để tương thích dữ liệu lịch sử, không phải output của worker learner mới.
 - AI prelim cho bài `grader=tutor` chỉ tạo response tạm thời; không insert job/report/artifact mới và không đổi assignment/status.
+- Runtime hiện xử lý Part 1, 2, 3 tuần tự. Mỗi Part được normalize nguyên file; Gemini transcription trả plain transcript nên `words_json`, `segments_json` và `asr_uncertainty_json` là `NULL`. Structured ASR và chunk/bounded parallelism chỉ là mục tiêu T068–T069.
+- `AI Estimated Band` dùng scoring-config/version scorer và cho phép `calibration_bundle_sha256=NULL` khi cờ estimate bật. Chỉ nhánh đã hiệu chuẩn/công bố production yêu cầu calibration bundle digest, signature và approval hợp lệ.
 
 **Hạ tầng migration có điều kiện**: nếu production không dùng migration history được nền tảng quản lý và schema thật chưa có bảng tương đương, runner dùng chung có thể cần `schema_migrations(version, checksum, applied_at, ...)`. Đây là platform table duy nhất cho toàn repository, không thuộc feature và chỉ được tạo sau preflight xác nhận chưa tồn tại; tuyệt đối không tạo `ai_schema_migrations` riêng.
 
@@ -95,9 +97,9 @@ Các cột đề xuất bổ sung:
 | `speaking_group_id` | `UUID NULL` | Truy vấn báo cáo cả phiên Speaking mà không dựa vào một Part ngẫu nhiên |
 | `grading_job_id` | `UUID NULL REFERENCES ai_grading_jobs(id)` | Audit kết quả thuộc lần xử lý nào |
 | `pipeline_version` | `VARCHAR(80)` | Version của toàn pipeline evidence/scoring |
-| `calibration_version` | `VARCHAR(80)` | Version mapping đã hiệu chuẩn hoặc version scorer ước lượng (giữ tên cột để tương thích schema) |
+| `calibration_version` | `VARCHAR(80)` | Runtime hiện lưu version scorer ước lượng; chỉ được coi là version mapping đã hiệu chuẩn sau khi T074 triển khai việc scorer tiêu thụ bundle và có bằng chứng calibration |
 | `evidence_mode` | `VARCHAR(32) CHECK (evidence_mode IN ('full_audio','partial_audio','transcript_only'))` | Tóm tắt mức evidence; gate thật nằm ở từng tiêu chí |
-| `requires_human_review` | `BOOLEAN NOT NULL DEFAULT FALSE` | Đưa vào hàng đợi tutor hiện có |
+| `requires_human_review` | `BOOLEAN NOT NULL DEFAULT FALSE` | Cờ tương thích legacy/audit; worker learner mới không dùng cờ này để đưa bài AI lỗi vào tutor queue |
 | `deleted_at` | `TIMESTAMPTZ NULL` | Soft delete |
 
 Quy tắc:
@@ -105,7 +107,7 @@ Quy tắc:
 - `submission_id` hiện là khóa đa hình bắt buộc. Với report Speaking cấp phiên, tiếp tục neo vào submission Part 1 để tương thích, đồng thời ghi `speaking_group_id` rõ ràng.
 - Không thêm `part_number` cho Speaking report. Feedback từng Part nằm trong `feedback_json.part_feedback`; band là đánh giá cả phiên.
 - Với Speaking mới, `criteria_json.fluency_coherence.band` là criterion-band duy nhất; ghi nó vào `fluency_score` để tương thích. `coherence_score` giữ cho Writing và phải là `NULL` ở report Speaking mới, không được average với `fluency_score`.
-- Reliability/uncertainty nội bộ từng tiêu chí và calibration bundle digest nằm trong `criteria_json` bên cạnh `evidence_status`/evidence refs; serializer learner dùng allowlist và không trả các field nội bộ này. Không tạo thêm cột JSONB trùng nghĩa.
+- Reliability/uncertainty nội bộ từng tiêu chí có thể nằm trong `criteria_json` sau khi calibrator T074 được triển khai; runtime hiện chưa sinh các field này. Calibration bundle digest không nằm trong `criteria_json`: report truy digest đã pin qua `grading_job_id`. Serializer learner dùng allowlist và không trả field nội bộ.
 - Không lặp lại `input_fingerprint`: report truy ra fingerprint qua `grading_job_id`.
 - `computed_band` là nguồn sự thật của Overall **Speaking job-backed** và là field duy nhất status API đọc. `band_score` chỉ là mirror tương thích: transaction writer phải ghi cùng giá trị backend tính vào cả hai và CHECK chỉ áp dụng khi `submission_type='speaking' AND grading_job_id IS NOT NULL`, buộc hai cột cùng `NULL` hoặc bằng nhau. Không áp CHECK này cho Writing/legacy vì runtime hiện có semantics khác. Không bao giờ lưu Overall Speaking do provider trả; thiếu một tiêu chí làm cả hai `NULL`.
 - Unique index trên `grading_job_id` khi khác `NULL`, không phụ thuộc `deleted_at`; retry luôn là job mới và một job không bao giờ có report thứ hai.
@@ -206,14 +208,14 @@ Một hàng biểu diễn evidence của một Part, một audio hash và một 
 | `language_code` | `VARCHAR(16) NOT NULL DEFAULT 'en'` | Ngôn ngữ nhận dạng |
 | `asr_transcript` | `TEXT NULL` | Output provider trước hậu xử lý ứng dụng; không được gọi là verbatim/ground truth |
 | `display_transcript` | `TEXT NULL` | Chỉ để hiển thị; không thay ASR input khi chấm |
-| `asr_uncertainty_json` | `JSONB NULL` | Logprob/no-speech/alternatives đã whitelist; không phải criterion confidence |
+| `asr_uncertainty_json` | `JSONB NULL` | Dự phòng logprob/no-speech/alternatives đã whitelist; runtime Gemini plain transcript hiện ghi `NULL` |
 | `provider_manifest_json` | `JSONB NOT NULL DEFAULT '{}'` | Provider/model/config version cho từng component |
 | `component_status_json` | `JSONB NOT NULL DEFAULT '{}'` | Trạng thái/lỗi chuẩn hóa của STT, quality, fluency, pronunciation |
-| `words_json` | `JSONB NULL` | Word, start/end, provider uncertainty/logprob; schema whitelist |
-| `segments_json` | `JSONB NULL` | Segment, start/end, provider uncertainty/logprob; schema whitelist |
+| `words_json` | `JSONB NULL` | Dự phòng word/start/end/uncertainty theo schema whitelist; runtime hiện ghi `NULL` |
+| `segments_json` | `JSONB NULL` | Dự phòng segment/start/end/uncertainty theo schema whitelist; runtime hiện ghi `NULL` |
 | `audio_quality_json` | `JSONB NULL` | Duration đo lại, silence, clipping, SNR/quality flags |
-| `fluency_metrics_json` | `JSONB NULL` | Speech/articulation rate, pause, filler, repair, mean length of run |
-| `pronunciation_evidence_json` | `JSONB NULL` | Acoustic proxies cùng provider-local recognized words/timestamps đã whitelist và alignment/disagreement với ASR chính; không ghi intelligibility trực tiếp nếu chưa có mapping human-rated |
+| `fluency_metrics_json` | `JSONB NULL` | Runtime Gemini lưu các trường định tính đã whitelist như speech rate, hesitation, pause control, repetition/repair và delivery summary |
+| `pronunciation_evidence_json` | `JSONB NULL` | Runtime Gemini lưu evidence định tính đã whitelist từ audio về intelligibility, segmental accuracy, word stress, rhythm, intonation và connected speech; không phải phoneme score đã hiệu chuẩn |
 | `created_at` | `TIMESTAMPTZ NOT NULL DEFAULT NOW()` |  |
 | `updated_at` | `TIMESTAMPTZ NOT NULL DEFAULT NOW()` | Trigger `set_updated_at()`; chỉ thay đổi lúc processing |
 | `finalized_at` | `TIMESTAMPTZ NULL` | Bắt buộc khi terminal |
@@ -232,24 +234,25 @@ Ví dụ manifest tối thiểu:
 
 ```json
 {
-  "transcription": { "provider": "openai", "model": "whisper-1", "config_version": "stt-v1", "locale": "en" },
-  "speech_evidence": { "provider": "azure", "model": "pronunciation-assessment", "config_version": "pa-v1", "locale": "en-US", "sdk_version": "pinned", "recognition_mode": "continuous" },
-  "media": { "ffmpeg_build": "pinned", "normalizer_version": "audio-v1" },
-  "local_metrics": { "feature_schema_version": "fluency-v1" }
+  "transcription": { "provider": "gemini", "model": "<AI_TRANSCRIPTION_MODEL>", "output": "plain_transcript", "locale": "en" },
+  "speech_evidence": { "provider": "gemini", "model": "<AI_GRADING_MODEL>", "config_version": "speaking-audio-analysis-v1", "input": "audio_and_asr_transcript" },
+  "media": { "normalizer": "ffmpeg-pcm16-mono-16khz-v1" },
+  "rubric": { "provider": "gemini", "assessment_type": "estimated" }
 }
 ```
 
+Đây là shape runtime hiện tại; tên model thật lấy từ cấu hình đã pin trên job. Không có Azure/continuous mode hoặc structured timestamp trong manifest hiện hành.
+
 Tên provider trong ví dụ là đề xuất nghiên cứu, chưa được xem là RFC đã phê duyệt.
 
-## Cấu trúc kết quả trong `criteria_json`
+## Cấu trúc kết quả calibration đề xuất trong `criteria_json` *(chưa triển khai — T074)*
 
-Tận dụng cột JSONB hiện có thay vì thêm nhiều cột reliability/evidence:
+Sau T074 có thể tận dụng cột JSONB hiện có thay vì thêm nhiều cột reliability/evidence. Ví dụ dưới đây là thiết kế đích, không phải payload runtime hiện tại; đặc biệt runtime chưa ghi `_calibration`, uncertainty bucket hoặc bundle digest vào `criteria_json`:
 
 ```json
 {
   "_calibration": {
     "version": "vi-ielts-v1",
-    "bundle_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
     "reliability_target": "absolute_error_lte_0_5"
   },
   "fluency_coherence": {
@@ -288,13 +291,13 @@ Tận dụng cột JSONB hiện có thay vì thêm nhiều cột reliability/evi
 }
 ```
 
-Các số trên chỉ minh họa shape, **không phải ngưỡng được phê duyệt**. Event đích là `abs(system_band - adjudicated_human_band) <= 0.5`; bucket rules khóa trước evaluation và per-result dùng `lower_95_ci` làm tín hiệu abstention. CI dùng bootstrap theo cụm speaker để nhiều session của một người không bị coi là độc lập; bundle ghi speaker/session count, numerator/denominator, population/slice, dataset hash và minimum speaker count. Trước gate/bucket thiếu mẫu, `uncertainty=null` và handoff. Object này chỉ dành cho audit nội bộ.
+Các số trên chỉ minh họa shape, **không phải ngưỡng được phê duyệt**. Event đích là `abs(system_band - adjudicated_human_band) <= 0.5`; bucket rules khóa trước evaluation và per-result dùng `lower_95_ci` làm tín hiệu abstention. CI dùng bootstrap theo cụm speaker để nhiều session của một người không bị coi là độc lập; bundle ghi speaker/session count, numerator/denominator, population/slice, dataset hash và minimum speaker count. Khi chưa có bundle/bucket được duyệt, các field reliability nội bộ là `null`: nhánh đã hiệu chuẩn phải fail-closed, còn nhánh luyện tập vẫn có thể trả `AI Estimated Band` nếu cờ estimate và audio evidence đều đạt. Không tự handoff tutor.
 
-Calibration source of truth là bundle bất biến trong build artifact/private object store. Registry chỉ chọn digest **lúc enqueue**; job pin `scoring_config_sha256` và `calibration_bundle_sha256`, sau đó worker luôn load đúng digest đã pin dù registry đổi. Scoring-config manifest khóa prompt hash/schema, ASR và speech provider/model/locale/SDK/config, media decoder/ffmpeg build/normalizer, local feature schema và calibrator bundle. Worker fail closed nếu lookup/signature/digest/binding sai; report truy đúng digest qua `grading_job_id`, không lặp dữ liệu. Không tạo bảng calibration thứ ba.
+Calibration source of truth của nhánh đã hiệu chuẩn là bundle bất biến trong build artifact/private object store. Runtime resolve scoring-config và calibration digest tùy chọn từ cấu hình process **lúc enqueue**; job luôn pin `scoring_config_sha256`, còn `calibration_bundle_sha256` có thể `NULL` cho AI estimate. Nếu job có bundle, worker phải load đúng digest và fail-closed khi lookup/signature/binding sai. Registry version-controlled chưa được triển khai và chỉ là phương án release tương lai. Report truy digest qua `grading_job_id`; không tạo bảng calibration thứ ba.
 
 Validator áp dụng:
 
-- `band != null` chỉ khi `evidence_status='sufficient'` trên đủ ba Part và đúng calibration binding.
+- `band != null` chỉ khi `evidence_status='sufficient'` trên đủ ba Part và đúng scoring-config binding. Nhánh đã hiệu chuẩn kiểm thêm calibration binding; nhánh estimate cho phép bundle `NULL` nhưng bắt buộc `assessment_type=estimated`, version scorer và disclaimer.
 - `fluency_coherence.band != null` chỉ khi cả acoustic Fluency evidence và ASR-fidelity/semantic Coherence evidence đều `sufficient`; thiếu một vế làm criterion `null`.
 - Speaking Overall dùng decimal: `mean=sum(bốn criterion)/4`, kết quả `floor(mean*2+0.5)/2`. Tie `.25/.75` hướng lên; không dùng floating binary/banker's rounding. Chỉ ghi sau khi thuật toán được hội đồng duyệt.
 - `partial_audio`: tiêu chí thiếu evidence có band `null`; `band_score`/`computed_band` luôn `null`.
@@ -311,7 +314,7 @@ Trong một transaction:
 1. Resolve/join và khóa authoritative test/prompt rows: test phải `skill='speaking'`, published/accessible cho learner; ba passage đúng test/Part. Tính RFC-8785 fingerprint và prompt snapshot/hash từ `title/instruction/content` chính thức.
 2. Lấy advisory lock theo `(user_id, UTC-date)`, rồi **lặp lại** authoritative lookup `(user_id,idempotency_key)` trước quota. Nếu tồn tại và request fingerprint khớp, replay job/config đã lưu bất kể deploy hiện tại; nếu khác trả `409 IDEMPOTENCY_KEY_REUSED`.
 3. Lookup original job theo unique fingerprint. Nếu đã tồn tại với key khác, trả `409 DUPLICATE_GRADING_REQUEST` cùng canonical IDs cho đúng owner; không tạo alias key hoặc row mới.
-4. Chỉ với request hoàn toàn mới, xác nhận preflight token/stat result còn hợp lệ, resolve registry thành immutable scoring-config/calibration digest và đếm/reserve quota. Original job mới tính quota; retry/replay không tính lại.
+4. Chỉ với request hoàn toàn mới, xác nhận preflight token/stat result còn hợp lệ, lấy immutable scoring-config/calibration digest từ cấu hình process đã validate và đếm/reserve quota. Original job mới tính quota; retry/replay không tính lại.
 5. Sinh group, insert job với config digests/idempotency expiry, rồi tạo ba submissions gồm source prompt ID/snapshot/hash và private-audio metadata. Unique object key thực hiện atomic bind-once; conflict rollback.
 6. Chỉ trả `202` sau commit.
 

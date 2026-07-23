@@ -3,6 +3,7 @@ const AppError = require('../utils/AppError');
 const supabase = require('../config/supabase');
 const { v4: uuidv4 } = require('uuid');
 const path = require('path');
+const { aiGradingConfig } = require('../config/aiGrading.config');
 
 const SUPABASE_BUCKET = process.env.SUPABASE_SPEAKING_BUCKET || 'speaking-audio';
 
@@ -42,12 +43,15 @@ class SubmissionController {
         throw new AppError('Tasks are required', 400, 'MISSING_FIELD');
       }
 
-      const result = await SubmissionService.submitFullWriting(userId, test_id, grader, tasks);
+      const result = await SubmissionService.submitFullWriting(userId, test_id, grader, tasks, {
+        idempotencyKey: req.get('Idempotency-Key'),
+        io: req.app.get('io'),
+      });
 
-      res.status(201).json({
+      res.status(201).set('Cache-Control', 'private, no-store').json({
         success: true,
         data: result,
-        meta: null,
+        meta: {},
         error: null
       });
     } catch (error) {
@@ -60,6 +64,13 @@ class SubmissionController {
    */
   static async uploadSpeakingAudio(req, res, next) {
     try {
+      if (aiGradingConfig.enabled) {
+        throw new AppError(
+          'Upload Speaking multipart cũ đã bị tắt. Hãy dùng signed upload riêng tư.',
+          410,
+          'LEGACY_SPEAKING_UPLOAD_DISABLED'
+        );
+      }
       if (!req.file) {
         throw new AppError('No audio file uploaded', 400, 'NO_FILE');
       }
@@ -106,7 +117,7 @@ class SubmissionController {
           audio_url: publicUrlData?.publicUrl || null
         },
         error: null,
-        meta: null
+        meta: {}
       });
     } catch (error) {
       next(error);
@@ -119,6 +130,13 @@ class SubmissionController {
    */
   static async submitSpeaking(req, res, next) {
     try {
+      if (aiGradingConfig.enabled) {
+        throw new AppError(
+          'Nộp Speaking từng Part kiểu cũ đã bị tắt. Hãy dùng /speaking/full.',
+          410,
+          'LEGACY_SPEAKING_SUBMISSION_DISABLED'
+        );
+      }
       const userId = req.user.id;
       let { test_id, part_number, temp_s3_key, grader } = req.body;
 
@@ -169,16 +187,16 @@ class SubmissionController {
         throw new AppError('type must be speaking', 400, 'INVALID_FIELD');
       }
 
-      const audioUrl = await SubmissionService.getSpeakingAudioUrl(id, req.user);
+      const audio = await SubmissionService.getSpeakingAudioUrl(id, req.user);
 
-      res.status(200).json({
+      res.status(200).set('Cache-Control', 'private, no-store').json({
         success: true,
         data: {
-          presigned_url: audioUrl,
-          audio_url: audioUrl
+          url: audio.url,
+          expires_at: audio.expires_at
         },
         error: null,
-        meta: null
+        meta: {}
       });
     } catch (error) {
       next(error);
@@ -295,10 +313,10 @@ class SubmissionController {
 
       const result = await SubmissionService.submitFullSpeaking(userId, test_id, grader, parts);
 
-      res.status(201).json({
+      res.status(201).set('Cache-Control', 'private, no-store').json({
         success: true,
         data: result,
-        meta: null,
+        meta: {},
         error: null
       });
     } catch (error) {

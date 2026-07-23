@@ -10,15 +10,21 @@
   "scripts": {
     "start": "node src/app.js",
     "dev": "nodemon src/app.js",
+    "worker": "node src/worker.js",
     "test": "jest --runInBand",
     "test:coverage": "jest --runInBand --coverage",
     "lint": "eslint src/ tests/ --ext .js",
+    "db:backup:public": "node scripts/backup-public-database.js",
+    "migrate:preflight": "node scripts/preflight-ai-grading-migration.js",
+    "migrate:baseline": "node scripts/baseline-migrations.js",
     "migrate": "node scripts/migrate.js",
     "test:api": "newman run \"DemoNewMan/IeltsZone Test API.postman_collection.json\" -e \"DemoNewMan/IeltsZone.postman_environment.json\" -r htmlextra",
     "assistant:inspect-schema": "node scripts/assistant-inspect-schema.js",
     "assistant:debug-db": "node scripts/assistant-debug-db.js"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1092.0",
+    "@aws-sdk/s3-request-presigner": "^3.1092.0",
     "@supabase/supabase-js": "^2.108.2",
     "bcrypt": "^6.0.0",
     "cookie-parser": "^1.4.7",
@@ -38,11 +44,13 @@
     "winston": "^3.11.0"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "eslint": "^10.5.0",
     "jest": "^29.7.0",
     "nodemailer-mock": "^2.0.11",
     "nodemon": "^3.1.14",
-    "supertest": "^7.2.2"
+    "supertest": "^7.2.2",
+    "yaml": "^2.9.0"
   },
   "jest": {
     "rootDir": "..",

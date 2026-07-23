@@ -9,7 +9,9 @@ const {
 } = require('../utils/scoring');
 const { gradeWriting } = require('../ai/grading.service');
 const { REPORT_STATUS } = require('../ai/aiGrading.constants');
-const { gradeSpeakingGroup, getLatestCompletedReports } = require('./speakingAiGrading.service');
+const { getLatestCompletedReports } = require('./speakingAiGrading.service');
+const gradingQueries = require('../db/queries/grading.queries');
+const { requireUuid } = require('./speakingSubmission.helpers');
 
 const countWords = (text) =>
   String(text || '').trim().split(/\s+/).filter(Boolean).length;
@@ -293,54 +295,38 @@ const formatPrelimFromReport = (report, fallbackTaskNumber = null) => {
   });
 };
 
-const formatSpeakingPrelimFromReport = (report, allReports = []) => {
-  const ai = mapAiReport(report);
-  const completed = allReports
-    .map(mapAiReport)
-    .filter(item => item?.overallBand !== null && item?.overallBand !== undefined);
-  const overall = completed.length === 3
-    ? roundToNearestHalf(completed.reduce((sum, item) => sum + Number(item.overallBand), 0) / 3)
-    : null;
-
+const formatSpeakingPrelimResult = (result) => {
+  const criteria = result.criteria || {};
+  const criterionScores = {
+    fluencyCoherence: criteria.fluency_coherence,
+    lexicalResource: criteria.lexical_resource,
+    grammaticalRangeAccuracy: criteria.grammatical_range_accuracy,
+    pronunciation: criteria.pronunciation,
+  };
+  const feedbackDraft = Object.values(criterionScores)
+    .map((item) => item?.feedback)
+    .filter(Boolean)
+    .join('\n\n');
   return {
-    partNumber: report.part_number,
-    suggestedOverallBand: ai?.overallBand || null,
+    suggestedOverallBand: result.overall_band,
     suggestedCriteria: {
-      fluencyScore: ai?.criterionScores?.fluencyCoherence?.band
-        ?? ai?.criterionScores?.fluencyCoherence
-        ?? null,
-      lexicalScore: ai?.criterionScores?.lexicalResource?.band
-        ?? ai?.criterionScores?.lexicalResource
-        ?? null,
-      grammarScore: ai?.criterionScores?.grammaticalRangeAccuracy?.band
-        ?? ai?.criterionScores?.grammaticalRangeAccuracy
-        ?? null,
-      pronunciationScore: ai?.criterionScores?.pronunciation?.band
-        ?? ai?.criterionScores?.pronunciation
-        ?? null,
+      fluencyScore: criterionScores.fluencyCoherence?.band ?? null,
+      lexicalScore: criterionScores.lexicalResource?.band ?? null,
+      grammarScore: criterionScores.grammaticalRangeAccuracy?.band ?? null,
+      pronunciationScore: criterionScores.pronunciation?.band ?? null,
     },
-    feedbackDraft: buildFeedbackDraft(ai),
-    keyProblems: ai?.weaknesses || [],
-    suggestedRewrite: '',
-    tutorNotes: [
-      ai?.summary,
-      ai?.nextStudyAdvice,
-      overall !== null ? `Overall 3-part reference band: ${overall.toFixed(1)}` : '',
-    ].filter(Boolean).join('\n\n'),
-    groupSummary: {
-      overallBand: overall,
-      parts: completed.map(item => ({
-        partNumber: item.partNumber,
-        overallBand: item.overallBand,
-        summary: item.summary,
-      })),
-    },
+    feedbackDraft,
+    keyProblems: [],
+    tutorNotes: 'Đây là bản nháp AI; tutor cần nghe audio, chỉnh điểm và phản hồi trước khi lưu.',
     aiFeedback: {
-      ...ai,
-      taskNumber: report.part_number,
-      partNumber: report.part_number,
       submissionType: 'speaking',
-      status: ai?.status || REPORT_STATUS.COMPLETED,
+      status: REPORT_STATUS.COMPLETED,
+      overallBand: result.overall_band,
+      criterionScores,
+      summary: feedbackDraft,
+      detailedFeedback: Object.fromEntries(
+        Object.entries(criterionScores).map(([key, value]) => [key, value?.feedback || ''])
+      ),
     },
   };
 };
@@ -393,7 +379,7 @@ class TutorService {
       FROM speaking_submissions ss
       JOIN users u ON u.id = ss.user_id
       LEFT JOIN mock_tests mt ON mt.id = ss.test_id
-      WHERE ss.status = 'pending' AND ss.grader = 'tutor'
+      WHERE ss.status = 'pending' AND ss.grader = 'tutor' AND ss.deleted_at IS NULL
       GROUP BY ss.speaking_group_id, ss.user_id, u.full_name, mt.title, ss.assigned_tutor_id
     `;
     let query = `SELECT * FROM (${baseQuery}) q WHERE 1=1`;
@@ -419,24 +405,60 @@ class TutorService {
 
     query += ' ORDER BY submitted_at ASC';
 
+    const result = await pool.query(query, params);
+    return result.rows.map(row => ({
+      submissionType: row.submission_type,
+      submissionId: row.submission_id,
+      speakingGroupId: row.speaking_group_id,
+      studentId: row.student_id,
+      studentName: row.student_name,
+      testTitle: row.test_title,
+      partsCount: row.parts_count,
+      submittedAt: row.submitted_at,
+      status: row.status,
+      grader: row.grader
+    }));
+  }
+
+  static async claimSpeakingGroup(groupId, tutorId) {
+    const normalizedGroupId = requireUuid(groupId, 'speakingGroupId');
+    const normalizedTutorId = requireUuid(tutorId, 'tutor_id');
+    const client = await pool.connect();
     try {
-      const result = await pool.query(query, params);
-      return result.rows.map(row => ({
-        submissionType: row.submission_type,
-        submissionId: row.submission_id,
-        speakingGroupId: row.speaking_group_id,
-        studentId: row.student_id,
-        studentName: row.student_name,
-        testTitle: row.test_title,
-        partsCount: row.parts_count,
-        submittedAt: row.submitted_at,
-        status: row.status,
-        grader: row.grader
-      }));
-    } catch (err) {
-      // Propagate any DB errors
-      throw err;
+      await client.query('BEGIN');
+      const locked = await gradingQueries.lockSpeakingGroupForClaim(client, normalizedGroupId);
+      if (locked.length !== 3) throw new AppError('Không tìm thấy group Speaking đầy đủ.', 404, 'SPEAKING_GROUP_NOT_FOUND');
+      if (locked.some((row, index) => Number(row.part_number) !== index + 1 || row.status !== 'pending' || row.grader !== 'tutor')) {
+        throw new AppError('Group Speaking không còn trong hàng chờ tutor.', 409, 'SPEAKING_GROUP_NOT_CLAIMABLE');
+      }
+      const assignedToOther = locked.some((row) => row.assigned_tutor_id && row.assigned_tutor_id !== normalizedTutorId);
+      if (assignedToOther) throw new AppError('Group Speaking đã được tutor khác claim.', 409, 'SPEAKING_GROUP_ALREADY_CLAIMED');
+      const updated = await client.query(
+        `UPDATE speaking_submissions
+         SET assigned_tutor_id = $2, assigned_tutor_at = COALESCE(assigned_tutor_at, NOW()), updated_at = NOW()
+         WHERE speaking_group_id = $1 AND deleted_at IS NULL
+         RETURNING assigned_tutor_at`, [normalizedGroupId, normalizedTutorId]);
+      await client.query('COMMIT');
+      return {
+        speaking_group_id: normalizedGroupId,
+        assigned_tutor_id: normalizedTutorId,
+        assignment_status: 'claimed',
+        claimed_at: updated.rows[0].assigned_tutor_at,
+      };
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
     }
+  }
+
+  static async assertSpeakingAssignment(submissionIdOrGroupId, requester) {
+    if (requester?.role === 'admin') return;
+    if (requester?.role !== 'tutor') throw new AppError('Bạn không có quyền xem bài này.', 403, 'AUTH_PERM_001');
+    const scope = await gradingQueries.getSpeakingAssignmentScope(pool, submissionIdOrGroupId, requester.id);
+    if (scope.part_count !== 3) throw new AppError('Không tìm thấy group Speaking.', 404, 'SPEAKING_GROUP_NOT_FOUND');
+    if (scope.assigned !== true) throw new AppError('Tutor phải claim group trước khi xem.', 403, 'SPEAKING_GROUP_NOT_ASSIGNED');
   }
 
   /**
@@ -444,33 +466,8 @@ class TutorService {
    * @param {string} type - 'writing' or 'speaking'
    * @param {string} submissionId 
    */
-  static async getSubmissionDetail(type, submissionId) {
-    // TEMPORARY FIX: ensure parts consistency before fetching detail
-    try {
-      if (type === 'speaking') {
-        await pool.query(`
-          UPDATE speaking_submissions ss_target
-          SET status = 'pending' 
-          WHERE ss_target.speaking_group_id IN (
-            SELECT ss_pending.speaking_group_id
-            FROM speaking_submissions ss_pending
-            WHERE ss_pending.status = 'pending'
-          ) AND ss_target.status = 'tutor_graded'
-        `);
-      } else {
-        await pool.query(`
-          UPDATE writing_submissions ws_target
-          SET status = 'pending' 
-          WHERE ws_target.writing_group_id IN (
-            SELECT ws_pending.writing_group_id
-            FROM writing_submissions ws_pending
-            WHERE ws_pending.status = 'pending'
-          ) AND ws_target.status = 'tutor_graded'
-        `);
-      }
-    } catch (err) {
-      console.error('Error applying temporary fix:', err);
-    }
+  static async getSubmissionDetail(type, submissionId, requester = {}) {
+    if (type === 'speaking') await this.assertSpeakingAssignment(submissionId, requester);
 
     if (type === 'writing') {
       const targetRes = await pool.query(
@@ -505,6 +502,7 @@ class TutorService {
          FROM ai_grading_reports
          WHERE submission_type = 'writing'
            AND submission_id = ANY($1::uuid[])
+           AND deleted_at IS NULL
          ORDER BY submission_id, generated_at DESC`,
         [taskIds]
       );
@@ -513,7 +511,7 @@ class TutorService {
       const tutorRes = await pool.query(
         `SELECT DISTINCT ON (writing_submission_id) *
          FROM tutor_feedback_reports
-         WHERE writing_submission_id = ANY($1::uuid[])
+         WHERE writing_submission_id = ANY($1::uuid[]) AND deleted_at IS NULL
          ORDER BY writing_submission_id, updated_at DESC, created_at DESC`,
         [taskIds]
       );
@@ -583,7 +581,7 @@ class TutorService {
         WITH base AS (
             SELECT COALESCE(speaking_group_id, id) AS group_id
             FROM speaking_submissions
-            WHERE id::text = $1 OR speaking_group_id::text = $1
+            WHERE (id::text = $1 OR speaking_group_id::text = $1) AND deleted_at IS NULL
             ORDER BY part_number ASC NULLS LAST
             LIMIT 1
         )
@@ -600,8 +598,16 @@ class TutorService {
                     'submissionId', ss.id,
                     'partNumber', ss.part_number,
                     'promptText', ss.prompt_text,
-                    'audioUrl', ss.audio_url,
-                    'transcript', ss.transcript
+                    'audioAvailable', (ss.audio_storage_key IS NOT NULL OR ss.audio_url IS NOT NULL),
+                    'transcript', COALESCE(
+                      (SELECT artifact.display_transcript
+                       FROM speaking_analysis_artifacts artifact
+                       WHERE artifact.speaking_submission_id = ss.id
+                         AND artifact.status IN ('complete','partial')
+                         AND artifact.deleted_at IS NULL
+                       ORDER BY artifact.created_at DESC LIMIT 1),
+                      ss.transcript
+                    )
                 )
                 ORDER BY ss.part_number
             ) AS parts
@@ -609,6 +615,7 @@ class TutorService {
         JOIN base b ON COALESCE(ss.speaking_group_id, ss.id) = b.group_id
         JOIN users u ON u.id = ss.user_id
         LEFT JOIN mock_tests mt ON mt.id = ss.test_id
+        WHERE ss.deleted_at IS NULL
         GROUP BY
             ss.speaking_group_id,
             ss.user_id,
@@ -624,7 +631,7 @@ class TutorService {
       const tutorRes = await pool.query(
         `SELECT DISTINCT ON (speaking_submission_id) *
          FROM tutor_feedback_reports
-         WHERE speaking_submission_id = ANY($1::uuid[])
+         WHERE speaking_submission_id = ANY($1::uuid[]) AND deleted_at IS NULL
          ORDER BY speaking_submission_id, updated_at DESC, created_at DESC`,
         [partIds]
       );
@@ -784,6 +791,7 @@ class TutorService {
           `UPDATE tutor_feedback_reports
            SET ${setClauses.join(', ')}
            WHERE writing_submission_id = $${updateValues.length}
+             AND deleted_at IS NULL
            RETURNING id`,
           updateValues
         );
@@ -824,7 +832,7 @@ class TutorService {
         const gradesResult = await client.query(
           `SELECT DISTINCT ON (ws.id) ws.task_number, tfr.band_score
            FROM writing_submissions ws
-           LEFT JOIN tutor_feedback_reports tfr ON tfr.writing_submission_id = ws.id
+           LEFT JOIN tutor_feedback_reports tfr ON tfr.writing_submission_id = ws.id AND tfr.deleted_at IS NULL
            WHERE ws.writing_group_id = $1
            ORDER BY ws.id, ${gradeOrder}`,
           [submission.writing_group_id]
@@ -875,7 +883,7 @@ class TutorService {
           SELECT ss.id, ss.speaking_group_id, ss.status, ss.grader, ss.user_id, u.full_name as student_name
           FROM speaking_submissions ss
           LEFT JOIN users u ON u.id = ss.user_id
-          WHERE ss.id::text = $1 OR ss.speaking_group_id::text = $1
+          WHERE (ss.id::text = $1 OR ss.speaking_group_id::text = $1) AND ss.deleted_at IS NULL
           ORDER BY ss.part_number ASC NULLS LAST
           LIMIT 1
           FOR UPDATE OF ss
@@ -893,16 +901,22 @@ class TutorService {
         }
 
         // 2. Check grader for all parts in the group. Re-grading updates the existing report.
-        const groupQuery = `SELECT id, status, grader FROM speaking_submissions WHERE speaking_group_id = $1`;
+        const groupQuery = `SELECT id, status, grader, assigned_tutor_id
+          FROM speaking_submissions WHERE speaking_group_id = $1 AND deleted_at IS NULL
+          ORDER BY part_number FOR UPDATE`;
         const groupResult = await client.query(groupQuery, [submission.speaking_group_id]);
+        if (groupResult.rows.length !== 3) throw new AppError('Speaking submission must contain three Parts.', 409);
         for (const part of groupResult.rows) {
           if (part.grader !== 'tutor') {
             throw new AppError('This Speaking submission is not assigned to tutor grading.', 409);
           }
+          if (part.assigned_tutor_id !== tutorId) {
+            throw new AppError('Tutor must claim the whole Speaking group before grading.', 403, 'SPEAKING_GROUP_NOT_ASSIGNED');
+          }
         }
 
         // 3. Select representative part to store the feedback reference (usually part 1)
-        const repPartQuery = `SELECT id FROM speaking_submissions WHERE speaking_group_id = $1 ORDER BY part_number ASC LIMIT 1`;
+        const repPartQuery = `SELECT id FROM speaking_submissions WHERE speaking_group_id = $1 AND deleted_at IS NULL ORDER BY part_number ASC LIMIT 1`;
         const repPartResult = await client.query(repPartQuery, [submission.speaking_group_id]);
         const repPartId = repPartResult.rows[0].id;
 
@@ -932,7 +946,7 @@ class TutorService {
               pronunciation_score = $6,
               written_feedback = $7,
               updated_at = NOW()
-          WHERE speaking_submission_id = $8
+          WHERE speaking_submission_id = $8 AND deleted_at IS NULL
           RETURNING id
         `;
         const updateFeedbackResult = await client.query(updateFeedbackQuery, [
@@ -970,7 +984,7 @@ class TutorService {
         const updateStatusQuery = `
           UPDATE speaking_submissions 
           SET status = 'tutor_graded' 
-          WHERE speaking_group_id = $1
+          WHERE speaking_group_id = $1 AND deleted_at IS NULL
         `;
         await client.query(updateStatusQuery, [submission.speaking_group_id]);
         submission.tutorStatus = 'graded';
@@ -1068,6 +1082,7 @@ class TutorService {
        WHERE submission_type = 'writing'
          AND submission_id = $1
          AND band_score IS NOT NULL
+         AND deleted_at IS NULL
          ${completedReportPredicate}
        ORDER BY generated_at DESC
        LIMIT 1`,
@@ -1094,24 +1109,36 @@ class TutorService {
   }
 
   static async runSpeakingAiPrelimCheck(submissionId, payload = {}) {
-    const partNumber = Number(payload.partNumber ?? payload.taskNumber ?? payload.part_number);
-    const result = await gradeSpeakingGroup(submissionId, {
-      force: true,
-      usageContext: payload.usageContext || {
-        feature: 'tutor_ai_reference',
-        entityType: 'speaking_submission',
-        entityId: submissionId,
-      },
-    });
-    const report = result.reports.find(row => row.part_number === partNumber) || result.reports[0];
-    if (!report || report.status === REPORT_STATUS.FAILED) {
-      throw new AppError(report?.error_message || 'Speaking AI prelim check failed.', 422, 'SPEAKING_AI_FAILED');
+    const context = payload.usageContext || {};
+    const requester = {
+      id: context.userId,
+      role: context.requesterRole || 'tutor',
+    };
+    await this.assertSpeakingAssignment(submissionId, requester);
+    const { getSpeakingSubmissionService } = require('./speakingSubmission.service');
+    try {
+      const status = await getSpeakingSubmissionService().getStatus(submissionId, requester);
+      if (status.result?.evidence_mode === 'full_audio') {
+        return formatSpeakingPrelimResult(status.result);
+      }
+    } catch (error) {
+      if (error.errorCode !== 'GRADING_JOB_NOT_FOUND') throw error;
     }
-    return formatSpeakingPrelimFromReport(report, result.reports);
+    const { getSpeakingTutorPrelimService } = require('./speakingTutorPrelim.service');
+    const preview = await getSpeakingTutorPrelimService().run(submissionId, context);
+    return formatSpeakingPrelimResult(preview.result);
   }
 
   static async transcribeSpeakingPart(partId, usageContext = {}) {
-    const res = await pool.query('SELECT audio_url, transcript FROM speaking_submissions WHERE id = $1', [partId]);
+    const requester = { id: usageContext.userId, role: usageContext.requesterRole || 'tutor' };
+    await this.assertSpeakingAssignment(partId, requester);
+    const res = await pool.query(
+      `SELECT COALESCE(
+         (SELECT display_transcript FROM speaking_analysis_artifacts
+          WHERE speaking_submission_id = speaking_submissions.id
+            AND status IN ('complete','partial') AND deleted_at IS NULL
+          ORDER BY created_at DESC LIMIT 1), transcript) AS transcript
+       FROM speaking_submissions WHERE id = $1 AND deleted_at IS NULL`, [partId]);
     if (res.rows.length === 0) {
       throw new AppError('Speaking part not found', 404);
     }
@@ -1120,12 +1147,10 @@ class TutorService {
       return part.transcript;
     }
 
-    if (!part.audio_url) {
-      throw new AppError('No audio URL found for this part', 400);
-    }
-
-    const { generateTranscript } = require('./ai.service');
-    const transcript = await generateTranscript(part.audio_url, {
+    const { transcribeSpeakingAudio } = require('../ai/grading.service');
+    const SubmissionService = require('./submission.service');
+    const audio = await SubmissionService.getSpeakingAudioUrl(partId, requester);
+    const { transcript } = await transcribeSpeakingAudio(audio.url, {
       ...usageContext,
       feature: usageContext.feature || 'tutor_ai_reference',
       entityType: usageContext.entityType || 'speaking_submission',
@@ -1146,7 +1171,11 @@ class TutorService {
     const gradedTodayQuery = `
       SELECT COUNT(id) AS count 
       FROM tutor_feedback_reports 
-      WHERE tutor_id = $1 AND created_at::date = CURRENT_DATE
+      WHERE tutor_id = $1 AND created_at::date = CURRENT_DATE AND deleted_at IS NULL
+        AND (speaking_submission_id IS NULL OR EXISTS (
+          SELECT 1 FROM speaking_submissions active_ss
+          WHERE active_ss.id = speaking_submission_id AND active_ss.deleted_at IS NULL
+        ))
     `;
     const gradedTodayResult = await pool.query(gradedTodayQuery, [tutorId]);
     const gradedToday = parseInt(gradedTodayResult.rows[0].count, 10);
@@ -1167,7 +1196,12 @@ class TutorService {
       SELECT 
         COUNT(tfr.id) AS count
       FROM generate_series(CURRENT_DATE - INTERVAL '6 days', CURRENT_DATE, '1 day'::interval) d(date)
-      LEFT JOIN tutor_feedback_reports tfr ON tfr.created_at::date = d.date::date AND tfr.tutor_id = $1
+      LEFT JOIN tutor_feedback_reports tfr ON tfr.created_at::date = d.date::date
+        AND tfr.tutor_id = $1 AND tfr.deleted_at IS NULL
+        AND (tfr.speaking_submission_id IS NULL OR EXISTS (
+          SELECT 1 FROM speaking_submissions active_ss
+          WHERE active_ss.id = tfr.speaking_submission_id AND active_ss.deleted_at IS NULL
+        ))
       GROUP BY d.date::date
       ORDER BY d.date::date ASC;
     `;
@@ -1191,7 +1225,7 @@ class TutorService {
       SELECT 
         COUNT(DISTINCT ss.speaking_group_id) AS count
       FROM generate_series(CURRENT_DATE - INTERVAL '6 days', CURRENT_DATE, '1 day'::interval) d(date)
-      LEFT JOIN speaking_submissions ss ON ss.submitted_at::date = d.date::date AND ss.status = 'pending' AND ss.grader = 'tutor'
+      LEFT JOIN speaking_submissions ss ON ss.submitted_at::date = d.date::date AND ss.status = 'pending' AND ss.grader = 'tutor' AND ss.deleted_at IS NULL
       GROUP BY d.date::date
       ORDER BY d.date::date ASC;
     `;
@@ -1260,15 +1294,20 @@ class TutorService {
           FROM (
             SELECT ws.id FROM writing_submissions ws
             JOIN tutor_feedback_reports t ON t.writing_submission_id = ws.id
-            WHERE t.tutor_id = $1 AND ws.status = 'reviewed'
+            WHERE t.tutor_id = $1 AND ws.status = 'reviewed' AND t.deleted_at IS NULL
             UNION ALL
             SELECT ss.id FROM speaking_submissions ss
             JOIN tutor_feedback_reports t ON t.speaking_submission_id = ss.id
-            WHERE t.tutor_id = $1 AND ss.status = 'reviewed'
+            WHERE t.tutor_id = $1 AND ss.status = 'reviewed' AND t.deleted_at IS NULL AND ss.deleted_at IS NULL
           ) AS complaints
         ) AS pending_complaints
       FROM tutor_feedback_reports tfr
       WHERE tfr.tutor_id = $1
+        AND tfr.deleted_at IS NULL
+        AND (tfr.speaking_submission_id IS NULL OR EXISTS (
+          SELECT 1 FROM speaking_submissions active_ss
+          WHERE active_ss.id = tfr.speaking_submission_id AND active_ss.deleted_at IS NULL
+        ))
         AND DATE_TRUNC('month', tfr.created_at) = DATE_TRUNC('month', CURRENT_DATE)
     `;
     const result = await pool.query(query, [tutorId]);
@@ -1305,11 +1344,18 @@ class TutorService {
       LEFT JOIN speaking_submissions ss ON tfr.speaking_submission_id = ss.id
       LEFT JOIN mock_tests mt ON mt.id = COALESCE(ws.test_id, ss.test_id)
       LEFT JOIN users u ON u.id = COALESCE(ws.user_id, ss.user_id)
-      WHERE tfr.tutor_id = $1
+      WHERE tfr.tutor_id = $1 AND tfr.deleted_at IS NULL
+        AND (tfr.speaking_submission_id IS NULL OR (ss.id IS NOT NULL AND ss.deleted_at IS NULL))
       ORDER BY tfr.created_at DESC
     `;
 
-    const countQuery = `SELECT COUNT(*)::int FROM tutor_feedback_reports WHERE tutor_id = $1`;
+    const countQuery = `
+      SELECT COUNT(*)::int
+      FROM tutor_feedback_reports tfr
+      LEFT JOIN speaking_submissions ss ON tfr.speaking_submission_id = ss.id
+      WHERE tfr.tutor_id = $1 AND tfr.deleted_at IS NULL
+        AND (tfr.speaking_submission_id IS NULL OR (ss.id IS NOT NULL AND ss.deleted_at IS NULL))
+    `;
     const countResult = await pool.query(countQuery, [tutorId]);
     const total = countResult.rows[0].count;
 
@@ -1386,7 +1432,9 @@ class TutorService {
       LEFT JOIN speaking_submissions ss ON tfr.speaking_submission_id = ss.id
       LEFT JOIN mock_tests mt ON mt.id = COALESCE(ws.test_id, ss.test_id)
       LEFT JOIN users u ON u.id = COALESCE(ws.user_id, ss.user_id)
-      WHERE tfr.tutor_id = $1 AND (ws.id = $2 OR ss.id = $2)
+      WHERE tfr.tutor_id = $1 AND tfr.deleted_at IS NULL
+        AND (tfr.speaking_submission_id IS NULL OR (ss.id IS NOT NULL AND ss.deleted_at IS NULL))
+        AND (ws.id = $2 OR ss.id = $2)
     `;
     const result = await pool.query(query, [tutorId, submissionId]);
     if (!result.rows[0]) throw new Error('Không tìm thấy bài chấm');
@@ -1436,7 +1484,9 @@ class TutorService {
         LEFT JOIN writing_submissions ws ON tfr.writing_submission_id = ws.id
         LEFT JOIN speaking_submissions ss ON tfr.speaking_submission_id = ss.id
         LEFT JOIN users u ON u.id = COALESCE(ws.user_id, ss.user_id)
-        WHERE tfr.tutor_id = $1 AND (tfr.writing_submission_id = $2 OR tfr.speaking_submission_id = $2)
+        WHERE tfr.tutor_id = $1 AND tfr.deleted_at IS NULL
+          AND (tfr.speaking_submission_id IS NULL OR (ss.id IS NOT NULL AND ss.deleted_at IS NULL))
+          AND (tfr.writing_submission_id = $2 OR tfr.speaking_submission_id = $2)
       `;
       const checkResult = await client.query(checkQuery, [tutorId, submissionId]);
       if (checkResult.rows.length === 0) {
@@ -1455,11 +1505,15 @@ class TutorService {
         await client.query(`
           UPDATE speaking_submissions 
           SET status = 'pending' 
-          WHERE speaking_group_id = (SELECT speaking_group_id FROM speaking_submissions WHERE id = $1)
+          WHERE speaking_group_id = (
+            SELECT speaking_group_id FROM speaking_submissions WHERE id = $1 AND deleted_at IS NULL
+          ) AND deleted_at IS NULL
         `, [submissionId]);
       }
 
-      await client.query(`DELETE FROM tutor_feedback_reports WHERE id = $1`, [report.id]);
+      await client.query(
+        `UPDATE tutor_feedback_reports SET deleted_at = NOW(), updated_at = NOW()
+         WHERE id = $1 AND deleted_at IS NULL`, [report.id]);
 
       const AuditLogService = require('./audit.service');
       try {
@@ -1505,7 +1559,9 @@ class TutorService {
         LEFT JOIN writing_submissions ws ON tfr.writing_submission_id = ws.id
         LEFT JOIN speaking_submissions ss ON tfr.speaking_submission_id = ss.id
         LEFT JOIN users u ON u.id = COALESCE(ws.user_id, ss.user_id)
-        WHERE tfr.tutor_id = $1 AND (tfr.writing_submission_id = $2 OR tfr.speaking_submission_id = $2)
+        WHERE tfr.tutor_id = $1 AND tfr.deleted_at IS NULL
+          AND (tfr.speaking_submission_id IS NULL OR (ss.id IS NOT NULL AND ss.deleted_at IS NULL))
+          AND (tfr.writing_submission_id = $2 OR tfr.speaking_submission_id = $2)
       `;
       const checkResult = await client.query(checkQuery, [tutorId, submissionId]);
       if (checkResult.rows.length === 0) {
@@ -1526,7 +1582,7 @@ class TutorService {
           pronunciation_score = COALESCE($7, pronunciation_score),
           written_feedback = COALESCE($8, written_feedback),
           updated_at = NOW()
-        WHERE id = $9
+        WHERE id = $9 AND deleted_at IS NULL
       `;
       await client.query(updateQuery, [
         payload.bandScore,
@@ -1577,56 +1633,6 @@ class TutorService {
   static async getActivityLogStats(tutorId) {
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
-
-    // TEMPORARY FIX: Apply missing migration 018
-    try {
-      await pool.query(`
-        ALTER TYPE log_action ADD VALUE IF NOT EXISTS 'submission_graded';
-        ALTER TYPE log_action ADD VALUE IF NOT EXISTS 'submission_drafted';
-        ALTER TYPE log_action ADD VALUE IF NOT EXISTS 'private_note_added';
-      `);
-
-      // BACKFILL missing logs
-      await pool.query(`
-        INSERT INTO audit_logs (actor_id, action, target_table, target_id, new_value, ip_address)
-        SELECT 
-          tutor_id, 
-          'submission_graded', 
-          CASE WHEN writing_submission_id IS NOT NULL THEN 'writing_submissions' ELSE 'speaking_submissions' END,
-          COALESCE(writing_submission_id, speaking_submission_id),
-          jsonb_build_object('reason', 'Band ' || band_score, 'band_score', band_score),
-          NULL
-        FROM tutor_feedback_reports tfr
-        WHERE NOT EXISTS (
-          SELECT 1 FROM audit_logs al 
-          WHERE al.actor_id = tfr.tutor_id 
-          AND al.action = 'submission_graded' 
-          AND al.target_id = COALESCE(tfr.writing_submission_id, tfr.speaking_submission_id)
-        )
-      `);
-
-      // BACKFILL missing test_updated logs based on mock_tests updated_at > created_at
-      await pool.query(`
-        INSERT INTO audit_logs (actor_id, action, target_table, target_id, new_value, ip_address, created_at)
-        SELECT 
-          created_by, 
-          'test_updated', 
-          'mock_tests',
-          id,
-          jsonb_build_object('title', title, 'skill', skill),
-          NULL,
-          updated_at
-        FROM mock_tests mt
-        WHERE updated_at > created_at
-        AND NOT EXISTS (
-          SELECT 1 FROM audit_logs al 
-          WHERE al.target_id = mt.id 
-          AND al.action = 'test_updated'
-        )
-      `);
-    } catch (err) {
-      console.error('Error applying migration 018:', err);
-    }
 
     const query = `
       SELECT 
@@ -1697,7 +1703,7 @@ class TutorService {
       LEFT JOIN (
         SELECT DISTINCT ON (submission_id) *
         FROM ai_grading_reports
-        WHERE submission_type = 'writing'
+        WHERE submission_type = 'writing' AND deleted_at IS NULL
         ORDER BY submission_id,
                  CASE WHEN ${reportColumns.has('computed_band') ? 'COALESCE(band_score, computed_band)' : 'band_score'} IS NOT NULL THEN 0 ELSE 1 END,
                  generated_at DESC
@@ -1812,6 +1818,7 @@ class TutorService {
       FROM ai_grading_reports
       WHERE submission_type = 'writing'
         AND submission_id = ANY($1::uuid[])
+        AND deleted_at IS NULL
       ORDER BY submission_id,
                CASE WHEN band_score IS NOT NULL THEN 0 ELSE 1 END,
                generated_at DESC`;

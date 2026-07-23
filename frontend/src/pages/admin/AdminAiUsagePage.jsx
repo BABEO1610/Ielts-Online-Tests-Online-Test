@@ -45,7 +45,6 @@ const AdminAiUsagePage = () => {
           <h1 className="display-md mb-1">Thống kê sử dụng AI</h1>
           <p className="body-sm text-secondary m-0">Lượt gọi, token tiêu thụ và phân tích theo từng tính năng.</p>
         </div>
-        <span className="admin-data-note">● Dữ liệu thật</span>
       </div>
 
       <div className="stat-grid mb-4">

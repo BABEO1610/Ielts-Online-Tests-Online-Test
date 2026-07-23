@@ -1,0 +1,434 @@
+openapi: 3.1.0
+info:
+  title: IELTSZone Global Assistant API (hiện trạng)
+  version: 1.0.0-current
+  description: |
+    Hợp đồng phản ánh code ngày 2026-07-22. Frontend dùng `/api/v1/assistant`.
+    Backend còn gắn cùng router tại `/api/assistant` như một bí danh tương thích.
+    Các phản hồi JSON hiện là cấu trúc phẳng và chưa tuân bao phản hồi của Hiến chương.
+servers:
+  - url: http://localhost:3000
+    description: Máy chủ phát triển cục bộ
+tags:
+  - name: Assistant
+security:
+  - accessTokenCookie: []
+  - legacyAccessTokenCookie: []
+paths:
+  /api/v1/assistant/chat:
+    post:
+      tags: [Assistant]
+      summary: Gửi một lượt trò chuyện và nhận JSON hoàn chỉnh
+      operationId: assistantChat
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChatRequest'
+      responses:
+        '200':
+          description: Phản hồi trợ lý thành công
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatSuccess'
+        '400':
+          $ref: '#/components/responses/AssistantError'
+        '401':
+          $ref: '#/components/responses/AssistantError'
+        '403':
+          $ref: '#/components/responses/AssistantError'
+        '404':
+          $ref: '#/components/responses/AssistantError'
+        '422':
+          $ref: '#/components/responses/AssistantError'
+        '429':
+          description: Hết quota AI hoặc vượt giới hạn 30 yêu cầu/IP/phút; hai trường hợp có cấu trúc JSON khác nhau
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/AssistantError'
+                  - $ref: '#/components/schemas/RateLimitError'
+        '500':
+          $ref: '#/components/responses/AssistantError'
+        '503':
+          $ref: '#/components/responses/AssistantError'
+  /api/v1/assistant/chat/stream:
+    post:
+      tags: [Assistant]
+      summary: Gửi một lượt trò chuyện và nhận sự kiện SSE
+      description: |
+        Nếu thất bại trước khi gửi header SSE, endpoint trả JSON AssistantError.
+        Khi thành công, thứ tự là assistant.start, một assistant.delta chứa toàn bộ
+        câu trả lời, rồi assistant.done. Đây chưa phải token streaming.
+      operationId: assistantChatStream
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChatRequest'
+      responses:
+        '200':
+          description: Luồng SSE; payload từng sự kiện là JSON đặt sau dòng `data:`
+          content:
+            text/event-stream:
+              schema:
+                type: string
+              examples:
+                success:
+                  value: |
+                    event: assistant.start
+                    data: {"conversationId":"fdc1b32e-aadb-4e37-bf96-dfb23d45179c","intent":"IELTS_KNOWLEDGE"}
+
+                    event: assistant.delta
+                    data: {"delta":"Câu trả lời hoàn chỉnh."}
+
+                    event: assistant.done
+                    data: {"answer":"Câu trả lời hoàn chỉnh.","suggestedLinks":[],"conversationId":"fdc1b32e-aadb-4e37-bf96-dfb23d45179c","intent":"IELTS_KNOWLEDGE","code":null}
+
+        '400':
+          $ref: '#/components/responses/AssistantError'
+        '401':
+          $ref: '#/components/responses/AssistantError'
+        '403':
+          $ref: '#/components/responses/AssistantError'
+        '429':
+          description: Hết quota AI hoặc vượt giới hạn tần suất
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/AssistantError'
+                  - $ref: '#/components/schemas/RateLimitError'
+        '500':
+          $ref: '#/components/responses/AssistantError'
+        '503':
+          $ref: '#/components/responses/AssistantError'
+  /api/v1/assistant/history:
+    get:
+      tags: [Assistant]
+      summary: Lấy tối đa 100 tin nhắn gần nhất của một phiên đang hoạt động thuộc sở hữu
+      operationId: assistantHistory
+      parameters:
+        - in: query
+          name: conversationId
+          required: false
+          schema:
+            type: string
+          description: Code hiện nhận chuỗi bất kỳ; chỉ một ID khớp phiên đang hoạt động thuộc sở hữu mới được chọn
+      responses:
+        '200':
+          description: Lịch sử theo thứ tự thời gian tăng dần
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HistoryResponse'
+        '401':
+          $ref: '#/components/responses/AssistantError'
+        '403':
+          $ref: '#/components/responses/AssistantError'
+        '500':
+          $ref: '#/components/responses/AssistantError'
+  /api/v1/assistant/status:
+    get:
+      tags: [Assistant]
+      summary: Kiểm tra trạng thái tối thiểu của trợ lý cho học viên đã xác thực
+      operationId: assistantStatus
+      responses:
+        '200':
+          description: Trợ lý khả dụng ở mức route
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StatusResponse'
+        '401':
+          $ref: '#/components/responses/AssistantError'
+        '403':
+          $ref: '#/components/responses/AssistantError'
+        '500':
+          $ref: '#/components/responses/AssistantError'
+  /api/v1/assistant/messages/{messageId}/rating:
+    post:
+      tags: [Assistant]
+      summary: Đánh giá một tin nhắn trợ lý thuộc cuộc trò chuyện của học viên
+      operationId: rateAssistantMessage
+      parameters:
+        - in: path
+          name: messageId
+          required: true
+          schema:
+            type: string
+          description: Code hiện chỉ kiểm tra chuỗi tồn tại; CSDL quyết định có khớp tin nhắn thuộc sở hữu hay không
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RatingRequest'
+      responses:
+        '200':
+          description: Đã lưu đánh giá
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RatingSuccess'
+        '400':
+          $ref: '#/components/responses/AssistantError'
+        '401':
+          $ref: '#/components/responses/AssistantError'
+        '403':
+          $ref: '#/components/responses/AssistantError'
+        '422':
+          $ref: '#/components/responses/AssistantError'
+        '500':
+          $ref: '#/components/responses/AssistantError'
+components:
+  securitySchemes:
+    accessTokenCookie:
+      type: apiKey
+      in: cookie
+      name: accessToken
+    legacyAccessTokenCookie:
+      type: apiKey
+      in: cookie
+      name: access_token
+  responses:
+    AssistantError:
+      description: Lỗi phẳng do controller trợ lý trả về
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AssistantError'
+  schemas:
+    ChatRequest:
+      type: object
+      additionalProperties: true
+      required: [message, context]
+      properties:
+        message:
+          type: string
+          minLength: 1
+          maxLength: 2000
+        context:
+          $ref: '#/components/schemas/PageContext'
+        conversationId:
+          type: [string, 'null']
+          format: uuid
+        sessionId:
+          type: [string, 'null']
+          format: uuid
+          deprecated: true
+          description: Bí danh tương thích; chỉ được dùng khi conversationId không có
+    PageContext:
+      type: object
+      additionalProperties: true
+      required: [pageType]
+      properties:
+        pageType:
+          type: string
+          enum: [home, test, test-list, library, lesson, profile, result, review, active-test, practice_history, post_test_review, unknown]
+        attemptId:
+          type: [string, 'null']
+        questionId:
+          type: [string, 'null']
+        route:
+          type: [string, 'null']
+        visibleItems:
+          type: array
+          maxItems: 20
+          items:
+            $ref: '#/components/schemas/VisibleItem'
+    VisibleItem:
+      type: object
+      additionalProperties: true
+      properties:
+        id:
+          type: [string, 'null']
+        title:
+          type: [string, 'null']
+        type:
+          type: [string, 'null']
+        route:
+          type: [string, 'null']
+      description: Object không có id/title sẽ bị code loại khỏi ngữ cảnh thay vì làm hỏng toàn bộ request
+    SuggestedLink:
+      type: object
+      additionalProperties: true
+      properties:
+        label:
+          type: string
+        href:
+          type: string
+        url:
+          type: string
+        type:
+          type: string
+    Grounding:
+      type: object
+      additionalProperties: true
+      properties:
+        usedDatabase:
+          type: boolean
+        usedKnowledgeBase:
+          type: boolean
+        usedSessionMemory:
+          type: boolean
+        sourceTables:
+          type: array
+          items:
+            type: string
+        resultCount:
+          type: integer
+          minimum: 0
+    Safety:
+      type: object
+      additionalProperties: true
+      properties:
+        outOfScope:
+          type: boolean
+        inventedContent:
+          type: boolean
+        containsBandScore:
+          type: boolean
+        containsWritingSpeakingGrading:
+          type: boolean
+        containsPrivateData:
+          type: boolean
+    ChatSuccess:
+      type: object
+      additionalProperties: false
+      required: [success, answer, suggestedLinks, conversationId, messageId, intent, needsMoreContext, code]
+      properties:
+        success:
+          const: true
+        answer:
+          type: string
+        suggestedLinks:
+          type: array
+          items:
+            $ref: '#/components/schemas/SuggestedLink'
+        linkMeta:
+          type: [object, 'null']
+          additionalProperties: true
+        conversationId:
+          type: [string, 'null']
+          format: uuid
+        messageId:
+          type: [string, 'null']
+          format: uuid
+        intent:
+          type: [string, 'null']
+        needsMoreContext:
+          type: boolean
+        grounding:
+          oneOf:
+            - $ref: '#/components/schemas/Grounding'
+            - type: 'null'
+        safety:
+          oneOf:
+            - $ref: '#/components/schemas/Safety'
+            - type: 'null'
+        code:
+          type: 'null'
+    AssistantError:
+      type: object
+      additionalProperties: false
+      required: [success, answer, suggestedLinks, code, message, intent]
+      properties:
+        success:
+          const: false
+        answer:
+          type: 'null'
+        suggestedLinks:
+          type: array
+          maxItems: 0
+        code:
+          type: string
+          enum: [LOGIN_REQUIRED, FORBIDDEN, VALIDATION_ERROR, ASSISTANT_DISABLED_DURING_TEST, ATTEMPT_NOT_FOUND, ATTEMPT_NOT_SUBMITTED, QUESTION_NOT_FOUND, MISSING_CONTEXT, MISSING_EXPLANATION, OUT_OF_SCOPE, INTERNAL_ERROR, AI_NOT_CONFIGURED, AI_QUOTA_EXCEEDED]
+        message:
+          type: string
+        intent:
+          type: string
+    RateLimitError:
+      type: object
+      additionalProperties: false
+      required: [success, error]
+      properties:
+        success:
+          const: false
+        error:
+          type: object
+          additionalProperties: false
+          required: [code, message]
+          properties:
+            code:
+              const: RATE_LIMIT_EXCEEDED
+            message:
+              type: string
+    HistoryMessage:
+      type: object
+      additionalProperties: false
+      required: [id, role, content, createdAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        role:
+          type: string
+          enum: [user, assistant]
+        content:
+          type: string
+        createdAt:
+          type: [string, 'null']
+          format: date-time
+    HistoryResponse:
+      type: object
+      additionalProperties: false
+      required: [history, conversationId, code]
+      properties:
+        history:
+          type: array
+          maxItems: 100
+          items:
+            $ref: '#/components/schemas/HistoryMessage'
+        conversationId:
+          type: [string, 'null']
+          format: uuid
+        code:
+          type: 'null'
+    StatusResponse:
+      type: object
+      additionalProperties: false
+      required: [code, status]
+      properties:
+        code:
+          type: 'null'
+        status:
+          const: ok
+    RatingRequest:
+      type: object
+      additionalProperties: true
+      required: [rating]
+      properties:
+        rating:
+          type: string
+          enum: [up, down]
+        reason:
+          type: [string, 'null']
+    RatingSuccess:
+      type: object
+      additionalProperties: false
+      required: [success, messageId, rating, code]
+      properties:
+        success:
+          const: true
+        messageId:
+          type: string
+        rating:
+          type: string
+          enum: [up, down]
+        code:
+          type: 'null'
