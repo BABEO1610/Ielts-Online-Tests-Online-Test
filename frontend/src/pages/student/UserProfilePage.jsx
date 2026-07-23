@@ -2,24 +2,28 @@ import React, { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import api from '../../services/api';
-import ChangePwdModal from '../../components/profile/ChangePwdModal';
 import PracticeHistoryPage from './PracticeHistoryPage';
+import SecuritySettingsPage from './SecuritySettingsPage';
 import StudyPlanPage from './StudyPlanPage';
 import { formatDateTime, rolePill, statusPill } from '../../utils/adminFormat';
 import '../../styles/admin.css';
 import '../../styles/profile.css';
 
 const ProfilePageContent = ({ user, refreshUser }) => {
-  const [form, setForm] = useState({ full_name: '', avatar_url: '' });
+  const [form, setForm] = useState({ full_name: '', avatar_url: '', target_band_score: 7.0, target_test_date: '' });
   const [loading, setLoading] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
-  const [showPwd, setShowPwd] = useState(false);
 
   useEffect(() => {
     if (user) {
-      setForm({ full_name: user.full_name || '', avatar_url: user.avatar_url || '' });
+      setForm({ 
+        full_name: user.full_name || '', 
+        avatar_url: user.avatar_url || '', 
+        target_band_score: user.target_band_score || 7.0,
+        target_test_date: user.target_test_date ? new Date(user.target_test_date).toISOString().split('T')[0] : ''
+      });
     }
   }, [user]);
 
@@ -28,6 +32,16 @@ const ProfilePageContent = ({ user, refreshUser }) => {
     setErrorMsg('');
     setSuccessMsg('');
   };
+
+  const handleBandScoreBlur = (e) => {
+    let val = parseFloat(e.target.value);
+    if (isNaN(val)) val = 7.0;
+    if (val < 0.0) val = 0.0;
+    if (val > 9.0) val = 9.0;
+    val = Math.round(val * 2) / 2;
+    setForm((prev) => ({ ...prev, target_band_score: val.toFixed(1) }));
+  };
+
 
   const handleAvatarUpload = async (e) => {
     const file = e.target.files?.[0];
@@ -68,7 +82,12 @@ const ProfilePageContent = ({ user, refreshUser }) => {
     setErrorMsg('');
     setSuccessMsg('');
     try {
-      await api.patch('/users/me', { full_name: form.full_name, avatar_url: form.avatar_url });
+      await api.patch('/users/me', { 
+        full_name: form.full_name, 
+        avatar_url: form.avatar_url,
+        target_band_score: Number(form.target_band_score),
+        target_test_date: form.target_test_date || null
+      });
       setSuccessMsg('Cập nhật hồ sơ thành công.');
       await refreshUser();
     } catch (error) {
@@ -138,31 +157,24 @@ const ProfilePageContent = ({ user, refreshUser }) => {
                       value={form.avatar_url} onChange={handleChange} data-testid="avatar-input" />
                   </div>
                 </div>
+                <div className="mb-4">
+                  <label className="form-label fw-semibold text-secondary">Ngày dự thi (Target Test Date)</label>
+                  <input type="date" className="form-control" name="target_test_date"
+                    value={form.target_test_date} onChange={handleChange} data-testid="target-date-input" />
+                </div>
+                <div className="mb-4">
+                  <label className="form-label fw-semibold text-secondary">Mục tiêu (Band Score)</label>
+                  <input type="number" step="0.5" min="0" max="9" className="form-control" name="target_band_score" placeholder="7.0"
+                    value={form.target_band_score} onChange={handleChange} onBlur={handleBandScoreBlur} data-testid="target-band-input" required />
+                </div>
                 <button type="submit" className="btn-pill btn-pill--dark px-4" disabled={loading || uploadingAvatar} data-testid="submit-btn">
                   {loading ? 'Đang lưu…' : 'Lưu thay đổi'}
                 </button>
               </form>
             </div>
           </div>
-
-          <div className="admin-card">
-            <div className="admin-card__header">
-              <h2 className="admin-card__title">Bảo mật &amp; tài khoản</h2>
-              <button className="btn-pill btn-pill--ghost" onClick={() => setShowPwd(true)}>Đổi mật khẩu</button>
-            </div>
-            <div className="admin-card__body">
-              <div className="row g-3">
-                <div className="col-sm-6"><span className="caption text-secondary d-block">Email</span><span className="body-md-strong">{user.email}</span></div>
-                <div className="col-sm-6"><span className="caption text-secondary d-block">Vai trò</span><span className="body-md-strong text-capitalize">{user.role || 'student'}</span></div>
-                <div className="col-sm-6"><span className="caption text-secondary d-block">Ngày tạo tài khoản</span><span className="body-md-strong">{formatDateTime(user.created_at)}</span></div>
-                <div className="col-sm-6"><span className="caption text-secondary d-block">Đăng nhập gần nhất</span><span className="body-md-strong">{formatDateTime(user.last_login_at)}</span></div>
-              </div>
-            </div>
-          </div>
         </div>
       </div>
-
-      <ChangePwdModal isOpen={showPwd} onClose={() => setShowPwd(false)} />
     </div>
   );
 };
@@ -177,6 +189,14 @@ const UserProfilePage = () => {
     return (
       <div className="py-4 px-3 px-md-4">
         <PracticeHistoryPage />
+      </div>
+    );
+  }
+
+  if (location.pathname === '/security') {
+    return (
+      <div className="py-4 px-3 px-md-4">
+        <SecuritySettingsPage />
       </div>
     );
   }

@@ -50,6 +50,7 @@ const ProfileLayout = () => {
 
   const navItems = [
     { path: '/profile', label: 'Hồ sơ cá nhân', icon: 'bi-person' },
+    { path: '/security', label: 'Bảo mật & tài khoản', icon: 'bi-shield-lock' },
     { path: '/practice-history', label: 'Lịch sử làm bài', icon: 'bi-clock-history' },
     { path: '/study-plan', label: 'Process Tracking', icon: 'bi-journal-check' }
   ];
