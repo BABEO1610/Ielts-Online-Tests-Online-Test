@@ -28,7 +28,8 @@ jobs:
             
             # Khởi động lại Docker Compose với bản build mới
             # Nó sẽ tự động dùng file .env.production đã cấu hình trên VPS
-            docker compose -f docker-compose.prod.yml up -d --build
+            docker compose --env-file .env.production -f docker-compose.prod.yml build --no-cache frontend
+            docker compose --env-file .env.production -f docker-compose.prod.yml up -d --build
             
             # Xóa các image rác cũ để giải phóng dung lượng
             docker image prune -f
