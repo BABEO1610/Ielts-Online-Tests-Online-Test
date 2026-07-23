@@ -1,6 +1,7 @@
 import { useMemo, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../../services/api';
+import { formatIeltsBandScore } from '../../utils/ieltsScoring';
 import '../../styles/admin.css';
 import '../../styles/profile.css';
 
@@ -49,9 +50,10 @@ function calcSummary(history) {
   const total = history.length;
 
   const validBands = history.filter(h => h.bandScore && !isNaN(h.bandScore));
-  const avgBand = validBands.length
-    ? (Math.round((validBands.reduce((s, h) => s + parseFloat(h.bandScore), 0) / validBands.length) * 2) / 2).toFixed(1)
-    : '—';
+  const rawAvg = validBands.length
+    ? validBands.reduce((s, h) => s + parseFloat(h.bandScore), 0) / validBands.length
+    : null;
+  const avgBand = rawAvg !== null ? formatIeltsBandScore(rawAvg) : '—';
 
   // Accuracy = tỉ lệ câu đúng trên tổng câu (chỉ tính bài objective test có totalQuestions > 0)
   const objItems = history.filter(h => (h.skill === 'reading' || h.skill === 'listening') && h.totalQuestions > 0);
@@ -200,7 +202,7 @@ const PracticeHistoryPage = () => {
             <div className="iot-history-row" key={item.id}>
               <strong>{item.testTitle}</strong>
               <span className="iot-history-skill">{SKILL_LABEL[item.skill] || item.skill}</span>
-              <span>{item.bandScore ? item.bandScore.toFixed(1) : '—'}</span>
+              <span>{item.bandScore != null && !isNaN(item.bandScore) ? formatIeltsBandScore(item.bandScore) : '—'}</span>
               <span>{formatDate(item.submittedAt)}</span>
               {(() => {
                 const statusInfo = getStatusInfo(item);

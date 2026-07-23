@@ -5,6 +5,7 @@ import { updateGradingResult } from '../../services/gradingHistory.service';
 import TutorContextSidebar from './TutorContextSidebar';
 import AiFeedbackPanel from './AiFeedbackPanel';
 import { calculatePreviewBand } from '../../utils/ieltsScoring';
+import { useToast, ToastContainer } from '../common/Toast';
 
 const IELTS_CRITERIA = {
   writing: [
@@ -76,6 +77,7 @@ const TutorGradingPanel = ({
   existingTutorGrade
 }) => {
   const navigate = useNavigate();
+  const { toasts, showToast, dismissToast } = useToast();
   const [taskScores, setTaskScores] = useState({});
   const [taskFeedbacks, setTaskFeedbacks] = useState({});
   const [showNotesModal, setShowNotesModal] = useState(false);
@@ -212,19 +214,26 @@ const TutorGradingPanel = ({
 
       if (response.success) {
         const isCompleted = type !== 'writing' || response.data?.tutorStatus === 'graded';
-        setSubmitSuccess({
-          completed: isCompleted,
-          message: isCompleted
-            ? 'Đã gửi điểm cho học sinh.'
-            : 'Đã lưu điểm task này. Hãy chuyển sang task còn lại để hoàn tất bài Writing.',
-        });
+        const toastMsg = isCompleted
+          ? 'Đã gửi điểm cho học sinh! Đang tự động chuyển về hàng chờ...'
+          : `Đã lưu điểm Task ${activeTaskNumber}. Vui lòng chuyển sang Task còn lại để hoàn tất.`;
+
+        showToast(toastMsg, 'success', 3000);
+
         if (onGradingComplete) {
           onGradingComplete(response.data);
         }
-        if (editMode) navigate('/grading/tutor/schedule');
+        
+        if (isCompleted || editMode) {
+          setTimeout(() => {
+            navigate(editMode ? '/grading/tutor/schedule' : '/grading/tutor/queue');
+          }, 1500);
+        }
       }
     } catch (err) {
-      setError(err.response?.data?.error?.message || 'Failed to submit grades.');
+      const errMsg = err.response?.data?.error?.message || 'Failed to submit grades.';
+      setError(errMsg);
+      showToast(errMsg, 'error', 4000);
     } finally {
       setSubmitting(false);
     }
@@ -232,6 +241,7 @@ const TutorGradingPanel = ({
 
   return (
     <>
+      <ToastContainer toasts={toasts} onDismiss={dismissToast} position="top-right" />
       <div className="bg-canvas rounded-4 p-4 h-100 d-flex flex-column">
         <div className="d-flex justify-content-between align-items-center mb-4">
           <h4 className="text-ink fw-bold mb-0">
@@ -266,23 +276,6 @@ const TutorGradingPanel = ({
           {error && (
             <div className="bg-canvas-soft border-start border-4 border-dark text-ink p-3 mb-4 rounded" role="alert">
               <span className="fw-medium">{error}</span>
-            </div>
-          )}
-
-          {submitSuccess && (
-            <div className="bg-canvas-soft border-start border-4 border-success text-ink p-3 mb-4 rounded" role="status">
-              <div className="d-flex justify-content-between align-items-center gap-3 flex-wrap">
-                <span className="fw-medium">{submitSuccess.message}</span>
-                {submitSuccess.completed && (
-                  <button
-                    type="button"
-                    className="btn btn-dark rounded-pill px-4 py-2 fw-bold"
-                    onClick={() => navigate('/grading/tutor/queue')}
-                  >
-                    Quay lại hàng chờ chấm
-                  </button>
-                )}
-              </div>
             </div>
           )}
 

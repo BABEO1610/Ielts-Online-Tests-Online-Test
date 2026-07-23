@@ -20,6 +20,7 @@ const AVATAR_COLORS = [
   '#e65100', '#006064', '#880e4f', '#33691e',
 ];
 import { getGradingHistoryById } from '../../services/gradingHistory.service';
+import { formatIeltsBandScore } from '../../utils/ieltsScoring';
 
 const getAvatarColor = (name = '') => {
   let hash = 0;
@@ -74,7 +75,7 @@ const GradingDetailModal = ({ record, onClose, statusMap, skillMap }) => {
       label: 'Điểm Band',
       value: (
         <span style={{ fontSize: '28px', fontWeight: 700, fontFamily: 'UberMove, system-ui, sans-serif' }}>
-          Band {displayRecord.band}
+          Band {formatIeltsBandScore(displayRecord.band)}
         </span>
       ),
     },

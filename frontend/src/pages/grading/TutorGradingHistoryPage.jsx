@@ -7,6 +7,7 @@ import GradingRevokeModal from '../../components/grading/GradingRevokeModal';
 import { getGradingHistory, getGradingHistoryStats, revokeGradingResult } from '../../services/gradingHistory.service';
 import { exportToCsv } from '../../utils/exportCsv';
 import { useToast, ToastContainer } from '../../components/common/Toast';
+import { formatIeltsBandScore } from '../../utils/ieltsScoring';
 
 // ─── Shared config ─────────────────────────────────────────────────────────────
 export const STATUS_MAP = {
@@ -202,7 +203,7 @@ const TutorGradingHistoryPage = () => {
       {/* Stat cards */}
       <div style={{ display: 'flex', gap: '16px', marginBottom: '28px' }}>
         <StatCard label="Tổng bài đã chấm (Tháng)" value={stats.total_graded_month || 0} />
-        <StatCard label="Điểm Band trung bình (Tháng)" value={`Band ${stats.avg_band_score_month || '0.0'}`} dark />
+        <StatCard label="Điểm Band trung bình (Tháng)" value={`Band ${formatIeltsBandScore(stats.avg_band_score_month)}`} dark />
         <StatCard label="Khiếu nại đang xử lý" value={stats.pending_complaints || 0} sub="bài cần xem xét" />
       </div>
 

@@ -5,6 +5,7 @@
 
 const { pool } = require('../db/pool');
 const trackingQueries = require('../db/queries/tracking.queries');
+const { roundToNearestHalf } = require('../utils/scoring');
 
 const getTrackingProcess = async (req, res, next) => {
   try {
@@ -24,8 +25,8 @@ const getTrackingProcess = async (req, res, next) => {
       const roundedScore = found ? Math.round(Number(found.avg_score) * 2) / 2 : 0;
       return {
         skill: s.charAt(0).toUpperCase() + s.slice(1),
-        score: roundedScore.toFixed(1),
-        target: Number(target).toFixed(1)
+        score: found ? roundToNearestHalf(found.avg_score).toFixed(1) : '0.0',
+        target: roundToNearestHalf(target).toFixed(1)
       };
     });
     

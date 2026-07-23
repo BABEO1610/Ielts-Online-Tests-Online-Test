@@ -396,6 +396,33 @@ const mapAiReport = (report) => {
 
 const mapTutorGrade = (report) => {
   if (!report) return null;
+  
+  if (report.speaking_submission_id != null || report.fluency_score != null || report.pronunciation_score != null) {
+    const fluency = report.fluency_score ? parseFloat(report.fluency_score) : null;
+    const lexical = report.lexical_score ? parseFloat(report.lexical_score) : null;
+    const grammar = report.grammar_score ? parseFloat(report.grammar_score) : null;
+    const pronunciation = report.pronunciation_score ? parseFloat(report.pronunciation_score) : null;
+    return {
+      id: report.id,
+      overallBand: report.band_score ? parseFloat(report.band_score) : null,
+      criterionScores: {
+        fluencyCoherence: fluency,
+        lexicalResource: lexical,
+        grammaticalRangeAccuracy: grammar,
+        pronunciation,
+      },
+      scores: {
+        fluency,
+        lexical,
+        grammar,
+        pronunciation,
+      },
+      writtenFeedback: report.written_feedback || '',
+      createdAt: report.created_at,
+      updatedAt: report.updated_at,
+    };
+  }
+
   return {
     id: report.id,
     overallBand: report.band_score ? parseFloat(report.band_score) : null,

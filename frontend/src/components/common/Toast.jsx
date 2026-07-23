@@ -82,21 +82,25 @@ const ToastItem = ({ toast, onDismiss }) => {
 };
 
 // ─── Container (fixed bottom-right) ───────────────────────────────────────────
-export const ToastContainer = ({ toasts, onDismiss }) => {
+export const ToastContainer = ({ toasts, onDismiss, position = 'bottom-right' }) => {
   if (!toasts || toasts.length === 0) return null;
+
+  const isTop = position.startsWith('top');
 
   return (
     <>
       {/* Keyframe animation */}
       <style>{`
         @keyframes slideInToast {
-          from { opacity: 0; transform: translateY(12px); }
+          from { opacity: 0; transform: translateY(${isTop ? '-12px' : '12px'}); }
           to   { opacity: 1; transform: translateY(0); }
         }
       `}</style>
 
       <div style={{
-        position: 'fixed', bottom: '28px', right: '28px',
+        position: 'fixed',
+        ...(isTop ? { top: '28px' } : { bottom: '28px' }),
+        right: '28px',
         zIndex: 9999,
         display: 'flex', flexDirection: 'column', gap: '10px',
         alignItems: 'flex-end',

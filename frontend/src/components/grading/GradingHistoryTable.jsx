@@ -1,4 +1,5 @@
 import React from 'react';
+import { formatIeltsBandScore } from '../../utils/ieltsScoring';
 
 // Keyframe cho skeleton shimmer
 const SHIMMER_STYLE = `
@@ -235,7 +236,7 @@ const GradingHistoryTable = ({
                   fontSize: '20px', fontWeight: 700,
                   fontFamily: 'UberMove, system-ui, sans-serif', color: '#000',
                 }}>
-                  {r.band.toFixed(1)}
+                  {formatIeltsBandScore(r.band)}
                 </span>
                 <div style={{ fontSize: '11px', color: '#aaa', marginTop: '2px' }}>Band score</div>
               </td>
