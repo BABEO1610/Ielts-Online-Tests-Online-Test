@@ -17,7 +17,7 @@ jobs:
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USERNAME }}
-          key: ${{ secrets.VPS_SSH_KEY }}
+          password: ${{ secrets.VPS_PASSWORD }}
           script: |
             # Di chuyển vào thư mục dự án trên VPS
             # Thay đổi đường dẫn này thành thư mục chứa code thật trên VPS của bạn
