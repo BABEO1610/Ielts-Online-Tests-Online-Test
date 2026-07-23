@@ -53,7 +53,6 @@ const AdminOverviewPage = () => {
           <h1 className="display-md mb-1">Tổng quan</h1>
           <p className="body-sm text-secondary m-0">Bức tranh nhanh về người dùng, hoạt động và mức sử dụng AI.</p>
         </div>
-        <span className="admin-data-note">● Dữ liệu thật</span>
       </div>
 
       <div className="stat-grid mb-4">
