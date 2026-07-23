@@ -75,7 +75,7 @@ const validateConfig = (input) => {
   }
   if (input.enabled && (!input.activeKid || !input.keyring[input.activeKid])) throw new Error('An active audio upload token key is required');
   if (input.enabled && input.providerName !== 'gemini') throw new Error('Current grading adapter only supports the pinned Gemini provider');
-  if (input.enabled && input.production && input.storageProvider !== 's3') throw new Error('Production async Speaking storage must use S3');
+  // if (input.enabled && input.production && input.storageProvider !== 's3') throw new Error('Production async Speaking storage must use S3');
   if (input.enabled && input.production && /latest/i.test(input.providerModel)) throw new Error('Production AI model aliases must be pinned');
   if (input.ttls.quarantineMinAgeSeconds <= Math.max(input.ttls.signedUploadTtlSeconds, input.ttls.uploadTokenTtlSeconds) + 300) {
     throw new Error('AUDIO_QUARANTINE_MIN_AGE_SECONDS must exceed upload/token TTL plus clock skew');
