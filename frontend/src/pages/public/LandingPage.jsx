@@ -1,6 +1,5 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Sun, Moon } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import {
     motion,

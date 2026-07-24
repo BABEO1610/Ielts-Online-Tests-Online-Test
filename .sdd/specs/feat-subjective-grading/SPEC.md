@@ -1,321 +1,123 @@
-# Subjective Grading - As-built Spec
-
-Status: active as-built documentation for student-facing Writing/Speaking
-subjective grading and the AI/tutor boundary.
-
-This spec intentionally describes only the current direct Express
-controller/service flow that calls the backend AI provider wrapper.
-
-## 1. Feature Scope
-
-In scope:
-
-- Student-facing AI Writing grading.
-- Student-facing AI Speaking grading.
-- Student choice of `grader = ai` or `grader = tutor`.
-- AI feedback as student-facing reference feedback.
-- Tutor grading as a separate manual/official flow.
-- Student feedback and history retrieval for the authenticated user's own
-  submissions.
-
-Out of scope for this spec:
-
-- Tutor AI support.
-- Tutor-side AI reference generation.
-- Replacing tutor grading with chatbot answers.
-- Any frontend direct call to an AI provider.
-
-## 2. Active Routes
-
-All submission routes are mounted under `/api/v1/submissions` and protected by
-`backend/src/middleware/authenticate.js`.
-
-Active student routes:
-
-| Method | Path | Purpose |
-| --- | --- | --- |
-| POST | `/writing/full` | Submit full Writing Task 1 + Task 2 for AI or tutor grading. |
-| POST | `/speaking/upload` | Upload temporary Speaking audio through backend middleware. |
-| POST | `/speaking/full` | Submit full Speaking Parts 1, 2, and 3 for AI or tutor grading. |
-| POST | `/speaking` | Legacy one-part endpoint. Tutor only; AI is rejected. |
-| GET | `/history` | Retrieve current student's Writing/Speaking history. |
-| GET | `/:id/feedback` | Retrieve current student's feedback detail. |
-
-Additional owned Writing AI endpoint:
-
-- `POST /writing/:submissionId/ai-grade` exists for an authenticated student-owned
-  Writing submission where `grader = ai`. It is not the primary current frontend
-  submission path.
-
-## 3. Writing AI Grading Flow
-
-Frontend:
-
-- `frontend/src/pages/subjective-testing/WritingTestPage.jsx`
-- `frontend/src/services/grading.service.js`
-
-Backend:
-
-- `backend/src/controllers/submission.controller.js`
-- `backend/src/services/submission.service.js`
-- `backend/src/ai/grading.service.js`
-- `backend/src/ai/grading.prompt.js`
-- `backend/src/ai/grading.validator.js`
-
-Flow:
-
-1. Student completes both Writing Task 1 and Task 2 in the frontend.
-2. Student selects `grader = ai` or `grader = tutor`.
-3. Frontend posts to `/api/v1/submissions/writing/full`.
-4. Controller uses `req.user.id`; it does not trust `req.body.userId`.
-5. Service validates `grader` and normalizes the tasks.
-6. `normalizeWritingTasks` requires exactly two tasks: task number 1 and task
-   number 2.
-7. Service validates optional `test_id` against `mock_tests`.
-8. Service creates a `writing_group_id`.
-9. Service inserts both `writing_submissions` rows inside a database transaction.
-10. If `grader = ai`, service directly calls `gradeWriting` for each task after the
-    transaction commits.
-11. AI provider returns structured JSON through `backend/src/services/ai.service.js`.
-12. `grading.validator.js` validates the four IELTS Writing criteria:
-    `taskAchievementOrResponse`, `coherenceCohesion`, `lexicalResource`, and
-    `grammarRangeAccuracy`.
-13. Band scores are normalized to IELTS half-band increments.
-14. Completed or failed AI reports are saved in `ai_grading_reports`.
-15. Writing rows are updated with `ai_status`, `overall_ai_band`, and status where
-    the schema supports those columns.
-16. Student can retrieve feedback/history through authenticated, user-scoped
-    endpoints.
-
-AI failure does not silently erase the submission. The service saves a failed AI
-report where possible and keeps the submission in a pending/failed AI state rather
-than converting it into tutor grading automatically.
-
-## 4. Speaking AI Grading Flow
-
-Frontend:
-
-- `frontend/src/pages/subjective-testing/SpeakingTestPage.jsx`
-- `frontend/src/components/grading/AudioRecorder.jsx`
-- `frontend/src/services/grading.service.js`
-
-Backend:
-
-- `backend/src/controllers/submission.controller.js`
-- `backend/src/services/submission.service.js`
-- `backend/src/services/speakingAiGrading.service.js`
-- `backend/src/ai/grading.service.js`
-- `backend/src/ai/speakingGrading.prompt.js`
-- `backend/src/ai/speakingGrading.validator.js`
-
-Flow:
-
-1. Student records Speaking Part 1, Part 2, and Part 3.
-2. Frontend uploads audio through `/api/v1/submissions/speaking/upload`.
-3. Frontend posts all three parts to `/api/v1/submissions/speaking/full`.
-4. Controller requires `parts.length === 3`.
-5. Service uses `req.user.id` from auth.
-6. Service validates `grader` and optional `test_id`.
-7. For each submitted part, service verifies the storage path belongs to the user:
-   it must start with `speaking/{userId}/` and must not contain `..`.
-8. Service creates a `speaking_group_id` and inserts all three
-   `speaking_submissions` rows inside a transaction.
-9. If `grader = ai`, service calls `gradeSpeakingGroup`.
-10. `gradeSpeakingGroup` reloads the group and rejects anything other than exactly
-    three parts.
-11. Missing transcripts are generated from audio through the backend AI provider
-    wrapper.
-12. The session is graded as one full Speaking session.
-13. `speakingGrading.validator.js` validates the four IELTS Speaking criteria:
-    `fluencyCoherence`, `lexicalResource`, `grammaticalRangeAccuracy`, and
-    `pronunciation`.
-14. Pronunciation is part of the Speaking result only because audio/transcript input
-    exists. The prompt warns not to pretend to hear details that are not available.
-15. Completed or failed AI reports are saved in `ai_grading_reports`.
-16. Student can retrieve feedback/history through authenticated, user-scoped
-    endpoints.
-
-The legacy one-part `/speaking` endpoint is not the active AI Speaking path. It now
-rejects `grader = ai` because AI Speaking grading requires all three parts.
-
-## 5. Tutor Grading Boundary
-
-Student choice controls the boundary:
-
-- `grader = ai`: submission is AI-only reference feedback unless a separate user
-  action or tutor flow handles it later.
-- `grader = tutor`: submission enters the tutor manual grading queue.
-
-Tutor queue code filters pending submissions by `grader = 'tutor'`. AI-only
-submissions should not appear in the tutor queue as pending tutor work.
-
-AI grading does not overwrite tutor grades. Tutor feedback is stored separately in
-`tutor_feedback_reports`, and Writing submissions have separate `ai_status`,
-`tutor_status`, `overall_ai_band`, and `overall_tutor_band` where the migration has
-run.
-
-## 6. Security Requirements
-
-- Use `req.user.id` from authentication for all student submission ownership.
-- Never trust `req.body.userId`.
-- Use parameterized SQL queries.
-- Verify history and feedback belong to the authenticated user before returning
-  data.
-- Reject foreign or malformed Speaking audio paths.
-- Do not call AI providers directly from the frontend.
-- Store AI usage metadata in `ai_usage_logs` when the AI wrapper is called.
-- Keep AI reports and tutor reports separate.
-- Do not expose raw provider credentials in API responses.
-
-## 7. Error Handling
-
-Handled cases:
-
-- invalid `grader`;
-- Writing submission missing Task 1 or Task 2;
-- Speaking submission missing one of the three parts;
-- invalid or foreign Speaking audio path;
-- AI provider failure;
-- invalid AI JSON;
-- missing required IELTS criteria;
-- AI report persistence failure;
-- missing database migration columns for required grouped Writing flow;
-- history or feedback lookup for another user's submission.
-
-The service should not silently lose a submitted subjective answer. When the answer
-has already been persisted and AI fails, the failure is recorded where possible and
-the submission remains retrievable.
-
-## 8. Database
-
-Current subjective grading tables used by code:
-
-### `writing_submissions`
-
-Columns from migrations/code include:
-
-- `id`, `user_id`, `test_id`, `task_number`, `prompt_text`, `response_text`,
-  `file_url`, `grader`, `status`, `submitted_at`, `created_at`;
-- `assigned_tutor_id`;
-- `writing_group_id`;
-- `word_count`, `ai_status`, `tutor_status`, `overall_ai_band`,
-  `overall_tutor_band`, `updated_at`.
-
-### `speaking_submissions`
-
-Columns from migrations/code include:
-
-- `id`, `user_id`, `test_id`, `part_number`, `prompt_text`, `audio_url`,
-  `transcript`, `grader`, `status`, `submitted_at`, `created_at`;
-- `assigned_tutor_id`;
-- `speaking_group_id`.
-
-### `ai_grading_reports`
-
-Base and extended columns from migrations/code include:
-
-- `id`, `submission_id`, `submission_type`, `band_score`;
-- Writing scores: `task_achievement_score`, `coherence_score`, `lexical_score`,
-  `grammar_score`;
-- Speaking scores: `fluency_score`, `pronunciation_score`;
-- `error_highlights`, `suggestions`, `raw_ai_response`, `generated_at`;
-- `status`, `improved_version`, `prompt_version`, `model_name`, `error_message`,
-  `criteria_json`, `feedback_json`, `computed_band`,
-  `band_validation_warning`, `created_at`, `updated_at`;
-- Writing group support: `task_number`, `writing_group_id`;
-- Speaking service conditionally writes `speaking_group_id` and `part_number` if
-  those columns exist in the live schema. This repo does not include a migration
-  that adds those two report columns.
-
-### `tutor_feedback_reports`
-
-Current grouped tutor feedback table used by `submission.service.js` and
-`tutor.service.js`:
-
-- `id`, `tutor_id`, `writing_submission_id`, `speaking_submission_id`,
-  `task_number`, `band_score`, criteria score columns, `written_feedback`,
-  `audio_feedback_url`, `created_at`, `updated_at`.
-
-### `ai_usage_logs`
-
-AI usage metadata table:
-
-- `id`, `user_id`, `feature`, `provider`, `model`, `response_id`, `entity_type`,
-  `entity_id`, token counters, `success`, `error_code`, `error_message`,
-  `latency_ms`, `created_at`.
-
-Chatbot tables are documented in the chatbot spec, not here, except for shared
-`ai_usage_logs`.
-
-## 9. Text Diagrams
-
-Writing AI flow:
-
-```text
-WritingTestPage
-  -> gradingService.submitFullWriting
-  -> POST /api/v1/submissions/writing/full
-  -> authenticate
-  -> submitFullWriting controller
-  -> SubmissionService.submitFullWriting
-  -> transaction inserts Task 1 + Task 2
-  -> gradeWriting for each task
-  -> grading.validator validates 4 criteria
-  -> ai_grading_reports
-  -> writing_submissions ai_status/overall_ai_band
-  -> response to student
-```
-
-Speaking AI flow:
-
-```text
-SpeakingTestPage
-  -> upload audio through backend
-  -> gradingService.submitFullSpeaking
-  -> POST /api/v1/submissions/speaking/full
-  -> authenticate
-  -> submitFullSpeaking controller
-  -> ownership check for speaking/{userId}/ audio paths
-  -> transaction inserts Part 1 + Part 2 + Part 3
-  -> gradeSpeakingGroup
-  -> transcript generation if needed
-  -> speakingGrading.validator validates 4 criteria
-  -> ai_grading_reports
-  -> speaking_submissions status
-  -> response to student
-```
-
-Tutor grading boundary:
-
-```text
-Student selects grader
-  -> grader = ai: AI reference feedback path
-  -> grader = tutor: pending tutor manual grading queue
-Tutor queue
-  -> WHERE status = 'pending' AND grader = 'tutor'
-```
-
-Student feedback/history:
-
-```text
-GET /api/v1/submissions/history or /:id/feedback
-  -> authenticate
-  -> use req.user.id
-  -> query writing/speaking group owned by user
-  -> join ai_grading_reports and tutor_feedback_reports
-  -> return only current student's data
-```
-
-## 10. Acceptance Criteria
-
-- AI Writing submission requires both Task 1 and Task 2.
-- AI Writing returns four criteria per task.
-- AI Speaking submission requires all three Speaking parts.
-- AI Speaking returns four criteria including pronunciation.
-- Pronunciation is only scored in the Speaking flow where audio/transcript exists.
-- Legacy one-part Speaking endpoint rejects `grader = ai`.
-- History and feedback only return current user's data.
-- AI grading does not overwrite tutor grade fields.
-- Tutor queue does not include AI-only pending submissions.
-- Invalid AI JSON or missing criteria is rejected/handled safely.
-- AI usage is logged when the AI provider wrapper is called.
+# Đặc tả tính năng tổng thể: Hệ thống Chấm bài Tự luận IELTS (Subjective Grading Master Spec)
+
+**Ngày cập nhật**: 2026-07-23
+
+**Trạng thái**: Tài liệu đặc tả tổng thể (Master Feature Spec) — Đã rà soát & tích hợp toàn bộ codebase
+
+**Đầu vào & Phạm vi tổng quát**:
+Nền tảng chấm bài tự luận IELTSZone quản lý toàn bộ chu trình xử lý bài thi tự luận Writing và Speaking cho học viên, quản trị viên và giáo viên: từ việc thu âm/soạn bài thi trên giao diện SPA, lựa chọn người chấm (`AI` hoặc `Giáo viên`), xử lý nộp bài, phân công bài nộp từ Admin cho Giảng viên phù hợp, xử lý và chấm điểm tự động qua dịch vụ AI, đến việc cung cấp Không gian làm việc chấm bài cho Giáo viên và trang Báo cáo phản hồi chi tiết cho Học viên.
+
+Feature lớn này được phân rã thành **6 sub-features chuyên biệt**:
+1. 📁 [feat-writing-test-flow](./feat-writing-test-flow/spec.md): Luồng thi và nộp bài Writing Task 1 & Task 2.
+2. 📁 [feat-speaking-test-flow](./feat-speaking-test-flow/spec.md): Luồng thi và nộp bài Speaking 3 Parts.
+3. 📁 [feat-ai-grading-integration](./feat-ai-grading-integration/spec.md): Luồng Xử lý & Chấm điểm Tự động bằng AI (Writing & Speaking AI Evaluation Pipeline).
+4. 📁 [feat-admin-tutor-assignment](./feat-admin-tutor-assignment/spec.md): Admin quản lý và Phân công Giảng viên chấm bài.
+5. 📁 [feat-tutor-grading-workspace](./feat-tutor-grading-workspace/spec.md): Không gian làm việc và chấm bài dành cho Giáo viên.
+6. 📁 [feat-student-feedback-history](./feat-student-feedback-history/spec.md): Tra cứu Lịch sử nộp bài và Báo cáo phản hồi cho Học viên.
+
+---
+
+## 1. Danh mục API Routes Hoạt động (Active API Endpoints)
+
+Tất cả các API được bảo vệ bởi middleware xác thực JWT/Session (`authenticate.js`) và phân quyền RBAC (`authorize.js`).
+
+### 1.1. Endpoints dành cho Học viên (Student Endpoints - `/api/v1/submissions`)
+
+| Method | Path | Mô tả chức năng | Quyền truy cập |
+|---|---|---|---|
+| `POST` | `/writing/full` | Nộp bài thi Writing full (gồm cả Task 1 và Task 2) cho AI hoặc Tutor | Authenticated Student |
+| `POST` | `/speaking/upload` | Tải lên file âm thanh Speaking tạm thời qua Multer middleware | Authenticated Student |
+| `POST` | `/speaking/full` | Nộp bài thi Speaking full (gồm cả 3 Parts 1, 2, 3) cho AI hoặc Tutor | Authenticated Student |
+| `POST` | `/speaking` | Endpoint legacy 1 Part Speaking (Chỉ dành cho Tutor; từ chối AI) | Authenticated Student |
+| `POST` | `/writing/:submissionId/ai-grade` | Yêu cầu chấm điểm/chấm lại AI cho bài nộp Writing | Authenticated Student |
+| `GET` | `/history` | Tra cứu danh sách lịch sử bài nộp Writing/Speaking của học viên | Authenticated Student |
+| `GET` | `/:id/feedback` | Lấy chi tiết báo cáo phản hồi chấm điểm (AI hoặc Tutor) | Authenticated Owner |
+
+### 1.2. Endpoints dành cho Quản trị viên (Admin Endpoints - `/api/v1/admin`)
+
+| Method | Path | Mô tả chức năng | Quyền truy cập |
+|---|---|---|---|
+| `GET` | `/tutor-assignments` | Lấy danh sách các bài nộp thi tự luận cần phân công & danh sách Tutor | `admin` |
+| `PUT` | `/tutor-assignments/:submissionId` | Phân công bài nộp cho một Giảng viên cụ thể (hoặc bỏ gán `null`) | `admin` |
+| `GET` | `/submissions` | Giám sát toàn bộ bài nộp thi tự luận trên toàn hệ thống | `admin` |
+| `POST` | `/submissions/:type/:id/retry` | Đặt lại trạng thái pending để chạy lại luồng chấm | `admin` |
+
+### 1.3. Endpoints dành cho Giáo viên (Tutor Workspace Endpoints - `/api/v1/tutors`)
+
+| Method | Path | Mô tả chức năng | Quyền truy cập |
+|---|---|---|---|
+| `GET` | `/queue` | Lấy hàng đợi bài nộp đang chờ chấm (`grader = 'tutor'` & `status = 'pending'`) | `tutor`, `admin` |
+| `GET` | `/dashboard-stats` | Thống kê số lượng bài chờ chấm, bài đã chấm trong ngày/tuần | `tutor`, `admin` |
+| `GET` | `/submissions/:type/:submissionId` | Lấy nội dung chi tiết bài nộp Writing/Speaking để chấm | `tutor`, `admin` |
+| `POST` | `/submissions/:type/:submissionId/grade` | Lưu điểm 4 tiêu chí và nhận xét chính thức của Giáo viên | `tutor` |
+| `POST` | `/submissions/:type/:submissionId/ai-prelim` | Lấy bản nháp gợi ý 4 tiêu chí từ AI (AI Prelim Assist) | `tutor`, `admin` |
+| `POST` | `/submissions/speaking/:partId/transcribe` | Tạo transcript âm thanh Speaking phục vụ chấm bài | `tutor`, `admin` |
+| `GET` | `/grading-history` | Xem danh sách các bài thi đã được chấm bởi chính Tutor | `tutor`, `admin` |
+| `GET` | `/grading-history/:submissionId` | Xem chi tiết báo cáo kết quả bài đã chấm trong lịch sử | `tutor`, `admin` |
+| `PATCH` | `/grading-history/:submissionId/revoke` | Thu hồi (soft-delete) kết quả chấm đã ban hành | `tutor`, `admin` |
+| `PATCH` | `/grading-history/:submissionId/score` | Cập nhật lại điểm số và nhận xét bài đã chấm | `tutor`, `admin` |
+| `GET` | `/ai-reference` | Xem danh sách bài nộp được AI chấm ở chế độ Read-only | `tutor`, `admin` |
+| `GET` | `/ai-reference/:submissionId` | Xem chi tiết báo cáo AI ở chế độ Read-only | `tutor`, `admin` |
+| `GET` | `/activity-logs` | Tra cứu nhật ký hoạt động cá nhân của Giáo viên | `tutor`, `admin` |
+
+---
+
+## 2. Kịch bản Người dùng và Kiểm thử (User Stories & Acceptance Criteria)
+
+### 2.1. Luồng Học viên thi và nộp bài Writing (US-W)
+- **Hành vi**: Học viên làm bài Writing Task 1 & Task 2 trên giao diện Split-view, xem đếm ngược thời gian và số từ realtime. Khi hoàn thành, chọn `AI chấm điểm` hoặc `Giảng viên chấm`.
+- **Kịch bản chấp nhận**:
+  1. Bài nộp thành công bắt buộc lưu đúng 2 bản ghi `writing_submissions` gắn chung một `writing_group_id`.
+  2. Nếu `grader = 'ai'`, kích hoạt luồng AI Grading Integration chấm 4 tiêu chí cho từng task và tính band tổng hợp trọng số.
+
+### 2.2. Luồng Học viên thi và nộp bài Speaking 3 Parts (US-S)
+- **Hành vi**: Học viên thực hiện 3 phần Speaking, file âm thanh được tự động tải lên kho lưu trữ tạm thời (`speaking/{userId}/`). Học viên nộp trọn bộ 3 Parts và chọn `grader`.
+- **Kịch bản chấp nhận**:
+  1. API nộp bài `/speaking/full` bắt buộc nhận đúng 3 Parts (`parts.length === 3`).
+  2. Backend kiểm tra an toàn đường dẫn âm thanh và lưu 3 bản ghi `speaking_submissions` cùng `speaking_group_id`.
+
+### 2.3. Luồng Tích hợp Chấm điểm AI Tự động (US-AI)
+- **Hành vi**: Hệ thống nhận bài nộp `grader = 'ai'`, kiểm tra ngưỡng từ tối thiểu (Task 1 ≥ 50, Task 2 ≥ 100), kiểm tra Idempotency (Cached Result), gọi LLM Provider chấm 4 tiêu chí IELTS, tính band tổng hợp trọng số (33%/67% Writing, 4-criteria average Speaking), lưu `ai_grading_reports`, log `ai_usage_logs` và phát sự kiện Socket.io realtime.
+- **Kịch bản chấp nhận**:
+  1. Bài nộp thiếu từ bị từ chối chấm trước khi gọi LLM API.
+  2. Bài nộp đã chấm thành công trước đó trả về kết quả Cached trong dưới 200ms.
+  3. Sự cố AI thất bại giữ bài nộp ở trạng thái `pending` và lưu log lỗi `status = 'failed'` thay vì xóa bài hay đẩy sang Tutor.
+
+### 2.4. Luồng Admin Phân công Giảng viên (US-A)
+- **Hành vi**: Admin truy cập `/admin/tutor-assignments`, xem danh sách bài nộp `status = 'pending'` chọn Giảng viên từ Dropdown để gán bài nộp.
+- **Kịch bản chấp nhận**:
+  1. Phân công cập nhật `assigned_tutor_id` cho cả nhóm bài nộp và ghi `audit_logs` với action `'tutor_assigned'`.
+
+### 2.5. Luồng Không gian chấm bài dành cho Giáo viên (US-T)
+- **Hành vi**: Giáo viên truy cập `/tutor/queue` xem danh sách bài nộp được phân công hoặc tự do, bấm nhận bài (Atomic Claim), dùng AI Prelim Assist, nhập điểm 4 tiêu chí và gửi kết quả.
+
+### 2.6. Luồng Lịch sử bài làm và Báo cáo phản hồi Học viên (US-H)
+- **Hành vi**: Học viên truy cập `/student/profile/practice-history` xem danh sách bài đã nộp, xem chi tiết báo cáo phản hồi 4 tiêu chí đính nhãn `AI Estimated Band` vs `Tutor Grade`.
+
+---
+
+## 3. Yêu cầu Chức năng Tổng thể (Master Functional Requirements)
+
+### Nhóm 1: Nộp bài & Tích hợp AI
+- **FR-001**: API Nộp bài Writing (`POST /writing/full`) và Speaking (`POST /speaking/full`) PHẢI tạo `group_id` gom nhóm các task/part nguyên tử trong DB transaction.
+- **FR-002**: Luồng chấm AI PHẢI kiểm tra ngưỡng từ tối thiểu, kiểm tra Idempotency cache report và chấm đủ 4 tiêu chí IELTS.
+- **FR-003**: Điểm tổng hợp AI Writing PHẢI tính theo trọng số 33% Task 1 + 67% Task 2 và làm tròn chuẩn nấc 0.5.
+- **FR-004**: Mọi cuộc gọi AI PHẢI lưu vết token usage và độ trễ vào `ai_usage_logs`.
+
+### Nhóm 2: Admin Phân công & Tutor Workspace
+- **FR-005**: API Phân công (`PUT /admin/tutor-assignments/:submissionId`) PHẢI bảo vệ bởi `authorize('admin')` và ghi `audit_logs` `'tutor_assigned'`.
+- **FR-006**: Tutor Queue PHẢI chỉ hiển thị các bài `grader = 'tutor'` & `status = 'pending'`. Báo cáo Tutor lưu riêng trong `tutor_feedback_reports`.
+
+### Nhóm 3: Lịch sử & Bảo mật
+- **FR-007**: 100% API Lịch sử và Báo cáo PHẢI lọc đúng `user_id = req.user.id`.
+- **FR-008**: Tất cả API endpoints PHẢI trả về cấu trúc envelope chuẩn `{ success, data, error, meta }`.
+
+---
+
+## 4. Tiêu chí Thành công Tổng thể (Master Success Criteria)
+
+- **SC-001**: 100% bài nộp thi tự luận đều hỗ trợ cả 2 luồng chấm AI và Tutor linh hoạt.
+- **SC-002**: 100% cuộc gọi chấm AI lặp lại cho bài nộp đã chấm thành công trả về kết quả Cached trong dưới 200ms.
+- **SC-003**: 100% thao tác phân công của Admin được ghi nhật ký hệ thống `audit_logs` với action `'tutor_assigned'`.
+- **SC-004**: 0% bài nộp chọn `grader = 'ai'` xuất hiện trong hàng đợi chấm thủ công của Tutor.
+- **SC-005**: Thời gian phản hồi API nộp bài, phân công Admin và nhận bài Tutor dưới 1.5 giây ở điều kiện baseline.

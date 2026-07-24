@@ -38,12 +38,13 @@ const getProfile = async (req, res, next) => {
 const updateProfile = async (req, res, next) => {
   try {
     const userId = req.user.id;
-    const { full_name, avatar_url, target_band_score } = req.body;
+    const { full_name, avatar_url, target_band_score, target_test_date } = req.body;
 
     const updatedProfile = await usersService.updateProfile(userId, {
       fullName: full_name,
       avatarUrl: avatar_url,
-      targetBandScore: target_band_score
+      targetBandScore: target_band_score,
+      targetTestDate: target_test_date
     });
 
     res.status(200).json({

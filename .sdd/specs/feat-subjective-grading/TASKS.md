@@ -1,69 +1,29 @@
-# Subjective Grading - As-built Tasks
+---
+description: "Danh sách công việc tổng thể của Hệ thống Chấm bài Tự luận IELTS (Subjective Grading Master Tasks)"
+---
 
-Status: current task inventory after code audit.
+# Công việc tổng thể: Hệ thống Chấm bài Tự luận IELTS (Subjective Grading Master Tasks)
 
-## Completed Runtime Tasks
+**Đầu vào**: [SPEC.md](./SPEC.md), [PLAN.md](./PLAN.md)
 
-- [x] Protect submission routes with `authenticate`.
-- [x] Use `req.user.id` for student submissions instead of trusting body `userId`.
-- [x] Implement active Writing flow at `POST /api/v1/submissions/writing/full`.
-- [x] Require Writing AI submissions to include Task 1 and Task 2.
-- [x] Create grouped Writing rows with `writing_group_id`.
-- [x] Store Writing word counts on `writing_submissions` when schema supports it.
-- [x] Call backend AI grading service for `grader = ai` Writing submissions.
-- [x] Validate AI Writing response against four IELTS Writing criteria.
-- [x] Normalize AI bands to half-band increments.
-- [x] Save completed Writing AI reports to `ai_grading_reports`.
-- [x] Save failed Writing AI reports where possible.
-- [x] Keep tutor grading separate through `grader = tutor`.
-- [x] Keep tutor feedback in `tutor_feedback_reports`.
-- [x] Filter tutor queue to pending `grader = 'tutor'` submissions.
-- [x] Implement active Speaking flow at `POST /api/v1/submissions/speaking/full`.
-- [x] Require Speaking AI submissions to include exactly three parts.
-- [x] Verify Speaking audio paths belong to `speaking/{userId}/`.
-- [x] Create grouped Speaking rows with `speaking_group_id`.
-- [x] Generate missing transcripts through backend AI provider wrapper.
-- [x] Validate AI Speaking response against four IELTS Speaking criteria.
-- [x] Include pronunciation only in the audio/transcript-based Speaking flow.
-- [x] Save Speaking AI reports to `ai_grading_reports`.
-- [x] Return student history through authenticated, user-scoped queries.
-- [x] Return feedback detail only for current user's submission/group.
-- [x] Log AI provider usage metadata in `ai_usage_logs`.
-- [x] Reject legacy one-part `/speaking` requests when `grader = ai`.
+**Danh sách Sub-Features triển khai**:
+1. 📁 [feat-writing-test-flow](./feat-writing-test-flow/tasks.md) — 23 Tasks
+2. 📁 [feat-speaking-test-flow](./feat-speaking-test-flow/tasks.md) — 22 Tasks
+3. 📁 [feat-ai-grading-integration](./feat-ai-grading-integration/tasks.md) — 18 Tasks
+4. 📁 [feat-admin-tutor-assignment](./feat-admin-tutor-assignment/tasks.md) — 16 Tasks
+5. 📁 [feat-tutor-grading-workspace](./feat-tutor-grading-workspace/tasks.md) — 23 Tasks
+6. 📁 [feat-student-feedback-history](./feat-student-feedback-history/tasks.md) — 21 Tasks
 
-## Completed Documentation And Chatbot Hardening Tasks
+---
 
-- [x] Fix assistant IELTS fallback dead code.
-- [x] Add assistant rate limit to `/chat` and `/chat/stream`.
-- [x] Protect assistant `/status` and remove provider/model/key disclosure.
-- [x] Deprecate `.sdd/specs/feat-ai-assistance/`.
-- [x] Create `.sdd/specs/global-ielts-virtual-assistant/RFC.md`.
-- [x] Rewrite chatbot active spec/plan/tasks as as-built docs.
-- [x] Rewrite subjective grading spec/plan/tasks as as-built docs.
+## 📊 Tổng hợp Tiến độ Triển khai theo Phân hệ
 
-## Remaining Hardening Tasks
-
-- [ ] Add focused backend tests for legacy `/speaking` rejecting `grader = ai`.
-- [ ] Add focused backend route tests for assistant rate limiting and protected
-      `/status` once auth helpers are ready.
-- [ ] Add or verify migration for `ai_grading_reports.speaking_group_id` and
-      `ai_grading_reports.part_number` only if group-level Speaking report lookup
-      needs those columns in production.
-- [ ] Confirm production database has `chatbot_sessions` and `chatbot_messages`
-      matching `.sdd/context/db-schema-snapshot.md`.
-- [ ] Decide whether old `AudioRecorder.jsx` legacy flow should expose only tutor
-      grading or be retired from active pages.
-
-## Removed From Active Task List
-
-The following older tasks are not part of the current implementation and should not
-be presented as completed architecture:
-
-- Legacy async grading queue.
-- Separate background grading process.
-- Vendor-specific speech-to-text or grading-provider tasks.
-- Required realtime completion-event pipeline for the active full-submission flow.
-- AI quota decrement/refund queue flow.
-- The old AI report table name used by earlier docs.
-
-Current table name for AI reports is `ai_grading_reports`.
+| Phân hệ (Sub-Feature) | Mã tệp Tasks | Công việc hoàn thành | Tỷ lệ | Trạng thái |
+|---|---|---|---|---|
+| **1. Luồng thi Writing** | [tasks.md](./feat-writing-test-flow/tasks.md) | 23 / 23 Tasks | **100%** | 🟢 Đã rà soát & tích chọn |
+| **2. Luồng thi Speaking 3 Parts** | [tasks.md](./feat-speaking-test-flow/tasks.md) | 19 / 22 Tasks | **86%** | 🟡 Sản phẩm hoàn thành 100%, chờ test suite |
+| **3. Tích hợp Chấm điểm AI** | [tasks.md](./feat-ai-grading-integration/tasks.md) | 18 / 18 Tasks | **100%** | 🟢 Đã rà soát & tích chọn |
+| **4. Admin Phân công Giảng viên** | [tasks.md](./feat-admin-tutor-assignment/tasks.md) | 16 / 16 Tasks | **100%** | 🟢 Đã rà soát & tích chọn |
+| **5. Không gian Giáo viên (Tutor)** | [tasks.md](./feat-tutor-grading-workspace/tasks.md) | 23 / 23 Tasks | **100%** | 🟢 Đã rà soát & tích chọn |
+| **6. Lịch sử & Báo cáo Học viên** | [tasks.md](./feat-student-feedback-history/tasks.md) | 21 / 21 Tasks | **100%** | 🟢 Đã rà soát & tích chọn |
+| **TỔNG THỂ TÍNH NĂNG** | **Bao quát 6 Sub-features** | **120 / 123 Tasks** | **~97.5%** | 🟢 Đạt chất lượng sản xuất |

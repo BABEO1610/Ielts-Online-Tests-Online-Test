@@ -70,17 +70,20 @@ const createUser = async ({ email, password_hash, full_name }) => {
  * @param {string} profileData.full_name
  * @param {string} [profileData.avatar_url]
  * @param {number} [profileData.target_band_score]
+ * @param {string} [profileData.target_test_date]
  * @returns {Promise<Object>} The updated user object
  */
-const updateProfile = async (id, { full_name, avatar_url, target_band_score }) => {
+const updateProfile = async (id, { full_name, avatar_url, target_band_score, target_test_date }) => {
+  await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS target_test_date DATE;').catch(() => {});
   const result = await pool.query(
     `UPDATE users
      SET full_name = COALESCE($2, full_name),
          avatar_url = COALESCE($3, avatar_url),
-         target_band_score = COALESCE($4, target_band_score)
+         target_band_score = COALESCE($4, target_band_score),
+         target_test_date = COALESCE($5, target_test_date)
      WHERE id = $1
      RETURNING *`,
-    [id, full_name, avatar_url, target_band_score]
+    [id, full_name, avatar_url, target_band_score, target_test_date]
   );
   return result.rows[0];
 };

@@ -159,7 +159,8 @@ const mapAiReport = (report) => {
 
 const mapTutorGrade = (report) => {
   if (!report) return null;
-  if (report.speaking_submission_id || report.fluency_score !== undefined || report.pronunciation_score !== undefined) {
+  // Sửa lỗi: pg trả về null cho cột không có giá trị, không phải undefined
+  if (report.speaking_submission_id != null || report.fluency_score != null || report.pronunciation_score != null) {
     const fluency = report.fluency_score ? parseFloat(report.fluency_score) : null;
     const lexical = report.lexical_score ? parseFloat(report.lexical_score) : null;
     const grammar = report.grammar_score ? parseFloat(report.grammar_score) : null;
@@ -1288,7 +1289,7 @@ class TutorService {
     const query = `
       SELECT 
         COUNT(tfr.id)::int AS total_graded_month,
-        ROUND(AVG(tfr.band_score), 1)::numeric AS avg_band_score_month,
+        ROUND(AVG(tfr.band_score) * 2.0, 0) / 2.0 AS avg_band_score_month,
         (
           SELECT COUNT(id)::int
           FROM (

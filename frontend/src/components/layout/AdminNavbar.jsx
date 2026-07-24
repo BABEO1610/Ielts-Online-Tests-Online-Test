@@ -1,14 +1,11 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { useTheme } from '../../context/ThemeContext';
-import { Sun, Moon } from 'lucide-react';
 import CreateTutorModal from '../admin/CreateTutorModal';
 import ChangePwdModal from '../profile/ChangePwdModal';
 
 const AdminNavbar = () => {
   const { user, logout } = useAuth();
-  const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
   const [showTutorModal, setShowTutorModal] = useState(false);
   const [showPwdModal, setShowPwdModal] = useState(false);
@@ -38,15 +35,6 @@ const AdminNavbar = () => {
         </div>
 
         <div className="d-flex align-items-center gap-3">
-          <button
-            onClick={toggleTheme}
-            className="btn rounded-circle d-flex align-items-center justify-content-center"
-            style={{ width: '40px', height: '40px', backgroundColor: 'var(--canvas-soft)', color: 'var(--ink)', border: 'none' }}
-            title="Toggle theme"
-          >
-            {theme === 'dark' ? <Sun size={18} strokeWidth={2.5} /> : <Moon size={18} strokeWidth={2.5} />}
-          </button>
-          
           <div className="dropdown">
             <button
               className="btn rounded-pill px-4 py-2 fw-medium border-0 d-flex align-items-center gap-2"
