@@ -1,5 +1,24 @@
 # Agents Changelog
 
+## [2026-07-24] | Codex | Backfill spec Auth/Profile/User/Audit Log
+
+### Thay đổi
+
+- Đọc đối chiếu spec tổng, plan/tasks cũ và source hiện tại của auth, profile, admin user/session và audit log.
+- Tạo spec Speckit và checklist chất lượng cho bốn feature con:
+  `.sdd/specs/feat-auth-and-users/feat-auth/`,
+  `.sdd/specs/feat-auth-and-users/feat-profile/`,
+  `.sdd/specs/feat-auth-and-users/feat-user/`,
+  `.sdd/specs/feat-auth-and-users/feat-audit-log/`.
+- Giữ spec ở mức nghiệp vụ: user stories, acceptance scenarios, edge cases, requirements, entities, success criteria và assumptions; không thay đổi source code.
+
+### Kiểm chứng
+
+- Checklist yêu cầu cho cả bốn feature đã được tick pass, không có placeholder template hoặc marker cần làm rõ trong spec.
+- `.specify/extensions.yml` không tồn tại nên không có hook specify cần chạy.
+
+---
+
 ## [2026-07-22] | Codex | Triển khai migration và storage AI grading
 
 - Sau khi người dùng cho phép rõ ràng, đã tạo và verify backup schema `public`, baseline
