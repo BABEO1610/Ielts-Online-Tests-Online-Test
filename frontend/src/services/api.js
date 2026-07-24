@@ -17,6 +17,11 @@ api.interceptors.response.use(
 
     // EARS[Unwanted]: IF response is 401 Unauthorized AND request has not been retried THEN attempt token refresh
     if (error.response && error.response.status === 401 && !originalRequest._retry) {
+      // Prevent token refresh loop if the request was to login or refresh-token itself
+      if (originalRequest.url?.includes('/auth/login') || originalRequest.url?.includes('/auth/refresh-token')) {
+        return Promise.reject(error);
+      }
+      
       originalRequest._retry = true;
 
       try {

@@ -73,7 +73,7 @@ Với tư cách là khách, tôi muốn đăng nhập bằng Google để có th
 
 ### Các trường hợp ngoại lệ (Edge Cases)
 
-- Đăng ký bằng email đã sử dụng sẽ trả về thông báo lỗi chung chung, không làm lộ quyền sở hữu tài khoản.
+- Đăng ký bằng email đã sử dụng sẽ thông báo rõ ràng cho người dùng rằng tài khoản đã tồn tại (ưu tiên UX).
 - Tài khoản ở trạng thái pending, inactive (không hoạt động) hoặc banned (cấm) không thể hoàn tất đăng nhập bình thường.
 - Các nỗ lực đăng nhập sai liên tục sẽ bị khóa (block) tạm thời.
 - Nếu có phiên đăng nhập thứ tư đang kích hoạt cho cùng một tài khoản, hệ thống sẽ thu hồi phiên cũ nhất.
@@ -87,7 +87,7 @@ Với tư cách là khách, tôi muốn đăng nhập bằng Google để có th
 
 - **FR-001**: Hệ thống PHẢI cho phép khách đăng ký với họ tên, email hợp lệ, mật khẩu và xác nhận mật khẩu.
 - **FR-002**: Hệ thống PHẢI yêu cầu tài khoản email/mật khẩu mới xác thực email trước khi truy cập các quyền xác thực bình thường.
-- **FR-003**: Hệ thống PHẢI ngăn chặn việc dò tìm tài khoản trùng lặp bằng cách sử dụng các thông báo chung chung cho kết quả đăng ký và khôi phục mật khẩu.
+- **FR-003**: Hệ thống PHẢI thông báo rõ ràng khi người dùng đăng ký bằng email đã tồn tại. Việc ngăn chặn dò tìm tài khoản (Enumeration) bằng thông báo chung chung CHỈ áp dụng cho chức năng khôi phục mật khẩu.
 - **FR-004**: Hệ thống PHẢI cho phép người dùng đang hoạt động (active) đăng nhập bằng email và mật khẩu.
 - **FR-005**: Hệ thống PHẢI điều hướng người dùng đã xác thực đến không gian làm việc khớp với vai trò hiện tại của họ.
 - **FR-006**: Hệ thống PHẢI từ chối đăng nhập đối với các tài khoản pending, inactive, banned, đang bị khóa tạm thời hoặc không được phép truy cập nền tảng.

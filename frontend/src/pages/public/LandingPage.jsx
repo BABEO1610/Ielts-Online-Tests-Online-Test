@@ -1,6 +1,5 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Sun, Moon } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import {
     motion,
@@ -91,10 +90,8 @@ const Counter = ({ to, suffix = '', prefix = '', decimals = 0, duration = 2 }) =
 // ─── LANDING NAVBAR ───────────────────────────────────────────────────────────
 // Per DESIGN.md: canvas background, ink text, body-md-strong (16px/500), pill CTAs
 // Includes full nav links so guests can explore Listening/Reading/Writing/Speaking/Library
-import { useTheme } from '../../context/ThemeContext';
 
 const LandingNavbar = () => {
-    const { theme, toggleTheme } = useTheme();
     const { user, logout } = useAuth();
     const navigate = useNavigate();
     const [scrolled, setScrolled] = useState(false);
@@ -193,19 +190,6 @@ const LandingNavbar = () => {
 
             {/* Right: auth CTAs */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                {/* Theme Toggle */}
-                <button
-                    onClick={toggleTheme}
-                    style={{
-                        backgroundColor: 'var(--canvas-soft)', color: 'var(--ink)',
-                        border: 'none', width: '40px', height: '40px',
-                        borderRadius: '999px', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        cursor: 'pointer', fontSize: '18px'
-                    }}
-                >
-                    {theme === 'dark' ? <Sun size={18} strokeWidth={2.5} /> : <Moon size={18} strokeWidth={2.5} />}
-                </button>
-
                 {user ? (
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                         {(user.role === 'admin' || user.role === 'tutor') && (
