@@ -87,17 +87,6 @@ const Counter = ({ to, suffix = '', prefix = '', decimals = 0, duration = 2 }) =
         </span>
     );
 };
-
-                                Đăng ký
-                            </Link>
-                        </MagneticButton>
-                    </>
-                )}
-            </div>
-        </nav>
-    );
-};
-
 // ─── Hero: Product mockup card (B&W design system) ───────────────────────────
 const HeroMockUI = () => {
     const bars = [
