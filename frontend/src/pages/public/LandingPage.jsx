@@ -10,6 +10,7 @@ import {
     useInView,
     animate,
 } from 'framer-motion';
+import StudentNavbar from '../../components/layout/StudentNavbar';
 
 // ─── DESIGN TOKENS (per DESIGN.md) ───────────────────────────────────────────
 // Primary: #000000  Canvas: #ffffff  Canvas-Soft: #efefef  Canvas-Softer: #f3f3f3
@@ -87,184 +88,6 @@ const Counter = ({ to, suffix = '', prefix = '', decimals = 0, duration = 2 }) =
     );
 };
 
-// ─── LANDING NAVBAR ───────────────────────────────────────────────────────────
-// Per DESIGN.md: canvas background, ink text, body-md-strong (16px/500), pill CTAs
-// Includes full nav links so guests can explore Listening/Reading/Writing/Speaking/Library
-
-const LandingNavbar = () => {
-    const { user, logout } = useAuth();
-    const navigate = useNavigate();
-    const [scrolled, setScrolled] = useState(false);
-    const location = useLocation();
-
-    const handleLogout = async () => {
-        try {
-            await logout();
-            navigate('/');
-        } catch (error) {
-            console.error('Logout failed', error);
-        }
-    };
-
-    useEffect(() => {
-        const onScroll = () => setScrolled(window.scrollY > 20);
-        window.addEventListener('scroll', onScroll, { passive: true });
-        return () => window.removeEventListener('scroll', onScroll);
-    }, []);
-
-    const navLinks = [
-        { to: '/listening', label: 'Listening' },
-        { to: '/reading', label: 'Reading' },
-        { to: '/writing', label: 'Writing' },
-        { to: '/speaking', label: 'Speaking' },
-        { to: '/library', label: 'Library' },
-    ];
-
-    return (
-        <nav style={{
-            position: 'fixed', top: 0, left: 0, right: 0, zIndex: 100,
-            height: '68px',
-            padding: '0 32px',
-            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-            // nav-bar: canvas bg, border-bottom on scroll
-            backgroundColor: scrolled ? 'rgba(255,255,255,0.96)' : 'var(--canvas)',
-            backdropFilter: scrolled ? 'blur(16px)' : 'none',
-            borderBottom: scrolled ? '1px solid #e2e2e2' : '1px solid transparent',
-            transition: 'border-color 0.3s ease, backdrop-filter 0.3s ease',
-            fontFamily: 'Inter, system-ui, sans-serif',
-        }}>
-            {/* Logo */}
-            <Link to="/" style={{ textDecoration: 'none' }}>
-                <span style={{
-                    fontWeight: 700, fontSize: '22px', color: 'var(--ink)',
-                    letterSpacing: '-0.02em',
-                    fontFamily: 'Inter, system-ui, sans-serif',
-                }}>
-                    IELTSZone
-                </span>
-            </Link>
-
-            {/* Center nav links — guests can visit all skill pages */}
-            <ul style={{
-                display: 'flex', alignItems: 'center', gap: '0',
-                listStyle: 'none', margin: 0, padding: 0,
-            }}>
-                {navLinks.map(({ to, label }) => {
-                    const isActive = location.pathname === to || location.pathname.startsWith(to + '/');
-                    return (
-                        <li key={to} style={{ position: 'relative' }}>
-                            <Link
-                                to={to}
-                                style={{
-                                    display: 'block',
-                                    padding: '6px 16px',
-                                    fontSize: '16px',
-                                    fontWeight: 500,
-                                    color: isActive ? 'var(--ink)' : 'var(--body)',
-                                    textDecoration: 'none',
-                                    fontFamily: 'Inter, system-ui, sans-serif',
-                                    transition: 'color 0.2s ease',
-                                    borderRadius: '999px',
-                                }}
-                                onMouseEnter={(e) => { if (!isActive) e.target.style.color = 'var(--ink)'; }}
-                                onMouseLeave={(e) => { if (!isActive) e.target.style.color = 'var(--body)'; }}
-                            >
-                                {label}
-                            </Link>
-                            {/* Active underline indicator */}
-                            {isActive && (
-                                <motion.div
-                                    layoutId="nav-indicator-landing"
-                                    style={{
-                                        position: 'absolute', bottom: '-2px', left: '16px',
-                                        right: '16px', height: '2px',
-                                        backgroundColor: 'var(--ink)', borderRadius: '2px',
-                                    }}
-                                    transition={{ type: 'spring', bounce: 0.2, duration: 0.5 }}
-                                />
-                            )}
-                        </li>
-                    );
-                })}
-            </ul>
-
-            {/* Right: auth CTAs */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                {user ? (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                        {(user.role === 'admin' || user.role === 'tutor') && (
-                            <Link
-                                to={user.role === 'admin' ? '/admin' : '/tutor/dashboard'}
-                                style={{
-                                    textDecoration: 'none', padding: '10px 20px', borderRadius: '999px',
-                                    fontSize: '15px', fontWeight: 500, color: 'var(--on-primary)',
-                                    backgroundColor: 'var(--primary)', fontFamily: 'Inter, system-ui, sans-serif'
-                                }}
-                            >
-                                Về bảng điều khiển
-                            </Link>
-                        )}
-                        <Link to="/profile" style={{
-                            display: 'flex', alignItems: 'center', gap: '8px',
-                            textDecoration: 'none', padding: '6px 16px', borderRadius: '999px',
-                            backgroundColor: 'var(--canvas-soft)', color: 'var(--ink)',
-                            fontFamily: 'Inter, system-ui, sans-serif', fontWeight: 500, fontSize: '15px'
-                        }}>
-                            {user.avatar_url ? (
-                                <img src={user.avatar_url} alt="Avatar" style={{ width: '24px', height: '24px', borderRadius: '50%', objectFit: 'cover' }} />
-                            ) : (
-                                <div style={{
-                                    width: '24px', height: '24px', borderRadius: '50%',
-                                    backgroundColor: 'var(--primary)', color: 'var(--on-primary)',
-                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                    fontSize: '12px'
-                                }}>
-                                    {user.full_name?.charAt(0).toUpperCase() || 'U'}
-                                </div>
-                            )}
-                            {user.full_name || 'Học viên'}
-                        </Link>
-                        <button
-                            onClick={handleLogout}
-                            style={{
-                                border: 'none', background: 'none', color: '#ff3b3b', cursor: 'pointer',
-                                fontSize: '15px', fontWeight: 500, fontFamily: 'Inter, system-ui, sans-serif'
-                            }}
-                        >
-                            Đăng xuất
-                        </button>
-                    </div>
-                ) : (
-                    <>
-                        <Link to="/login" style={{
-                            textDecoration: 'none',
-                            padding: '10px 20px',
-                            borderRadius: '999px',
-                            fontSize: '16px',
-                            fontWeight: 500,
-                            color: 'var(--ink)',
-                            fontFamily: 'Inter, system-ui, sans-serif',
-                            backgroundColor: 'var(--canvas-soft)',
-                            transition: 'background-color 0.2s ease',
-                        }}
-                            onMouseEnter={(e) => e.target.style.backgroundColor = 'var(--surface-pressed)'}
-                            onMouseLeave={(e) => e.target.style.backgroundColor = 'var(--canvas-soft)'}
-                        >
-                            Đăng nhập
-                        </Link>
-                        <MagneticButton>
-                            <Link to="/register" style={{
-                                textDecoration: 'none',
-                                display: 'inline-flex', alignItems: 'center',
-                                padding: '10px 20px', borderRadius: '999px',
-                                fontSize: '16px', fontWeight: 500,
-                                color: 'var(--canvas)', backgroundColor: 'var(--ink)',
-                                fontFamily: 'Inter, system-ui, sans-serif',
-                                transition: 'background-color 0.2s ease',
-                            }}
-                                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--black-elevated)'}
-                                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'var(--ink)'}
-                            >
                                 Đăng ký
                             </Link>
                         </MagneticButton>
@@ -507,7 +330,7 @@ const LandingPage = () => {
 
     return (
         <div style={{ fontFamily: FONT, backgroundColor: 'var(--canvas)', overflowX: 'hidden' }}>
-            <LandingNavbar />
+            <StudentNavbar />
 
             {/* Subtle dot grid bg — B&W only */}
             <div style={{
