@@ -39,13 +39,11 @@ describe('LandingPage Component', () => {
   test('renders hero section and guest call-to-action buttons', () => {
     render(<MemoryRouter><LandingPage /></MemoryRouter>);
 
-    expect(screen.getByText('Master')).toBeInTheDocument();
-    expect(screen.getByText('IELTS')).toBeInTheDocument();
-    expect(screen.getByText('Bắt đầu ngay')).toBeInTheDocument();
-    expect(screen.getByText('Đăng nhập')).toBeInTheDocument();
+    expect(screen.getByText(/Luyện thi IELTS thông minh hơn với AI/i)).toBeInTheDocument();
+    expect(screen.getByText('Bắt đầu miễn phí')).toBeInTheDocument();
   });
 
-  test('does not render login call-to-action for authenticated users', () => {
+  test('does not render guest call-to-action for authenticated users', () => {
     authMock.value = {
       user: { id: 'user-1', role: 'student' },
       isAuthenticated: true,
@@ -54,7 +52,7 @@ describe('LandingPage Component', () => {
 
     render(<MemoryRouter><LandingPage /></MemoryRouter>);
 
-    expect(screen.getByText('Bắt đầu ngay')).toBeInTheDocument();
-    expect(screen.queryByText('Đăng nhập')).not.toBeInTheDocument();
+    expect(screen.getByText('Tiếp tục luyện tập')).toBeInTheDocument();
+    expect(screen.queryByText('Bắt đầu miễn phí')).not.toBeInTheDocument();
   });
 });
