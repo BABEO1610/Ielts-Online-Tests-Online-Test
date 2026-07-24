@@ -1,133 +1,133 @@
-# Feature Specification: Authentication
+# Đặc tả Chức năng: Xác thực (Authentication)
 
-**Feature Branch**: `feat-auth-and-users`
+**Nhánh tính năng**: `feat-auth-and-users`
 
-**Created**: 2026-07-24
+**Ngày tạo**: 24-07-2026
 
-**Status**: Draft
+**Trạng thái**: Draft
 
-**Input**: User description: "Backfill feature spec from the completed web application for authentication, including registration, email verification, login, logout, password recovery, password change, session refresh, role-based redirection, and Google sign-in."
+**Đầu vào**: Mô tả của người dùng: "Tạo tài liệu đặc tả tính năng (backfill) từ ứng dụng web đã hoàn thành cho chức năng xác thực, bao gồm đăng ký, xác thực email, đăng nhập, đăng xuất, khôi phục mật khẩu, đổi mật khẩu, làm mới phiên (session refresh), điều hướng dựa trên vai trò, và đăng nhập qua Google."
 
-## User Scenarios & Testing *(mandatory)*
+## Kịch bản Người dùng & Kiểm thử *(bắt buộc)*
 
-### User Story 1 - Register and Verify Account (Priority: P1)
+### Kịch bản 1 - Đăng ký và Xác thực Tài khoản (Độ ưu tiên: P1)
 
-As a guest, I want to create an account with my email, password, and full name, then verify my email before using protected learning features.
+Với tư cách là khách, tôi muốn tạo tài khoản bằng email, mật khẩu và họ tên của mình, sau đó xác thực email trước khi sử dụng các tính năng học tập được bảo vệ.
 
-**Why this priority**: Account creation is the entry point for learners and enables the platform to associate progress, submissions, and feedback with a real identity.
+**Lý do ưu tiên**: Tạo tài khoản là bước đầu tiên để người học tham gia và cho phép nền tảng gắn kết quá trình học, bài nộp và phản hồi với một danh tính thực.
 
-**Independent Test**: Can be fully tested by registering with a new email, receiving a verification instruction, opening the verification link, and then reaching a state where login is allowed.
+**Kiểm thử độc lập**: Có thể kiểm thử bằng cách đăng ký với một email mới, nhận hướng dẫn xác thực, mở liên kết xác thực và sau đó đạt đến trạng thái cho phép đăng nhập.
 
-**Acceptance Scenarios**:
+**Kịch bản nghiệm thu**:
 
-1. **Given** a guest provides a valid full name, email, password, and matching confirmation, **When** they submit registration, **Then** the system creates a pending account and tells the guest to check email for verification.
-2. **Given** a guest opens a valid unused verification link within its allowed time, **When** verification is processed, **Then** the account becomes active and the guest is invited to log in.
-3. **Given** the registration password confirmation does not match, **When** the guest tries to submit, **Then** the system prevents submission and explains that the passwords do not match.
-
----
-
-### User Story 2 - Sign In and Reach the Correct Workspace (Priority: P1)
-
-As a student, tutor, or admin, I want to sign in securely and be taken to the workspace that matches my role.
-
-**Why this priority**: Every protected feature depends on a trustworthy login state and correct role-specific navigation.
-
-**Independent Test**: Can be fully tested by signing in as each role and confirming that each user lands on the correct student, tutor, or admin area.
-
-**Acceptance Scenarios**:
-
-1. **Given** an active account with valid credentials, **When** the user signs in, **Then** the system creates an authenticated session and redirects the user based on their role.
-2. **Given** an authenticated user returns to the login page, **When** the current session is still valid, **Then** the system redirects them away from the login form to their appropriate workspace.
-3. **Given** a user submits incorrect credentials, **When** authentication fails, **Then** the system shows a generic failure message without exposing whether the email exists.
+1. **Cho trước** khách cung cấp họ tên hợp lệ, email, mật khẩu và xác nhận mật khẩu khớp nhau, **Khi** họ gửi yêu cầu đăng ký, **Thì** hệ thống tạo một tài khoản ở trạng thái chờ (pending) và báo khách kiểm tra email để xác thực.
+2. **Cho trước** khách mở một liên kết xác thực hợp lệ, chưa sử dụng và còn hạn, **Khi** việc xác thực được xử lý, **Thì** tài khoản trở thành trạng thái hoạt động (active) và khách được mời đăng nhập.
+3. **Cho trước** mật khẩu xác nhận khi đăng ký không khớp, **Khi** khách cố gắng gửi biểu mẫu, **Thì** hệ thống ngăn chặn việc gửi và giải thích rằng mật khẩu không khớp.
 
 ---
 
-### User Story 3 - Recover or Change Password (Priority: P2)
+### Kịch bản 2 - Đăng nhập và Đi tới đúng Không gian làm việc (Độ ưu tiên: P1)
 
-As a user, I want to recover access through email and change my password when signed in, so I can keep access to my account under my control.
+Với tư cách là học viên, giảng viên hoặc admin, tôi muốn đăng nhập an toàn và được đưa đến không gian làm việc (workspace) tương ứng với vai trò của mình.
 
-**Why this priority**: Password recovery reduces account lockout support burden and password change is a basic security expectation.
+**Lý do ưu tiên**: Mọi tính năng được bảo vệ đều phụ thuộc vào một trạng thái đăng nhập đáng tin cậy và việc điều hướng đúng theo vai trò.
 
-**Independent Test**: Can be fully tested by requesting password recovery, completing reset with a valid token, then signing in with the new password; separately, a signed-in user can change password after confirming the old one.
+**Kiểm thử độc lập**: Có thể kiểm thử bằng cách đăng nhập dưới từng vai trò và xác nhận mỗi người dùng được đưa đến đúng khu vực dành cho học viên, giảng viên hoặc admin.
 
-**Acceptance Scenarios**:
+**Kịch bản nghiệm thu**:
 
-1. **Given** a guest requests password recovery for any email, **When** the request is submitted, **Then** the system shows the same success-style message regardless of whether the email exists.
-2. **Given** a user has a valid reset token, **When** they submit a new password and confirmation that meet password rules, **Then** the password is updated and the user is guided back to login.
-3. **Given** a signed-in user enters the correct current password and a valid new password, **When** they save the change, **Then** the system updates the password and confirms success.
+1. **Cho trước** một tài khoản đang hoạt động (active) với thông tin đăng nhập hợp lệ, **Khi** người dùng đăng nhập, **Thì** hệ thống tạo một phiên xác thực và điều hướng người dùng dựa trên vai trò của họ.
+2. **Cho trước** một người dùng đã xác thực quay lại trang đăng nhập, **Khi** phiên hiện tại vẫn còn hiệu lực, **Thì** hệ thống điều hướng họ khỏi form đăng nhập và đưa tới không gian làm việc phù hợp.
+3. **Cho trước** người dùng nhập sai thông tin đăng nhập, **Khi** xác thực thất bại, **Thì** hệ thống hiển thị thông báo lỗi chung chung mà không làm lộ việc email đó có tồn tại hay không.
 
 ---
 
-### User Story 4 - Continue with Google (Priority: P3)
+### Kịch bản 3 - Khôi phục hoặc Đổi Mật khẩu (Độ ưu tiên: P2)
 
-As a guest, I want to sign in with Google so I can enter the platform without creating a separate password first.
+Với tư cách là người dùng, tôi muốn khôi phục quyền truy cập qua email và đổi mật khẩu khi đã đăng nhập, để tôi có thể tự kiểm soát quyền truy cập tài khoản của mình.
 
-**Why this priority**: Social sign-in improves onboarding convenience but the email/password path remains the primary access path.
+**Lý do ưu tiên**: Khôi phục mật khẩu giúp giảm gánh nặng hỗ trợ mở khóa tài khoản và đổi mật khẩu là kỳ vọng bảo mật cơ bản.
 
-**Independent Test**: Can be fully tested by choosing Google sign-in, approving the provider flow, and confirming the user lands in the appropriate workspace.
+**Kiểm thử độc lập**: Có thể kiểm thử bằng cách yêu cầu khôi phục mật khẩu, hoàn tất đặt lại bằng token hợp lệ, sau đó đăng nhập bằng mật khẩu mới; ngoài ra, người dùng đã đăng nhập có thể đổi mật khẩu sau khi xác nhận mật khẩu cũ.
 
-**Acceptance Scenarios**:
+**Kịch bản nghiệm thu**:
 
-1. **Given** a guest chooses Google sign-in, **When** the provider confirms a valid profile, **Then** the system creates or updates the account and starts an authenticated session.
-2. **Given** the provider callback is invalid or expired, **When** the user returns to the login page, **Then** the system displays a clear login error and allows retry.
+1. **Cho trước** khách yêu cầu khôi phục mật khẩu cho bất kỳ email nào, **Khi** yêu cầu được gửi đi, **Thì** hệ thống hiển thị cùng một thông báo thành công chung chung bất kể email đó có tồn tại hay không.
+2. **Cho trước** người dùng có một token đặt lại mật khẩu hợp lệ, **Khi** họ gửi mật khẩu mới và xác nhận mật khẩu đáp ứng các quy tắc bảo mật, **Thì** mật khẩu được cập nhật và người dùng được hướng dẫn quay lại trang đăng nhập.
+3. **Cho trước** một người dùng đã đăng nhập nhập đúng mật khẩu hiện tại và mật khẩu mới hợp lệ, **Khi** họ lưu thay đổi, **Thì** hệ thống cập nhật mật khẩu và xác nhận thành công.
 
-### Edge Cases
+---
 
-- Registration with an already-used email returns a generic failure and does not reveal account ownership.
-- Pending, inactive, or banned accounts cannot complete normal sign-in.
-- Repeated failed sign-in attempts temporarily block further login attempts.
-- A fourth active session for the same account revokes the oldest active session.
-- Expired, reused, or missing verification/reset tokens are rejected with user-friendly errors.
-- Google-linked users without a local password are guided to password recovery instead of normal password change.
-- Signed-out or expired-session users are redirected to login before accessing protected pages.
+### Kịch bản 4 - Tiếp tục với Google (Độ ưu tiên: P3)
 
-## Requirements *(mandatory)*
+Với tư cách là khách, tôi muốn đăng nhập bằng Google để có thể tham gia nền tảng mà không cần tạo mật khẩu riêng biệt.
 
-### Functional Requirements
+**Lý do ưu tiên**: Đăng nhập mạng xã hội tăng tính tiện lợi khi tiếp cận nền tảng nhưng đường dẫn email/mật khẩu vẫn là phương thức truy cập chính.
 
-- **FR-001**: System MUST allow guests to register with full name, valid email, password, and password confirmation.
-- **FR-002**: System MUST require new email/password accounts to verify email before normal authenticated access.
-- **FR-003**: System MUST prevent duplicate-account discovery by using generic messaging for registration and password recovery outcomes.
-- **FR-004**: System MUST allow active users to sign in with email and password.
-- **FR-005**: System MUST redirect authenticated users to the workspace matching their current role.
-- **FR-006**: System MUST deny sign-in for accounts that are pending, inactive, banned, temporarily locked, or otherwise not allowed to access the platform.
-- **FR-007**: System MUST track failed sign-in attempts and temporarily block repeated failures.
-- **FR-008**: System MUST maintain secure user sessions and support automatic continuation when a still-valid session can be refreshed.
-- **FR-009**: System MUST allow users to sign out and end the current session.
-- **FR-010**: System MUST limit simultaneous active sessions per account and revoke the oldest session when the limit is exceeded.
-- **FR-011**: System MUST allow guests to request password recovery using email without revealing whether the account exists.
-- **FR-012**: System MUST allow password reset only with a valid, unused, unexpired reset credential.
-- **FR-013**: System MUST prevent users from reusing recently used passwords during reset.
-- **FR-014**: System MUST allow signed-in users with a local password to change password after confirming the current password.
-- **FR-015**: System MUST support Google sign-in for account creation or account access, including a clear failure path when provider validation fails.
-- **FR-016**: System MUST never expose password secrets, recovery secrets, or session secrets in user-facing responses.
+**Kiểm thử độc lập**: Có thể kiểm thử bằng cách chọn đăng nhập Google, chấp thuận luồng xác thực của nhà cung cấp, và xác nhận người dùng được đưa đến không gian làm việc phù hợp.
 
-### Key Entities
+**Kịch bản nghiệm thu**:
 
-- **Account**: A platform identity with email, display name, role, status, optional avatar, and security-related account state.
-- **Session**: A signed-in device or browser session associated with one account, including activity and expiration state.
-- **Verification Credential**: A time-limited credential used to activate a newly registered email account.
-- **Password Reset Credential**: A time-limited credential used to prove control of the account email during password recovery.
-- **Password History Entry**: A record of prior password changes used to prevent unsafe reuse.
-- **External Login Account**: A link between a platform account and a third-party identity provider.
+1. **Cho trước** khách chọn đăng nhập bằng Google, **Khi** nhà cung cấp xác nhận một hồ sơ hợp lệ, **Thì** hệ thống tạo mới hoặc cập nhật tài khoản và bắt đầu một phiên xác thực.
+2. **Cho trước** phản hồi từ nhà cung cấp không hợp lệ hoặc hết hạn, **Khi** người dùng quay lại trang đăng nhập, **Thì** hệ thống hiển thị lỗi đăng nhập rõ ràng và cho phép thử lại.
 
-## Success Criteria *(mandatory)*
+### Các trường hợp ngoại lệ (Edge Cases)
 
-### Measurable Outcomes
+- Đăng ký bằng email đã sử dụng sẽ trả về thông báo lỗi chung chung, không làm lộ quyền sở hữu tài khoản.
+- Tài khoản ở trạng thái pending, inactive (không hoạt động) hoặc banned (cấm) không thể hoàn tất đăng nhập bình thường.
+- Các nỗ lực đăng nhập sai liên tục sẽ bị khóa (block) tạm thời.
+- Nếu có phiên đăng nhập thứ tư đang kích hoạt cho cùng một tài khoản, hệ thống sẽ thu hồi phiên cũ nhất.
+- Token xác thực/khôi phục bị hết hạn, tái sử dụng hoặc bị thiếu sẽ bị từ chối với thông báo lỗi thân thiện.
+- Người dùng liên kết qua Google (không có mật khẩu cục bộ) sẽ được hướng dẫn dùng tính năng khôi phục mật khẩu thay vì đổi mật khẩu thông thường.
+- Người dùng đã đăng xuất hoặc hết hạn phiên sẽ bị chuyển hướng về trang đăng nhập trước khi xem các trang được bảo vệ.
 
-- **SC-001**: At least 95% of valid registrations display the email verification instruction in under 5 seconds.
-- **SC-002**: At least 95% of valid sign-ins reach the correct workspace in under 3 seconds after submission.
-- **SC-003**: 100% of protected pages redirect unauthenticated users to login before showing protected content.
-- **SC-004**: 100% of password recovery requests display a non-enumerating response regardless of account existence.
-- **SC-005**: Repeated incorrect password attempts lock or throttle the affected login flow within 5 consecutive failures.
-- **SC-006**: No user can maintain more than 3 active sessions at the same time.
-- **SC-007**: 100% of password reset attempts with expired, reused, or invalid credentials fail without changing the password.
-- **SC-008**: Users can complete password reset or password change in under 2 minutes when they have the required information.
+## Yêu cầu *(bắt buộc)*
 
-## Assumptions
+### Yêu cầu chức năng
 
-- Users have access to the email inbox associated with their account for verification and password recovery.
-- Email/password remains the primary authentication path; Google sign-in is an additional convenience path.
-- Roles are assigned by the platform and determine the landing workspace after sign-in.
-- Session duration and lockout duration follow the security policy already implemented in the completed application.
-- Password strength is enforced at a minimum of 8 characters in the current application.
+- **FR-001**: Hệ thống PHẢI cho phép khách đăng ký với họ tên, email hợp lệ, mật khẩu và xác nhận mật khẩu.
+- **FR-002**: Hệ thống PHẢI yêu cầu tài khoản email/mật khẩu mới xác thực email trước khi truy cập các quyền xác thực bình thường.
+- **FR-003**: Hệ thống PHẢI ngăn chặn việc dò tìm tài khoản trùng lặp bằng cách sử dụng các thông báo chung chung cho kết quả đăng ký và khôi phục mật khẩu.
+- **FR-004**: Hệ thống PHẢI cho phép người dùng đang hoạt động (active) đăng nhập bằng email và mật khẩu.
+- **FR-005**: Hệ thống PHẢI điều hướng người dùng đã xác thực đến không gian làm việc khớp với vai trò hiện tại của họ.
+- **FR-006**: Hệ thống PHẢI từ chối đăng nhập đối với các tài khoản pending, inactive, banned, đang bị khóa tạm thời hoặc không được phép truy cập nền tảng.
+- **FR-007**: Hệ thống PHẢI theo dõi các lần đăng nhập thất bại và khóa tạm thời các trường hợp thất bại liên tục.
+- **FR-008**: Hệ thống PHẢI duy trì các phiên người dùng an toàn và hỗ trợ gia hạn (refresh) tự động khi phiên đó vẫn còn hiệu lực.
+- **FR-009**: Hệ thống PHẢI cho phép người dùng đăng xuất và kết thúc phiên hiện tại.
+- **FR-010**: Hệ thống PHẢI giới hạn số lượng phiên hoạt động đồng thời trên mỗi tài khoản và thu hồi phiên cũ nhất khi vượt quá giới hạn.
+- **FR-011**: Hệ thống PHẢI cho phép khách yêu cầu khôi phục mật khẩu qua email mà không làm lộ việc tài khoản đó có tồn tại hay không.
+- **FR-012**: Hệ thống PHẢI chỉ cho phép đặt lại mật khẩu với một chứng chỉ (token) hợp lệ, chưa sử dụng và chưa hết hạn.
+- **FR-013**: Hệ thống PHẢI ngăn người dùng sử dụng lại các mật khẩu đã dùng gần đây trong quá trình đặt lại mật khẩu.
+- **FR-014**: Hệ thống PHẢI cho phép người dùng đã đăng nhập (có mật khẩu cục bộ) đổi mật khẩu sau khi xác nhận mật khẩu hiện tại.
+- **FR-015**: Hệ thống PHẢI hỗ trợ đăng nhập bằng Google để tạo hoặc truy cập tài khoản, bao gồm xử lý lỗi rõ ràng khi xác thực phía nhà cung cấp thất bại.
+- **FR-016**: Hệ thống KHÔNG BAO GIỜ được lộ mật khẩu, mã khôi phục, hay mã bí mật phiên (session secrets) trong bất kỳ phản hồi nào tới người dùng.
+
+### Các thực thể chính (Key Entities)
+
+- **Account (Tài khoản)**: Danh tính trên nền tảng với email, tên hiển thị, vai trò, trạng thái, ảnh đại diện tùy chọn và trạng thái bảo mật.
+- **Session (Phiên hoạt động)**: Một thiết bị hoặc trình duyệt đã đăng nhập liên kết với một tài khoản, bao gồm trạng thái hoạt động và thời gian hết hạn.
+- **Verification Credential (Chứng chỉ xác thực)**: Một token có giới hạn thời gian dùng để kích hoạt tài khoản email mới đăng ký.
+- **Password Reset Credential (Chứng chỉ Đặt lại Mật khẩu)**: Một token có giới hạn thời gian dùng để chứng minh quyền kiểm soát email trong quá trình khôi phục mật khẩu.
+- **Password History Entry (Lịch sử Mật khẩu)**: Bản ghi các thay đổi mật khẩu trước đó dùng để ngăn chặn việc sử dụng lại các mật khẩu cũ kém an toàn.
+- **External Login Account (Tài khoản Đăng nhập Ngoài)**: Liên kết giữa tài khoản nền tảng và nhà cung cấp danh tính bên thứ ba (Google).
+
+## Tiêu chí Thành công *(bắt buộc)*
+
+### Kết quả có thể đo lường
+
+- **SC-001**: Ít nhất 95% các đăng ký hợp lệ hiển thị hướng dẫn xác thực email trong vòng dưới 5 giây.
+- **SC-002**: Ít nhất 95% các lần đăng nhập hợp lệ truy cập đúng workspace trong vòng dưới 3 giây sau khi gửi yêu cầu.
+- **SC-003**: 100% các trang được bảo vệ điều hướng người dùng chưa xác thực về trang đăng nhập trước khi hiển thị nội dung.
+- **SC-004**: 100% các yêu cầu khôi phục mật khẩu hiển thị thông báo chống dò tìm bất kể tài khoản có tồn tại hay không.
+- **SC-005**: Các nỗ lực nhập sai mật khẩu liên tục sẽ bị khóa hoặc giới hạn lưu lượng (throttle) trong vòng 5 lần thất bại liên tiếp.
+- **SC-006**: Không người dùng nào duy trì hơn 3 phiên hoạt động cùng một lúc.
+- **SC-007**: 100% các nỗ lực đặt lại mật khẩu bằng các chứng chỉ hết hạn, đã sử dụng hoặc không hợp lệ đều thất bại và không làm đổi mật khẩu.
+- **SC-008**: Người dùng có thể hoàn tất quy trình đặt lại mật khẩu hoặc đổi mật khẩu trong dưới 2 phút khi họ có đầy đủ thông tin yêu cầu.
+
+## Giả định
+
+- Người dùng có quyền truy cập vào hộp thư email liên kết với tài khoản của họ để xác thực và khôi phục mật khẩu.
+- Đăng nhập bằng Email/mật khẩu vẫn là đường dẫn xác thực chính; Đăng nhập Google là một phương thức tiện ích bổ sung.
+- Vai trò do nền tảng ấn định và quyết định workspace (trang đích) sau khi đăng nhập.
+- Thời lượng phiên và thời lượng khóa tài khoản tuân theo chính sách bảo mật đã triển khai trong ứng dụng web.
+- Độ mạnh mật khẩu được ép buộc ở mức tối thiểu 8 ký tự trong ứng dụng hiện tại.

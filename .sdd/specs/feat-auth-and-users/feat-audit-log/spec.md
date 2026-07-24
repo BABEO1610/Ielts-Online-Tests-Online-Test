@@ -1,133 +1,133 @@
-# Feature Specification: Audit Log and Change History
+# Đặc tả Chức năng: Nhật ký Hệ thống và Lịch sử Thay đổi (Audit Log and Change History)
 
-**Feature Branch**: `feat-auth-and-users`
+**Nhánh tính năng**: `feat-auth-and-users`
 
-**Created**: 2026-07-24
+**Ngày tạo**: 24-07-2026
 
-**Status**: Draft
+**Trạng thái**: Draft
 
-**Input**: User description: "Backfill feature spec from the completed web application for audit logging, including security/activity logs, admin change logs, filtering, suspicious action visibility, detail view, undo for supported user changes, and audit stats."
+**Đầu vào**: Mô tả của người dùng: "Tạo tài liệu đặc tả tính năng (backfill) từ ứng dụng web đã hoàn thành cho chức năng nhật ký hệ thống (audit logging), bao gồm nhật ký bảo mật/hoạt động, nhật ký thay đổi của admin, bộ lọc, hiển thị các hành động đáng ngờ, xem chi tiết, hoàn tác (undo) các thay đổi được hỗ trợ, và thống kê audit."
 
-## User Scenarios & Testing *(mandatory)*
+## Kịch bản Người dùng & Kiểm thử *(bắt buộc)*
 
-### User Story 1 - Capture Sensitive Actions (Priority: P1)
+### Kịch bản 1 - Ghi lại các hành động nhạy cảm (Độ ưu tiên: P1)
 
-As the platform owner, I want sensitive account, security, and admin actions recorded so the team can investigate incidents and prove accountability.
+Với tư cách là chủ sở hữu nền tảng, tôi muốn các hành động nhạy cảm liên quan đến tài khoản, bảo mật và quản trị được ghi lại để đội ngũ có thể điều tra sự cố và truy cứu trách nhiệm.
 
-**Why this priority**: Auditability is required for a secure identity and administration system.
+**Lý do ưu tiên**: Khả năng kiểm toán là bắt buộc đối với một hệ thống quản trị và định danh an toàn.
 
-**Independent Test**: Can be fully tested by performing login failure, login success, role change, status change, password change, or session revocation actions and confirming each creates an audit entry.
+**Kiểm thử độc lập**: Có thể kiểm thử hoàn toàn bằng cách thực hiện đăng nhập thất bại, đăng nhập thành công, thay đổi vai trò, thay đổi trạng thái, thay đổi mật khẩu hoặc thu hồi phiên hoạt động và xác nhận mỗi hành động đều tạo ra một mục nhật ký.
 
-**Acceptance Scenarios**:
+**Kịch bản nghiệm thu**:
 
-1. **Given** a user signs in successfully, **When** the session starts, **Then** the action is recorded with actor, target, time, and context.
-2. **Given** a sign-in attempt fails, **When** the failure is processed, **Then** the failure is recorded as a security-relevant event.
-3. **Given** an admin changes another user's role or status, **When** the change succeeds, **Then** the previous and new values are recorded.
-4. **Given** an admin revokes a session, **When** the revocation succeeds, **Then** the revocation is recorded.
-
----
-
-### User Story 2 - Monitor Activity Logs (Priority: P1)
-
-As an admin, I want to view activity logs and highlight suspicious events so I can quickly notice risky behavior.
-
-**Why this priority**: Admins need an operational view of login failures, permission changes, account deactivation, and other security-relevant activity.
-
-**Independent Test**: Can be fully tested by opening the activity log, switching between all/normal/suspicious filters, and confirming rows and counts update.
-
-**Acceptance Scenarios**:
-
-1. **Given** an admin opens activity logs, **When** logs load, **Then** the system shows time, actor, action, target, IP, severity, and note.
-2. **Given** an admin filters to suspicious activity, **When** the filter is applied, **Then** only suspicious security-relevant actions are shown.
-3. **Given** there are no matching logs, **When** a filter is applied, **Then** the system shows an empty state.
+1. **Cho trước** một người dùng đăng nhập thành công, **Khi** phiên hoạt động bắt đầu, **Thì** hành động đó được ghi lại cùng với người thực hiện (actor), đối tượng chịu tác động (target), thời gian và ngữ cảnh.
+2. **Cho trước** một nỗ lực đăng nhập thất bại, **Khi** lỗi này được xử lý, **Thì** sự cố thất bại đó được ghi lại như một sự kiện liên quan đến bảo mật.
+3. **Cho trước** một admin thay đổi vai trò hoặc trạng thái của người dùng khác, **Khi** thay đổi thành công, **Thì** giá trị cũ và giá trị mới được ghi lại.
+4. **Cho trước** một admin thu hồi một phiên hoạt động, **Khi** việc thu hồi thành công, **Thì** hành động thu hồi đó được ghi lại.
 
 ---
 
-### User Story 3 - Review Change History (Priority: P1)
+### Kịch bản 2 - Theo dõi Nhật ký Hoạt động (Độ ưu tiên: P1)
 
-As an admin, I want to inspect administrative change logs with before/after values so I can understand exactly what changed.
+Với tư cách là admin, tôi muốn xem nhật ký hoạt động và làm nổi bật các sự kiện đáng ngờ để có thể nhanh chóng nhận ra các hành vi rủi ro.
 
-**Why this priority**: Change history is necessary to diagnose permission or account-state mistakes.
+**Lý do ưu tiên**: Admin cần một góc nhìn tổng quan về các lần đăng nhập thất bại, thay đổi quyền hạn, vô hiệu hóa tài khoản và các hoạt động nhạy cảm bảo mật khác.
 
-**Independent Test**: Can be fully tested by changing a user's role or status, opening change history, viewing the detail, and confirming before/after fields are visible.
+**Kiểm thử độc lập**: Có thể kiểm thử bằng cách mở nhật ký hoạt động, chuyển đổi giữa các bộ lọc tất cả/bình thường/đáng ngờ, và xác nhận các hàng cũng như số lượng được cập nhật chính xác.
 
-**Acceptance Scenarios**:
+**Kịch bản nghiệm thu**:
 
-1. **Given** an admin opens change history, **When** logs load, **Then** the system shows time, admin, action, target, and status.
-2. **Given** an admin opens a change detail, **When** the detail loads, **Then** the system displays field-level previous and new values.
-3. **Given** an admin searches by action, **When** the search is applied, **Then** matching changes are shown with pagination.
+1. **Cho trước** một admin mở nhật ký hoạt động, **Khi** nhật ký tải xong, **Thì** hệ thống hiển thị thời gian, người thực hiện, hành động, đối tượng chịu tác động, IP, mức độ nghiêm trọng và ghi chú.
+2. **Cho trước** một admin lọc theo hoạt động đáng ngờ, **Khi** bộ lọc được áp dụng, **Thì** chỉ các hành động liên quan đến bảo mật và đáng ngờ mới được hiển thị.
+3. **Cho trước** không có nhật ký nào khớp, **Khi** bộ lọc được áp dụng, **Thì** hệ thống hiển thị trạng thái trống (empty state).
 
 ---
 
-### User Story 4 - Undo Supported User Changes (Priority: P2)
+### Kịch bản 3 - Xem lại Lịch sử Thay đổi (Độ ưu tiên: P1)
 
-As an admin, I want to undo supported user role or status changes so I can safely correct mistaken account-management actions.
+Với tư cách là admin, tôi muốn kiểm tra nhật ký thay đổi quản trị với các giá trị trước/sau để có thể hiểu chính xác những gì đã thay đổi.
 
-**Why this priority**: Reversible administrative changes reduce operational risk while preserving traceability.
+**Lý do ưu tiên**: Lịch sử thay đổi là cần thiết để chẩn đoán các sai sót về quyền hạn hoặc trạng thái tài khoản.
 
-**Independent Test**: Can be fully tested by changing a user's role or status, opening the change detail, undoing the change, and confirming the original log is marked undone and a new undo log is created.
+**Kiểm thử độc lập**: Có thể kiểm thử bằng cách thay đổi vai trò/trạng thái của một người dùng, mở lịch sử thay đổi, xem chi tiết và xác nhận các trường dữ liệu trước/sau đều hiển thị.
 
-**Acceptance Scenarios**:
+**Kịch bản nghiệm thu**:
 
-1. **Given** a change log is marked undoable and has not been undone, **When** an admin requests undo, **Then** the system restores the previous supported value and marks the source log as undone.
-2. **Given** a change log is not undoable, already undone, or has a changed target state, **When** undo is requested, **Then** the system rejects the undo and explains why.
-3. **Given** an admin attempts to undo a change on their own account, **When** undo is requested, **Then** the system denies the action.
+1. **Cho trước** một admin mở lịch sử thay đổi, **Khi** nhật ký tải xong, **Thì** hệ thống hiển thị thời gian, admin, hành động, đối tượng tác động và trạng thái.
+2. **Cho trước** một admin mở chi tiết một thay đổi, **Khi** chi tiết tải xong, **Thì** hệ thống hiển thị giá trị cũ và mới ở mức độ từng trường (field-level).
+3. **Cho trước** một admin tìm kiếm theo hành động, **Khi** tìm kiếm được áp dụng, **Thì** các thay đổi khớp với từ khóa được hiển thị kèm phân trang.
 
-### Edge Cases
+---
 
-- Audit creation failure is treated as a system error for actions that require traceability.
-- Logs may have a system actor when no human actor exists.
-- Some actions have no before/after values and still need a readable log row.
-- Suspicious classification includes security-sensitive actions such as failed login, account lock, deactivation, role change, password change by admin, and permission denial.
-- Undo is supported only for selected user role/status changes.
-- Undo detects conflicts when the target was changed again after the source log.
-- Pagination and filters remain stable when log volume is high.
+### Kịch bản 4 - Hoàn tác (Undo) Thay đổi Người dùng Được hỗ trợ (Độ ưu tiên: P2)
 
-## Requirements *(mandatory)*
+Với tư cách là admin, tôi muốn hoàn tác các thay đổi về vai trò hoặc trạng thái người dùng (nằm trong danh sách hỗ trợ) để có thể khắc phục an toàn những thao tác quản lý tài khoản sai sót.
 
-### Functional Requirements
+**Lý do ưu tiên**: Các thay đổi quản trị có thể đảo ngược giúp giảm rủi ro vận hành trong khi vẫn duy trì khả năng truy vết.
 
-- **FR-001**: System MUST record security-sensitive and administrative actions with actor, action, target, timestamp, and IP context when available.
-- **FR-002**: System MUST record previous and new values for changes where before/after comparison is meaningful.
-- **FR-003**: System MUST allow admins to view paginated activity logs.
-- **FR-004**: System MUST allow admins to filter activity logs by suspicious severity.
-- **FR-005**: System MUST label audit actions in user-friendly language.
-- **FR-006**: System MUST show activity log rows with time, actor, action, target, IP, severity, and note.
-- **FR-007**: System MUST allow admins to view paginated change logs.
-- **FR-008**: System MUST allow admins to search or filter change logs by action.
-- **FR-009**: System MUST allow admins to open a change-log detail with before/after values.
-- **FR-010**: System MUST summarize total, undoable, and undone changes for change history.
-- **FR-011**: System MUST allow undo only for supported, undoable, not-yet-undone user changes.
-- **FR-012**: System MUST prevent undo when the target state no longer matches the logged change.
-- **FR-013**: System MUST prevent admins from undoing changes on their own account.
-- **FR-014**: System MUST create a new audit entry whenever a change is undone.
-- **FR-015**: System MUST preserve the original audit entry and mark it as undone rather than deleting it.
-- **FR-016**: System MUST provide activity statistics for total logs, suspicious logs, and failed sign-ins.
+**Kiểm thử độc lập**: Có thể kiểm thử bằng cách thay đổi vai trò/trạng thái của người dùng, mở chi tiết thay đổi, hoàn tác thay đổi, và xác nhận nhật ký gốc được đánh dấu là đã hoàn tác (undone), đồng thời một nhật ký hoàn tác mới được tạo ra.
 
-### Key Entities
+**Kịch bản nghiệm thu**:
 
-- **Audit Log Entry**: A durable record of a sensitive action, including actor, action, target, context, and time.
-- **Activity Log View**: A user-friendly presentation of audit entries for monitoring normal and suspicious events.
-- **Change Log View**: A user-friendly presentation of before/after administrative changes.
-- **Undo Record**: A new audit entry that documents reversal of a supported prior change.
-- **Severity Classification**: A categorization that marks certain actions as suspicious for admin monitoring.
+1. **Cho trước** một nhật ký thay đổi được đánh dấu là có thể hoàn tác (undoable) và chưa bị hoàn tác, **Khi** admin yêu cầu hoàn tác, **Thì** hệ thống khôi phục lại giá trị được hỗ trợ trước đó và đánh dấu nhật ký gốc là đã hoàn tác.
+2. **Cho trước** một nhật ký thay đổi không thể hoàn tác, đã được hoàn tác từ trước, hoặc trạng thái của đối tượng đã thay đổi, **Khi** yêu cầu hoàn tác được gửi đi, **Thì** hệ thống từ chối hoàn tác và giải thích lý do.
+3. **Cho trước** một admin cố gắng hoàn tác một thay đổi trên chính tài khoản của họ, **Khi** yêu cầu hoàn tác, **Thì** hệ thống từ chối hành động này.
 
-## Success Criteria *(mandatory)*
+### Các trường hợp ngoại lệ (Edge Cases)
 
-### Measurable Outcomes
+- Lỗi không tạo được audit log được coi là lỗi hệ thống đối với các hành động yêu cầu tính truy vết.
+- Các nhật ký có thể có `actor` là system (hệ thống) khi không có người dùng cụ thể thao tác.
+- Một số hành động không có giá trị trước/sau nhưng vẫn cần một dòng nhật ký có thể đọc được.
+- Phân loại đáng ngờ (suspicious) bao gồm các hành động nhạy cảm bảo mật như: đăng nhập thất bại, khóa tài khoản, vô hiệu hóa, đổi vai trò, admin đổi mật khẩu người khác và bị từ chối quyền.
+- Chức năng Hoàn tác (Undo) chỉ được hỗ trợ cho một số thay đổi vai trò/trạng thái người dùng nhất định.
+- Chức năng Hoàn tác phát hiện xung đột nếu đối tượng đã bị thay đổi lần nữa sau khi nhật ký nguồn được tạo.
+- Phân trang và bộ lọc vẫn hoạt động ổn định khi lượng nhật ký lớn.
 
-- **SC-001**: 100% of successful role changes, status changes, password changes, login failures, logins, and session revocations produce an audit entry.
-- **SC-002**: Admins can load the latest activity logs in under 3 seconds for normal log volumes.
-- **SC-003**: Admins can identify suspicious activity count and failed-login count within 10 seconds of opening the activity page.
-- **SC-004**: At least 95% of action searches in change history return filtered results in under 3 seconds.
-- **SC-005**: 100% of supported undo actions preserve the source log and create a separate undo log.
-- **SC-006**: 100% of unsupported, conflicted, already-undone, or self-targeted undo attempts are rejected without changing the target.
-- **SC-007**: Admins can inspect before/after values for a change in under 30 seconds from the change history page.
+## Yêu cầu *(bắt buộc)*
 
-## Assumptions
+### Yêu cầu chức năng
 
-- Audit log access is restricted to admins.
-- Audit logs are append-oriented; deletion of audit history is outside this feature.
-- Only selected user role/status changes are undoable in the current scope.
-- Content review and grading actions may also appear in audit logs, but the core scope here is identity, access, and admin accountability.
-- The application treats suspicious classification as an operational aid, not as a legal fraud determination.
+- **FR-001**: Hệ thống PHẢI ghi lại các hành động nhạy cảm bảo mật và quản trị với người thực hiện, hành động, đối tượng, thời gian, và ngữ cảnh IP (nếu có).
+- **FR-002**: Hệ thống PHẢI ghi lại các giá trị cũ và mới cho những thay đổi mà việc so sánh trước/sau có ý nghĩa.
+- **FR-003**: Hệ thống PHẢI cho phép admin xem nhật ký hoạt động có phân trang.
+- **FR-004**: Hệ thống PHẢI cho phép admin lọc nhật ký hoạt động theo mức độ đáng ngờ (suspicious severity).
+- **FR-005**: Hệ thống PHẢI gắn nhãn (label) các hành động audit bằng ngôn ngữ thân thiện với người dùng.
+- **FR-006**: Hệ thống PHẢI hiển thị các dòng nhật ký hoạt động với thời gian, người thực hiện, hành động, đối tượng, IP, mức độ nghiêm trọng và ghi chú.
+- **FR-007**: Hệ thống PHẢI cho phép admin xem nhật ký thay đổi có phân trang.
+- **FR-008**: Hệ thống PHẢI cho phép admin tìm kiếm hoặc lọc nhật ký thay đổi theo hành động.
+- **FR-009**: Hệ thống PHẢI cho phép admin mở chi tiết một nhật ký thay đổi với các giá trị trước/sau.
+- **FR-010**: Hệ thống PHẢI tóm tắt tổng số thay đổi, số thay đổi có thể hoàn tác, và số thay đổi đã hoàn tác trên trang lịch sử.
+- **FR-011**: Hệ thống PHẢI cho phép hoàn tác (undo) chỉ với những thay đổi về người dùng được hỗ trợ, có thể hoàn tác và chưa bị hoàn tác.
+- **FR-012**: Hệ thống PHẢI ngăn chặn hoàn tác khi trạng thái của đối tượng không còn khớp với thay đổi đã ghi log.
+- **FR-013**: Hệ thống PHẢI ngăn chặn admin hoàn tác các thay đổi trên chính tài khoản của họ.
+- **FR-014**: Hệ thống PHẢI tạo ra một mục nhật ký audit mới mỗi khi một thay đổi bị hoàn tác.
+- **FR-015**: Hệ thống PHẢI giữ nguyên mục nhật ký gốc và đánh dấu nó là đã hoàn tác (undone) thay vì xóa nó.
+- **FR-016**: Hệ thống PHẢI cung cấp số liệu thống kê hoạt động cho tổng số nhật ký, nhật ký đáng ngờ và đăng nhập thất bại.
+
+### Các thực thể chính (Key Entities)
+
+- **Audit Log Entry (Mục Nhật ký Kiểm toán)**: Bản ghi bền vững về một hành động nhạy cảm, bao gồm người thực hiện, hành động, đối tượng, ngữ cảnh và thời gian.
+- **Activity Log View (Giao diện Nhật ký Hoạt động)**: Giao diện hiển thị thân thiện của các mục nhật ký để theo dõi các sự kiện bình thường và đáng ngờ.
+- **Change Log View (Giao diện Nhật ký Thay đổi)**: Giao diện hiển thị thân thiện của các thay đổi quản trị trước/sau.
+- **Undo Record (Bản ghi Hoàn tác)**: Một mục nhật ký audit mới ghi lại việc đảo ngược một thay đổi trước đó (nằm trong danh sách hỗ trợ undo).
+- **Severity Classification (Phân loại Mức độ Nghiêm trọng)**: Việc phân loại đánh dấu một số hành động là đáng ngờ để admin theo dõi.
+
+## Tiêu chí Thành công *(bắt buộc)*
+
+### Kết quả có thể đo lường
+
+- **SC-001**: 100% các thay đổi vai trò, trạng thái, mật khẩu, đăng nhập thất bại, đăng nhập thành công và thu hồi phiên đều tạo ra một mục nhật ký audit.
+- **SC-002**: Admin có thể tải nhật ký hoạt động mới nhất trong dưới 3 giây đối với dung lượng nhật ký bình thường.
+- **SC-003**: Admin có thể thấy số lượng hoạt động đáng ngờ và số lần đăng nhập thất bại trong vòng 10 giây kể từ khi mở trang hoạt động.
+- **SC-004**: Ít nhất 95% các truy vấn tìm kiếm hành động trong lịch sử thay đổi trả về kết quả đã lọc trong dưới 3 giây.
+- **SC-005**: 100% các hành động hoàn tác được hỗ trợ đều giữ nguyên nhật ký gốc và tạo ra một nhật ký hoàn tác riêng.
+- **SC-006**: 100% các nỗ lực hoàn tác không được hỗ trợ, bị xung đột, đã hoàn tác rồi hoặc thao tác trên chính mình đều bị từ chối mà không làm thay đổi trạng thái đối tượng.
+- **SC-007**: Admin có thể kiểm tra các giá trị trước/sau cho một thay đổi trong dưới 30 giây từ trang lịch sử thay đổi.
+
+## Giả định
+
+- Quyền truy cập vào nhật ký Audit chỉ dành cho admin.
+- Nhật ký Audit có tính chất nối thêm (append-only); việc xóa lịch sử nhật ký nằm ngoài phạm vi của tính năng này.
+- Chỉ một số thay đổi về vai trò/trạng thái người dùng được chọn lọc mới có thể hoàn tác trong phạm vi hiện tại.
+- Các hành động chấm điểm và đánh giá tài liệu cũng có thể xuất hiện trong nhật ký audit, nhưng trọng tâm cốt lõi ở đây là định danh, truy cập và trách nhiệm của admin.
+- Ứng dụng coi phân loại "đáng ngờ" (suspicious) như một công cụ hỗ trợ vận hành, không phải là một kết luận gian lận mang tính pháp lý.
