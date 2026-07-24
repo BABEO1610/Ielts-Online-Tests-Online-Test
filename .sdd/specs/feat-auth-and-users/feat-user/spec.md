@@ -1,131 +1,131 @@
-# Feature Specification: User Administration and Authorization
+# Đặc tả Chức năng: Quản trị và Phân quyền Người dùng (User Administration and Authorization)
 
-**Feature Branch**: `feat-auth-and-users`
+**Nhánh tính năng**: `feat-auth-and-users`
 
-**Created**: 2026-07-24
+**Ngày tạo**: 24-07-2026
 
-**Status**: Draft
+**Trạng thái**: Draft
 
-**Input**: User description: "Backfill feature spec from the completed web application for user authorization and administration, including role guards, admin user list, search and filters, role/status changes, self-protection, session management, and session revocation."
+**Đầu vào**: Mô tả của người dùng: "Tạo tài liệu đặc tả tính năng (backfill) từ ứng dụng web đã hoàn thành cho chức năng quản trị và phân quyền người dùng, bao gồm các bộ bảo vệ vai trò (role guards), danh sách người dùng cho admin, tìm kiếm và bộ lọc, thay đổi vai trò/trạng thái, tự bảo vệ tài khoản của admin, quản lý phiên và thu hồi phiên."
 
-## User Scenarios & Testing *(mandatory)*
+## Kịch bản Người dùng & Kiểm thử *(bắt buộc)*
 
-### User Story 1 - Protect Role-Specific Areas (Priority: P1)
+### Kịch bản 1 - Bảo vệ Các Khu vực Theo Vai trò (Độ ưu tiên: P1)
 
-As the platform owner, I want students, tutors, and admins to access only the areas allowed for their role, so sensitive management functions remain protected.
+Với tư cách là chủ sở hữu nền tảng, tôi muốn học viên, giảng viên và admin chỉ được truy cập vào những khu vực được phép cho vai trò của họ, để đảm bảo các chức năng quản lý nhạy cảm được bảo vệ.
 
-**Why this priority**: Role enforcement is the safety boundary between normal learning, tutor work, and system administration.
+**Lý do ưu tiên**: Việc thực thi vai trò là ranh giới an toàn giữa các khu vực học tập bình thường, công việc của giảng viên và việc quản trị hệ thống.
 
-**Independent Test**: Can be fully tested by signing in as each role and attempting to access student, tutor, and admin areas.
+**Kiểm thử độc lập**: Có thể kiểm thử hoàn toàn bằng cách đăng nhập vào từng vai trò và cố gắng truy cập vào các khu vực của học viên, giảng viên và admin.
 
-**Acceptance Scenarios**:
+**Kịch bản nghiệm thu**:
 
-1. **Given** a signed-in student tries to open an admin or tutor-only area, **When** authorization is checked, **Then** access is denied or redirected to an allowed area.
-2. **Given** a signed-in tutor opens a tutor workspace, **When** authorization is checked, **Then** the workspace is shown.
-3. **Given** a signed-in admin opens the admin dashboard, **When** authorization is checked, **Then** the admin area is shown.
-
----
-
-### User Story 2 - Search and Filter Users (Priority: P1)
-
-As an admin, I want to browse, search, filter, and page through users so I can quickly find accounts that need review.
-
-**Why this priority**: User administration starts with finding the right account reliably and safely.
-
-**Independent Test**: Can be fully tested by opening user management, applying role/status/search filters, moving between pages, and confirming the table updates.
-
-**Acceptance Scenarios**:
-
-1. **Given** an admin opens user management, **When** the list loads, **Then** the system shows users with name, email, role, status, and created date.
-2. **Given** an admin searches by name or email, **When** the search is applied, **Then** only matching users are shown.
-3. **Given** an admin filters by role or status, **When** the filter is applied, **Then** the list shows only users matching the selected criteria.
-4. **Given** there are more users than fit on one page, **When** the admin changes page, **Then** the correct page of users is shown.
+1. **Cho trước** một học viên đã đăng nhập cố gắng mở một khu vực dành riêng cho admin hoặc giảng viên, **Khi** quyền truy cập được kiểm tra, **Thì** quyền truy cập bị từ chối hoặc người dùng bị điều hướng đến khu vực hợp lệ.
+2. **Cho trước** một giảng viên đã đăng nhập mở không gian làm việc của giảng viên, **Khi** quyền truy cập được kiểm tra, **Thì** không gian làm việc hiển thị bình thường.
+3. **Cho trước** một admin đã đăng nhập mở bảng điều khiển admin, **Khi** quyền truy cập được kiểm tra, **Thì** khu vực admin hiển thị bình thường.
 
 ---
 
-### User Story 3 - Change User Role or Status (Priority: P1)
+### Kịch bản 2 - Tìm kiếm và Lọc Người dùng (Độ ưu tiên: P1)
 
-As an admin, I want to update another user's role or account status so I can grant tutor/admin access or restrict unsafe accounts.
+Với tư cách là admin, tôi muốn duyệt, tìm kiếm, lọc và phân trang qua danh sách người dùng để có thể nhanh chóng tìm thấy các tài khoản cần xem xét.
 
-**Why this priority**: Role and status changes directly control platform access and operational responsibility.
+**Lý do ưu tiên**: Việc quản trị người dùng bắt đầu từ việc tìm kiếm đúng tài khoản một cách đáng tin cậy và an toàn.
 
-**Independent Test**: Can be fully tested by choosing a non-self user, changing role and status, saving, and confirming the user row reflects the new values.
+**Kiểm thử độc lập**: Có thể kiểm thử bằng cách mở phần quản lý người dùng, áp dụng các bộ lọc vai trò/trạng thái/tìm kiếm, di chuyển giữa các trang và xác nhận bảng dữ liệu được cập nhật đúng.
 
-**Acceptance Scenarios**:
+**Kịch bản nghiệm thu**:
 
-1. **Given** an admin selects another user, **When** they change that user's role and save, **Then** the user receives the new role and existing sessions for that user are ended.
-2. **Given** an admin selects another user, **When** they change that user's status to inactive or banned, **Then** the user receives the new status and active sessions are ended.
-3. **Given** an admin attempts to modify their own role or status, **When** they submit the change, **Then** the system rejects the action.
+1. **Cho trước** một admin mở quản lý người dùng, **Khi** danh sách tải xong, **Thì** hệ thống hiển thị người dùng cùng với tên, email, vai trò, trạng thái và ngày tạo.
+2. **Cho trước** một admin tìm kiếm theo tên hoặc email, **Khi** lệnh tìm kiếm được áp dụng, **Thì** chỉ những người dùng khớp mới được hiển thị.
+3. **Cho trước** một admin lọc theo vai trò hoặc trạng thái, **Khi** bộ lọc được áp dụng, **Thì** danh sách chỉ hiển thị những người dùng khớp với tiêu chí đã chọn.
+4. **Cho trước** có nhiều người dùng hơn mức có thể hiển thị trên một trang, **Khi** admin chuyển trang, **Thì** hệ thống hiển thị đúng trang danh sách người dùng đó.
 
 ---
 
-### User Story 4 - Manage Active Sessions (Priority: P2)
+### Kịch bản 3 - Thay đổi Vai trò hoặc Trạng thái Người dùng (Độ ưu tiên: P1)
 
-As an admin, I want to review active sessions and revoke suspicious ones so I can respond quickly to compromised or unsafe access.
+Với tư cách là admin, tôi muốn cập nhật vai trò hoặc trạng thái tài khoản của người dùng khác để có thể cấp quyền truy cập giảng viên/admin hoặc hạn chế các tài khoản không an toàn.
 
-**Why this priority**: Session revocation gives admins a direct operational control after suspicious login activity or role/status changes.
+**Lý do ưu tiên**: Các thay đổi về vai trò và trạng thái trực tiếp kiểm soát quyền truy cập và trách nhiệm vận hành trên nền tảng.
 
-**Independent Test**: Can be fully tested by opening active sessions, filtering/searching by user or sign-in type, revoking a session, and confirming it disappears from active sessions.
+**Kiểm thử độc lập**: Có thể kiểm thử bằng cách chọn một người dùng khác, thay đổi vai trò và trạng thái, lưu, và xác nhận dòng dữ liệu người dùng phản ánh giá trị mới.
 
-**Acceptance Scenarios**:
+**Kịch bản nghiệm thu**:
 
-1. **Given** an admin opens active sessions, **When** sessions load, **Then** the system shows user, email, device, IP, sign-in type, last activity, and expiration.
-2. **Given** an admin filters sessions by password or external sign-in, **When** the filter is applied, **Then** only matching sessions are shown.
-3. **Given** an admin revokes an active session, **When** the action succeeds, **Then** that session can no longer be used.
+1. **Cho trước** một admin chọn một người dùng khác, **Khi** họ đổi vai trò của người dùng đó và lưu lại, **Thì** người dùng nhận được vai trò mới và các phiên hoạt động hiện tại của người đó bị chấm dứt.
+2. **Cho trước** một admin chọn một người dùng khác, **Khi** họ đổi trạng thái của người dùng đó thành inactive (không hoạt động) hoặc banned (cấm), **Thì** người dùng nhận được trạng thái mới và các phiên hoạt động hiện tại bị chấm dứt.
+3. **Cho trước** một admin cố gắng tự sửa vai trò hoặc trạng thái của chính mình, **Khi** họ gửi yêu cầu thay đổi, **Thì** hệ thống từ chối hành động.
 
-### Edge Cases
+---
 
-- Non-admin users cannot access user management, session management, or admin-only controls.
-- Admins cannot modify their own role or status.
-- Role changes end active sessions for the changed user to prevent stale permissions.
-- Inactive or banned status changes end active sessions for the affected user.
-- Empty search or filter results show an empty state rather than failing.
-- Session revocation for a missing or already revoked session returns a clear failure.
-- User list pagination remains valid when filters reduce the number of results.
+### Kịch bản 4 - Quản lý Các Phiên Hoạt động (Độ ưu tiên: P2)
 
-## Requirements *(mandatory)*
+Với tư cách là admin, tôi muốn kiểm tra các phiên hoạt động và thu hồi (revoke) các phiên đáng ngờ để có thể phản ứng nhanh chóng với các hoạt động đăng nhập bị lộ hoặc thay đổi vai trò/trạng thái.
 
-### Functional Requirements
+**Lý do ưu tiên**: Tính năng thu hồi phiên cấp cho admin quyền kiểm soát vận hành trực tiếp sau khi có hành vi đáng ngờ.
 
-- **FR-001**: System MUST enforce role-based access for protected student, tutor, and admin areas.
-- **FR-002**: System MUST deny admin user-management access to non-admin users.
-- **FR-003**: System MUST allow admins to view a paginated list of users.
-- **FR-004**: System MUST allow admins to search users by name or email.
-- **FR-005**: System MUST allow admins to filter users by role and account status.
-- **FR-006**: System MUST show user role, account status, email, display name, and created date in the user list.
-- **FR-007**: System MUST allow admins to change another user's role.
-- **FR-008**: System MUST allow admins to change another user's account status.
-- **FR-009**: System MUST prevent admins from changing their own role or status.
-- **FR-010**: System MUST end active sessions when a user's role changes.
-- **FR-011**: System MUST end active sessions when a user's status becomes inactive or banned.
-- **FR-012**: System MUST allow admins to view active user sessions with user, device, IP, sign-in type, activity, and expiration information.
-- **FR-013**: System MUST allow admins to revoke a specific active session.
-- **FR-014**: System MUST record role changes, status changes, and admin session revocations in the system audit trail.
-- **FR-015**: System MUST return clear permission errors when a user lacks authority for an action.
+**Kiểm thử độc lập**: Có thể kiểm thử bằng cách mở danh sách các phiên hoạt động, lọc/tìm kiếm theo người dùng hoặc loại đăng nhập, thu hồi một phiên, và xác nhận phiên đó biến mất khỏi danh sách.
 
-### Key Entities
+**Kịch bản nghiệm thu**:
 
-- **User Account**: A person or system identity with role, status, profile, and account lifecycle state.
-- **Role**: A permission category such as student, tutor, or admin that determines accessible areas and actions.
-- **Account Status**: The lifecycle state that controls whether an account may access the platform.
-- **Admin Action**: A privileged change made by an admin to another user's role, status, or session.
-- **Active Session**: A currently valid sign-in instance that can be reviewed and revoked.
+1. **Cho trước** một admin mở danh sách phiên hoạt động, **Khi** danh sách tải xong, **Thì** hệ thống hiển thị người dùng, email, thiết bị, IP, kiểu đăng nhập, hoạt động cuối cùng và thời gian hết hạn.
+2. **Cho trước** một admin lọc các phiên theo đăng nhập mật khẩu hoặc bên ngoài (External), **Khi** bộ lọc được áp dụng, **Thì** chỉ các phiên khớp mới được hiển thị.
+3. **Cho trước** một admin thu hồi một phiên hoạt động, **Khi** thao tác thành công, **Thì** phiên đó không còn có thể sử dụng được nữa.
 
-## Success Criteria *(mandatory)*
+### Các trường hợp ngoại lệ (Edge Cases)
 
-### Measurable Outcomes
+- Người dùng không phải admin không thể truy cập quản lý người dùng, quản lý phiên hoặc các tính năng kiểm soát chỉ dành cho admin.
+- Admin không thể tự đổi vai trò hoặc trạng thái của chính mình.
+- Thay đổi vai trò sẽ chấm dứt các phiên hoạt động hiện tại của người bị thay đổi để tránh tình trạng quyền truy cập cũ còn sót lại.
+- Trạng thái thay đổi thành inactive hoặc banned sẽ chấm dứt các phiên hoạt động hiện tại của người bị ảnh hưởng.
+- Các tìm kiếm hoặc lọc không có kết quả sẽ hiển thị trạng thái trống (empty state) thay vì bị lỗi.
+- Thu hồi một phiên không tồn tại hoặc đã bị thu hồi sẽ trả về kết quả lỗi rõ ràng.
+- Việc phân trang danh sách người dùng vẫn hợp lệ khi các bộ lọc làm giảm số lượng kết quả.
 
-- **SC-001**: 100% of admin-only pages deny access to non-admin users.
-- **SC-002**: Admins can find a known user by email or full name in under 30 seconds.
-- **SC-003**: At least 95% of user list searches or filters show updated results in under 3 seconds.
-- **SC-004**: 100% of successful role changes are reflected in the user list after refresh.
-- **SC-005**: 100% of successful inactive or banned status changes prevent the affected account from continuing active access.
-- **SC-006**: 100% of self role/status modification attempts by admins are rejected.
-- **SC-007**: Admins can revoke a selected active session in under 10 seconds.
+## Yêu cầu *(bắt buộc)*
 
-## Assumptions
+### Yêu cầu chức năng
 
-- The supported platform roles are fixed for this feature: student, tutor, and admin.
-- Account statuses include active, inactive, pending, and banned.
-- Admins manage other users but do not create users in this feature; account creation belongs to authentication or other admin workflows.
-- Detailed audit viewing and undo behavior belong to the audit log feature, while this feature only requires audit trail creation for privileged actions.
+- **FR-001**: Hệ thống PHẢI thực thi kiểm soát truy cập dựa trên vai trò cho các khu vực học viên, giảng viên và admin được bảo vệ.
+- **FR-002**: Hệ thống PHẢI từ chối cấp quyền truy cập khu vực quản lý người dùng admin cho những người dùng không phải admin.
+- **FR-003**: Hệ thống PHẢI cho phép admin xem danh sách người dùng có phân trang.
+- **FR-004**: Hệ thống PHẢI cho phép admin tìm kiếm người dùng theo tên hoặc email.
+- **FR-005**: Hệ thống PHẢI cho phép admin lọc người dùng theo vai trò và trạng thái tài khoản.
+- **FR-006**: Hệ thống PHẢI hiển thị vai trò người dùng, trạng thái, email, tên hiển thị và ngày tạo trong danh sách người dùng.
+- **FR-007**: Hệ thống PHẢI cho phép admin đổi vai trò của một người dùng khác.
+- **FR-008**: Hệ thống PHẢI cho phép admin đổi trạng thái tài khoản của một người dùng khác.
+- **FR-009**: Hệ thống PHẢI ngăn không cho admin thay đổi vai trò hoặc trạng thái của chính mình.
+- **FR-010**: Hệ thống PHẢI chấm dứt các phiên đang kích hoạt khi vai trò của một người dùng thay đổi.
+- **FR-011**: Hệ thống PHẢI chấm dứt các phiên đang kích hoạt khi trạng thái của người dùng trở thành inactive hoặc banned.
+- **FR-012**: Hệ thống PHẢI cho phép admin xem các phiên đang kích hoạt với thông tin người dùng, thiết bị, IP, kiểu đăng nhập, thời gian hoạt động và thời gian hết hạn.
+- **FR-013**: Hệ thống PHẢI cho phép admin thu hồi một phiên hoạt động cụ thể.
+- **FR-014**: Hệ thống PHẢI lưu vết (record) việc thay đổi vai trò, trạng thái và thu hồi phiên quản trị vào nhật ký hệ thống (audit trail).
+- **FR-015**: Hệ thống PHẢI trả về các lỗi quyền truy cập rõ ràng khi người dùng không đủ quyền thực hiện một thao tác.
+
+### Các thực thể chính (Key Entities)
+
+- **User Account (Tài khoản Người dùng)**: Một danh tính người dùng hoặc hệ thống với vai trò, trạng thái, hồ sơ và vòng đời tài khoản.
+- **Role (Vai trò)**: Một danh mục quyền hạn như học viên, giảng viên hoặc admin quyết định các khu vực và hành động có thể truy cập.
+- **Account Status (Trạng thái Tài khoản)**: Trạng thái vòng đời quyết định xem tài khoản có thể truy cập nền tảng hay không.
+- **Admin Action (Hành động Quản trị)**: Một sự thay đổi có đặc quyền được thực hiện bởi admin đối với vai trò, trạng thái hoặc phiên của người dùng khác.
+- **Active Session (Phiên Hoạt động)**: Một instance đăng nhập đang hợp lệ có thể được xem xét và thu hồi.
+
+## Tiêu chí Thành công *(bắt buộc)*
+
+### Kết quả có thể đo lường
+
+- **SC-001**: 100% các trang chỉ dành cho admin từ chối truy cập từ các người dùng không phải admin.
+- **SC-002**: Admin có thể tìm thấy một người dùng qua email hoặc tên đầy đủ trong dưới 30 giây.
+- **SC-003**: Ít nhất 95% các tìm kiếm hoặc lọc danh sách người dùng hiển thị kết quả được cập nhật trong dưới 3 giây.
+- **SC-004**: 100% các thay đổi vai trò thành công đều được phản ánh trong danh sách người dùng sau khi tải lại trang.
+- **SC-005**: 100% các thay đổi trạng thái thành inactive hoặc banned thành công đều ngăn tài khoản bị ảnh hưởng tiếp tục truy cập.
+- **SC-006**: 100% các nỗ lực tự sửa vai trò/trạng thái của admin bị từ chối.
+- **SC-007**: Admin có thể thu hồi một phiên được chọn trong dưới 10 giây.
+
+## Giả định
+
+- Các vai trò được hỗ trợ trên nền tảng cố định cho tính năng này: học viên (student), giảng viên (tutor) và admin.
+- Trạng thái tài khoản bao gồm active, inactive, pending và banned.
+- Admin quản lý người dùng khác nhưng không trực tiếp tạo người dùng trong tính năng này; việc tạo tài khoản thuộc về xác thực (auth) hoặc các luồng quy trình admin khác.
+- Hành vi xem chi tiết audit log và hoàn tác thuộc về tính năng `feat-audit-log`, trong khi tính năng này chỉ yêu cầu tự động tạo log truy vết cho các hành động có đặc quyền.

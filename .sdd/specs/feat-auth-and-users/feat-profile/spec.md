@@ -1,144 +1,144 @@
-# Feature Specification: User Profile
+# Đặc tả Chức năng: Hồ sơ Người dùng (User Profile)
 
-**Feature Branch**: `feat-auth-and-users`
+**Nhánh tính năng**: `feat-auth-and-users`
 
-**Created**: 2026-07-24
+**Ngày tạo**: 24-07-2026
 
-**Status**: Draft
+**Trạng thái**: Draft
 
-**Input**: User description: "Backfill feature spec from the completed web application for profile management, including viewing account identity, editing profile details, avatar, IELTS target band score, target test date, onboarding target setup, security settings, password change, and personal support history."
+**Đầu vào**: Mô tả của người dùng: "Tạo tài liệu đặc tả tính năng (backfill) từ ứng dụng web đã hoàn thành cho chức năng quản lý hồ sơ, bao gồm xem danh tính tài khoản, chỉnh sửa chi tiết hồ sơ, ảnh đại diện (avatar), điểm IELTS mục tiêu, ngày thi mục tiêu, thiết lập mục tiêu khi mới onboarding, cài đặt bảo mật, đổi mật khẩu và lịch sử hỗ trợ cá nhân."
 
-## User Scenarios & Testing *(mandatory)*
+## Kịch bản Người dùng & Kiểm thử *(bắt buộc)*
 
-### User Story 1 - View Personal Profile (Priority: P1)
+### Kịch bản 1 - Xem Hồ sơ Cá nhân (Độ ưu tiên: P1)
 
-As a signed-in user, I want to view my account identity, email, role, status, and learning profile so I can confirm the platform recognizes me correctly.
+Với tư cách là người dùng đã đăng nhập, tôi muốn xem danh tính tài khoản, email, vai trò, trạng thái và hồ sơ học tập của mình để xác nhận hệ thống nhận diện tôi chính xác.
 
-**Why this priority**: Users need confidence that progress, submissions, and account settings are attached to the right identity.
+**Lý do ưu tiên**: Người dùng cần sự an tâm rằng tiến độ học tập, bài nộp và cài đặt tài khoản được gắn đúng với danh tính của họ.
 
-**Independent Test**: Can be fully tested by signing in and opening the profile area to confirm the displayed name, email, role, status, avatar, target band score, and target test date match the account data.
+**Kiểm thử độc lập**: Có thể kiểm thử bằng cách đăng nhập và mở khu vực hồ sơ để xác nhận tên, email, vai trò, trạng thái, avatar, điểm mục tiêu và ngày thi mục tiêu hiển thị đúng với dữ liệu tài khoản.
 
-**Acceptance Scenarios**:
+**Kịch bản nghiệm thu**:
 
-1. **Given** a signed-in user opens the profile page, **When** their account is found, **Then** the system shows their identity and learning profile fields.
-2. **Given** a user has no avatar, **When** the profile page is shown, **Then** the system displays a safe placeholder based on their name.
-3. **Given** the user is not signed in, **When** they try to open the profile area, **Then** the system requires sign-in first.
-
----
-
-### User Story 2 - Update Learning Profile (Priority: P1)
-
-As a learner, I want to update my full name, avatar, IELTS target band score, and target test date so my profile and study experience stay current.
-
-**Why this priority**: The target band and target test date drive personalization and help the learner keep goals visible.
-
-**Independent Test**: Can be fully tested by editing profile fields, saving, refreshing the page, and confirming the changed values remain visible.
-
-**Acceptance Scenarios**:
-
-1. **Given** a signed-in user changes their full name or avatar URL, **When** they save, **Then** the system updates the profile and confirms success.
-2. **Given** a signed-in user selects a valid IELTS target band score, **When** they save, **Then** the target score is stored and displayed.
-3. **Given** a signed-in user sets or clears the target test date, **When** they save, **Then** the profile reflects the latest target date choice.
+1. **Cho trước** một người dùng đã đăng nhập mở trang hồ sơ, **Khi** tài khoản của họ được tìm thấy, **Thì** hệ thống hiển thị danh tính và các trường hồ sơ học tập của họ.
+2. **Cho trước** một người dùng không có ảnh đại diện, **Khi** trang hồ sơ được hiển thị, **Thì** hệ thống hiển thị một ảnh đại diện mặc định (placeholder) dựa trên tên của họ.
+3. **Cho trước** người dùng chưa đăng nhập, **Khi** họ cố mở khu vực hồ sơ, **Thì** hệ thống yêu cầu đăng nhập trước.
 
 ---
 
-### User Story 3 - Upload Avatar (Priority: P2)
+### Kịch bản 2 - Cập nhật Hồ sơ Học tập (Độ ưu tiên: P1)
 
-As a user, I want to upload an avatar image so my account feels personal without needing to host an image myself.
+Với tư cách là người học, tôi muốn cập nhật họ tên, ảnh đại diện, điểm IELTS mục tiêu và ngày thi mục tiêu để hồ sơ và trải nghiệm học tập của tôi luôn được cập nhật.
 
-**Why this priority**: Avatar upload improves profile usability and reduces friction compared with requiring a manual image URL.
+**Lý do ưu tiên**: Điểm mục tiêu và ngày thi mục tiêu thúc đẩy cá nhân hóa và giúp người học luôn nhìn thấy mục tiêu của mình.
 
-**Independent Test**: Can be fully tested by uploading a supported image, receiving the uploaded image location, saving the profile, and seeing the avatar on reload.
+**Kiểm thử độc lập**: Có thể kiểm thử bằng cách chỉnh sửa các trường hồ sơ, lưu, làm mới trang và xác nhận các giá trị thay đổi vẫn được hiển thị.
 
-**Acceptance Scenarios**:
+**Kịch bản nghiệm thu**:
 
-1. **Given** a signed-in user selects a supported image within the allowed size, **When** upload succeeds, **Then** the system fills the avatar field and prompts the user to save profile changes.
-2. **Given** a selected avatar file is too large or invalid, **When** upload is attempted, **Then** the system rejects it and explains the issue.
-
----
-
-### User Story 4 - Manage Security Settings (Priority: P2)
-
-As a signed-in user, I want to change my password from my profile area so I can maintain account security.
-
-**Why this priority**: Password change is a core account-management action and supports users who suspect exposure.
-
-**Independent Test**: Can be fully tested by opening security settings, submitting the current password plus a valid new password, and then using the new password for the next sign-in.
-
-**Acceptance Scenarios**:
-
-1. **Given** a signed-in user has a local password, **When** they submit the correct current password and matching valid new password, **Then** the password changes and the user sees confirmation.
-2. **Given** the new password confirmation does not match, **When** the user submits, **Then** the system prevents the change and shows a mismatch error.
-3. **Given** the user signed up through Google and has no local password, **When** they open password change, **Then** the system explains that they should use password recovery to create one.
+1. **Cho trước** một người dùng đã đăng nhập thay đổi họ tên hoặc URL ảnh đại diện, **Khi** họ lưu, **Thì** hệ thống cập nhật hồ sơ và xác nhận thành công.
+2. **Cho trước** một người dùng đã đăng nhập chọn điểm IELTS mục tiêu hợp lệ, **Khi** họ lưu, **Thì** điểm mục tiêu được lưu trữ và hiển thị.
+3. **Cho trước** một người dùng đã đăng nhập thiết lập hoặc xóa ngày thi mục tiêu, **Khi** họ lưu, **Thì** hồ sơ phản ánh lựa chọn ngày thi mục tiêu mới nhất.
 
 ---
 
-### User Story 5 - Review Support History (Priority: P3)
+### Kịch bản 3 - Tải lên Ảnh đại diện (Độ ưu tiên: P2)
 
-As a signed-in user, I want to view my previous support requests and replies so I can track whether my issues were handled.
+Với tư cách là người dùng, tôi muốn tải lên ảnh đại diện để tài khoản cá nhân hóa hơn mà không cần tự cung cấp URL hình ảnh.
 
-**Why this priority**: Support history helps users self-serve status updates without asking the team again.
+**Lý do ưu tiên**: Tính năng upload avatar cải thiện tính tiện dụng của hồ sơ và giảm bớt khó khăn so với việc yêu cầu cung cấp URL thủ công.
 
-**Independent Test**: Can be fully tested by opening support history and confirming each request shows message, status, created time, and any admin reply.
+**Kiểm thử độc lập**: Có thể kiểm thử bằng cách tải lên một hình ảnh được hỗ trợ, nhận URL tải lên, lưu hồ sơ và thấy ảnh đại diện khi tải lại trang.
 
-**Acceptance Scenarios**:
+**Kịch bản nghiệm thu**:
 
-1. **Given** a user has support requests, **When** they open support history, **Then** the system lists requests with status and replies.
-2. **Given** a user has no support requests, **When** they open support history, **Then** the system shows an empty state.
+1. **Cho trước** người dùng đã đăng nhập chọn một hình ảnh được hỗ trợ trong kích thước cho phép, **Khi** tải lên thành công, **Thì** hệ thống điền ảnh đại diện vào trường thông tin và nhắc người dùng lưu thay đổi hồ sơ.
+2. **Cho trước** một tệp ảnh đại diện được chọn quá lớn hoặc không hợp lệ, **Khi** người dùng cố gắng tải lên, **Thì** hệ thống từ từ chối và giải thích vấn đề.
 
-### Edge Cases
+---
 
-- Target band score must stay within IELTS band range and valid half-band increments.
-- Empty optional fields, such as avatar or target test date, are allowed without blocking profile save.
-- Avatar uploads over the size limit are rejected before profile save.
-- Profile updates for a missing or inactive account fail safely.
-- Users cannot access profile or security settings without an active signed-in session.
-- Password change requires a current password unless the account has no local password.
-- Support history may be empty and should still render a useful state.
+### Kịch bản 4 - Quản lý Cài đặt Bảo mật (Độ ưu tiên: P2)
 
-## Requirements *(mandatory)*
+Với tư cách là người dùng đã đăng nhập, tôi muốn đổi mật khẩu từ khu vực hồ sơ của mình để duy trì bảo mật tài khoản.
 
-### Functional Requirements
+**Lý do ưu tiên**: Đổi mật khẩu là thao tác quản lý tài khoản cốt lõi và hỗ trợ người dùng khi nghi ngờ bị lộ thông tin.
 
-- **FR-001**: System MUST allow signed-in users to view their own profile identity and learning settings.
-- **FR-002**: System MUST omit password secrets and other sensitive authentication details from profile data shown to users.
-- **FR-003**: System MUST allow users to update their full name.
-- **FR-004**: System MUST allow users to update avatar by entering an image location or uploading a supported image.
-- **FR-005**: System MUST reject avatar uploads that exceed the allowed size or are not supported image types.
-- **FR-006**: System MUST allow users to set, update, or clear a target test date.
-- **FR-007**: System MUST allow users to set an IELTS target band score from 0.0 to 9.0 in 0.5 increments.
-- **FR-008**: System MUST reject invalid target band scores with a clear user-facing message.
-- **FR-009**: System MUST refresh visible profile data after a successful save.
-- **FR-010**: System MUST allow first-time or onboarding users to set target band score before continuing.
-- **FR-011**: System MUST allow signed-in users with a local password to change password after confirming the current password.
-- **FR-012**: System MUST prevent password change when the new password is too short or confirmation does not match.
-- **FR-013**: System MUST explain the alternate password creation path for users who only have external sign-in.
-- **FR-014**: System MUST allow users to view their own support request history and admin replies.
+**Kiểm thử độc lập**: Có thể kiểm thử bằng cách mở cài đặt bảo mật, gửi mật khẩu hiện tại cùng với mật khẩu mới hợp lệ, và sau đó dùng mật khẩu mới cho lần đăng nhập tiếp theo.
 
-### Key Entities
+**Kịch bản nghiệm thu**:
 
-- **Profile**: User-facing account information, including full name, email, avatar, role, status, and learning goals.
-- **Learning Goal**: IELTS target band score and optional target test date used to personalize the learning experience.
-- **Avatar Image**: A user-selected profile picture location or uploaded image reference.
-- **Security Setting**: User-controlled password change state and account sign-in method awareness.
-- **Support Request History**: Prior user support messages, statuses, timestamps, and admin responses.
+1. **Cho trước** người dùng đã đăng nhập có mật khẩu cục bộ, **Khi** họ gửi đúng mật khẩu hiện tại và mật khẩu mới khớp với xác nhận, **Thì** mật khẩu được thay đổi và người dùng nhận được xác nhận.
+2. **Cho trước** xác nhận mật khẩu mới không khớp, **Khi** người dùng gửi yêu cầu, **Thì** hệ thống ngăn cản thay đổi và hiển thị lỗi không khớp.
+3. **Cho trước** người dùng đăng ký qua Google và không có mật khẩu cục bộ, **Khi** họ mở mục đổi mật khẩu, **Thì** hệ thống giải thích rằng họ nên sử dụng tính năng khôi phục mật khẩu để tạo mới.
 
-## Success Criteria *(mandatory)*
+---
 
-### Measurable Outcomes
+### Kịch bản 5 - Xem Lịch sử Hỗ trợ (Độ ưu tiên: P3)
 
-- **SC-001**: At least 95% of signed-in users can load their profile in under 3 seconds.
-- **SC-002**: At least 95% of valid profile updates are saved and reflected after refresh in under 5 seconds.
-- **SC-003**: 100% of invalid target band scores are rejected before being stored.
-- **SC-004**: 100% of avatar uploads over the allowed size are rejected with a clear message.
-- **SC-005**: Users can update profile name, avatar, target band score, and target test date in under 2 minutes.
-- **SC-006**: 100% of password change attempts with mismatched confirmation are blocked before submission completes.
-- **SC-007**: Users with no support history see an empty state rather than an error.
+Với tư cách là người dùng đã đăng nhập, tôi muốn xem các yêu cầu hỗ trợ trước đây và phản hồi của admin để theo dõi xem sự cố của tôi đã được giải quyết chưa.
 
-## Assumptions
+**Lý do ưu tiên**: Lịch sử hỗ trợ giúp người dùng tự cập nhật trạng thái mà không cần hỏi lại đội ngũ.
 
-- Profile management applies to all signed-in roles unless a role-specific page overrides presentation.
-- Email is treated as account identity and is not editable in this profile feature.
-- Avatar upload and avatar URL entry are both accepted paths, but saving profile confirms the final avatar choice.
-- Target band score defaults may be shown to guide the user, but the user can change the goal.
-- Support request creation belongs to the support feature; this feature only covers viewing personal support history.
+**Kiểm thử độc lập**: Có thể kiểm thử bằng cách mở lịch sử hỗ trợ và xác nhận mỗi yêu cầu hiển thị nội dung, trạng thái, thời gian tạo và mọi phản hồi từ admin.
+
+**Kịch bản nghiệm thu**:
+
+1. **Cho trước** người dùng có các yêu cầu hỗ trợ, **Khi** họ mở lịch sử hỗ trợ, **Thì** hệ thống liệt kê các yêu cầu cùng trạng thái và phản hồi.
+2. **Cho trước** người dùng không có yêu cầu hỗ trợ nào, **Khi** họ mở lịch sử hỗ trợ, **Thì** hệ thống hiển thị trạng thái trống.
+
+### Các trường hợp ngoại lệ (Edge Cases)
+
+- Điểm IELTS mục tiêu phải nằm trong dải điểm chuẩn của IELTS và là bội số của 0.5.
+- Các trường không bắt buộc bị để trống (như avatar, ngày thi mục tiêu) vẫn được cho phép mà không chặn việc lưu hồ sơ.
+- Các bản tải lên ảnh đại diện vượt quá giới hạn kích thước sẽ bị từ chối trước khi lưu hồ sơ.
+- Việc cập nhật hồ sơ cho một tài khoản không tồn tại hoặc không hoạt động (inactive) sẽ bị lỗi một cách an toàn.
+- Người dùng không thể truy cập hồ sơ hoặc cài đặt bảo mật mà không có phiên đăng nhập hợp lệ.
+- Đổi mật khẩu yêu cầu mật khẩu hiện tại trừ khi tài khoản đó không có mật khẩu cục bộ.
+- Lịch sử hỗ trợ có thể trống và vẫn phải render giao diện sử dụng được.
+
+## Yêu cầu *(bắt buộc)*
+
+### Yêu cầu chức năng
+
+- **FR-001**: Hệ thống PHẢI cho phép người dùng đã đăng nhập xem danh tính và các thiết lập học tập của họ.
+- **FR-002**: Hệ thống PHẢI loại bỏ thông tin mật khẩu và các dữ liệu xác thực nhạy cảm khác khỏi dữ liệu hồ sơ hiển thị cho người dùng.
+- **FR-003**: Hệ thống PHẢI cho phép người dùng cập nhật họ tên.
+- **FR-004**: Hệ thống PHẢI cho phép người dùng cập nhật ảnh đại diện bằng cách nhập URL hình ảnh hoặc tải lên một hình ảnh được hỗ trợ.
+- **FR-005**: Hệ thống PHẢI từ chối việc tải lên các ảnh đại diện vượt quá kích thước cho phép hoặc định dạng hình ảnh không được hỗ trợ.
+- **FR-006**: Hệ thống PHẢI cho phép người dùng đặt, cập nhật hoặc xóa ngày thi mục tiêu.
+- **FR-007**: Hệ thống PHẢI cho phép người dùng đặt điểm IELTS mục tiêu từ 0.0 đến 9.0 với các mức tăng 0.5.
+- **FR-008**: Hệ thống PHẢI từ chối điểm mục tiêu không hợp lệ kèm theo thông báo rõ ràng cho người dùng.
+- **FR-009**: Hệ thống PHẢI làm mới dữ liệu hồ sơ hiển thị sau khi lưu thành công.
+- **FR-010**: Hệ thống PHẢI cho phép người dùng lần đầu hoặc trong quá trình onboarding thiết lập điểm mục tiêu trước khi tiếp tục.
+- **FR-011**: Hệ thống PHẢI cho phép người dùng đã đăng nhập có mật khẩu cục bộ đổi mật khẩu sau khi xác nhận mật khẩu hiện tại.
+- **FR-012**: Hệ thống PHẢI ngăn thay đổi mật khẩu khi mật khẩu mới quá ngắn hoặc xác nhận không khớp.
+- **FR-013**: Hệ thống PHẢI giải thích phương pháp tạo mật khẩu thay thế cho những người dùng chỉ đăng nhập qua bên thứ 3 (Google).
+- **FR-014**: Hệ thống PHẢI cho phép người dùng xem lịch sử yêu cầu hỗ trợ của họ và phản hồi từ admin.
+
+### Các thực thể chính (Key Entities)
+
+- **Profile (Hồ sơ)**: Thông tin tài khoản hướng tới người dùng, bao gồm họ tên, email, ảnh đại diện, vai trò, trạng thái, và mục tiêu học tập.
+- **Learning Goal (Mục tiêu Học tập)**: Điểm IELTS mục tiêu và ngày thi mục tiêu tùy chọn, được dùng để cá nhân hóa trải nghiệm học.
+- **Avatar Image (Ảnh đại diện)**: Một URL hình ảnh được chọn hoặc một tham chiếu tới ảnh tải lên.
+- **Security Setting (Cài đặt Bảo mật)**: Trạng thái kiểm soát việc thay đổi mật khẩu và nhận diện phương thức đăng nhập của tài khoản.
+- **Support Request History (Lịch sử Hỗ trợ)**: Nội dung hỗ trợ trước đây của người dùng, trạng thái, timestamp và phản hồi từ admin.
+
+## Tiêu chí Thành công *(bắt buộc)*
+
+### Kết quả có thể đo lường
+
+- **SC-001**: Ít nhất 95% người dùng đã đăng nhập có thể tải hồ sơ của họ trong dưới 3 giây.
+- **SC-002**: Ít nhất 95% cập nhật hồ sơ hợp lệ được lưu và phản ánh sau khi refresh trong dưới 5 giây.
+- **SC-003**: 100% điểm mục tiêu không hợp lệ bị từ chối trước khi lưu.
+- **SC-004**: 100% bản tải lên ảnh đại diện vượt quá kích thước cho phép bị từ chối kèm thông báo rõ ràng.
+- **SC-005**: Người dùng có thể cập nhật tên, ảnh, điểm mục tiêu và ngày thi trong dưới 2 phút.
+- **SC-006**: 100% nỗ lực đổi mật khẩu với thông tin xác nhận không khớp bị chặn trước khi yêu cầu hoàn tất.
+- **SC-007**: Người dùng không có lịch sử hỗ trợ sẽ thấy trạng thái trống (empty state) thay vì gặp lỗi.
+
+## Giả định
+
+- Việc quản lý hồ sơ áp dụng cho mọi vai trò đã đăng nhập trừ khi một trang riêng biệt của vai trò đó ghi đè cách hiển thị.
+- Email được coi là danh tính tài khoản và không thể chỉnh sửa trong chức năng hồ sơ này.
+- Việc tải lên ảnh đại diện và nhập URL ảnh đại diện đều được chấp nhận, nhưng việc "Lưu hồ sơ" sẽ xác nhận lựa chọn ảnh đại diện cuối cùng.
+- Mức điểm mục tiêu mặc định có thể được hiển thị để định hướng người dùng, nhưng họ có thể thay đổi mục tiêu.
+- Việc tạo yêu cầu hỗ trợ thuộc về chức năng hỗ trợ; tính năng này chỉ bao gồm việc xem lịch sử hỗ trợ cá nhân.
