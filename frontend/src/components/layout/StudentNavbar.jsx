@@ -1,8 +1,6 @@
 import React from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { useTheme } from '../../context/ThemeContext';
-import { Sun, Moon } from 'lucide-react';
 import ChangePwdModal from '../profile/ChangePwdModal';
 import { motion } from 'framer-motion';
 
@@ -44,7 +42,6 @@ const NavItem = ({ to, label, currentPath }) => {
 
 const StudentNavbar = () => {
   const { user, isAuthenticated, logout } = useAuth();
-  const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
   const [showPwdModal, setShowPwdModal] = React.useState(false);
@@ -80,15 +77,6 @@ const StudentNavbar = () => {
           </ul>
 
           <div className="d-flex align-items-center gap-3 mt-3 mt-lg-0">
-            <button
-              onClick={toggleTheme}
-              className="btn rounded-circle d-flex align-items-center justify-content-center"
-              style={{ width: '40px', height: '40px', backgroundColor: 'var(--canvas-soft)', color: 'var(--ink)', border: 'none' }}
-              title="Toggle theme"
-            >
-              {theme === 'dark' ? <Sun size={18} strokeWidth={2.5} /> : <Moon size={18} strokeWidth={2.5} />}
-            </button>
-
             {(user?.role === 'admin' || user?.role === 'tutor') && (
               <Link
                 to={user.role === 'admin' ? '/admin' : '/tutor/dashboard'}

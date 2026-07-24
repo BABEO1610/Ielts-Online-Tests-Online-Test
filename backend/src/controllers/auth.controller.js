@@ -25,6 +25,12 @@ const registerValidator = [
   body('email')
     .notEmpty().withMessage('Email is required')
     .isEmail().withMessage('Invalid email format')
+    .custom((value) => {
+      if (!value.endsWith('@gmail.com')) {
+        throw new Error('Chỉ chấp nhận email thuộc tên miền @gmail.com');
+      }
+      return true;
+    })
     .normalizeEmail(),
   body('password')
     .notEmpty().withMessage('Password is required')
