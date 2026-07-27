@@ -5,11 +5,14 @@ import {
 import StatCard from '../../components/admin/StatCard';
 import { fetchAiUsage } from '../../services/adminStats.service';
 import { formatNumber } from '../../utils/adminFormat';
+import Pagination from '../../components/common/Pagination';
 
 const AdminAiUsagePage = () => {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 5;
 
   useEffect(() => {
     let alive = true;
@@ -37,6 +40,9 @@ const AdminAiUsagePage = () => {
   const byDay = data.byDay || [];
   const byFeature = data.byFeature || [];
   const topUsers = data.topUsers || [];
+
+  const totalPages = Math.ceil(topUsers.length / ITEMS_PER_PAGE);
+  const currentUsers = topUsers.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
 
   return (
     <div>
@@ -105,11 +111,11 @@ const AdminAiUsagePage = () => {
               <tr><th>#</th><th>Người dùng</th><th>Email</th><th className="text-end">Lượt gọi</th><th className="text-end">Token</th><th className="text-end">TB/lượt</th></tr>
             </thead>
             <tbody>
-              {topUsers.length === 0 ? (
+              {currentUsers.length === 0 ? (
                 <tr><td colSpan="6" className="text-center text-secondary py-4">Chưa có dữ liệu.</td></tr>
-              ) : topUsers.map((u, i) => (
+              ) : currentUsers.map((u, i) => (
                 <tr key={u.userId || u.email}>
-                  <td className="text-secondary">{i + 1}</td>
+                  <td className="text-secondary">{(currentPage - 1) * ITEMS_PER_PAGE + i + 1}</td>
                   <td className="fw-semibold">{u.name}</td>
                   <td className="text-secondary">{u.email}</td>
                   <td className="text-end">{formatNumber(u.calls)}</td>
@@ -120,6 +126,11 @@ const AdminAiUsagePage = () => {
             </tbody>
           </table>
         </div>
+        {totalPages > 1 && (
+          <div className="py-2">
+            <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
+          </div>
+        )}
       </div>
     </div>
   );

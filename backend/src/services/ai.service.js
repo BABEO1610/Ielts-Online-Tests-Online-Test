@@ -61,6 +61,10 @@ const getGeminiApiKey = () =>
   process.env.GOOGLE_API_KEY ||
   '';
 
+/**
+ * normalizeGeminiModel
+ * Hàm hỗ trợ: Chuẩn hóa tên Model của Gemini để gọi API cho đúng chuẩn Google
+ */
 const normalizeGeminiModel = (model) => {
   const value = String(model || '').trim().replace(/^models\//i, '');
   if (!value || value === 'gemini' || /^(gpt-|o\d)/i.test(value)) {
@@ -76,6 +80,10 @@ const normalizeOpenAiModel = (model) => {
     : value;
 };
 
+/**
+ * getAiConfig
+ * Đọc cấu hình từ biến môi trường (.env) để quyết định dùng OpenAI hay Gemini và lấy API Key
+ */
 const getAiConfig = () => {
   const openaiApiKey = process.env.OPENAI_API_KEY || '';
   const geminiApiKey = getGeminiApiKey();
@@ -338,6 +346,10 @@ const generateGeminiAnswer = async ({
   return answer;
 };
 
+/**
+ * generateGeminiJsonAnswer
+ * ÉP AI TRẢ VỀ JSON: Thiết lập cấu hình ép AI (Gemini) phải trả lời đúng chuẩn cấu trúc JSON
+ */
 const generateGeminiJsonAnswer = async ({
   model,
   apiKey,
@@ -466,6 +478,10 @@ const buildScopeClassificationInput = ({ message, recentMessages = [], routingHi
   ].join('\n');
 };
 
+/**
+ * generateScopeClassification
+ * AI CLASSIFIER: Ép AI làm "Lễ tân" phân loại tin nhắn (Chấm điểm xem user đang hỏi chủ đề gì)
+ */
 const generateScopeClassification = async ({
   message,
   usageContext,
@@ -596,6 +612,10 @@ BLOCKED SCOPES (set intent to OUT_OF_SCOPE, allowed to false):
   throw createAssistantError(ERROR_CODES.AI_NOT_CONFIGURED, `Unsupported provider: ${provider}`);
 };
 
+/**
+ * generateAssistantAnswer
+ * GỌI AI SINH CHỮ (Text Generation): Chờ AI trả lời xong toàn bộ mới gửi về
+ */
 const generateAssistantAnswer = async ({
   mode, message, officialContext, systemPrompt, userPrompt, usageContext, jsonMode = true,
 }) => {
@@ -810,6 +830,10 @@ const streamGeminiAnswer = async ({ model, apiKey, mode, message, officialContex
   return text.trim();
 };
 
+/**
+ * streamAssistantAnswer
+ * GỌI AI TRẢ VỀ TỪNG CHỮ (Streaming): Dùng SSE (Server-Sent Events) nhả từng chữ về Frontend giống ChatGPT
+ */
 const streamAssistantAnswer = async ({ mode, message, officialContext, systemPrompt, userPrompt, onDelta, usageContext }) => {
   const { provider, model, openaiApiKey, geminiApiKey } = getAiConfig();
 

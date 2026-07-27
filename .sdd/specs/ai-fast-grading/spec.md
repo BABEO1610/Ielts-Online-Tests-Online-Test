@@ -1,7 +1,5 @@
 # Đặc tả tính năng: Chấm nhanh Writing và Speaking bằng AI
 
-**Nhánh tính năng**: `feature-global-ielts-virtual-assistant/Datnt`
-
 **Ngày tạo**: 2026-07-21
 
 **Ngày cập nhật**: 2026-07-22
