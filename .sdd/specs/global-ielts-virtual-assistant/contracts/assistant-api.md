@@ -8,7 +8,7 @@
 
 ## Phạm vi hợp đồng
 
-Đây là hợp đồng **theo code hiện tại**, không phải hợp đồng đích đã tuân Hiến chương.
+Đây là hợp đồng, không phải hợp đồng đích đã tuân Hiến chương.
 Frontend dùng tiền tố `/api/v1/assistant`; backend đồng thời gắn cùng router tại
 `/api/assistant` để tương thích. Các ví dụ bên dưới dùng tiền tố chính.
 
@@ -103,7 +103,6 @@ data: {"delta":"Toàn bộ câu trả lời hoàn chỉnh, không phải một t
 
 event: assistant.done
 data: {"answer":"...","suggestedLinks":[],"conversationId":"...","messageId":"...","intent":"IELTS_KNOWLEDGE","code":null,...}
-
 ```
 
 `assistant.done` là kết quả nội bộ đầy đủ của service, vì vậy ngoài các trường công
@@ -116,7 +115,6 @@ Lỗi sau khi đã gửi header:
 ```text
 event: assistant.error
 data: {"code":"INTERNAL_ERROR","message":"Trợ lý IELTS đang gặp lỗi. Vui lòng thử lại sau."}
-
 ```
 
 Code không tự động gửi lại qua `/chat` khi stream bị ngắt; làm như vậy có thể tạo cặp
@@ -190,16 +188,16 @@ Ngoại trừ lỗi giới hạn tần suất, controller trả object phẳng:
 }
 ```
 
-| Mã | HTTP |
-|---|---:|
-| `LOGIN_REQUIRED` | 401 |
-| `FORBIDDEN`, `ASSISTANT_DISABLED_DURING_TEST`, `ATTEMPT_NOT_SUBMITTED` | 403 |
-| `VALIDATION_ERROR`, `OUT_OF_SCOPE` | 400 |
-| `ATTEMPT_NOT_FOUND`, `QUESTION_NOT_FOUND` | 404 |
-| `MISSING_CONTEXT`, `MISSING_EXPLANATION` | 422 |
-| `AI_QUOTA_EXCEEDED` | 429 |
-| `AI_NOT_CONFIGURED` | 503 |
-| `INTERNAL_ERROR` | 500 |
+| Mã                                                                          | HTTP |
+| ---------------------------------------------------------------------------- | ---: |
+| `LOGIN_REQUIRED`                                                           |  401 |
+| `FORBIDDEN`, `ASSISTANT_DISABLED_DURING_TEST`, `ATTEMPT_NOT_SUBMITTED` |  403 |
+| `VALIDATION_ERROR`, `OUT_OF_SCOPE`                                       |  400 |
+| `ATTEMPT_NOT_FOUND`, `QUESTION_NOT_FOUND`                                |  404 |
+| `MISSING_CONTEXT`, `MISSING_EXPLANATION`                                 |  422 |
+| `AI_QUOTA_EXCEEDED`                                                        |  429 |
+| `AI_NOT_CONFIGURED`                                                        |  503 |
+| `INTERNAL_ERROR`                                                           |  500 |
 
 Khi `/chat` hoặc `/chat/stream` vượt 30 yêu cầu/IP/phút, middleware trả một cấu trúc
 khác:

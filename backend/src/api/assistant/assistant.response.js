@@ -1,3 +1,10 @@
+/**
+ * ==========================================
+ * UTILS: XỬ LÝ PHẢN HỒI TỪ AI (AI Response Parser)
+ * ==========================================
+ * Nhiệm vụ: Hứng kết quả thô từ con AI trả về, dọn dẹp các ký tự thừa (như ```json), 
+ * parse nó thành Object JSON chuẩn, và xử lý các trường hợp AI trả về lỗi (Fallback).
+ */
 const { ASSISTANT_INTENTS } = require('./assistant.intent');
 const { ASSISTANT_CONTEXT_RESULT_LIMIT } = require('./assistant.constants');
 
@@ -14,6 +21,7 @@ const DEFAULT_SAFETY = {
   containsWritingSpeakingGrading: false,
 };
 
+// Cắt bỏ chuỗi bọc mã (ví dụ: ```json ... ```) mà AI thường hay tự động chèn vào
 const stripCodeFence = (value) =>
   String(value || '')
     .trim()
@@ -21,8 +29,10 @@ const stripCodeFence = (value) =>
     .replace(/\s*```$/i, '')
     .trim();
 
+// Kiểm tra nhanh xem chuỗi trả về có hình dáng giống JSON không (bắt đầu bằng { hoặc [)
 const looksLikeJson = (value) => /^[\[{]/.test(value) || (value.includes('{') && value.includes('}'));
 
+// Cố gắng parse chuỗi JSON. Nếu lỗi, thử dùng mẹo cắt lấy phần bên trong ngoặc {} đầu tiên
 const tryParseJson = (cleaned) => {
   try {
     return JSON.parse(cleaned);
@@ -40,6 +50,7 @@ const tryParseJson = (cleaned) => {
   }
 };
 
+// Chuẩn hóa danh sách các link gợi ý do AI trả về để đảm bảo không bị lỗi format
 const normalizeSuggestedLinks = (links) => {
   if (!Array.isArray(links)) return [];
   return links
@@ -56,6 +67,7 @@ const normalizeSuggestedLinks = (links) => {
     .slice(0, ASSISTANT_CONTEXT_RESULT_LIMIT);
 };
 
+// Hàm chính: Nhận câu trả lời thô của AI, làm sạch, bóc tách JSON và trả về kết quả chuẩn mực
 const normalizeAssistantResponse = ({ rawText, mode, fallbackAnswer, fallbackLinks = [], allowPlainText = false }) => {
   const cleaned = stripCodeFence(rawText);
   const jsonLike = looksLikeJson(cleaned);

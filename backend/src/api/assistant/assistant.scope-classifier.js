@@ -1,6 +1,14 @@
+/**
+ * ==========================================
+ * UTILS: PHÂN LOẠI NHANH (Scope Classifier)
+ * ==========================================
+ * Nhiệm vụ: Gửi một prompt nhỏ cho AI để nhờ nó phân loại nhanh ý định của người dùng 
+ * (ví dụ: đây là câu hỏi IELTS, hay là câu hỏi hỏi đường/tìm quán ăn).
+ */
 const { ASSISTANT_INTENTS } = require('./assistant.intent');
 const aiService = require('../../services/ai.service');
 
+// Gọi API Gemini/OpenAI cực nhanh để lấy nhãn phân loại (intent, allowed, confidence)
 const classifyScope = async (message, options = {}) => {
   try {
     const rawJson = await aiService.generateScopeClassification({

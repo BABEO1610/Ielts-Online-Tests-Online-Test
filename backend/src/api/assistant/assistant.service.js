@@ -1,3 +1,11 @@
+/**
+ * ==========================================
+ * TẦNG 3: NÃO BỘ (Service & Intent Routing)
+ * ==========================================
+ * Nhiệm vụ: Trái tim của trợ lý ảo. Xử lý logic nghiệp vụ chính, tổng hợp ngữ cảnh (Context), 
+ * phân loại ý định (Intent) và quyết định gọi AI hay gọi Database.
+ */
+
 const aiService = require('../../services/ai.service');
 const repository = require('./assistant.repository');
 const { evaluateGuardrails } = require('./assistant.guardrails');

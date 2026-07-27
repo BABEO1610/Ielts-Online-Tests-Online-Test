@@ -4,7 +4,7 @@
 
 **Đầu vào**: Đặc tả tính năng theo hiện trạng từ `.sdd/specs/global-ielts-virtual-assistant/spec.md`
 
-**Phạm vi tài liệu**: Chuẩn hóa tài liệu hiện trạng của tính năng dựa trên mã nguồn và các bài kiểm thử. Kế hoạch này không cho phép thay đổi mã nguồn, chạy migration trên môi trường vận hành (production), gọi trực tiếp nhà cung cấp AI hoặc truy cập bí mật.
+**Phạm vi tài liệu**: Trợ lý ảo IELTS toàn cục
 
 ## Tóm tắt
 
@@ -44,27 +44,6 @@ Tính năng sử dụng kiến thức tĩnh dạng JSON và các truy vấn Post
 **Ràng buộc**: Chỉ dành cho học viên; không hỗ trợ trong lúc làm bài khi ngữ cảnh yêu cầu khai báo `active-test`; không chấm điểm Writing/Speaking chính thức; không dùng RAG dựa trên vector/embedding; không chuyển đổi dự phòng giữa các nhà cung cấp; chỉ dùng SQL thuần được tham số hóa; không đưa bí mật hoặc PII thô vào tài liệu/đầu ra kiểm thử; SSE chỉ phát phản hồi cuối thay vì truyền từng token.
 
 **Quy mô/Phạm vi**: 20 mô-đun JS phía máy chủ (backend) của trợ lý, 10 tệp JSON trong kho kiến thức (9 tệp nội dung và 1 tệp đăng ký — registry), 2 mô-đun dịch vụ AI dùng chung, 1 migration và 10 tệp tính năng phía giao diện (frontend), gồm 7 component, 1 hook, 1 service và 1 tệp CSS.
-
-## Kiểm tra Hiến chương
-
-*CỔNG TUÂN THỦ: **KHÔNG ĐẠT đối với hiện trạng triển khai**. Có thể tiếp tục chuẩn hóa tài liệu, nhưng không được trình bày các sai lệch dưới đây như thể đã tuân thủ. Lần kiểm tra hiện trạng được ghi lại ở đây dùng `.sdd/constitution.md`, `.agents/AGENTS.md` và các tệp trong `.sdd/constraints/` làm nguồn có thẩm quyền; các thay đổi chưa được xác minh trong `.specify/memory/constitution.md` không làm thay đổi kết luận lịch sử này.*
-
-| Quy tắc | Trạng thái | Bằng chứng |
-|---|---|---|
-| Node.js 20, Express 5.x, PostgreSQL 16, `pg` thuần | ĐẠT | `backend/package.json`, `backend/src/db/pool.js`, các lớp truy cập dữ liệu (repository) của trợ lý |
-| SQL được tham số hóa; không dùng ORM | ĐẠT | Các định danh động được giới hạn bằng danh sách cho phép/đặt trong dấu nháy; giá trị người dùng được truyền dưới dạng `$1`, `$2`, v.v. |
-| Bí mật chỉ nằm ở phía máy chủ | ĐẠT | Khóa nhà cung cấp được đọc từ môi trường; khóa Gemini được gửi trong `x-goog-api-key`, không nằm trong URL |
-| Phụ thuộc Bootstrap 5.x và sử dụng component | ĐẠT | Frontend phụ thuộc vào Bootstrap và không đưa thêm Tailwind hoặc CSS-in-JS |
-| Vị trí CSS tùy chỉnh | **KHÔNG ĐẠT** | CSS của tính năng nằm tại `frontend/src/features/global-assistant/globalAssistant.css`, trong khi Hiến chương yêu cầu CSS tùy chỉnh nằm tại `frontend/src/styles/custom.css` |
-| React 18 là bất biến | **KHÔNG ĐẠT** | `frontend/package.json` dùng React/ReactDOM `19.2.6`; không có RFC đã được phê duyệt nào được tham chiếu |
-| Bao phản hồi API `{success,data,error,meta}` | **KHÔNG ĐẠT** | Bộ điều khiển/lịch sử/trạng thái của trợ lý trả về nhiều cấu trúc phản hồi phẳng; cơ chế giới hạn tần suất dùng một cấu trúc khác |
-| Xử lý lỗi tập trung và bộ ghi log (logger) của dự án | **KHÔNG ĐẠT** | `assistant.controller.js` bắt lỗi cục bộ và dùng `console.error`; bộ phân loại phạm vi cũng ghi log bằng `console.error` |
-| Xác thực/vai trò thông qua middleware | **KHÔNG ĐẠT** | Các bước kiểm tra xác thực và vai trò của trợ lý được triển khai trực tiếp trong `assistant.controller.js`, không dùng middleware xác thực dùng chung |
-| Tối đa 40 dòng/hàm và 300 dòng/tệp | **KHÔNG ĐẠT** | `assistant.service.js`, `assistant.repository.js`, `assistant.context.js` và `ai.service.js` vượt quá giới hạn đã khóa |
-| Kiểm thử tích hợp cho endpoint được bảo vệ | **MỘT PHẦN** | Đã có độ bao phủ ở mức kiểm thử đơn vị (unit); kiểm thử tích hợp rõ ràng cho giới hạn tần suất/trạng thái và HTTP E2E có xác thực vẫn còn mở |
-| Tối thiểu 80% độ bao phủ service/nghiệp vụ và unit test cho các hàm service/query | **CHƯA XÁC MINH** | Các bộ kiểm thử tập trung đều đạt, nhưng chưa tạo báo cáo độ bao phủ và số lượng bài đạt không chứng minh được ngưỡng của Hiến chương |
-| Cách đặt tên nhánh và tạo tác (artifact) đặc tả | **KHÔNG ĐẠT** | Nhánh hiện tại `feature-global-ielts-virtual-assistant/Datnt` không theo dạng `feat/...` hoặc `spec/...`; Speckit dùng `spec.md` thay vì quy ước `[name].spec.md` của Hiến chương |
-| Áp dụng migration trước khi phụ thuộc vào tính bền vững dữ liệu | **ĐANG CHỜ** | Tệp migration đã tồn tại; việc áp dụng trên môi trường thật và xác minh `preferred_address` vẫn còn mở |
 
 ## Cấu trúc dự án
 
@@ -190,17 +169,17 @@ frontend/
 
 ## Theo dõi độ phức tạp
 
-| Sai lệch | Lý do tồn tại trong mã nguồn hiện tại | Việc cần làm tiếp theo |
-|---|---|---|
-| React 19 so với React 18 đã khóa | Các phụ thuộc frontend được nâng cấp nhưng không tham chiếu sửa đổi Hiến chương | Nhóm cần quyết định: cập nhật RFC/Hiến chương đã được phê duyệt hoặc hạ phiên bản phụ thuộc |
-| CSS tùy chỉnh đặt trong thư mục tính năng | Kiểu hiển thị (style) được đặt cùng trợ lý thay vì trong một stylesheet CSS tùy chỉnh duy nhất theo Hiến chương | Chuyển các quy tắc sang stylesheet bắt buộc hoặc phê duyệt RFC thay đổi quy ước |
-| Nhiều cấu trúc phản hồi trợ lý | Bộ điều khiển riêng của tính năng phát triển độc lập với bao phản hồi API toàn cục | Xác định một hợp đồng trợ lý tương thích ngược, sau đó bổ sung kiểm thử hợp đồng |
-| Xác thực và xử lý lỗi trực tiếp trong bộ điều khiển | Bộ điều khiển của trợ lý lặp lại các mối quan tâm của route được bảo vệ | Chuyển sang luồng middleware/xử lý lỗi dùng chung mà không thay đổi ngữ nghĩa phân quyền |
-| Các tệp điều phối/lớp truy cập dữ liệu quá lớn | Tính năng tích lũy định tuyến, phương án dự phòng, lưu dữ liệu và theo dấu (tracing) trong một số ít mô-đun | Tái cấu trúc phía sau các bài kiểm thử hiện có; không đưa thêm lớp trừu tượng (abstraction) mới khi chưa có nhiệm vụ xác định phạm vi |
-| Chưa chứng minh cổng độ bao phủ | Các bộ kiểm thử tập trung đạt cung cấp bằng chứng hồi quy nhưng không có tỷ lệ phần trăm/danh mục hàm | Tạo báo cáo độ bao phủ và khép các khoảng trống service/query trước khi coi cổng Hiến chương là đạt |
-| Tên nhánh/đặc tả hiện tại khác quy ước quản trị | Tính năng có trước đợt chuẩn hóa Speckit hiện tại và dùng tạo tác `spec.md` cố định của Speckit | Nhóm cần quyết định: đồng bộ tên trong một thay đổi phối hợp hoặc phê duyệt ngoại lệ quy ước có tài liệu |
-| Cơ chế truyền luồng giả lập chỉ phát phản hồi cuối | Ứng dụng ưu tiên chuẩn hóa/tự kiểm tra và lưu dữ liệu trước khi gửi tới trình duyệt | Chỉ bổ sung truyền từng `token` sau khi xác định ngữ nghĩa lỗi một phần và lưu dữ liệu |
-| Thiếu các ô dữ liệu (slot) theo dõi có cấu trúc | Bộ nhớ định tuyến theo dõi ý định/kỹ năng/chủ đề nhưng không theo dõi loại/ID tài nguyên hoặc ID lượt làm bài | Chỉ bổ sung nếu hành vi sản phẩm cần các lượt hỏi tiếp đó; phải bao phủ trường hợp quyền sở hữu và ngữ cảnh cũ |
+| Sai lệch                                                       | Lý do tồn tại trong mã nguồn hiện tại                                                                                           | Việc cần làm tiếp theo                                                                                                                                       |
+| --------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| React 19 so với React 18 đã khóa                            | Các phụ thuộc frontend được nâng cấp nhưng không tham chiếu sửa đổi Hiến chương                                       | Nhóm cần quyết định: cập nhật RFC/Hiến chương đã được phê duyệt hoặc hạ phiên bản phụ thuộc                                               |
+| CSS tùy chỉnh đặt trong thư mục tính năng               | Kiểu hiển thị (style) được đặt cùng trợ lý thay vì trong một stylesheet CSS tùy chỉnh duy nhất theo Hiến chương     | Chuyển các quy tắc sang stylesheet bắt buộc hoặc phê duyệt RFC thay đổi quy ước                                                                      |
+| Nhiều cấu trúc phản hồi trợ lý                           | Bộ điều khiển riêng của tính năng phát triển độc lập với bao phản hồi API toàn cục                                   | Xác định một hợp đồng trợ lý tương thích ngược, sau đó bổ sung kiểm thử hợp đồng                                                           |
+| Xác thực và xử lý lỗi trực tiếp trong bộ điều khiển | Bộ điều khiển của trợ lý lặp lại các mối quan tâm của route được bảo vệ                                              | Chuyển sang luồng middleware/xử lý lỗi dùng chung mà không thay đổi ngữ nghĩa phân quyền                                                           |
+| Các tệp điều phối/lớp truy cập dữ liệu quá lớn       | Tính năng tích lũy định tuyến, phương án dự phòng, lưu dữ liệu và theo dấu (tracing) trong một số ít mô-đun      | Tái cấu trúc phía sau các bài kiểm thử hiện có; không đưa thêm lớp trừu tượng (abstraction) mới khi chưa có nhiệm vụ xác định phạm vi |
+| Chưa chứng minh cổng độ bao phủ                           | Các bộ kiểm thử tập trung đạt cung cấp bằng chứng hồi quy nhưng không có tỷ lệ phần trăm/danh mục hàm              | Tạo báo cáo độ bao phủ và khép các khoảng trống service/query trước khi coi cổng Hiến chương là đạt                                          |
+| Tên nhánh/đặc tả hiện tại khác quy ước quản trị     | Tính năng có trước đợt chuẩn hóa Speckit hiện tại và dùng tạo tác`spec.md` cố định của Speckit                    | Nhóm cần quyết định: đồng bộ tên trong một thay đổi phối hợp hoặc phê duyệt ngoại lệ quy ước có tài liệu                                 |
+| Cơ chế truyền luồng giả lập chỉ phát phản hồi cuối   | Ứng dụng ưu tiên chuẩn hóa/tự kiểm tra và lưu dữ liệu trước khi gửi tới trình duyệt                                  | Chỉ bổ sung truyền từng`token` sau khi xác định ngữ nghĩa lỗi một phần và lưu dữ liệu                                                          |
+| Thiếu các ô dữ liệu (slot) theo dõi có cấu trúc        | Bộ nhớ định tuyến theo dõi ý định/kỹ năng/chủ đề nhưng không theo dõi loại/ID tài nguyên hoặc ID lượt làm bài | Chỉ bổ sung nếu hành vi sản phẩm cần các lượt hỏi tiếp đó; phải bao phủ trường hợp quyền sở hữu và ngữ cảnh cũ                         |
 
 ## Chiến lược xác thực
 

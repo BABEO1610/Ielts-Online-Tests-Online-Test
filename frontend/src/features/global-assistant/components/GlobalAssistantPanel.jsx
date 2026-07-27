@@ -4,21 +4,23 @@ import assistantApi from '../services/assistantApi';
 import ChatInputBox from './ChatInputBox';
 import ChatMessageList from './ChatMessageList';
 import LoginRequiredPrompt from './LoginRequiredPrompt';
-
+// hàm phụ trợ tạo ra id ngẫu nhiêm cho mỗi tin nhắn ( dùng làm key khi gender tin nhắn)
 const createMessageId = () => {
   if (window.crypto?.randomUUID) {
     return window.crypto.randomUUID();
   }
   return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 };
-
+// hàm chuẩn hóa dữ liệu khi backend trả về lịch sử chat
 const toMessage = (row) => ({
   id: row.id || createMessageId(),
   messageId: row.id || null,
   role: row.role === 'user' ? 'user' : 'assistant',
   content: row.content || row.answer || '',
 });
-
+// hàm này cực hay nó đóng vai trò đọc trộm giao diện người dùng đang xem để gom ngữ cảnh( context0 gửi cho ai 
+// bằng cách nó dùng document.quenrySeclectorAll để quét màn hình các thẻ có tiêu đề như h3, h4 xem có đề thi nào đang hiển thị không
+// sau đó nó gom tối đa 20 tên đưa vào mảng và gửi lên sever và tư vấn cho đúng 
 const collectVisibleItems = () => {
   const selectors = [
     '[data-testid="library-page"] h3',
@@ -34,13 +36,14 @@ const collectVisibleItems = () => {
     .slice(0, 20)
     .map((title) => ({ title }));
 };
-
+// dùng để vẽ ra toàn bộ khung chat messaes , is loading, error, sugestedlink, linkmeta
 const GlobalAssistantPanel = ({
   availability,
   conversationId,
   onConversationIdChange,
   onClose,
 }) => {
+  // Khởi tạo các State lưu trữ trạng thái của khung chat
   const [messages, setMessages] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [historyLoaded, setHistoryLoaded] = useState(false);
@@ -58,7 +61,7 @@ const GlobalAssistantPanel = ({
     route: availability.route,
   }), [availability.attemptId, availability.pageType, availability.questionId, availability.route]);
   const showLoginPrompt = requiresLogin || availability.isGuest;
-
+  // tự động gọi api khi khung chat được mở lên
   useEffect(() => {
     let isMounted = true;
 
@@ -95,7 +98,7 @@ const GlobalAssistantPanel = ({
     historyReloadToken,
     onConversationIdChange,
   ]);
-
+  // luôn tự động cuộn xuống dưới cùng mỗi lần có tin nhắn xuất hiện
   useEffect(() => {
     if (showLoginPrompt) return undefined;
     const frameId = window.requestAnimationFrame(() => {
@@ -104,7 +107,7 @@ const GlobalAssistantPanel = ({
     });
     return () => window.cancelAnimationFrame(frameId);
   }, [historyLoaded, isLoading, messages, showLoginPrompt, suggestedLinks.length]);
-
+  // Xử lý khi gửi tin nhắn bị lỗi (vd: lỗi mạng, hết quota)
   const handleSendError = (response) => {
     setIsLoading(false);
 
@@ -129,6 +132,7 @@ const GlobalAssistantPanel = ({
     return false;
   };
 
+  // Xử lý sự kiện khi user bấm gửi tin nhắn
   const handleSend = async (message) => {
     if (!availability.isAuthenticated) {
       setRequiresLogin(true);
@@ -204,6 +208,7 @@ const GlobalAssistantPanel = ({
     setIsLoading(false);
   };
 
+  // Xử lý sự kiện đánh giá Like/Dislike tin nhắn của trợ lý
   const handleRate = async (messageId, rating) => {
     setMessages((current) =>
       current.map((item) =>

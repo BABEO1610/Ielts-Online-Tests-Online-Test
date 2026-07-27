@@ -1,14 +1,22 @@
+/**
+ * ==========================================
+ * TẦNG 1: GIAO TIẾP (Routing & Validation)
+ * ==========================================
+ * Nhiệm vụ: Xác thực tính hợp lệ của dữ liệu đầu vào (payload) trước khi xử lý.
+ */
+
 const { ERROR_CODES, PAGE_TYPES } = require('./assistant.constants');
 
 const MAX_MESSAGE_LENGTH = 2000;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
+// Chuẩn hóa một chuỗi các kí tự có thể mang lại giá trị rỗng, null về 1 định dạng nhât quán( string hoác null)
 const normalizeNullableString = (value) => {
   if (value === undefined || value === null || value === '') return null;
   if (typeof value !== 'string') return value;
   return value.trim() || null;
 };
 
+// làm sạch và giới hạn danh sách các phần tử đang hiển thị trên màn hình người dùng
 const normalizeVisibleItems = (value) => {
   if (!Array.isArray(value)) return [];
   return value
@@ -22,7 +30,7 @@ const normalizeVisibleItems = (value) => {
     }))
     .filter((item) => item.id || item.title);
 };
-
+// xác thực validate toàn bộ dữ liệu đầu vào khi người dùng gửi tin nhắn tới trợ lý ảo ví dụ(body phải là 1 object, messages không dài quá 2000 kí tự)
 const validateChatPayload = (body) => {
   const errors = [];
 
@@ -84,7 +92,7 @@ const validateChatPayload = (body) => {
     },
   };
 };
-
+// đánh giá câu trả lời của người dùng dislike hay like(giúp admin đo lường chất lượng câu trả lời)
 const validateRatingPayload = (body) => {
   if (!body || typeof body !== 'object' || Array.isArray(body)) {
     return {
