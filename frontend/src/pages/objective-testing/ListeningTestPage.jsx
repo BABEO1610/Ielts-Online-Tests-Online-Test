@@ -7,6 +7,12 @@
  * Render MCQ (Radio btn) và Fill-in-blank (Text input).
  * 
  * Design: Uber-inspired — sticky audio player, clean question cards.
+ * 
+ * (ListeningTestPage là Container Component: Trái tim điều phối State.
+ * Nắm giữ Global State của bài thi (answers, testData, activeSection).
+ * Audio Sticky: Gắn chặt Component AudioPlayer lên đỉnh màn hình.
+ * Bottom Navigation: Hiển thị 4 Part.
+ * Submit Flow: Tính thời gian thực tế bằng Math.round((Date.now() - startTime) / 1000).)
  */
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';

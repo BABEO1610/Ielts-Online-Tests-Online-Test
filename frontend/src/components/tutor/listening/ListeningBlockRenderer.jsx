@@ -1,5 +1,12 @@
 import React from 'react';
 
+/**
+ * ListeningBlockRenderer Component
+ * (Renderer Component: Trình diễn nội dung câu hỏi.
+ * Render giao diện tương tác thực tế (Radio button cho Multiple Choice, Input text cho Fill-in-blank).
+ * Component này được tái sử dụng cho cả luồng Học viên thi và luồng Giáo viên xem trước (Preview) đề thi.)
+ */
+
 // Normalizes type to handle both backend constants and UI labels
 const normalizeType = (type) => {
   const t = String(type || '').toUpperCase();

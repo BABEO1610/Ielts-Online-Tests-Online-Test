@@ -4,6 +4,10 @@
  *
  * Bootstrap 5: table table-striped table-hover.
  * Design: Uber-inspired data table styling.
+ * 
+ * (TestHistoryPage Component: Xử lý hiển thị danh sách (List View).
+ * Gọi API `getHistory` lúc `useEffect`. 
+ * Nhờ Backend đã gộp sẵn Objective và Subjective, màn hình này chỉ việc lặp (Map) ra UI)
  */
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';

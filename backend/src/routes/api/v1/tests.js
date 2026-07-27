@@ -25,6 +25,7 @@ router.put('/:id', authenticate, TestController.updateTest);
 router.delete('/:id', authenticate, TestController.deleteTest);
 
 // POST /api/v1/tests/:id/attempts — Nộp bài thi (yêu cầu đăng nhập)
+// (Route được bảo vệ bởi middleware `authenticate`. Middleware này giải mã JWT Token, trích xuất thông tin người dùng và gắn vào `req.user`. Chặn việc một user giả mạo ID để nộp bài hộ người khác (IDOR))
 router.post('/:id/attempts', authenticate, AttemptController.submitAttempt);
 
 module.exports = router;

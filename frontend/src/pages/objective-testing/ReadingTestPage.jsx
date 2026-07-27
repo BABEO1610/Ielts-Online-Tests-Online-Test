@@ -16,10 +16,15 @@
  *       .questions[]
  *         .id
  *         .questionOrder (int)
- *         .text (question_text)
  *         .options (JSONB — array of { label, text } or string[])
  *         .correctAnswer
  *         .correctAnswers
+ *
+ * (ReadingTestPage là Container Component: Trái tim điều phối State & Layout.
+ * Nó kết nối API lấy đề, quản lý State (answers, activePassage), và nộp bài.
+ * Data Parser: Dùng hàm flattenTestData để chuẩn hóa dữ liệu JSON.
+ * Split-View Layout: Chia màn hình làm 2 (trái: nội dung, phải: câu hỏi).
+ * Bottom Navigation: Đổi Passage dựa trên trạng thái activePassage)
  */
 import React, { useState, useEffect, useCallback } from 'react';
 import { useLocation, useParams, useNavigate } from 'react-router-dom';
@@ -34,6 +39,7 @@ import '../../styles/objective-testing.css';
 /**
  * Flatten passages + questions from the actual API response shape.
  * Returns { passages (filtered), questions (flat, sorted by questionOrder) }
+ * (Hàm flattenTestData: Data Parser để băm nhỏ và chuẩn hóa chuỗi dữ liệu JSON khổng lồ từ Backend)
  */
 function flattenTestData(testData, allowedPassageNumbers) {
   const allPassages = testData.passages || [];
