@@ -25,12 +25,6 @@ const registerValidator = [
   body('email')
     .notEmpty().withMessage('Email is required')
     .isEmail().withMessage('Invalid email format')
-    .custom((value) => {
-      if (!value.endsWith('@gmail.com')) {
-        throw new Error('Chỉ chấp nhận email thuộc tên miền @gmail.com');
-      }
-      return true;
-    })
     .normalizeEmail(),
   body('password')
     .notEmpty().withMessage('Password is required')
@@ -101,13 +95,14 @@ const loginValidator = [
 
 const login = async (req, res, next) => {
   try {
-    // EARS[Event]: WHEN a User submits valid credentials and the account is active...
+    // EARS[Event]: CONTROLLER NHẬN EMAIL VÀ PASSWORD TỪ FRONTEND TẠI ĐÂY
     const { email, password } = req.body;
 
-    // Thu thập IP & User-Agent
+    // Thu thập thêm IP & User-Agent để chống brute-force và quản lý Session
     const ipAddress = req.ip || req.connection.remoteAddress;
     const userAgent = req.headers['user-agent'] || 'unknown';
 
+    // Chuyển xuống Service xử lý nghiệp vụ (Mã hóa, check DB...)
     const { user, tokens } = await authService.login(email, password, ipAddress, userAgent);
 
     // API Contract: Set HttpOnly + Secure cookies cho access (15m) & refresh (7d).
