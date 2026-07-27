@@ -1,6 +1,6 @@
-# API Contract: Authentication
+# Hợp đồng API (API Contract): Authentication
 
-All JSON responses use `{ success, data, error, meta }`. Auth cookies are HttpOnly where set by backend.
+Tất cả các phản hồi JSON đều sử dụng `{ success, data, error, meta }`. Các Auth cookies được thiết lập HttpOnly từ backend.
 
 ## POST `/api/v1/auth/register`
 
@@ -10,7 +10,7 @@ Body:
 { "email": "learner@example.com", "password": "secret123", "full_name": "Learner Name" }
 ```
 
-Success: `201`, generic registration/verification guidance. Duplicate emails must not disclose ownership.
+Thành công (Success): `201`, hướng dẫn đăng ký/xác thực chung (generic registration/verification guidance). Email trùng lặp trả về `400` kèm theo thông báo rõ ràng rằng tài khoản đã tồn tại (tính năng chống dò tìm tài khoản KHÔNG áp dụng ở đây; xem FR-003). Chống dò tìm tài khoản (Anti-enumeration - phản hồi chung chung bất kể tài khoản có tồn tại hay không) chỉ áp dụng cho forgot-password.
 
 ## POST `/api/v1/auth/verify-email`
 
@@ -20,7 +20,7 @@ Body:
 { "token": "opaque-token" }
 ```
 
-Success: account active. Errors: invalid, used, or expired token.
+Thành công: tài khoản chuyển sang active. Lỗi (Errors): token không hợp lệ (invalid), đã dùng (used), hoặc hết hạn (expired).
 
 ## POST `/api/v1/auth/login`
 
@@ -30,19 +30,19 @@ Body:
 { "email": "learner@example.com", "password": "secret123" }
 ```
 
-Success data: safe user object without `password_hash`; access/refresh cookies set. Errors are generic for bad credentials or blocked status.
+Dữ liệu thành công (Success data): trả về đối tượng user an toàn không có `password_hash`; access/refresh cookies được thiết lập. Các lỗi về thông tin sai (bad credentials) hoặc tài khoản bị chặn (blocked status) được hiển thị chung chung.
 
 ## POST `/api/v1/auth/refresh-token`
 
-Body: optional `{ "refreshToken": "..." }`; cookie preferred.
+Body: tuỳ chọn (optional) `{ "refreshToken": "..." }`; ưu tiên sử dụng cookie.
 
-Success: new access token/cookie if DB session is active and user remains active.
+Thành công: access token/cookie mới được cấp nếu DB session vẫn active và người dùng vẫn đang active.
 
 ## POST `/api/v1/auth/logout`
 
-Auth: any logged-in user.
+Xác thực (Auth): mọi người dùng đã đăng nhập.
 
-Success: current session revoked and cookies cleared.
+Thành công: session hiện tại bị thu hồi (revoked) và cookies bị xóa.
 
 ## POST `/api/v1/auth/forgot-password`
 
@@ -52,7 +52,7 @@ Body:
 { "email": "learner@example.com" }
 ```
 
-Success: generic message whether or not the email exists.
+Thành công: thông báo chung chung dù email có tồn tại hay không.
 
 ## POST `/api/v1/auth/reset-password`
 
@@ -62,11 +62,11 @@ Body:
 { "token": "reset-token-or-otp", "password": "newsecret123" }
 ```
 
-Success: password hash updated, token marked used, password history inserted.
+Thành công: password hash được cập nhật, token được đánh dấu đã dùng, thêm bản ghi lịch sử mật khẩu (password history inserted).
 
 ## POST `/api/v1/auth/change-password`
 
-Auth: logged-in user.
+Auth: người dùng đã đăng nhập.
 
 Body:
 
@@ -74,14 +74,14 @@ Body:
 { "old_password": "oldsecret123", "new_password": "newsecret123" }
 ```
 
-Errors: Google-only account without local password, wrong old password, too-short password.
+Lỗi: tài khoản Google-only không có mật khẩu cục bộ, sai old password, mật khẩu quá ngắn.
 
 ## GET `/api/v1/auth/google`
 
-Redirects to Google OAuth with state cookie.
+Điều hướng (Redirects) tới Google OAuth cùng với state cookie.
 
 ## GET `/api/v1/auth/google/callback`
 
 Query: `code`, `state`.
 
-Success: validates state, exchanges code, upserts local user, starts session, redirects to frontend.
+Thành công: kiểm tra (validates) state, trao đổi (exchanges) code, upsert user cục bộ, bắt đầu session, điều hướng về frontend.

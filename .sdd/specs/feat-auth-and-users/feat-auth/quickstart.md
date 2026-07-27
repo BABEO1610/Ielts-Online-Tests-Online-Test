@@ -1,12 +1,12 @@
-# Quickstart: Authentication
+# Khởi động Nhanh (Quickstart): Authentication
 
-## Prerequisites
+## Yêu cầu Cần thiết (Prerequisites)
 
-- PostgreSQL configured and migrated.
-- `JWT_SECRET`, database env vars, email env vars, and optional `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` set.
-- `FRONTEND_URL` points to Vite dev server.
+- PostgreSQL đã được cấu hình và chạy migration.
+- Cài đặt `JWT_SECRET`, các biến môi trường (env vars) database, email, và tuỳ chọn `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`.
+- `FRONTEND_URL` trỏ tới Vite dev server.
 
-## Run
+## Chạy (Run)
 
 ```powershell
 cd backend
@@ -23,31 +23,31 @@ npm test -- --run tests/components/auth
 npm run dev
 ```
 
-## Validation Scenarios
+## Các Kịch bản Xác thực (Validation Scenarios)
 
-1. Register with valid name/email/password.
-   Expected: pending account, verification token created, generic success response.
+1. Đăng ký với tên/email/mật khẩu hợp lệ.
+   Kết quả mong đợi: tài khoản ở trạng thái pending, token xác thực (verification token) được tạo, phản hồi thành công chung chung.
 
-2. Verify email with a valid unused token.
-   Expected: account becomes `active`; token is marked used.
+2. Xác thực email bằng một token hợp lệ chưa sử dụng.
+   Kết quả mong đợi: tài khoản chuyển thành `active`; token được đánh dấu là đã dùng.
 
-3. Login as active student/tutor/admin.
-   Expected: session row created, cookies set, frontend routes to role-appropriate workspace.
+3. Đăng nhập với vai trò active student/tutor/admin.
+   Kết quả mong đợi: tạo một dòng session, cookie được thiết lập, frontend điều hướng tới workspace phù hợp với vai trò.
 
-4. Login with bad credentials repeatedly.
-   Expected: generic error, failed attempts tracked, temporary lock at policy threshold.
+4. Đăng nhập liên tục với thông tin sai.
+   Kết quả mong đợi: lỗi chung chung, số lần thử sai được theo dõi, khóa tạm thời (temporary lock) khi đạt ngưỡng chính sách.
 
-5. Open a protected route while unauthenticated.
-   Expected: frontend redirects to `/login`.
+5. Mở một tuyến (route) được bảo vệ trong khi chưa xác thực.
+   Kết quả mong đợi: frontend điều hướng (redirects) về `/login`.
 
-6. Refresh an authenticated session.
-   Expected: `/auth/refresh-token` issues a new access token only if session remains active.
+6. Làm mới (Refresh) một session đã xác thực.
+   Kết quả mong đợi: `/auth/refresh-token` cấp một JWT access/refresh tokens mới chỉ khi session vẫn đang hoạt động (active).
 
-7. Logout.
-   Expected: current session revoked and frontend auth state cleared.
+7. Đăng xuất.
+   Kết quả mong đợi: session hiện tại bị thu hồi (revoked) và trạng thái auth trên frontend bị xóa.
 
-8. Forgot/reset password.
-   Expected: forgot response does not reveal account existence; reset succeeds once with a valid unused token and rejects reuse/expired tokens.
+8. Quên/Đặt lại mật khẩu.
+   Kết quả mong đợi: phản hồi quên mật khẩu không làm lộ việc tài khoản có tồn tại hay không; việc đặt lại thành công một lần với token hợp lệ chưa dùng và từ chối các token đã dùng/hết hạn.
 
-9. Google login callback.
-   Expected: local user is created or updated, OAuth session is created, and user is redirected back to frontend.
+9. Trả về (Callback) khi đăng nhập Google.
+   Kết quả mong đợi: người dùng cục bộ được tạo hoặc cập nhật, OAuth session được tạo, và người dùng được điều hướng trở lại frontend.

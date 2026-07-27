@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../../services/api';
 import GoogleLoginButton from './GoogleLoginButton';
+import { usePasswordToggle } from '../../hooks/usePasswordToggle';
 
 const RegisterForm = () => {
   const [formData, setFormData] = useState({
@@ -14,6 +15,8 @@ const RegisterForm = () => {
   const [loading, setLoading] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
+  const [pwdType, pwdVisible, togglePwd] = usePasswordToggle();
+  const [confirmType, confirmVisible, toggleConfirm] = usePasswordToggle();
 
   const handleChange = (e) => {
     setFormData({
@@ -116,30 +119,62 @@ const RegisterForm = () => {
 
       <div className="mb-3">
         <label className="form-label fw-medium text-dark">Mật khẩu</label>
-        <input
-          type="password"
-          className="form-control form-control-lg rounded-3 bg-white border-0 shadow-sm"
-          name="password"
-          placeholder="Nhập mật khẩu"
-          value={formData.password}
-          onChange={handleChange}
-          required
-          data-testid="password-input"
-        />
+        <div style={{ position: 'relative' }}>
+          <input
+            type={pwdType}
+            className="form-control form-control-lg rounded-3 bg-white border-0 shadow-sm"
+            name="password"
+            placeholder="Nhập mật khẩu"
+            value={formData.password}
+            onChange={handleChange}
+            style={{ paddingRight: '2.5rem' }}
+            required
+            data-testid="password-input"
+          />
+          <button
+            type="button"
+            onClick={togglePwd}
+            aria-label={pwdVisible ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+            style={{
+              position: 'absolute', right: '12px', top: '50%',
+              transform: 'translateY(-50%)',
+              background: 'none', border: 'none', cursor: 'pointer',
+              color: '#6c757d', padding: '0 2px', lineHeight: 1
+            }}
+          >
+            <i className={`bi bi-eye${pwdVisible ? '-slash' : ''}`} />
+          </button>
+        </div>
       </div>
 
       <div className="mb-4">
         <label className="form-label fw-medium text-dark">Xác nhận mật khẩu</label>
-        <input
-          type="password"
-          className={`form-control form-control-lg rounded-3 bg-white border-0 shadow-sm ${!isPasswordMatch ? 'is-invalid' : ''}`}
-          name="confirmPassword"
-          placeholder="Nhập lại mật khẩu"
-          value={formData.confirmPassword}
-          onChange={handleChange}
-          required
-          data-testid="confirm-password-input"
-        />
+        <div style={{ position: 'relative' }}>
+          <input
+            type={confirmType}
+            className={`form-control form-control-lg rounded-3 bg-white border-0 shadow-sm ${!isPasswordMatch ? 'is-invalid' : ''}`}
+            name="confirmPassword"
+            placeholder="Nhập lại mật khẩu"
+            value={formData.confirmPassword}
+            onChange={handleChange}
+            style={{ paddingRight: '2.5rem' }}
+            required
+            data-testid="confirm-password-input"
+          />
+          <button
+            type="button"
+            onClick={toggleConfirm}
+            aria-label={confirmVisible ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+            style={{
+              position: 'absolute', right: '12px', top: '50%',
+              transform: 'translateY(-50%)',
+              background: 'none', border: 'none', cursor: 'pointer',
+              color: '#6c757d', padding: '0 2px', lineHeight: 1
+            }}
+          >
+            <i className={`bi bi-eye${confirmVisible ? '-slash' : ''}`} />
+          </button>
+        </div>
         {!isPasswordMatch && (
           <div className="invalid-feedback" data-testid="password-mismatch-error">
             Mật khẩu xác nhận không khớp.

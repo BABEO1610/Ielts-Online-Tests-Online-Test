@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import api from '../../services/api';
+import { usePasswordToggle } from '../../hooks/usePasswordToggle';
 
 const ResetPwdForm = () => {
   const [searchParams] = useSearchParams();
@@ -13,6 +14,8 @@ const ResetPwdForm = () => {
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
+  const [pwdType, pwdVisible, togglePwd] = usePasswordToggle();
+  const [confirmType, confirmVisible, toggleConfirm] = usePasswordToggle();
 
   useEffect(() => {
     if (!token) {
@@ -88,19 +91,36 @@ const ResetPwdForm = () => {
       <form onSubmit={handleSubmit} noValidate>
         <div className="mb-3">
           <label className="form-label fw-medium text-dark">Mật khẩu mới</label>
-          <input
-            type="password"
-            className={`form-control form-control-lg rounded-3 bg-white border-0 shadow-sm ${!isPasswordStrong ? 'is-invalid' : ''}`}
-            placeholder="Tối thiểu 8 ký tự"
-            value={password}
-            onChange={(e) => {
-              setPassword(e.target.value);
-              setErrorMsg('');
-            }}
-            required
-            disabled={!token || successMsg !== ''}
-            data-testid="password-input"
-          />
+          <div style={{ position: 'relative' }}>
+            <input
+              type={pwdType}
+              className={`form-control form-control-lg rounded-3 bg-white border-0 shadow-sm ${!isPasswordStrong ? 'is-invalid' : ''}`}
+              placeholder="Tối thiểu 8 ký tự"
+              value={password}
+              onChange={(e) => {
+                setPassword(e.target.value);
+                setErrorMsg('');
+              }}
+              style={{ paddingRight: '2.5rem' }}
+              required
+              disabled={!token || successMsg !== ''}
+              data-testid="password-input"
+            />
+            <button
+              type="button"
+              onClick={togglePwd}
+              aria-label={pwdVisible ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+              disabled={!token || successMsg !== ''}
+              style={{
+                position: 'absolute', right: '12px', top: !isPasswordStrong ? 'calc(50% - 10px)' : '50%',
+                transform: 'translateY(-50%)',
+                background: 'none', border: 'none', cursor: 'pointer',
+                color: '#6c757d', padding: '0 2px', lineHeight: 1
+              }}
+            >
+              <i className={`bi bi-eye${pwdVisible ? '-slash' : ''}`} />
+            </button>
+          </div>
           {!isPasswordStrong && (
             <div className="invalid-feedback fw-medium" data-testid="password-strength-error">
               Mật khẩu phải có ít nhất 8 ký tự.
@@ -110,19 +130,36 @@ const ResetPwdForm = () => {
 
         <div className="mb-4">
           <label className="form-label fw-medium text-dark">Xác nhận mật khẩu</label>
-          <input
-            type="password"
-            className={`form-control form-control-lg rounded-3 bg-white border-0 shadow-sm ${!isPasswordMatch ? 'is-invalid' : ''}`}
-            placeholder="Nhập lại mật khẩu mới"
-            value={confirmPassword}
-            onChange={(e) => {
-              setConfirmPassword(e.target.value);
-              setErrorMsg('');
-            }}
-            required
-            disabled={!token || successMsg !== ''}
-            data-testid="confirm-password-input"
-          />
+          <div style={{ position: 'relative' }}>
+            <input
+              type={confirmType}
+              className={`form-control form-control-lg rounded-3 bg-white border-0 shadow-sm ${!isPasswordMatch ? 'is-invalid' : ''}`}
+              placeholder="Nhập lại mật khẩu mới"
+              value={confirmPassword}
+              onChange={(e) => {
+                setConfirmPassword(e.target.value);
+                setErrorMsg('');
+              }}
+              style={{ paddingRight: '2.5rem' }}
+              required
+              disabled={!token || successMsg !== ''}
+              data-testid="confirm-password-input"
+            />
+            <button
+              type="button"
+              onClick={toggleConfirm}
+              aria-label={confirmVisible ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+              disabled={!token || successMsg !== ''}
+              style={{
+                position: 'absolute', right: '12px', top: !isPasswordMatch ? 'calc(50% - 10px)' : '50%',
+                transform: 'translateY(-50%)',
+                background: 'none', border: 'none', cursor: 'pointer',
+                color: '#6c757d', padding: '0 2px', lineHeight: 1
+              }}
+            >
+              <i className={`bi bi-eye${confirmVisible ? '-slash' : ''}`} />
+            </button>
+          </div>
           {!isPasswordMatch && (
             <div className="invalid-feedback fw-medium" data-testid="password-mismatch-error">
               Mật khẩu xác nhận không khớp.
