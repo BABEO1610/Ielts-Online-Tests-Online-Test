@@ -15,6 +15,23 @@ const authorize = authorizeFactory(AppError);
 // GET    /api/v1/library          — danh sách tài liệu (public, ai cũng xem được)
 router.get('/', libraryController.listResources);
 
+// GET    /api/v1/library/mine     — tài liệu của người upload, gồm pending/rejected
+router.get(
+  '/mine',
+  authenticate,
+  authorize(['tutor', 'admin']),
+  libraryController.listMyResources
+);
+
+// GET    /api/v1/library/mine/:id — owner/admin xem chi tiết cả khi đang pending
+router.get(
+  '/mine/:id',
+  authenticate,
+  authorize(['tutor', 'admin']),
+  ...libraryController.validateResourceId,
+  libraryController.getManagedResource
+);
+
 // GET    /api/v1/library/files/:filename — serve file (public download)
 router.get(
   '/files/:filename',
@@ -28,7 +45,7 @@ router.get(
 );
 
 // GET    /api/v1/library/:id      — chi tiết tài liệu (public)
-router.get('/:id', libraryController.getResource);
+router.get('/:id', ...libraryController.validateResourceId, libraryController.getResource);
 
 // ── Protected routes (tutor/admin mới được tạo/sửa/xóa) ────────────────────
 
@@ -51,7 +68,13 @@ router.put(
 );
 
 // DELETE /api/v1/library/:id      — xóa tài liệu
-router.delete('/:id', authenticate, authorize(['tutor', 'admin']), libraryController.deleteResource);
+router.delete(
+  '/:id',
+  authenticate,
+  authorize(['tutor', 'admin']),
+  ...libraryController.validateResourceId,
+  libraryController.deleteResource
+);
 
 module.exports = router;
 

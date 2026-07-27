@@ -12,13 +12,13 @@ const {
 const AppError = require('../utils/AppError');
 const logger = require('../utils/logger');
 const { calcWeightedWritingOverall } = require('../utils/scoring');
-const { v4: uuidv4 } = require('uuid');
+const { randomUUID } = require('node:crypto');
 
 /**
  * POST /api/v1/submissions/writing/:submissionId/ai-grade
  */
 const requestAiGrade = async (req, res, next) => {
-  const requestId = uuidv4();
+  const requestId = randomUUID();
   const { submissionId } = req.params;
   const userId = req.user.id;
   let submission = null;
