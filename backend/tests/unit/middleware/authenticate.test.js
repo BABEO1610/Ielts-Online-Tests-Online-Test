@@ -2,8 +2,6 @@
  * Traceability Matrix:
  * - SPEC §4 (State-driven): Decode JWT and match session_token against user_sessions. Deny if revoked_at IS NOT NULL OR expires_at < NOW() -> Test "should throw 401 if session is inactive in DB"
  * - SPEC §4 (State-driven): Check Redis cache -> Test "should throw 401 if session is revoked in Redis"
- * - SPEC §4 (State-driven): Block if must_change_password = TRUE -> Test "should throw 403 if must_change_password is true and route is not whitelisted"
- * - SPEC §9 (Edge Cases): Whitelist change password and logout -> Test "should allow access if must_change_password is true but route is whitelisted"
  * - SPEC §8 (Error Handling): AUTH_LOG_001, AUTH_SES_001 mapping -> Checked in all failure tests.
  */
 
@@ -130,56 +128,12 @@ describe('Middleware: Authenticate', () => {
     redisClient.status = 'ready';
   });
 
-  it('should throw 403 AUTH_PERM_002 if must_change_password is true and route is not whitelisted', async () => {
-    req.cookies.access_token = 'valid_token';
-    verifyAccessToken.mockReturnValue({ 
-      sub: 'user-123', role: 'student', session_token: 'session-123', must_change_password: true 
-    });
-    redisClient.hget.mockResolvedValue(null);
-    findActiveSession.mockResolvedValue({ id: 'session-123' });
 
-    await authenticate(req, res, next);
-
-    expect(next).toHaveBeenCalledWith(expect.any(AppError));
-    const error = next.mock.calls[0][0];
-    expect(error.statusCode).toBe(403);
-    expect(error.errorCode).toBe('AUTH_PERM_002');
-  });
-
-  it('should allow access if must_change_password is true but route is /api/v1/auth/change-password', async () => {
-    req.path = '/api/v1/auth/change-password';
-    req.cookies.access_token = 'valid_token';
-    verifyAccessToken.mockReturnValue({ 
-      sub: 'user-123', role: 'student', session_token: 'session-123', must_change_password: true 
-    });
-    redisClient.hget.mockResolvedValue(null);
-    findActiveSession.mockResolvedValue({ id: 'session-123' });
-
-    await authenticate(req, res, next);
-
-    expect(next).toHaveBeenCalledWith(); // called without error
-    expect(req.user.must_change_password).toBe(true);
-  });
-
-  it('should allow access if must_change_password is true but route is /api/v1/auth/logout', async () => {
-    req.path = '/api/v1/auth/logout';
-    req.cookies.access_token = 'valid_token';
-    verifyAccessToken.mockReturnValue({ 
-      sub: 'user-123', role: 'student', session_token: 'session-123', must_change_password: true 
-    });
-    redisClient.hget.mockResolvedValue(null);
-    findActiveSession.mockResolvedValue({ id: 'session-123' });
-
-    await authenticate(req, res, next);
-
-    expect(next).toHaveBeenCalledWith(); // called without error
-    expect(req.user.must_change_password).toBe(true);
-  });
 
   it('should attach req.user and call next on happy path', async () => {
     req.cookies.access_token = 'valid_token';
     verifyAccessToken.mockReturnValue({ 
-      sub: 'user-123', role: 'student', session_token: 'session-123', must_change_password: false 
+      sub: 'user-123', role: 'student', session_token: 'session-123' 
     });
     redisClient.hget.mockResolvedValue(null);
     findActiveSession.mockResolvedValue({ id: 'session-123' });
@@ -190,8 +144,7 @@ describe('Middleware: Authenticate', () => {
     expect(req.user).toEqual({
       id: 'user-123',
       role: 'student',
-      session_token: 'session-123',
-      must_change_password: false
+      session_token: 'session-123'
     });
   });
 });

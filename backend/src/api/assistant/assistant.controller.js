@@ -86,16 +86,12 @@ const resolveAuthenticatedUser = async (req) => {
     return { user: null, code: ERROR_CODES.LOGIN_REQUIRED };
   }
 
-  if (decoded.must_change_password) {
-    return { user: null, code: ERROR_CODES.FORBIDDEN };
-  }
 
   return {
     user: {
       id: decoded.sub,
       role: decoded.role,
       session_token: decoded.session_token,
-      must_change_password: decoded.must_change_password,
     },
     code: null,
   };

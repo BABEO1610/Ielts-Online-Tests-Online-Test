@@ -8,10 +8,6 @@ const AppError = require('../utils/AppError'); // Giả định AppError đã đ
  * EARS[State-driven]: WHILE a request passes through the Authenticated Middleware, 
  * THE system SHALL decode the JWT and match the session_token against user_sessions. 
  * If revoked_at IS NOT NULL OR expires_at < NOW(), deny access (HTTP 401).
- * 
- * EARS[State-driven]: WHILE a user has must_change_password = TRUE in the DB 
- * (embedded in JWT), THE system SHALL block all business API requests and 
- * force-redirect the user to the Change Password endpoint.
  */
 const authenticate = async (req, res, next) => {
   try {
@@ -29,7 +25,7 @@ const authenticate = async (req, res, next) => {
       throw new AppError('Unauthorized: Invalid or expired token', 401, 'AUTH_SES_001');
     }
 
-    const { sub, role, session_token, must_change_password } = decoded;
+    const { sub, role, session_token } = decoded;
 
     if (!session_token) {
       throw new AppError('Unauthorized: Invalid token payload', 401, 'AUTH_SES_001');
@@ -66,25 +62,11 @@ const authenticate = async (req, res, next) => {
       throw new AppError('Session expired', 401, 'AUTH_SES_001');
     }
 
-    // 5. Kiểm tra must_change_password
-    if (must_change_password) {
-      const whitelistPaths = [
-        '/api/v1/auth/change-password',
-        '/api/v1/auth/logout'
-      ];
-
-      // Nếu đường dẫn không nằm trong whitelist -> block
-      if (!whitelistPaths.includes(req.path)) {
-        throw new AppError('You must change your password before continuing', 403, 'AUTH_PERM_002'); // Có thể define thêm mã lỗi AUTH_PERM_002 hoặc dùng AUTH_PERM_001
-      }
-    }
-
-    // 6. Gán thông tin user vào request object
+    // 5. Gán thông tin user vào request object
     req.user = {
       id: sub,
       role,
-      session_token,
-      must_change_password
+      session_token
     };
 
     next();
