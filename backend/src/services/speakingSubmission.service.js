@@ -240,10 +240,11 @@ class SpeakingSubmissionService {
     });
     if (!job) throw new AppError('Không tìm thấy grading job.', 404, 'GRADING_JOB_NOT_FOUND');
     const terminal = ['completed', 'needs_review', 'failed'].includes(job.canonical_status);
-    // A learner gets one manual recovery attempt after every terminal failure,
-    // including a non-retryable infrastructure/configuration failure. The
-    // child-job uniqueness constraint still prevents repeated retries.
-    const canRetry = !job.retry_job_id && job.canonical_status === 'failed';
+    const manualRetryLimit = this.config.manualRetryLimit ?? 2;
+    const manualRetryCount = Number(job.manual_retry_count || 0);
+    // A manual retry is available after any terminal failure, including an
+    // infrastructure failure. Completed jobs never expose this action.
+    const canRetry = job.canonical_status === 'failed' && manualRetryCount < manualRetryLimit;
     let result = null;
     if (job.canonical_status === 'completed' || (job.canonical_status === 'needs_review' && user.role !== 'student')) {
       const report = await this.pool.query(
@@ -263,6 +264,8 @@ class SpeakingSubmissionService {
       max_attempts: job.max_attempts,
       is_terminal: terminal,
       can_retry: canRetry,
+      manual_retry_count: manualRetryCount,
+      manual_retry_limit: manualRetryLimit,
       result,
       updated_at: job.canonical_updated_at,
     };

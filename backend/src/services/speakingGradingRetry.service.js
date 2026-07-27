@@ -12,8 +12,8 @@ const toAsyncJob = (job) => ({
   submitted_at: job.created_at,
 });
 
-const retryAlreadyCreated = (job) => {
-  const error = new AppError('Bài này đã dùng lượt retry thủ công.', 409, 'RETRY_ALREADY_CREATED');
+const retryUnavailable = (job, message, errorCode = 'RETRY_ALREADY_CREATED') => {
+  const error = new AppError(message, 409, errorCode);
   error.details = { job_id: job.id, speaking_group_id: job.group_id };
   return error;
 };
@@ -49,11 +49,18 @@ class SpeakingGradingRetryService {
     const root = rootResult.rows[0];
     if (!root) throw new AppError('Không tìm thấy grading job.', 404, 'GRADING_JOB_NOT_FOUND');
     const byKey = await jobQueries.lookupJobByIdempotency(client, userId, key);
-    if (byKey) return this.replay(root, byKey);
-    const existing = await jobQueries.findRetryChild(client, root.id);
-    if (existing) throw retryAlreadyCreated(existing);
+    const retryChain = await jobQueries.getRetryChain(client, root.id);
+    if (byKey) return this.replay(root, byKey, retryChain);
+    const retryLimit = this.config.manualRetryLimit ?? 2;
+    const latest = retryChain.at(-1) || root;
+    if (retryChain.length >= retryLimit) {
+      throw retryUnavailable(latest, `Bài này đã dùng hết ${retryLimit} lượt retry thủ công.`, 'RETRY_LIMIT_REACHED');
+    }
+    if (latest.status !== 'failed') {
+      throw retryUnavailable(latest, 'Bài đang chấm hoặc đã có kết quả, chưa thể retry.');
+    }
     const child = await jobQueries.insertRetryChild(client, {
-      rootJobId: root.id,
+      parentJobId: latest.id,
       idempotencyKey: key,
       expiresAt: new Date(this.now() + this.config.idempotencyTtlSeconds * 1000).toISOString(),
     });
@@ -74,11 +81,13 @@ class SpeakingGradingRetryService {
     }
   }
 
-  replay(root, job) {
+  replay(root, job, retryChain) {
     if (new Date(job.idempotency_expires_at).getTime() <= this.now()) {
       throw new AppError('Cửa sổ phát lại đã hết hạn.', 410, 'IDEMPOTENCY_WINDOW_EXPIRED');
     }
-    if (job.retry_of_job_id !== root.id) {
+    const belongsToRetryChain = retryChain.some((candidate) => candidate.id === job.id);
+    if (job.group_id !== root.group_id || job.user_id !== root.user_id
+      || !job.retry_of_job_id || !belongsToRetryChain) {
       throw new AppError('Idempotency-Key đã dùng cho yêu cầu khác.', 409, 'IDEMPOTENCY_KEY_REUSED');
     }
     return { ...toAsyncJob(job), replayed: true };

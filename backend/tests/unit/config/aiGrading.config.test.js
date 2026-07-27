@@ -32,6 +32,11 @@ describe('aiGrading.config', () => {
     expect(config.publishSpeakingBands).toBe(false);
   });
 
+  test('allows two manual Speaking recovery retries by default', () => {
+    const config = loadAiGradingConfig(enabledEnv);
+    expect(config.manualRetryLimit).toBe(2);
+  });
+
   test('can explicitly enable clearly-labelled estimated Speaking bands without a calibration bundle', () => {
     const config = loadAiGradingConfig({
       ...enabledEnv,

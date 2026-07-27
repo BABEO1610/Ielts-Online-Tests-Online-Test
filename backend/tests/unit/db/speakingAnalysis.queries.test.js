@@ -26,7 +26,19 @@ describe('speaking analysis queries', () => {
     });
     const [sql] = db.query.mock.calls[0];
     expect(sql).toMatch(/ON CONFLICT .* DO NOTHING/is);
+    expect(sql).toMatch(/speaking_submission_id, audio_sha256, scoring_config_sha256, source_job_id/i);
     expect(sql).not.toMatch(/DO UPDATE/i);
+  });
+
+  test('scopes reusable artifacts to the exact grading job', async () => {
+    const db = dbWith([]);
+    await queries.getReusableArtifact(db, {
+      submissionId: 'submission-1', sourceJobId: 'job-retry-2',
+      audioSha256: 'a'.repeat(64), scoringConfigSha256: 'b'.repeat(64),
+    });
+    const [sql, params] = db.query.mock.calls[0];
+    expect(sql).toMatch(/source_job_id = \$2/i);
+    expect(params).toEqual(['submission-1', 'job-retry-2', 'a'.repeat(64), 'b'.repeat(64)]);
   });
 
   test('report insert projects an explicit column allowlist', async () => {

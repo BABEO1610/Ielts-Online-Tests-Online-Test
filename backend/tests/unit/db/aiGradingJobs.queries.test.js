@@ -42,15 +42,25 @@ describe('aiGradingJobs queries', () => {
     expect(sql).toMatch(/\$2::date \+ 1/i);
   });
 
-  test('allows exactly one manual child for every failed Speaking job', async () => {
+  test('creates a retry child from any failed job in the retry chain', async () => {
     const db = dbWith([{ id: 'retry-1' }]);
     await queries.insertRetryChild(db, {
-      rootJobId: 'root-1', idempotencyKey: 'manual-retry-key-0001', expiresAt: '2026-07-23T00:00:00Z',
+      parentJobId: 'retry-1', idempotencyKey: 'manual-retry-key-0001', expiresAt: '2026-07-23T00:00:00Z',
     });
     const [sql] = db.query.mock.calls[0];
     expect(sql).toMatch(/status = 'failed'/i);
+    expect(sql).not.toMatch(/retry_of_job_id IS NULL AND status = 'failed'/i);
     expect(sql).not.toMatch(/attempt_count = max_attempts/i);
     expect(sql).not.toMatch(/last_error_retryable IS TRUE/i);
     expect(sql).toMatch(/ON CONFLICT \(retry_of_job_id\)/i);
+  });
+
+  test('selects the deepest retry as the canonical status', async () => {
+    const db = dbWith([]);
+    await queries.getCanonicalJobForGroup(db, { groupId: 'group-1', userId: 'user-1' });
+    const [sql] = db.query.mock.calls[0];
+    expect(sql).toMatch(/WITH RECURSIVE retry_chain/i);
+    expect(sql).toMatch(/ORDER BY retry_depth DESC/i);
+    expect(sql).toMatch(/manual_retry_count/i);
   });
 });
