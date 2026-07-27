@@ -1,4 +1,4 @@
-const { body, param, query, validationResult } = require('express-validator');
+const { body, param, validationResult } = require('express-validator');
 const libraryService = require('../services/library.service');
 const AppError = require('../utils/AppError');
 
@@ -31,14 +31,24 @@ const validateUpdate = [
     .trim(),
 ];
 
+const validateResourceId = [
+  param('id').isUUID().withMessage('ID không hợp lệ.'),
+  (req, res, next) => {
+    void res;
+    if (checkValidation(req, next)) next();
+  },
+];
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function checkValidation(req, next) {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
     const messages = errors.array().map((e) => e.msg).join('; ');
-    return next(new AppError(messages, 422, 'VALIDATION_ERROR'));
+    next(new AppError(messages, 422, 'VALIDATION_ERROR'));
+    return false;
   }
+  return true;
 }
 
 // ─── Controllers ─────────────────────────────────────────────────────────────
@@ -51,6 +61,26 @@ const listResources = async (req, res, next) => {
   try {
     const { category, search, resource_type } = req.query;
     const resources = await libraryService.listResources({ category, search, resource_type });
+
+    return res.status(200).json({
+      success: true,
+      data: resources,
+      error: null,
+      meta: { total: resources.length },
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+const listMyResources = async (req, res, next) => {
+  try {
+    const { category, search, resource_type } = req.query;
+    const resources = await libraryService.listMyResources(req.user.id, {
+      category,
+      search,
+      resource_type,
+    });
 
     return res.status(200).json({
       success: true,
@@ -82,6 +112,25 @@ const getResource = async (req, res, next) => {
   }
 };
 
+const getManagedResource = async (req, res, next) => {
+  try {
+    const resource = await libraryService.getManagedResourceDetail(
+      req.params.id,
+      req.user.id,
+      req.user.role
+    );
+
+    return res.status(200).json({
+      success: true,
+      data: resource,
+      error: null,
+      meta: null,
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
 /**
  * POST /api/v1/library
  * Tạo tài liệu mới — multipart/form-data
@@ -89,8 +138,7 @@ const getResource = async (req, res, next) => {
 const createResource = [
   ...validateCreate,
   async (req, res, next) => {
-    const validationErr = checkValidation(req, next);
-    if (validationErr) return validationErr;
+    if (!checkValidation(req, next)) return;
 
     try {
       const created = await libraryService.createResource(req.body, req.file, req.user.id);
@@ -114,11 +162,16 @@ const createResource = [
 const updateResource = [
   ...validateUpdate,
   async (req, res, next) => {
-    const validationErr = checkValidation(req, next);
-    if (validationErr) return validationErr;
+    if (!checkValidation(req, next)) return;
 
     try {
-      const updated = await libraryService.updateResource(req.params.id, req.user.id, req.body, req.file);
+      const updated = await libraryService.updateResource(
+        req.params.id,
+        req.user.id,
+        req.user.role,
+        req.body,
+        req.file
+      );
 
       return res.status(200).json({
         success: true,
@@ -138,7 +191,7 @@ const updateResource = [
  */
 const deleteResource = async (req, res, next) => {
   try {
-    await libraryService.deleteResource(req.params.id, req.user.id);
+    await libraryService.deleteResource(req.params.id, req.user.id, req.user.role);
 
     return res.status(200).json({
       success: true,
@@ -152,8 +205,11 @@ const deleteResource = async (req, res, next) => {
 };
 
 module.exports = {
+  validateResourceId,
   listResources,
+  listMyResources,
   getResource,
+  getManagedResource,
   createResource,
   updateResource,
   deleteResource,

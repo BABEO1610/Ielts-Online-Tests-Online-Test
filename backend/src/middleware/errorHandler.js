@@ -16,7 +16,17 @@ const errorHandler = (err, req, res, next) => {
   let errorCode = err.errorCode || err.code || 'INTERNAL_ERROR';
 
   // Handle specific library/native errors gracefully
-  if (err.name === 'SyntaxError' && err.type === 'entity.parse.failed') {
+  if (err.name === 'MulterError') {
+    if (err.code === 'LIMIT_FILE_SIZE') {
+      statusCode = 413;
+      errorCode = 'FILE_TOO_LARGE';
+      message = 'File tải lên vượt quá giới hạn 200MB.';
+    } else {
+      statusCode = 422;
+      errorCode = err.code || 'UPLOAD_VALIDATION_ERROR';
+      message = 'Dữ liệu file upload không hợp lệ.';
+    }
+  } else if (err.name === 'SyntaxError' && err.type === 'entity.parse.failed') {
     // EARS[Unwanted]: WHERE a JSON syntax error occurs in body, return 400
     statusCode = 400;
     errorCode = 'BAD_REQUEST_JSON';
