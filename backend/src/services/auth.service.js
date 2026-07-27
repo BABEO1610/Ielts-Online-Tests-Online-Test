@@ -30,8 +30,8 @@ const register = async ({ email, password, full_name }) => {
     // Check if email already exists
     const existingUser = await findUserByEmail(email);
     if (existingUser) {
-        // EARS[Unwanted]: Return generic message to prevent email enumeration
-        const error = new Error('Registration failed. Please try again.');
+        // User requested explicit message for existing accounts
+        const error = new Error('Tài khoản đã tồn tại.');
         error.code = 'AUTH_REG_001';
         error.statusCode = 400;
         throw error;

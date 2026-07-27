@@ -1,114 +1,107 @@
-# SPEC.md — Đặc tả Kỹ thuật: Luồng Thi Trắc nghiệm & Quản lý Đề (feat-objective-testing)
-# Dự án: IELTS Learning Website | Ngày: 25/05/2026
+# Feature Specification: Thi Trắc Nghiệm (feat-objective-testing)
 
-Dựa trên cấu trúc chuẩn từ phương pháp Spec-Driven Development (SDD), đây là tài liệu đặc tả thực thi cho tính năng Thi Trắc Nghiệm.
+**Feature Branch**: `[feat-objective-testing]`
+
+**Created**: 2026-07-24
+
+**Status**: Completed
+
+**Input**: Bối cảnh dự án IELTSZone. Yêu cầu tách 4 luồng chính: Giao diện Listening, Giao diện Reading, Auto-grading Engine, History & Retrieval. Đã cập nhật theo source code thực tế.
+
+## User Scenarios & Testing *(mandatory)*
+
+### User Story 1 - Giao diện thi Listening (Priority: P1)
+
+Là một học viên, tôi muốn có một giao diện làm bài thi Listening với Audio Player không tự động chuyển bài, và danh sách câu hỏi rõ ràng, để tôi có thể nghe và chọn đáp án dễ dàng.
+
+**Why this priority**: Luồng chính để học viên trải nghiệm chức năng cốt lõi của website luyện thi IELTS.
+
+**Independent Test**: Có thể kiểm thử giao diện tĩnh và tương tác chọn đáp án thông qua local state mà không cần gọi API nộp bài.
+
+**Acceptance Scenarios**:
+
+1. **Given** học viên bắt đầu bài thi Listening, **When** học viên nhấn "Play" audio, **Then** audio phát bình thường và học viên có thể chọn đáp án ở các câu hỏi bên dưới (state được lưu cục bộ trong component).
+2. **Given** thời gian đếm ngược về `00:00`, **When** hết giờ, **Then** hệ thống tự động gọi API `/api/v1/tests/:id/attempts` để submit bài.
 
 ---
 
-## 1. Context & Goal (Bối cảnh & Mục tiêu)
-- **Bối cảnh:** Website luyện thi IELTS cần một môi trường thi mô phỏng thực tế (bấm giờ, chấm điểm tự động chuẩn Academic). Ngoài ra, Giáo viên (Tutor) cần cập nhật/sửa lỗi các đề thi cũ đã publish mà không làm hỏng dữ liệu điểm của học viên đã thi.
-- **Mục tiêu:** 1. Xây dựng luồng thi Reading/Listening trượt tru với tính năng đếm ngược và tự động nộp bài (auto-submit).
-  2. Implement cơ chế chấm điểm tự động (Auto-grading) có xử lý chuỗi.
-  3. Xây dựng cơ chế Versioning (Soft-delete) cho đề thi để bảo toàn lịch sử.
-  4. Ghi log kiểm toán (Audit Logging) mọi thao tác thay đổi đề.
+### User Story 2 - Giao diện thi Reading (Priority: P1)
 
-## 2. Actors & Roles (Tác nhân & Vai trò)
-- **Student (Học viên):** Người tham gia làm bài test, xem điểm số và giải thích đáp án.
-- **Tutor (Giáo viên / Người tạo đề):** Người tạo mới đề thi, cập nhật đáp án và cấu hình bài thi.
-- **Admin (Quản trị viên):** Người có quyền theo dõi hệ thống và xem Audit Logs.
+Là một học viên, tôi muốn giao diện bài thi Reading được chia đôi màn hình (Split View), một bên là bài đọc, một bên là câu hỏi để không phải cuộn trang lên xuống liên tục.
 
-## 3. Functional Requirements (Yêu cầu Chức năng)
-- **REQ-01 (Giao diện thi):** - Reading: Chia màn hình (Split View) bên trái là đoạn văn, phải là câu hỏi.
-  - Listening: Player âm thanh cố định phía trên, không tự động qua bài.
-  - Cả hai: Có thanh điều hướng 40 câu hỏi (hiển thị trạng thái làm/chưa làm).
-- **REQ-02 (Auto-submit):** Hệ thống đếm ngược thời gian. Khi về `00:00`, tự động khóa màn hình, hiển thị popup và gọi API nộp bài (không cần user bấm nút).
-- **REQ-03 (Auto-grading):**
-  - Trắc nghiệm (Multiple Choice): So khớp ID đáp án (Exact match).
-  - Điền khuyết (Fill-in-blanks): Phải tiền xử lý `trim()`, `toLowerCase()`, loại bỏ dấu câu thừa trước khi so sánh chuỗi.
-  - Quy đổi điểm thô (0-40) ra Band Score (1.0 - 9.0) theo chuẩn IELTS Academic.
-- **REQ-04 (Versioning đề thi):** Khi Tutor cập nhật câu hỏi/đáp án của một đề đã publish, hệ thống KHÔNG cập nhật đè (override) dữ liệu cũ, mà tạo ra bản ghi mới (`version += 1`). Đề cũ được chuyển thành `is_active = false`.
-- **REQ-05 (Audit Logging):** Mọi hành động `CREATE`, `UPDATE`, `SOFT_DELETE` trên Đề thi (Exam) và Câu hỏi (Question) đều phải lưu vào bảng Audit Log.
+**Why this priority**: Yêu cầu UI cốt lõi để đảm bảo UX cho dạng bài Reading IELTS dài.
 
-## 4. Non-functional Requirements (Yêu cầu Phi chức năng)
-- **Performance:** Khi nộp bài, API trả về kết quả trong thời gian < 1 giây để không làm gián đoạn trải nghiệm.
-- **Security & Integrity:** Không được phép xóa cứng (Hard-delete) bất kỳ bản ghi Đề thi/Câu hỏi nào đã có người thi.
-- **UI/UX:** Responsive hoạt động tốt trên Tablet và Desktop (Tạm thời không tối ưu cho Mobile vì tính chất chia đôi màn hình bài Reading).
+**Independent Test**: Có thể kiểm thử bố cục Split View và thanh cuộn độc lập giữa 2 pane.
 
-## 5. Data Model (Mô hình Dữ liệu)
-Cơ sở dữ liệu: PostgreSQL 
+**Acceptance Scenarios**:
 
-- **Table `mock_tests` (Đề thi):**
-  - `id` (UUID, PK)
-  - `title` (VARCHAR)
-  - `description` (TEXT)
-  - `skill` (Enum: 'reading', 'listening', 'writing', 'speaking')
-  - `difficulty` (Enum: 'beginner', 'intermediate', 'advanced')
-  - `duration_minutes` (INT, NULL nếu là untimed)
-  - `is_published` (BOOLEAN, default FALSE)
-  - `publish_at` (TIMESTAMPTZ - dùng cho scheduled publish)
-  - `created_by` (UUID, FK -> users.id)
-  - `created_at`, `updated_at` (TIMESTAMPTZ)
+1. **Given** màn hình thi Reading, **When** cuộn văn bản bên trái, **Then** câu hỏi bên phải vẫn đứng yên.
+2. **Given** học viên điền text vào câu hỏi điền khuyết (fill-in-blanks), **When** chuyển sang câu khác, **Then** nội dung đã điền được giữ lại trong state cục bộ của component.
 
-- **Table `questions` (Câu hỏi):**
-  - `id` (UUID, PK)
-  - `test_id` (UUID, FK -> mock_tests.id)
-  - `question_order` (INT)
-  - `question_text` (TEXT)
-  - `options` (JSONB) - *Lưu mảng lựa chọn (VD: `[{"label":"A", "text":"..."}]`), NULL nếu là câu điền khuyết*
-  - `correct_answer` (TEXT) - *Lưu "A" hoặc chuỗi text chính xác*
-  - `explanation` (TEXT)
-  - `created_at`, `updated_at` (TIMESTAMPTZ)
+---
 
-- **Table `test_attempts` (Lịch sử làm bài):**
-  - `id` (UUID, PK)
-  - `user_id` (UUID, FK -> users.id)
-  - `test_id` (UUID, FK -> mock_tests.id)
-  - `mode` (Enum: 'timed', 'untimed')
-  - `started_at` (TIMESTAMPTZ)
-  - `submitted_at` (TIMESTAMPTZ)
-  - `band_score` (NUMERIC 3,1)
-  - `created_at` (TIMESTAMPTZ)
+### User Story 3 - Engine Chấm điểm Tự động (Priority: P1)
 
-- **Table `Youtubes` (Chi tiết đáp án học viên nộp):**
-  - `id` (UUID, PK)
-  - `attempt_id` (UUID, FK -> test_attempts.id)
-  - `question_id` (UUID, FK -> questions.id)
-  - `given_answer` (TEXT)
-  - `is_correct` (BOOLEAN)
-  - `created_at` (TIMESTAMPTZ)
+Là một hệ thống (Backend), tôi muốn tự động so khớp các câu trả lời của học viên với đáp án đúng, xử lý loại bỏ khoảng trắng, in hoa/thường, và quy đổi điểm thô ra Band Score IELTS Academic thông qua service `attempt.service.js`.
 
-- **Table `audit_logs` (Nhật ký hệ thống/Kiểm toán):**
-  - `id` (UUID, PK)
-  - `actor_id` (UUID, FK -> users.id)
-  - `action` (Enum: log_action)
-  - `target_table` (VARCHAR)
-  - `target_id` (UUID)
-  - `old_value` (JSONB)
-  - `new_value` (JSONB)
-  - `ip_address` (INET)
-  - `created_at` (TIMESTAMPTZ)
+**Why this priority**: Cần thiết để sinh ra kết quả thi. Đây là trái tim của hệ thống đánh giá.
 
-- **Table `ai_explain_requests` (Yêu cầu AI giải thích câu hỏi):**
-  - `id` (UUID, PK)
-  - `user_id` (UUID, FK -> users.id)
-  - `question_id` (UUID, FK -> questions.id)
-  - `tutor_explanation` (TEXT)
-  - `ai_response` (TEXT)
-  - `tokens_used` (INT)
-  - `created_at` (TIMESTAMPTZ)
+**Independent Test**: Có thể test API nộp bài bằng cách gửi 1 JSON chứa payload answers lên endpoint `/api/v1/tests/:id/attempts`.
 
-## 6. Error Handling (Xử lý Ngoại lệ)
-- **Mất kết nối mạng:** Hệ thống lưu nháp tạm thời xuống LocalStorage của trình duyệt mỗi phút 1 lần. Khi có mạng sẽ tự động sync lên.
-- **Sai định dạng Submit Payload:** Trả về `400 Bad Request` nếu payload không chứa đủ `answers` array hoặc sai kiểu dữ liệu.
-- **Hết hạn Token (Timeout):** Nếu token của học viên hết hạn trong lúc thi, vẫn cho phép nộp bài bằng cách hiển thị popup yêu cầu nhập lại password thay vì refresh trang làm mất bài.
+**Acceptance Scenarios**:
 
-## 7. Acceptance Criteria (Tiêu chí Nghiệm thu - DoD)
-- Bài thi được tạo và hiển thị đúng 40 câu hỏi.
-- Thuật toán chấm bài chạy đúng với cả trường hợp học viên nhập "apples" (bừa khoảng trắng) với "apples" trong DB.
-- Khi thời gian = `00:00`, API nộp bài bắt buộc phải được trigger tự động.
-- Sửa đáp án của câu 1 từ "A" thành "B" -> Bảng `exams` tạo version mới, điểm của học viên thi hôm qua không bị thay đổi, bảng `audit_logs` lưu lại record.
+1. **Given** đáp án đúng là "apples", **When** học viên nhập " Apples ", **Then** hệ thống chấm đúng (sau khi trim và lowerCase trong logic `normalizeAnswer`).
+2. **Given** bài làm đúng 30/40 câu Reading, **When** tính điểm, **Then** hệ thống trả về Band Score 7.0.
 
-## 8. Out of Scope (Ngoài phạm vi thực hiện)
-- Tính năng nhận diện giọng nói hoặc chấm Writing (Phạm vi hiện tại chỉ tập trung vào Objective Testing - Trắc nghiệm Khách quan).
-- Thang điểm General Training (Chỉ support Academic).
-- Tính năng tải file PDF offline.
+---
+
+### User Story 4 - Lịch sử và Tra cứu kết quả (Priority: P2)
+
+Là một học viên, sau khi nộp bài xong, tôi muốn xem lại chi tiết bài làm của mình (câu đúng/sai, lời giải thích) và xem danh sách các bài thi đã làm trong trang Dashboard lịch sử.
+
+**Why this priority**: Quan trọng để học viên tự học và rút kinh nghiệm, nhưng xếp sau luồng làm bài và chấm bài.
+
+**Independent Test**: Test dựa trên data lưu sẵn ở bảng `test_attempts`.
+
+**Acceptance Scenarios**:
+
+1. **Given** học viên đã có 2 lần nộp bài, **When** vào trang Dashboard lịch sử, **Then** thấy danh sách 2 lượt thi với thời gian và điểm số.
+2. **Given** học viên click vào chi tiết 1 bài thi, **When** xem danh sách câu hỏi, **Then** thấy highlight xanh cho câu đúng, đỏ cho câu sai kèm text giải thích.
+
+---
+
+### Edge Cases
+
+- Hệ thống xử lý thế nào khi payload nộp bài bị thiếu field `answers`? -> Trả về `400 Bad Request` yêu cầu chuẩn JSON.
+- Xử lý thế nào nếu Token hết hạn khi nộp bài? -> Block luồng và yêu cầu đăng nhập lại (được handle qua JWT middleware chung của hệ thống).
+- (Lưu ý) Trạng thái hiện tại không có chức năng auto-save khi mất mạng, nếu refresh trang sẽ bị mất dữ liệu nháp đang làm.
+
+## Requirements *(mandatory)*
+
+### Functional Requirements
+
+- **FR-001**: Hệ thống MUST hỗ trợ giao diện làm bài Split View (Reading) và Single Scroll (Listening).
+- **FR-002**: Hệ thống MUST có thanh điều hướng hiển thị trạng thái câu hỏi đã làm/chưa làm.
+- **FR-003**: Hệ thống MUST tự động đếm ngược và gọi API `POST /api/v1/tests/:id/attempts` khi thời gian = 0.
+- **FR-004**: Hệ thống MUST xử lý chấm điểm chuỗi (String Matching) linh hoạt cho dạng điền từ: loại bỏ khoảng trắng thừa, quy về chữ thường, lờ đi các dấu câu đặc biệt ở đầu/cuối (thực hiện ở `attempt.service.js`).
+- **FR-005**: Hệ thống MUST chuyển đổi điểm raw (0-40) thành Band Score chuẩn IELTS (1.0 - 9.0) tùy theo kỹ năng Reading / Listening.
+- **FR-006**: Hệ thống MUST lưu lại chi tiết câu trả lời của từng học viên vào cơ sở dữ liệu (bảng `test_attempts` và các bảng liên quan).
+
+### Key Entities
+
+- **`test_attempts`**: Đại diện cho 1 lượt làm bài của học viên (lưu thời gian bắt đầu, nộp bài, tổng điểm, band score).
+- **`mock_tests`, `questions`**: Lấy read-only để lấy thông tin đề và cấu trúc đề.
+
+## Success Criteria *(mandatory)*
+
+### Measurable Outcomes
+
+- **SC-001**: API chấm điểm (Auto-grading) trả về kết quả trong thời gian dưới 1 giây với payload 40 câu hỏi.
+- **SC-002**: UI không bị giật lag khi chuyển đổi qua lại giữa 40 câu hỏi.
+- **SC-003**: 100% các câu hỏi điền khuyết bị thừa khoảng trắng nhưng đúng từ vựng đều được hệ thống chấp nhận là đúng.
+
+## Assumptions
+
+- Hệ thống Auth đã hoạt động trơn tru (để cấp JWT token khi gọi API submit).
+- Database đã có sẵn đầy đủ dữ liệu cấu trúc đề thi, câu hỏi và đáp án để module này gọi ra (được chuẩn bị từ `feat-content-builder`).
+- Người dùng làm bài IELTS chủ yếu trên màn hình Tablet và Desktop.

@@ -10,7 +10,7 @@ const RegisterForm = () => {
     password: '',
     confirmPassword: ''
   });
-  
+
   const [loading, setLoading] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
@@ -34,6 +34,11 @@ const RegisterForm = () => {
 
     if (formData.password !== formData.confirmPassword) {
       setErrorMsg('Mật khẩu xác nhận không khớp.');
+      return;
+    }
+
+    if (!formData.email.endsWith('@gmail.com')) {
+      setErrorMsg('Chỉ chấp nhận email thuộc tên miền @gmail.com');
       return;
     }
 
@@ -73,7 +78,7 @@ const RegisterForm = () => {
           <div>{successMsg}</div>
         </div>
       )}
-      
+
       {errorMsg && (
         <div className="alert alert-danger d-flex align-items-center mb-4 rounded-3 shadow-sm" role="alert" data-testid="error-alert">
           <i className="bi bi-exclamation-circle-fill me-2"></i>
@@ -163,7 +168,7 @@ const RegisterForm = () => {
       <div className="d-grid gap-2">
         <GoogleLoginButton />
       </div>
-      
+
       <div className="text-center mt-4">
         <span className="text-muted" style={{ fontSize: '14px' }}>Đã có tài khoản? </span>
         <Link to="/login" className="text-decoration-none fw-bold" style={{ color: '#000000', fontSize: '14px' }}>

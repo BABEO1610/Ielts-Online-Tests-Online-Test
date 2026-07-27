@@ -123,8 +123,8 @@ class TestService {
 
       // 1. Insert Test (with audio_url for listening tests)
       const testRes = await client.query(
-        `INSERT INTO mock_tests (title, description, skill, difficulty, duration_minutes, is_published, publish_at, created_by, audio_url)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
+        `INSERT INTO mock_tests (title, description, skill, difficulty, duration_minutes, is_published, publish_at, created_by, audio_url, review_status, submitted_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'pending', NOW()) RETURNING id`,
         [title, description, skill, difficulty, duration, isPublished, publishAt || null, userId, audioUrl || null]
       );
       const testId = testRes.rows[0].id;
@@ -546,7 +546,7 @@ class TestService {
       // 1. Update Test (including audio_url for listening tests)
       await client.query(
         `UPDATE mock_tests 
-         SET title = $1, description = $2, skill = $3, difficulty = $4, duration_minutes = $5, is_published = $6, publish_at = $7, audio_url = $8, updated_at = NOW() 
+         SET title = $1, description = $2, skill = $3, difficulty = $4, duration_minutes = $5, is_published = $6, publish_at = $7, audio_url = $8, updated_at = NOW(), review_status = 'pending', submitted_at = NOW() 
          WHERE id = $9`,
         [title, description, skill, difficulty, duration, isPublished, publishAt || null, audioUrl || null, testId]
       );

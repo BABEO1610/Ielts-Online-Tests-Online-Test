@@ -22,6 +22,7 @@ const getTrackingProcess = async (req, res, next) => {
     const defaultSkills = ['listening', 'reading', 'writing', 'speaking'];
     const formattedSkills = defaultSkills.map(s => {
       const found = skills.find(sk => sk.skill && sk.skill.toLowerCase() === s);
+      const roundedScore = found ? Math.round(Number(found.avg_score) * 2) / 2 : 0;
       return {
         skill: s.charAt(0).toUpperCase() + s.slice(1),
         score: found ? roundToNearestHalf(found.avg_score).toFixed(1) : '0.0',
