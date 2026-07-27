@@ -13,6 +13,7 @@ describe('AI grading migration contracts', () => {
   const canonicalLibrary = read('012_create_library_resources.sql');
   const queue = read('025_harden_ai_grading_schema.sql');
   const artifacts = read('026_create_speaking_analysis_artifacts.sql');
+  const retryArtifacts = read('030_retry_speaking_artifacts_by_job.sql');
   const featureSql = `${queue}\n${artifacts}`;
 
   test('creates only the two approved feature tables', () => {
@@ -53,5 +54,11 @@ describe('AI grading migration contracts', () => {
     expect(artifacts).toMatch(/No synthetic job\/artifact is created/i);
     expect(artifacts).not.toMatch(/INSERT\s+INTO/i);
     expect(artifacts).toMatch(/uq_speaking_artifact_config/i);
+  });
+
+  test('scopes every retry artifact to the job that generated it', () => {
+    expect(retryArtifacts).toMatch(/DROP INDEX IF EXISTS uq_speaking_artifact_config/i);
+    expect(retryArtifacts).toMatch(/uq_speaking_artifact_job_config/i);
+    expect(retryArtifacts).toMatch(/source_job_id/i);
   });
 });

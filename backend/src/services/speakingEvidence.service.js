@@ -157,6 +157,7 @@ class SpeakingEvidenceService {
     const source = await this.loadVerifiedSource({ submission, job, workerId, generation });
     const cacheKey = {
       submissionId: submission.id,
+      sourceJobId: job.id,
       audioSha256: source.audioSha256,
       scoringConfigSha256: job.scoring_config_sha256,
     };

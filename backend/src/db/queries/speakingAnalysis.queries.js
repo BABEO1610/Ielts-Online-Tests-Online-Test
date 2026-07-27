@@ -1,25 +1,25 @@
 const one = async (db, sql, params) => (await db.query(sql, params)).rows[0] || null;
 const json = (value) => value === undefined || value === null ? null : JSON.stringify(value);
 
-const getReusableArtifact = (db, { submissionId, audioSha256, scoringConfigSha256 }) => one(db,
+const getReusableArtifact = (db, { submissionId, sourceJobId, audioSha256, scoringConfigSha256 }) => one(db,
   `SELECT * FROM speaking_analysis_artifacts
-   WHERE speaking_submission_id = $1 AND audio_sha256 = $2 AND scoring_config_sha256 = $3
+   WHERE speaking_submission_id = $1 AND source_job_id = $2 AND audio_sha256 = $3 AND scoring_config_sha256 = $4
      AND status IN ('complete','partial') AND deleted_at IS NULL
    LIMIT 1`,
-  [submissionId, audioSha256, scoringConfigSha256]);
+  [submissionId, sourceJobId, audioSha256, scoringConfigSha256]);
 
-const getArtifactByConfig = (db, { submissionId, audioSha256, scoringConfigSha256 }) => one(db,
+const getArtifactByConfig = (db, { submissionId, sourceJobId, audioSha256, scoringConfigSha256 }) => one(db,
   `SELECT * FROM speaking_analysis_artifacts
-   WHERE speaking_submission_id = $1 AND audio_sha256 = $2 AND scoring_config_sha256 = $3
+   WHERE speaking_submission_id = $1 AND source_job_id = $2 AND audio_sha256 = $3 AND scoring_config_sha256 = $4
      AND deleted_at IS NULL LIMIT 1`,
-  [submissionId, audioSha256, scoringConfigSha256]);
+  [submissionId, sourceJobId, audioSha256, scoringConfigSha256]);
 
 const insertProcessingArtifact = (db, input) => one(db,
   `INSERT INTO speaking_analysis_artifacts (
      speaking_submission_id, source_job_id, audio_sha256, pipeline_version,
      scoring_config_sha256, provider_manifest_json, component_status_json
    ) VALUES ($1,$2,$3,$4,$5,$6::jsonb,$7::jsonb)
-   ON CONFLICT (speaking_submission_id, audio_sha256, scoring_config_sha256) DO NOTHING
+   ON CONFLICT (speaking_submission_id, audio_sha256, scoring_config_sha256, source_job_id) DO NOTHING
    RETURNING *`,
   [input.submissionId, input.sourceJobId, input.audioSha256, input.pipelineVersion,
     input.scoringConfigSha256, json(input.providerManifest || {}), json(input.componentStatus || {})]);
