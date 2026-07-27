@@ -1,17 +1,17 @@
-# API Contract: User Administration and Authorization
+# Hợp đồng API (API Contract): User Administration and Authorization
 
 ## GET `/api/v1/admin/users`
 
-Auth: admin.
+Xác thực (Auth): admin.
 
-Query:
-- `page` integer default `1`.
-- `limit` integer default `10`.
-- `role` optional: `student`, `tutor`, `admin`.
-- `status` optional: `pending`, `active`, `inactive`, `banned`.
-- `search` optional name/email substring.
+Query (Tham số):
+- `page` số nguyên (integer) mặc định `1`.
+- `limit` số nguyên mặc định `10`.
+- `role` tùy chọn (optional): `student`, `tutor`, `admin`.
+- `status` tùy chọn: `pending`, `active`, `inactive`, `banned`.
+- `search` tùy chọn: tìm chuỗi con (substring) theo name/email.
 
-Success data: array of safe users.
+Dữ liệu thành công (Success data): mảng (array) các người dùng đã loại bỏ thông tin nhạy cảm (safe users).
 
 Meta:
 
@@ -21,7 +21,7 @@ Meta:
 
 ## PUT `/api/v1/admin/users/:id/role`
 
-Auth: admin.
+Xác thực (Auth): admin.
 
 Body:
 
@@ -29,20 +29,20 @@ Body:
 { "role": "tutor" }
 ```
 
-Success: updated safe user.
+Thành công: người dùng đã được cập nhật an toàn (updated safe user).
 
-Errors:
-- 403 for self-change.
-- 404 for missing user.
-- 400 for invalid role.
+Lỗi (Errors):
+- 403 khi thao tác lên chính mình (self-change).
+- 404 khi không tìm thấy người dùng (missing user).
+- 400 đối với role không hợp lệ.
 
-Side effects:
-- Revoke target user's active sessions.
-- Insert audit log with old/new role values.
+Hiệu ứng phụ (Side effects):
+- Thu hồi (Revoke) các phiên hoạt động (active sessions) của người dùng bị tác động.
+- Chèn (Insert) log audit bao gồm các giá trị cũ/mới của role.
 
 ## PUT `/api/v1/admin/users/:id/status`
 
-Auth: admin.
+Xác thực (Auth): admin.
 
 Body:
 
@@ -50,22 +50,22 @@ Body:
 { "status": "inactive" }
 ```
 
-Success: updated safe user.
+Thành công: người dùng đã được cập nhật an toàn.
 
-Errors:
-- 403 for self-change.
-- 404 for missing user.
-- 400 for invalid status.
+Lỗi (Errors):
+- 403 khi thao tác lên chính mình.
+- 404 khi không tìm thấy người dùng.
+- 400 đối với status không hợp lệ.
 
-Side effects:
-- Revoke active sessions when target becomes `inactive` or `banned`.
-- Insert audit log with old/new status values.
+Hiệu ứng phụ (Side effects):
+- Thu hồi (Revoke) các phiên hoạt động khi mục tiêu bị chuyển thành `inactive` hoặc `banned`.
+- Chèn (Insert) log audit bao gồm các giá trị cũ/mới của status.
 
 ## GET `/api/v1/admin/sessions`
 
-Auth: admin.
+Xác thực (Auth): admin.
 
-Success data:
+Dữ liệu thành công (Success data):
 
 ```json
 [
@@ -86,12 +86,12 @@ Success data:
 
 ## DELETE `/api/v1/admin/sessions/:id`
 
-Auth: admin.
+Xác thực (Auth): admin.
 
-Success: session `revoked_at` set.
+Thành công: trường `revoked_at` của session được thiết lập thời gian hiện tại.
 
-Errors:
-- 404 or clear error for missing/already revoked session.
+Lỗi (Errors):
+- 404 hoặc trả về lỗi rõ ràng khi không tìm thấy/đã bị thu hồi từ trước.
 
-Side effects:
-- Insert audit log for session revocation.
+Hiệu ứng phụ (Side effects):
+- Chèn log audit về thao tác thu hồi session.

@@ -101,6 +101,7 @@ Với tư cách là khách, tôi muốn đăng nhập bằng Google để có th
 - **FR-014**: Hệ thống PHẢI cho phép người dùng đã đăng nhập (có mật khẩu cục bộ) đổi mật khẩu sau khi xác nhận mật khẩu hiện tại.
 - **FR-015**: Hệ thống PHẢI hỗ trợ đăng nhập bằng Google để tạo hoặc truy cập tài khoản, bao gồm xử lý lỗi rõ ràng khi xác thực phía nhà cung cấp thất bại.
 - **FR-016**: Hệ thống KHÔNG BAO GIỜ được lộ mật khẩu, mã khôi phục, hay mã bí mật phiên (session secrets) trong bất kỳ phản hồi nào tới người dùng.
+- **FR-017**: Hệ thống PHẢI cung cấp tính năng bật/tắt hiển thị mật khẩu (show/hide password toggle) tại tất cả các ô nhập mật khẩu trên giao diện để cải thiện trải nghiệm người dùng.
 
 ### Các thực thể chính (Key Entities)
 

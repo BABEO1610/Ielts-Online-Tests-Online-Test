@@ -1,44 +1,44 @@
-# Implementation Plan: User Administration and Authorization
+# Kế hoạch Triển khai (Implementation Plan): User Administration and Authorization
 
-**Branch**: `feat-auth-and-users` | **Date**: 2026-07-24 | **Spec**: `feat-user/spec.md`
+**Nhánh (Branch)**: `feat-auth-and-users` | **Ngày**: 2026-07-24 | **Đặc tả (Spec)**: `feat-user/spec.md`
 
-**Input**: Feature specification from `.sdd/specs/feat-auth-and-users/feat-user/spec.md`
+**Đầu vào (Input)**: Đặc tả tính năng từ `.sdd/specs/feat-auth-and-users/feat-user/spec.md`
 
-## Summary
+## Tóm tắt (Summary)
 
-Backfill design for role guards, admin user listing/search/filter/pagination, role/status changes with self-protection, session listing/revocation, and audit trail recording using existing admin routes, authorize middleware, users/sessions services, PostgreSQL queries, and React admin pages.
+Thiết kế backfill cho các chức năng bảo vệ theo vai trò (role guards), xem danh sách/tìm kiếm/lọc/phân trang người dùng cho admin, thay đổi role/status đi kèm tính năng tự bảo vệ không đổi của chính mình (self-protection), xem danh sách/thu hồi session, và ghi nhận nhật ký kiểm toán (audit trail). Việc triển khai tận dụng các admin routes hiện có, middleware authorize, các services users/sessions, các truy vấn PostgreSQL, và trang React dành cho admin.
 
-## Technical Context
+## Bối cảnh Kỹ thuật (Technical Context)
 
-**Language/Version**: Node.js 20+, Express 5.2; React + Vite currently installed as React 19.2.6.
+**Ngôn ngữ/Phiên bản (Language/Version)**: Node.js 20+, Express 5.2; React + Vite hiện đang cài đặt React 19.2.6.
 
-**Primary Dependencies**: `pg`, JWT/cookie auth, Express middleware, Axios, React Router, Bootstrap/react-bootstrap.
+**Các thư viện chính (Primary Dependencies)**: `pg`, xác thực qua JWT/cookie, Express middleware, Axios, React Router, Bootstrap/react-bootstrap.
 
-**Storage**: PostgreSQL `users`, `user_sessions`, `v_active_sessions`, `audit_logs`.
+**Lưu trữ (Storage)**: Các bảng PostgreSQL `users`, `user_sessions`, view `v_active_sessions`, bảng `audit_logs`.
 
-**Testing**: Jest for users/sessions/admin controller; Vitest for ProtectedRoute/AdminUsersPage/SessionsPage.
+**Kiểm thử (Testing)**: Jest cho users/sessions/admin controller; Vitest cho ProtectedRoute/AdminUsersPage/SessionsPage.
 
-**Target Platform**: Admin browser UI backed by REST API.
+**Nền tảng đích (Target Platform)**: Giao diện Admin (Admin browser UI) được hỗ trợ bởi REST API.
 
-**Project Type**: Full-stack web application.
+**Loại Dự án (Project Type)**: Full-stack web application.
 
-**Performance Goals**: 95% user searches/filters update under 3 seconds; admin can revoke a session within 10 seconds.
+**Mục tiêu Hiệu suất (Performance Goals)**: 95% thao tác tìm kiếm/lọc người dùng phản hồi dưới 3 giây; admin có thể thu hồi (revoke) một session trong vòng 10 giây.
 
-**Constraints**: Admin-only routes; actor id/role from auth middleware; admin cannot change own role/status; status/role changes revoke target sessions; actions recorded to audit trail.
+**Ràng buộc (Constraints)**: Các route chỉ dành cho admin; id/role của người thao tác (actor) lấy từ auth middleware; admin không thể thay đổi role/status của chính mình; thay đổi status/role sẽ thu hồi các phiên đăng nhập (sessions) của mục tiêu; hành động được ghi lại vào nhật ký kiểm toán (audit trail).
 
-**Scale/Scope**: Student/tutor/admin roles and pending/active/inactive/banned account statuses.
+**Quy mô/Phạm vi (Scale/Scope)**: Các roles gồm student/tutor/admin và các status tài khoản gồm pending/active/inactive/banned.
 
-## Constitution Check
+## Kiểm tra Hiến pháp (Constitution Check)
 
-- Tech stack: PASS for backend/Postgres/raw `pg`; WATCH for React version drift.
-- API protocol: PASS. Admin controller returns standard envelopes.
-- Security: PASS. Admin routes use `authenticate` and `authorize('admin')`; mutating endpoints never take actor from body/query.
-- Database: PASS. User/session queries are parameterized; session revocation updates `revoked_at` instead of deleting.
-- Testing: PASS WITH RISK. Existing user/session tests are present; role guard and self-protection paths should remain covered.
+- Tech stack: ĐẠT (PASS) cho backend/Postgres/raw `pg`; CHÚ Ý (WATCH) đối với việc lệch phiên bản React (React version drift).
+- API protocol: ĐẠT. Các Admin controller luôn trả về standard envelopes.
+- Security: ĐẠT. Các Admin routes sử dụng `authenticate` và `authorize('admin')`; các endpoints cập nhật dữ liệu (mutating) không bao giờ nhận định danh người thực hiện (actor) từ body/query.
+- Database: ĐẠT. Các queries user/session được tham số hóa (parameterized); thao tác thu hồi session cập nhật `revoked_at` thay vì xóa dữ liệu (deleting).
+- Testing: ĐẠT CÓ RỦI RO (PASS WITH RISK). Các bài test hiện tại cho user/session đã có; cần đảm bảo vẫn có đủ độ bao phủ (covered) đối với role guard và tính năng tự bảo vệ (self-protection paths).
 
-Post-design re-check: PASS WITH NOTED RISK. No new unguarded admin mutation or hard delete is introduced.
+Kiểm tra lại sau thiết kế (Post-design re-check): ĐẠT NHƯNG ĐÃ GHI NHẬN RỦI RO. Không giới thiệu thêm endpoint admin thay đổi dữ liệu nào mà không được bảo vệ (unguarded), và không sử dụng thao tác xóa cứng (hard delete).
 
-## Project Structure
+## Cấu trúc Dự án (Project Structure)
 
 ```text
 backend/
@@ -61,10 +61,10 @@ frontend/
 └── src/App.jsx
 ```
 
-**Structure Decision**: Keep authorization enforcement on both layers: frontend route guard for UX, backend middleware as the source of truth. Admin list/mutation behavior stays in admin routes and users/session services.
+**Quyết định Cấu trúc (Structure Decision)**: Duy trì việc thi hành (enforcement) cấp quyền ở cả hai tầng: sử dụng route guard ở frontend nhằm tối ưu UX, dùng middleware backend làm nguồn chân lý (source of truth). Logic danh sách người dùng và thay đổi (mutation) của admin tiếp tục được đặt trong admin routes và các services users/session.
 
-## Complexity Tracking
+## Theo dõi Độ phức tạp (Complexity Tracking)
 
-| Violation | Why Needed | Simpler Alternative Rejected Because |
+| Vi phạm (Violation) | Lý do Cần thiết (Why Needed) | Giải pháp Đơn giản hơn Bị từ chối Vì (Simpler Alternative Rejected Because) |
 |-----------|------------|-------------------------------------|
-| Existing React 19 package drift from constitution React 18 | Repo already contains React 19.2.6 | Must be explicitly remediated or approved before implementation completion. |
+| Sự lệch phiên bản package React 19 hiện tại so với React 18 trong hiến pháp | Repo đã chứa sẵn React 19.2.6 | Phải được khắc phục rõ ràng hoặc phê duyệt trước khi hoàn tất triển khai (implementation completion). |
