@@ -12,6 +12,7 @@ const DEFAULT_ERROR = {
   message: 'Trợ lý IELTS đang gặp lỗi. Vui lòng thử lại sau.',
 };
 
+// Hàm chuẩn hóa lỗi: Đưa mọi lỗi từ Backend về một định dạng chung (DEFAULT_ERROR) để Frontend dễ xử lý
 const normalizeAssistantError = (error) => {
   const data = error.response?.data;
 
@@ -43,8 +44,10 @@ const normalizeAssistantError = (error) => {
   };
 };
 
+// Nối đường dẫn API cơ bản với đường dẫn cụ thể của tính năng Assistant
 const getApiUrl = (path) => `${api.defaults.baseURL}${path}`;
 
+// Hàm giải mã dữ liệu luồng (Server-Sent Events - SSE): Cắt lấy sự kiện (event) và dữ liệu (data) từ chuỗi văn bản server trả về
 const parseSsePayload = (chunk) => {
   const eventMatch = chunk.match(/^event:\s*(.+)$/m);
   const dataMatch = chunk.match(/^data:\s*(.+)$/m);
@@ -62,15 +65,14 @@ const parseSsePayload = (chunk) => {
 };
 
 export const assistantApi = {
+  // Gửi tin nhắn dạng thông thường (nhận cục dữ liệu một lần - ít dùng)
   sendChat: async ({ message, context, conversationId = null }) => {
     try {
       const response = await api.post('/assistant/chat', { message, context, conversationId });
-      return response.data;
-    } catch (error) {
-      return normalizeAssistantError(error);
     }
   },
 
+  // Gửi tin nhắn dạng luồng (Stream - giống ChatGPT): Nhận từng mảnh chữ trả về liên tục qua SSE
   streamChat: async ({ message, context, conversationId = null, onStart, onDelta, onDone, onError }) => {
     try {
       const response = await fetch(getApiUrl('/assistant/chat/stream'), {
@@ -137,6 +139,7 @@ export const assistantApi = {
     }
   },
 
+  // Gửi đánh giá Like/Dislike của người dùng cho một tin nhắn cụ thể
   rateMessage: async ({ messageId, rating, reason = null }) => {
     try {
       const response = await api.post(`/assistant/messages/${messageId}/rating`, { rating, reason });
@@ -146,6 +149,7 @@ export const assistantApi = {
     }
   },
 
+  // Tải lại lịch sử toàn bộ các tin nhắn cũ trong đoạn chat
   getHistory: async ({ conversationId = null } = {}) => {
     try {
       const response = await api.get('/assistant/history', {

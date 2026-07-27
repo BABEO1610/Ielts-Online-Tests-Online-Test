@@ -1,3 +1,11 @@
+/**
+ * ==========================================
+ * TẦNG 4: GIAO TIẾP AI & KIỂM DUYỆT (Prompts & Selfcheck)
+ * ==========================================
+ * Nhiệm vụ: Lưu trữ các kịch bản (Prompt) chuẩn để nói chuyện với LLM (Gemini/OpenAI), 
+ * đảm bảo AI luôn trả lời đúng format JSON và đúng Persona của giáo viên IELTS.
+ */
+
 const { ASSISTANT_INTENTS } = require('./assistant.intent');
 
 const JSON_CONTRACT =

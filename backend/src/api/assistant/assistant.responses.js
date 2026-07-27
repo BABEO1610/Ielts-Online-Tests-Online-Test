@@ -1,5 +1,13 @@
+/**
+ * ==========================================
+ * UTILS: PHẢN HỒI CỨNG (Hardcoded Responses)
+ * ==========================================
+ * Nhiệm vụ: Chứa các câu trả lời tĩnh (không cần dùng AI) để tiết kiệm chi phí API.
+ * Ví dụ: Chào hỏi, từ chối trả lời, hướng dẫn điều hướng trang web.
+ */
 const { ERROR_CODES, ERROR_MESSAGES } = require('./assistant.constants');
 
+// Xóa dấu tiếng Việt và chuẩn hóa các từ lóng (tks -> thanks) để dễ nhận diện
 const normalizeImmediateText = (value) => {
   const text = String(value || '')
     .toLowerCase()
@@ -20,6 +28,7 @@ const normalizeImmediateText = (value) => {
   return text === 'cam on b' ? 'cam on ban' : text;
 };
 
+// Nhận diện sắc thái lời chào (là câu cảm ơn, câu chào, hay tạm biệt)
 const detectImmediateTone = (message) => {
   const text = normalizeImmediateText(message);
   if (/\b(cam on|thanks|thank you|thank|tks|thx)\b/.test(text)) return 'thanks';
@@ -27,6 +36,7 @@ const detectImmediateTone = (message) => {
   return 'hello';
 };
 
+// Trả về câu chào phù hợp dựa theo tên người dùng và sắc thái
 const buildGreetingResponse = ({ displayName = 'bạn', isGuest = false, message = '' } = {}) => {
   if (isGuest) {
     return 'Chào bạn! Bạn cần đăng nhập để sử dụng IELTS Assistant.';
@@ -41,6 +51,7 @@ const buildGreetingResponse = ({ displayName = 'bạn', isGuest = false, message
   return `Chào ${displayName}! Mình là IELTS Assistant. Bạn muốn tìm đề thi, tài liệu, mẹo học IELTS, học tiếng Anh hay xem lại kết quả bài làm?`;
 };
 
+// Trả về câu hỏi làm rõ (khi người dùng hỏi quá mơ hồ, ví dụ: "cho mình bài luyện")
 const buildClarificationResponse = (message = '') => {
   const text = normalizeImmediateText(message);
   if (/\b(reading|listening|writing|speaking)\b/.test(text)) {
@@ -56,14 +67,17 @@ const buildClarificationResponse = (message = '') => {
   return 'Được, bạn gửi câu hoặc nội dung cần làm rõ nhé.';
 };
 
+// Phản hồi từ chối khéo việc chấm bài Speaking/Writing trực tiếp
 const buildSafeGradingResponse = () => {
   return 'Mình không chấm band Writing/Speaking trực tiếp trong khung chat này. Bạn hãy dùng flow nộp/chấm bài chính thức của hệ thống; ở đây mình chỉ có thể giải thích tiêu chí chung hoặc gợi ý cách luyện.';
 };
 
+// Phản hồi từ chối khéo các câu hỏi nằm ngoài phạm vi (như chính trị, thời tiết...)
 const buildOutOfScopeResponse = () => {
   return ERROR_MESSAGES[ERROR_CODES.OUT_OF_SCOPE] || 'Xin lỗi, mình chỉ có thể trả lời các vấn đề liên quan đến IELTS hoặc cách sử dụng website này. Mình không thể hỗ trợ bạn các vấn đề khác.';
 };
 
+// Phản hồi hướng dẫn người dùng tìm kiếm đường link chức năng (Navigation)
 const buildNavigationResponse = (message = '') => {
   const text = normalizeImmediateText(message);
 

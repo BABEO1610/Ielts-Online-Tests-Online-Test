@@ -1,3 +1,11 @@
+/**
+ * ==========================================
+ * TẦNG 5: LƯU TRỮ & PHẢN HỒI (Repository & SSE)
+ * ==========================================
+ * Nhiệm vụ: Truy xuất cơ sở dữ liệu PostgreSQL (lấy lịch sử chat, lưu đánh giá), 
+ * tách biệt hoàn toàn việc chọc vào DB khỏi logic nghiệp vụ.
+ */
+
 const { pool } = require('../../db/pool');
 const {
   ERROR_CODES,
