@@ -51,7 +51,7 @@ describe('Speaking async learner feedback', () => {
     expect(screen.getAllByText('6.5').length).toBeGreaterThanOrEqual(5);
   });
 
-  it('offers the one manual retry on failed retryable jobs', () => {
+  it('offers the one manual retry for every failed job', () => {
     const onRetry = vi.fn();
     render(<SpeakingFeedbackDetail data={{
       ...base,
@@ -64,6 +64,23 @@ describe('Speaking async learner feedback', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Chấm lại bằng AI' }));
     expect(onRetry).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not show a Speaking retry action after a successful first attempt', () => {
+    render(<SpeakingFeedbackDetail data={{
+      ...base,
+      gradingStatus: 'completed',
+      aiStatus: 'completed',
+      canRetry: false,
+      overallSpeakingBand: 6.5,
+      aiFeedback: {
+        evidenceMode: 'full_audio',
+        overallBand: 6.5,
+        criterionScores: {},
+      },
+    }} onRetry={vi.fn()} />);
+
+    expect(screen.queryByRole('button', { name: 'Chấm lại bằng AI' })).not.toBeInTheDocument();
   });
 });
 

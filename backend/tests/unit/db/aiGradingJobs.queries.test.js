@@ -41,4 +41,16 @@ describe('aiGradingJobs queries', () => {
     expect(sql.match(/AT TIME ZONE 'UTC'/gi)).toHaveLength(2);
     expect(sql).toMatch(/\$2::date \+ 1/i);
   });
+
+  test('allows exactly one manual child for every failed Speaking job', async () => {
+    const db = dbWith([{ id: 'retry-1' }]);
+    await queries.insertRetryChild(db, {
+      rootJobId: 'root-1', idempotencyKey: 'manual-retry-key-0001', expiresAt: '2026-07-23T00:00:00Z',
+    });
+    const [sql] = db.query.mock.calls[0];
+    expect(sql).toMatch(/status = 'failed'/i);
+    expect(sql).not.toMatch(/attempt_count = max_attempts/i);
+    expect(sql).not.toMatch(/last_error_retryable IS TRUE/i);
+    expect(sql).toMatch(/ON CONFLICT \(retry_of_job_id\)/i);
+  });
 });

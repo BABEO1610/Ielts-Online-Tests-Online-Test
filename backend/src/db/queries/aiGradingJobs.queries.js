@@ -127,8 +127,8 @@ const insertRetryChild = (db, { rootJobId, idempotencyKey, expiresAt }) => one(d
    SELECT submission_type, group_id, user_id, $2, $3, input_fingerprint,
           pipeline_version, scoring_config_sha256, calibration_bundle_sha256, id, 1
    FROM ai_grading_jobs
-   WHERE id = $1 AND retry_of_job_id IS NULL AND status = 'failed'
-     AND attempt_count = max_attempts AND last_error_retryable IS TRUE AND deleted_at IS NULL
+    WHERE id = $1 AND retry_of_job_id IS NULL AND status = 'failed'
+      AND deleted_at IS NULL
    ON CONFLICT (retry_of_job_id) WHERE retry_of_job_id IS NOT NULL DO NOTHING
    RETURNING *`,
   [rootJobId, idempotencyKey, expiresAt]);

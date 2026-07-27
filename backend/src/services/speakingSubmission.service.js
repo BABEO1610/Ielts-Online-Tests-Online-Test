@@ -240,8 +240,10 @@ class SpeakingSubmissionService {
     });
     if (!job) throw new AppError('Không tìm thấy grading job.', 404, 'GRADING_JOB_NOT_FOUND');
     const terminal = ['completed', 'needs_review', 'failed'].includes(job.canonical_status);
-    const canRetry = !job.retry_job_id && job.canonical_status === 'failed'
-      && job.attempt_count === job.max_attempts && job.canonical_error_retryable === true;
+    // A learner gets one manual recovery attempt after every terminal failure,
+    // including a non-retryable infrastructure/configuration failure. The
+    // child-job uniqueness constraint still prevents repeated retries.
+    const canRetry = !job.retry_job_id && job.canonical_status === 'failed';
     let result = null;
     if (job.canonical_status === 'completed' || (job.canonical_status === 'needs_review' && user.role !== 'student')) {
       const report = await this.pool.query(

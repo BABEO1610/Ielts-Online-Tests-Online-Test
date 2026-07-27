@@ -1327,9 +1327,7 @@ class SubmissionService {
               COALESCE(child.stage, root.stage) AS stage,
               COALESCE(child.attempt_count, root.attempt_count) AS attempt_count,
               COALESCE(child.max_attempts, root.max_attempts) AS max_attempts,
-              (child.id IS NULL AND root.status = 'failed'
-                AND root.attempt_count = root.max_attempts
-                AND root.last_error_retryable IS TRUE) AS can_retry
+               (child.id IS NULL AND root.status = 'failed') AS can_retry
        FROM ai_grading_jobs root
        LEFT JOIN ai_grading_jobs child
          ON child.retry_of_job_id = root.id AND child.deleted_at IS NULL
