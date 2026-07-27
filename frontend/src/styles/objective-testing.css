@@ -226,7 +226,7 @@
 /* ─── Band Score Display ─── */
 .band-score-display {
   font-family: var(--font-display);
-  font-size: 96px;
+  font-size: clamp(48px, 12vw, 96px);
   font-weight: 700;
   line-height: 1;
   color: var(--ink);
@@ -628,34 +628,49 @@
   white-space: normal;
 }
 
+/* Padding container when bottom-nav-bar is present */
+.test-page-container.has-bottom-nav {
+  padding-bottom: 84px !important;
+}
+
 /* ─── Responsive ─── */
 @media (max-width: 767px) {
   .split-view {
     flex-direction: column;
     height: auto;
+    min-height: calc(100vh - 120px);
   }
   .split-view .split-left,
   .split-view .split-right {
     border-right: none;
+    padding: var(--spacing-md);
   }
   .split-view .split-left {
     border-bottom: 1px solid var(--surface-pressed);
-    max-height: 50vh;
+    max-height: 45vh;
   }
   .question-nav-grid {
-    grid-template-columns: repeat(8, 1fr);
-  }
-  .band-score-display {
-    font-size: 64px;
+    grid-template-columns: repeat(auto-fill, minmax(36px, 1fr));
   }
   .exam-detail-hero {
-    padding: var(--spacing-3xl) var(--spacing-lg);
+    padding: var(--spacing-2xl) var(--spacing-md);
   }
   .exam-detail-hero .hero-title {
-    font-size: 28px;
-    line-height: 36px;
+    font-size: 24px;
+    line-height: 32px;
   }
   .bottom-nav-tabs {
+    padding: var(--spacing-xs) var(--spacing-sm);
+  }
+  .filter-bar {
+    flex-direction: column;
+  }
+  .filter-bar select,
+  .filter-bar input {
+    width: 100%;
+  }
+  .audio-player-sticky {
     padding: var(--spacing-sm) var(--spacing-md);
   }
 }
+

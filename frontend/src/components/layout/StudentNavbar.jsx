@@ -113,7 +113,9 @@ const StudentNavbar = () => {
                       {user?.full_name?.charAt(0)?.toUpperCase() || 'U'}
                     </div>
                   )}
-                  <span className="d-none d-sm-inline">{user?.full_name || 'Học viên'}</span>
+                  <span className="d-none d-sm-inline text-truncate" style={{ maxWidth: '140px' }}>
+                    {user?.full_name || 'Học viên'}
+                  </span>
                 </button>
                 <ul className="dropdown-menu dropdown-menu-end rounded-4 shadow border-0 mt-2 p-2" style={{ backgroundColor: 'var(--canvas)' }}>
                   <li><Link className="dropdown-item rounded-3 py-2" to="/profile" style={{ color: 'var(--ink)' }}>Hồ sơ cá nhân</Link></li>

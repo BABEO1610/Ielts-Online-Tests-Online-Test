@@ -657,8 +657,54 @@
   color: #123e78;
 }
 
+.admin-sidebar-overlay {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  z-index: 998;
+}
+
+.admin-mobile-toggle {
+  display: none;
+  background: transparent;
+  border: 1px solid var(--surface-pressed);
+  border-radius: var(--rounded-md);
+  padding: 6px 10px;
+  color: var(--ink);
+  cursor: pointer;
+  align-items: center;
+  justify-content: center;
+}
+
+.admin-mobile-toggle:hover {
+  background-color: var(--canvas-soft);
+}
+
 @media (max-width: 992px) {
-  .admin-sidebar { display: none; }
+  .admin-sidebar {
+    display: flex;
+    position: fixed;
+    top: 0;
+    left: -280px;
+    width: 260px;
+    height: 100vh;
+    z-index: 999;
+    transition: left 0.25s ease-in-out;
+    box-shadow: var(--shadow-card);
+  }
+  .admin-sidebar.mobile-open {
+    left: 0;
+  }
+  .admin-sidebar-overlay.mobile-open {
+    display: block;
+  }
+  .admin-mobile-toggle {
+    display: inline-flex;
+  }
   .admin-content { padding: var(--spacing-lg); }
   .admin-topbar { padding: var(--spacing-md) var(--spacing-lg); }
   .student-topbar {
@@ -674,3 +720,4 @@
     flex-direction: column;
   }
 }
+

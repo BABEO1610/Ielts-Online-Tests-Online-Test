@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Outlet, NavLink, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { Menu, X } from 'lucide-react';
 import CreateTutorModal from '../components/admin/CreateTutorModal';
 import ChangePwdModal from '../components/profile/ChangePwdModal';
 import '../styles/admin.css';
@@ -44,6 +45,7 @@ const AdminLayout = () => {
   const navigate = useNavigate();
   const [showTutorModal, setShowTutorModal] = useState(false);
   const [showPwdModal, setShowPwdModal] = useState(false);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   const handleLogout = async () => {
     try {
@@ -54,11 +56,30 @@ const AdminLayout = () => {
     }
   };
 
+  const closeMobileNav = () => setMobileNavOpen(false);
+
   return (
     <div className="admin-shell">
+      {/* Mobile Backdrop Overlay */}
+      <div
+        className={`admin-sidebar-overlay${mobileNavOpen ? ' mobile-open' : ''}`}
+        onClick={closeMobileNav}
+      />
+
       {/* ── Sidebar ───────────────────────────────────────────── */}
-      <aside className="admin-sidebar">
-        <Link to="/admin" className="admin-sidebar__brand">IELTSZone Admin</Link>
+      <aside className={`admin-sidebar${mobileNavOpen ? ' mobile-open' : ''}`}>
+        <div className="d-flex align-items-center justify-content-between pe-3">
+          <Link to="/admin" className="admin-sidebar__brand" onClick={closeMobileNav}>
+            IELTSZone Admin
+          </Link>
+          <button
+            className="btn btn-sm text-secondary d-lg-none"
+            onClick={closeMobileNav}
+            aria-label="Close Sidebar"
+          >
+            <X size={20} />
+          </button>
+        </div>
         <nav className="admin-sidebar__nav">
           {NAV_SECTIONS.map((section) => (
             <React.Fragment key={section.eyebrow}>
@@ -68,6 +89,7 @@ const AdminLayout = () => {
                   key={item.to}
                   to={item.to}
                   end={item.end}
+                  onClick={closeMobileNav}
                   className={({ isActive }) => `admin-nav-row${isActive ? ' active' : ''}`}
                 >
                   {item.label}
@@ -85,8 +107,15 @@ const AdminLayout = () => {
       <div className="admin-main">
         <header className="admin-topbar">
           <div className="d-flex align-items-center gap-2">
+            <button
+              className="admin-mobile-toggle"
+              onClick={() => setMobileNavOpen((prev) => !prev)}
+              aria-label="Toggle Navigation"
+            >
+              <Menu size={20} />
+            </button>
             <a
-              className="btn-pill btn-pill--ghost"
+              className="btn-pill btn-pill--ghost d-none d-sm-inline-flex"
               href="/"
               target="_blank"
               rel="noopener noreferrer"

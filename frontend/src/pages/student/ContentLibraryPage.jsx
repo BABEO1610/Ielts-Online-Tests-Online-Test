@@ -523,11 +523,11 @@ const ContentLibraryPage = () => {
             )}
           </div>
 
-          <div className="d-flex gap-2 flex-wrap">
+          <div className="d-flex gap-2" style={{ overflowX: 'auto', flexWrap: 'nowrap', maxWidth: '100%', paddingBottom: '4px', scrollbarWidth: 'none' }}>
             {SKILL_FILTERS.map((f) => (
               <button
                 key={f.value}
-                className={`btn btn-sm rounded-pill px-3 fw-medium ${activeSkill === f.value ? 'btn-dark' : 'btn-outline-secondary'}`}
+                className={`btn btn-sm rounded-pill px-3 fw-medium text-nowrap ${activeSkill === f.value ? 'btn-dark' : 'btn-outline-secondary'}`}
                 onClick={() => setActiveSkill(f.value)}
                 data-testid={`filter-${f.value || 'all'}`}
               >

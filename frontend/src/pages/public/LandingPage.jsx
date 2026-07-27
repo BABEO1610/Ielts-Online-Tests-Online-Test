@@ -1,6 +1,6 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Sun, Moon } from 'lucide-react';
+import { Sun, Moon, Menu, X } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import {
     motion,
@@ -98,6 +98,7 @@ const LandingNavbar = () => {
     const { user, logout } = useAuth();
     const navigate = useNavigate();
     const [scrolled, setScrolled] = useState(false);
+    const [mobileOpen, setMobileOpen] = useState(false);
     const location = useLocation();
 
     const handleLogout = async () => {
@@ -123,171 +124,272 @@ const LandingNavbar = () => {
         { to: '/library', label: 'Library' },
     ];
 
-    return (
-        <nav style={{
-            position: 'fixed', top: 0, left: 0, right: 0, zIndex: 100,
-            height: '68px',
-            padding: '0 32px',
-            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-            // nav-bar: canvas bg, border-bottom on scroll
-            backgroundColor: scrolled ? 'rgba(255,255,255,0.96)' : 'var(--canvas)',
-            backdropFilter: scrolled ? 'blur(16px)' : 'none',
-            borderBottom: scrolled ? '1px solid #e2e2e2' : '1px solid transparent',
-            transition: 'border-color 0.3s ease, backdrop-filter 0.3s ease',
-            fontFamily: 'Inter, system-ui, sans-serif',
-        }}>
-            {/* Logo */}
-            <Link to="/" style={{ textDecoration: 'none' }}>
-                <span style={{
-                    fontWeight: 700, fontSize: '22px', color: 'var(--ink)',
-                    letterSpacing: '-0.02em',
-                    fontFamily: 'Inter, system-ui, sans-serif',
-                }}>
-                    IELTSZone
-                </span>
-            </Link>
+    const closeMobile = () => setMobileOpen(false);
 
-            {/* Center nav links — guests can visit all skill pages */}
-            <ul style={{
-                display: 'flex', alignItems: 'center', gap: '0',
-                listStyle: 'none', margin: 0, padding: 0,
+    return (
+        <>
+            <nav style={{
+                position: 'fixed', top: 0, left: 0, right: 0, zIndex: 100,
+                height: '68px',
+                padding: '0 20px',
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                backgroundColor: scrolled ? 'rgba(255,255,255,0.96)' : 'var(--canvas)',
+                backdropFilter: scrolled ? 'blur(16px)' : 'none',
+                borderBottom: scrolled ? '1px solid #e2e2e2' : '1px solid transparent',
+                transition: 'border-color 0.3s ease, backdrop-filter 0.3s ease',
+                fontFamily: 'Inter, system-ui, sans-serif',
             }}>
-                {navLinks.map(({ to, label }) => {
-                    const isActive = location.pathname === to || location.pathname.startsWith(to + '/');
-                    return (
-                        <li key={to} style={{ position: 'relative' }}>
-                            <Link
-                                to={to}
+                {/* Logo */}
+                <Link to="/" style={{ textDecoration: 'none' }}>
+                    <span style={{
+                        fontWeight: 700, fontSize: '22px', color: 'var(--ink)',
+                        letterSpacing: '-0.02em',
+                        fontFamily: 'Inter, system-ui, sans-serif',
+                    }}>
+                        IELTSZone
+                    </span>
+                </Link>
+
+                {/* Center nav links — Desktop only */}
+                <ul className="d-none d-lg-flex" style={{
+                    alignItems: 'center', gap: '0',
+                    listStyle: 'none', margin: 0, padding: 0,
+                }}>
+                    {navLinks.map(({ to, label }) => {
+                        const isActive = location.pathname === to || location.pathname.startsWith(to + '/');
+                        return (
+                            <li key={to} style={{ position: 'relative' }}>
+                                <Link
+                                    to={to}
+                                    style={{
+                                        display: 'block',
+                                        padding: '6px 16px',
+                                        fontSize: '16px',
+                                        fontWeight: 500,
+                                        color: isActive ? 'var(--ink)' : 'var(--body)',
+                                        textDecoration: 'none',
+                                        fontFamily: 'Inter, system-ui, sans-serif',
+                                        transition: 'color 0.2s ease',
+                                        borderRadius: '999px',
+                                    }}
+                                    onMouseEnter={(e) => { if (!isActive) e.target.style.color = 'var(--ink)'; }}
+                                    onMouseLeave={(e) => { if (!isActive) e.target.style.color = 'var(--body)'; }}
+                                >
+                                    {label}
+                                </Link>
+                                {isActive && (
+                                    <motion.div
+                                        layoutId="nav-indicator-landing"
+                                        style={{
+                                            position: 'absolute', bottom: '-2px', left: '16px',
+                                            right: '16px', height: '2px',
+                                            backgroundColor: 'var(--ink)', borderRadius: '2px',
+                                        }}
+                                        transition={{ type: 'spring', bounce: 0.2, duration: 0.5 }}
+                                    />
+                                )}
+                            </li>
+                        );
+                    })}
+                </ul>
+
+                {/* Right: auth CTAs & mobile toggler */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <button
+                        onClick={toggleTheme}
+                        style={{
+                            backgroundColor: 'var(--canvas-soft)', color: 'var(--ink)',
+                            border: 'none', width: '40px', height: '40px',
+                            borderRadius: '999px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            cursor: 'pointer', fontSize: '18px'
+                        }}
+                        title="Toggle Theme"
+                    >
+                        {theme === 'dark' ? <Sun size={18} strokeWidth={2.5} /> : <Moon size={18} strokeWidth={2.5} />}
+                    </button>
+
+                    {user ? (
+                        <div className="d-none d-sm-flex" style={{ alignItems: 'center', gap: '12px' }}>
+                            {(user.role === 'admin' || user.role === 'tutor') && (
+                                <Link
+                                    to={user.role === 'admin' ? '/admin' : '/tutor/dashboard'}
+                                    style={{
+                                        textDecoration: 'none', padding: '10px 20px', borderRadius: '999px',
+                                        fontSize: '15px', fontWeight: 500, color: 'var(--on-primary)',
+                                        backgroundColor: 'var(--primary)', fontFamily: 'Inter, system-ui, sans-serif'
+                                    }}
+                                >
+                                    Về bảng điều khiển
+                                </Link>
+                            )}
+                            <Link to="/profile" style={{
+                                display: 'flex', alignItems: 'center', gap: '8px',
+                                textDecoration: 'none', padding: '6px 16px', borderRadius: '999px',
+                                backgroundColor: 'var(--canvas-soft)', color: 'var(--ink)',
+                                fontFamily: 'Inter, system-ui, sans-serif', fontWeight: 500, fontSize: '15px'
+                            }}>
+                                {user.avatar_url ? (
+                                    <img src={user.avatar_url} alt="Avatar" style={{ width: '24px', height: '24px', borderRadius: '50%', objectFit: 'cover' }} />
+                                ) : (
+                                    <div style={{
+                                        width: '24px', height: '24px', borderRadius: '50%',
+                                        backgroundColor: 'var(--primary)', color: 'var(--on-primary)',
+                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                        fontSize: '12px'
+                                    }}>
+                                        {user.full_name?.charAt(0).toUpperCase() || 'U'}
+                                    </div>
+                                )}
+                                <span className="text-truncate" style={{ maxWidth: '120px' }}>{user.full_name || 'Học viên'}</span>
+                            </Link>
+                            <button
+                                onClick={handleLogout}
                                 style={{
-                                    display: 'block',
-                                    padding: '6px 16px',
-                                    fontSize: '16px',
-                                    fontWeight: 500,
-                                    color: isActive ? 'var(--ink)' : 'var(--body)',
-                                    textDecoration: 'none',
-                                    fontFamily: 'Inter, system-ui, sans-serif',
-                                    transition: 'color 0.2s ease',
-                                    borderRadius: '999px',
+                                    border: 'none', background: 'none', color: '#ff3b3b', cursor: 'pointer',
+                                    fontSize: '15px', fontWeight: 500, fontFamily: 'Inter, system-ui, sans-serif'
                                 }}
-                                onMouseEnter={(e) => { if (!isActive) e.target.style.color = 'var(--ink)'; }}
-                                onMouseLeave={(e) => { if (!isActive) e.target.style.color = 'var(--body)'; }}
+                            >
+                                Đăng xuất
+                            </button>
+                        </div>
+                    ) : (
+                        <div className="d-none d-sm-flex" style={{ gap: '8px', alignItems: 'center' }}>
+                            <Link to="/login" style={{
+                                textDecoration: 'none',
+                                padding: '10px 20px',
+                                borderRadius: '999px',
+                                fontSize: '16px',
+                                fontWeight: 500,
+                                color: 'var(--ink)',
+                                fontFamily: 'Inter, system-ui, sans-serif',
+                                backgroundColor: 'var(--canvas-soft)',
+                                transition: 'background-color 0.2s ease',
+                            }}>
+                                Đăng nhập
+                            </Link>
+                            <MagneticButton>
+                                <Link to="/register" style={{
+                                    textDecoration: 'none',
+                                    display: 'inline-flex', alignItems: 'center',
+                                    padding: '10px 20px', borderRadius: '999px',
+                                    fontSize: '16px', fontWeight: 500,
+                                    color: 'var(--canvas)', backgroundColor: 'var(--ink)',
+                                    fontFamily: 'Inter, system-ui, sans-serif',
+                                }}>
+                                    Đăng ký
+                                </Link>
+                            </MagneticButton>
+                        </div>
+                    )}
+
+                    {/* Mobile Hamburger Button */}
+                    <button
+                        onClick={() => setMobileOpen((prev) => !prev)}
+                        className="btn btn-sm d-lg-none border-0 rounded-circle"
+                        style={{ width: '40px', height: '40px', backgroundColor: 'var(--canvas-soft)', color: 'var(--ink)' }}
+                        aria-label="Toggle Navigation"
+                    >
+                        {mobileOpen ? <X size={20} /> : <Menu size={20} />}
+                    </button>
+                </div>
+            </nav>
+
+            {/* Mobile Navigation Drawer Overlay */}
+            {mobileOpen && (
+                <div
+                    style={{
+                        position: 'fixed', top: '68px', left: 0, right: 0, bottom: 0,
+                        backgroundColor: 'var(--canvas)', zIndex: 99,
+                        padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px',
+                        overflowY: 'auto',
+                    }}
+                    className="d-lg-none"
+                >
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        {navLinks.map(({ to, label }) => (
+                            <Link
+                                key={to}
+                                to={to}
+                                onClick={closeMobile}
+                                style={{
+                                    padding: '14px 20px', borderRadius: '12px',
+                                    fontSize: '18px', fontWeight: 600, color: 'var(--ink)',
+                                    textDecoration: 'none', backgroundColor: 'var(--canvas-soft)',
+                                }}
                             >
                                 {label}
                             </Link>
-                            {/* Active underline indicator */}
-                            {isActive && (
-                                <motion.div
-                                    layoutId="nav-indicator-landing"
-                                    style={{
-                                        position: 'absolute', bottom: '-2px', left: '16px',
-                                        right: '16px', height: '2px',
-                                        backgroundColor: 'var(--ink)', borderRadius: '2px',
-                                    }}
-                                    transition={{ type: 'spring', bounce: 0.2, duration: 0.5 }}
-                                />
-                            )}
-                        </li>
-                    );
-                })}
-            </ul>
+                        ))}
+                    </div>
 
-            {/* Right: auth CTAs */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                {/* Theme Toggle */}
-                <button
-                    onClick={toggleTheme}
-                    style={{
-                        backgroundColor: 'var(--canvas-soft)', color: 'var(--ink)',
-                        border: 'none', width: '40px', height: '40px',
-                        borderRadius: '999px', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        cursor: 'pointer', fontSize: '18px'
-                    }}
-                >
-                    {theme === 'dark' ? <Sun size={18} strokeWidth={2.5} /> : <Moon size={18} strokeWidth={2.5} />}
-                </button>
+                    <hr style={{ borderColor: 'var(--surface-pressed)' }} />
 
-                {user ? (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                        {(user.role === 'admin' || user.role === 'tutor') && (
+                    {user ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                             <Link
-                                to={user.role === 'admin' ? '/admin' : '/tutor/dashboard'}
+                                to="/profile"
+                                onClick={closeMobile}
                                 style={{
-                                    textDecoration: 'none', padding: '10px 20px', borderRadius: '999px',
-                                    fontSize: '15px', fontWeight: 500, color: 'var(--on-primary)',
-                                    backgroundColor: 'var(--primary)', fontFamily: 'Inter, system-ui, sans-serif'
+                                    padding: '14px 20px', borderRadius: '12px',
+                                    fontSize: '16px', fontWeight: 600, color: 'var(--ink)',
+                                    textDecoration: 'none', backgroundColor: 'var(--canvas-soft)',
                                 }}
                             >
-                                Về bảng điều khiển
+                                Hồ sơ cá nhân ({user.full_name || 'Học viên'})
                             </Link>
-                        )}
-                        <Link to="/profile" style={{
-                            display: 'flex', alignItems: 'center', gap: '8px',
-                            textDecoration: 'none', padding: '6px 16px', borderRadius: '999px',
-                            backgroundColor: 'var(--canvas-soft)', color: 'var(--ink)',
-                            fontFamily: 'Inter, system-ui, sans-serif', fontWeight: 500, fontSize: '15px'
-                        }}>
-                            {user.avatar_url ? (
-                                <img src={user.avatar_url} alt="Avatar" style={{ width: '24px', height: '24px', borderRadius: '50%', objectFit: 'cover' }} />
-                            ) : (
-                                <div style={{
-                                    width: '24px', height: '24px', borderRadius: '50%',
-                                    backgroundColor: 'var(--primary)', color: 'var(--on-primary)',
-                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                    fontSize: '12px'
-                                }}>
-                                    {user.full_name?.charAt(0).toUpperCase() || 'U'}
-                                </div>
+                            {(user.role === 'admin' || user.role === 'tutor') && (
+                                <Link
+                                    to={user.role === 'admin' ? '/admin' : '/tutor/dashboard'}
+                                    onClick={closeMobile}
+                                    style={{
+                                        padding: '14px 20px', borderRadius: '12px',
+                                        fontSize: '16px', fontWeight: 600, color: 'var(--on-primary)',
+                                        textDecoration: 'none', backgroundColor: 'var(--primary)', textCenter: 'center',
+                                    }}
+                                >
+                                    Về bảng điều khiển
+                                </Link>
                             )}
-                            {user.full_name || 'Học viên'}
-                        </Link>
-                        <button
-                            onClick={handleLogout}
-                            style={{
-                                border: 'none', background: 'none', color: '#ff3b3b', cursor: 'pointer',
-                                fontSize: '15px', fontWeight: 500, fontFamily: 'Inter, system-ui, sans-serif'
-                            }}
-                        >
-                            Đăng xuất
-                        </button>
-                    </div>
-                ) : (
-                    <>
-                        <Link to="/login" style={{
-                            textDecoration: 'none',
-                            padding: '10px 20px',
-                            borderRadius: '999px',
-                            fontSize: '16px',
-                            fontWeight: 500,
-                            color: 'var(--ink)',
-                            fontFamily: 'Inter, system-ui, sans-serif',
-                            backgroundColor: 'var(--canvas-soft)',
-                            transition: 'background-color 0.2s ease',
-                        }}
-                            onMouseEnter={(e) => e.target.style.backgroundColor = 'var(--surface-pressed)'}
-                            onMouseLeave={(e) => e.target.style.backgroundColor = 'var(--canvas-soft)'}
-                        >
-                            Đăng nhập
-                        </Link>
-                        <MagneticButton>
-                            <Link to="/register" style={{
-                                textDecoration: 'none',
-                                display: 'inline-flex', alignItems: 'center',
-                                padding: '10px 20px', borderRadius: '999px',
-                                fontSize: '16px', fontWeight: 500,
-                                color: 'var(--canvas)', backgroundColor: 'var(--ink)',
-                                fontFamily: 'Inter, system-ui, sans-serif',
-                                transition: 'background-color 0.2s ease',
-                            }}
-                                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--black-elevated)'}
-                                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'var(--ink)'}
+                            <button
+                                onClick={() => { closeMobile(); handleLogout(); }}
+                                style={{
+                                    padding: '14px 20px', borderRadius: '12px',
+                                    fontSize: '16px', fontWeight: 600, color: '#ff3b3b',
+                                    border: 'none', backgroundColor: 'var(--canvas-soft)', textAlign: 'left',
+                                }}
+                            >
+                                Đăng xuất
+                            </button>
+                        </div>
+                    ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                            <Link
+                                to="/login"
+                                onClick={closeMobile}
+                                style={{
+                                    padding: '14px 20px', borderRadius: '12px',
+                                    fontSize: '16px', fontWeight: 600, color: 'var(--ink)',
+                                    textDecoration: 'none', backgroundColor: 'var(--canvas-soft)', textAlign: 'center',
+                                }}
+                            >
+                                Đăng nhập
+                            </Link>
+                            <Link
+                                to="/register"
+                                onClick={closeMobile}
+                                style={{
+                                    padding: '14px 20px', borderRadius: '12px',
+                                    fontSize: '16px', fontWeight: 600, color: 'var(--canvas)',
+                                    textDecoration: 'none', backgroundColor: 'var(--ink)', textAlign: 'center',
+                                }}
                             >
                                 Đăng ký
                             </Link>
-                        </MagneticButton>
-                    </>
-                )}
-            </div>
-        </nav>
+                        </div>
+                    )}
+                </div>
+            )}
+        </>
     );
 };
 
@@ -649,14 +751,14 @@ const LandingPage = () => {
                                 transition={{ delay: 0.5, duration: 0.7 }}
                                 style={{ display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap' }}
                             >
-                                <div style={{ display: 'flex' }}>
+                                <div style={{ display: 'flex', flexShrink: 0 }}>
                                     {['N', 'T', 'L', 'M', 'H'].map((init, i) => (
                                         <div key={i} style={{
                                             width: '32px', height: '32px', borderRadius: '9999px',
                                             backgroundColor: ['var(--ink)', 'var(--hairline-mid)', 'var(--body)', 'var(--ink)', 'var(--hairline-mid)'][i],
                                             display: 'flex', alignItems: 'center', justifyContent: 'center',
                                             color: 'var(--canvas)', fontWeight: 700, fontSize: '13px',
-                                            border: '2px solid #ffffff', marginLeft: i === 0 ? 0 : '-8px',
+                                            border: '2px solid #ffffff', marginLeft: i === 0 ? 0 : '-8px', flexShrink: 0,
                                         }}>{init}</div>
                                     ))}
                                 </div>
@@ -692,8 +794,9 @@ const LandingPage = () => {
                                 transition={{ delay: i * 0.1, duration: 0.6 }}
                             >
                                 <div style={{
-                                    fontSize: 'clamp(28px, 4vw, 44px)', fontWeight: 700,
+                                    fontSize: 'clamp(22px, 5vw, 44px)', fontWeight: 700,
                                     color: 'var(--ink)', letterSpacing: '-0.02em', lineHeight: 1,
+                                    whiteSpace: 'nowrap',
                                 }}>
                                     <Counter to={s.to} suffix={s.suffix} prefix={s.prefix || ''} decimals={s.decimals || 0} />
                                 </div>

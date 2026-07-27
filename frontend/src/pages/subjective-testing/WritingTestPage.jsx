@@ -201,11 +201,13 @@ const WritingTestScreen = ({ exam, onSubmitSuccess, practiceMode, customTimeLimi
             </div>
           )}
 
-          <div className="p-3 rounded-3" style={{ backgroundColor: '#e2e2e2', borderLeft: '3px solid #000' }}>
-            <p className="mb-0 fw-medium text-dark" style={{ fontSize: '14px', fontFamily: 'UberMoveText, system-ui, sans-serif' }}>
-              💡 {activeTask.hint}
-            </p>
-          </div>
+          {activeTask.hint && (
+            <div className="p-3 rounded-3" style={{ backgroundColor: '#e2e2e2', borderLeft: '3px solid #000' }}>
+              <p className="mb-0 fw-medium text-dark" style={{ fontSize: '14px', fontFamily: 'UberMoveText, system-ui, sans-serif' }}>
+                💡 {activeTask.hint}
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Right Panel: Editor */}
