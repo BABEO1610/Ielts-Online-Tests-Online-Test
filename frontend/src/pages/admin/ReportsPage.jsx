@@ -4,12 +4,15 @@ import {
 } from 'recharts';
 import { exportReportCsv, fetchReport } from '../../services/adminOps.service';
 import { formatDate, formatNumber } from '../../utils/adminFormat';
+import Pagination from '../../components/common/Pagination';
 
 const ReportsPage = () => {
   const [report, setReport] = useState(null);
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
   const [error, setError] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 5;
 
   useEffect(() => {
     let alive = true;
@@ -46,6 +49,9 @@ const ReportsPage = () => {
   const rows = report?.daily || [];
   const summary = report?.summary || { newUsers: 0, attempts: 0, aiCalls: 0, submissions: 0 };
   const chartData = rows.map((r) => ({ ...r, label: formatDate(r.date) }));
+
+  const totalPages = Math.ceil(rows.length / ITEMS_PER_PAGE);
+  const currentRows = rows.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
 
   return (
     <div>
@@ -95,9 +101,9 @@ const ReportsPage = () => {
           <table className="admin-table">
             <thead><tr><th>Ngày</th><th className="text-end">Người dùng mới</th><th className="text-end">Lượt làm bài</th><th className="text-end">Lượt gọi AI</th><th className="text-end">AI Tokens</th><th className="text-end">Bài nộp</th></tr></thead>
             <tbody>
-              {rows.length === 0 ? (
+              {currentRows.length === 0 ? (
                 <tr><td colSpan="6" className="text-center text-secondary py-4">Chưa có dữ liệu.</td></tr>
-              ) : rows.map((r) => (
+              ) : currentRows.map((r) => (
                 <tr key={r.date}>
                   <td className="fw-semibold">{formatDate(r.date)}</td>
                   <td className="text-end">{formatNumber(r.newUsers)}</td>
@@ -110,6 +116,11 @@ const ReportsPage = () => {
             </tbody>
           </table>
         </div>
+        {totalPages > 1 && (
+          <div className="py-2">
+            <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
+          </div>
+        )}
       </div>
     </div>
   );
