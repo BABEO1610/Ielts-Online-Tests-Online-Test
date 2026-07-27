@@ -1,6 +1,12 @@
 import React, { useState } from 'react';
 import '../../styles/objective-testing.css';
 
+/**
+ * ReviewModal Component
+ * (Modal hiển thị bảng lưới 40 câu hỏi. Đọc prop answers để bôi màu câu nào đã làm, câu nào chưa.
+ * Hỗ trợ nhúng Callback điều hướng ngược (onNavigate) để khi bấm vào 1 ô, nó kích hoạt cuộn đến câu hỏi tương ứng)
+ */
+
 function ReviewModal({ isOpen, onClose, questions = [], answers = {}, onNavigate }) {
   if (!isOpen) return null;
 

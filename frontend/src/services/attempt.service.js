@@ -13,6 +13,7 @@ const getApiError = (error) => ({
 export const attemptService = {
   /**
    * Nộp bài thi — gửi toàn bộ đáp án và thời gian làm bài lên server.
+   * (Đóng gói logic gọi API Axios bằng hàm submitAttempt. Trả về đúng format để UI không cần bận tâm cấu trúc HTTP)
    *
    * @param {string} testId
    * @param {Object} payload - { answers: {[questionOrder]: string}, timeSpent: number, practiceMode?: boolean }

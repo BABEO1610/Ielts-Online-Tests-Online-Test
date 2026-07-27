@@ -4,6 +4,8 @@
  * 
  * TimerBar.jsx
  * Thanh trạng thái hiển thị thời gian làm bài ở trên cùng màn hình.
+ * (TimerBar Component: Đếm ngược thời gian, nhận prop onTimeUp từ trang chính.
+ * Khi thời gian về 0 sẽ kích hoạt gọi ngược hàm lên trang chính để tự động nộp bài.)
  */
 import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';

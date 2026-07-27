@@ -6,6 +6,7 @@
  * Modal không cho đóng, có spinner-border text-primary.
  * 
  * Design: Uber-inspired modal, static backdrop, spinner.
+ * (AutoSubmitModal Component: Modal cực kỳ đơn giản, không có nút tắt. Chỉ bật lên che toàn bộ màn hình khi hết giờ, khóa hành vi click của user.)
  */
 import '../../styles/objective-testing.css';
 

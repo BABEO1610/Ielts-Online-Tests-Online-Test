@@ -2,6 +2,10 @@
  * TestResultDetailPage.jsx — /results/:attemptId/detail
  * Chi tiết từng câu hỏi: đáp án của bạn, đáp án đúng, giải thích.
  * Lấy dữ liệu thật từ GET /api/v1/attempts/:attemptId/detail
+ * 
+ * (TestResultDetailPage Component: Bắn API lấy Detail 40 câu.
+ * Xử lý UX hiển thị giao diện Accordion. 
+ * Khi bấm vào câu trả lời sai sẽ rủ xuống hiển thị đoạn văn bản giải thích tại sao sai)
  */
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';

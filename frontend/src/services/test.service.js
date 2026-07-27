@@ -50,6 +50,7 @@ export const testService = {
 
   /**
    * Fetch a test by ID (full detail: passages, blocks, questions)
+   * (Chạy ngay lúc trang vừa load để fetch đề thi (passages, blocks, questions) từ Server)
    * @param {string} id
    * @returns {Promise<Object>}
    */

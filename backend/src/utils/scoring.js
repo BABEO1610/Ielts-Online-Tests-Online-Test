@@ -48,11 +48,13 @@ const calculateReadingAcademicBand = (rawScore) => {
 
 /**
  * Get band score based on skill and raw score.
+ * (Hàm getBandScore: Dựa trên scaledRawScore và skill, tra cứu (Lookup table) để ra Band Score (từ 0.0 - 9.0). Barem cứng cho Reading Academic và Listening)
  * @param {string} skill - 'listening' or 'reading'
  * @param {number} rawScore - The number of correct answers (0 - 40)
  * @returns {number} The band score (0.0 - 9.0)
  */
 const getBandScore = (skill, rawScore) => {
+  // Barem cứng cho Reading Academic và Listening. Tra cứu (Lookup table) để ra Band Score (từ 0.0 - 9.0)
   if (rawScore < 0 || rawScore > 40) {
     throw new Error('Raw score must be between 0 and 40');
   }
