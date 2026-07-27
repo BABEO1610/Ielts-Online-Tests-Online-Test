@@ -146,6 +146,27 @@ const parseProbeResult = (stdout) => {
   }
 };
 
+const sameCommand = (left, right) => String(left || '').trim().toLowerCase()
+  === String(right || '').trim().toLowerCase();
+
+/**
+ * A configured binary path can become stale after a package-manager upgrade
+ * (notably WinGet).  Keep the configured binary as the first choice, but use
+ * the approved PATH command once when spawning that path fails.  This lets a
+ * running deployment recover when ffmpeg/ffprobe is still available on PATH
+ * without ever enabling a shell.
+ */
+const runWithPathFallback = async ({ runner, command, fallbackCommand, args, options }) => {
+  try {
+    return await runner(command, args, options);
+  } catch (error) {
+    if (error?.code !== 'MEDIA_TOOL_UNAVAILABLE' || sameCommand(command, fallbackCommand)) {
+      throw error;
+    }
+    return runner(fallbackCommand, args, options);
+  }
+};
+
 const buildNormalizedResult = (normalized, metadata, detectedType) => {
   if (!normalized.length || normalized.length > 64 * 1024 * 1024) {
     throw new MediaError('Audio chuẩn hóa không hợp lệ.', 'AUDIO_NORMALIZED_INVALID');
@@ -193,14 +214,24 @@ class AudioNormalizerService {
     const outputPath = path.join(workspace, 'normalized.wav');
     try {
       await fs.writeFile(inputPath, input, { flag: 'wx' });
-      const probeResult = await this.runner(this.ffprobe, [
-        '-v', 'error', '-show_streams', '-show_format', '-of', 'json', inputPath,
-      ], { timeoutMs: 15000 });
+      const probeResult = await runWithPathFallback({
+        runner: this.runner,
+        command: this.ffprobe,
+        fallbackCommand: 'ffprobe',
+        args: ['-v', 'error', '-show_streams', '-show_format', '-of', 'json', inputPath],
+        options: { timeoutMs: 15000 },
+      });
       const metadata = parseProbeResult(probeResult.stdout);
-      await this.runner(this.ffmpeg, [
-        '-nostdin', '-hide_banner', '-loglevel', 'error', '-i', inputPath,
-        '-map_metadata', '-1', '-vn', '-ac', '1', '-ar', '16000', '-c:a', 'pcm_s16le', '-y', outputPath,
-      ], { timeoutMs: 45000 });
+      await runWithPathFallback({
+        runner: this.runner,
+        command: this.ffmpeg,
+        fallbackCommand: 'ffmpeg',
+        args: [
+          '-nostdin', '-hide_banner', '-loglevel', 'error', '-i', inputPath,
+          '-map_metadata', '-1', '-vn', '-ac', '1', '-ar', '16000', '-c:a', 'pcm_s16le', '-y', outputPath,
+        ],
+        options: { timeoutMs: 45000 },
+      });
       return buildNormalizedResult(await fs.readFile(outputPath), metadata, detectedType);
     } finally {
       await fs.rm(workspace, { recursive: true, force: true });
@@ -215,5 +246,6 @@ module.exports = {
   validateProbe,
   assertAllowedAudioType,
   analyzePcm16Wav,
+  runWithPathFallback,
   MAX_DURATION_SECONDS,
 };
