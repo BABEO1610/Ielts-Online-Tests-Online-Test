@@ -287,9 +287,7 @@ export const SpeakingFeedbackDetail = ({ data, onRetry, retrying = false, retryE
     running: 'Hệ thống đang kiểm tra audio và evidence. Hệ thống chưa công bố điểm.',
     retry_wait: 'Lỗi tạm thời; worker sẽ tự thử lại. Hệ thống chưa công bố điểm.',
     needs_review: 'Evidence hiện tại chưa đủ để công bố band Speaking. Bài đã được chuyển cho tutor nghe audio và xác nhận.',
-    failed: data.canRetry
-      ? 'Chấm tự động thất bại sau các lần thử. Bạn còn một lần yêu cầu retry thủ công.'
-      : 'Chấm tự động thất bại. Bài vẫn được giữ lại để hỗ trợ xử lý.',
+    failed: 'Chấm tự động thất bại. Bạn có thể yêu cầu AI chấm lại một lần.',
   }[data.gradingStatus];
 
   return (
