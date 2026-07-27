@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import { useState, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
 import { createLibraryResource, updateLibraryResource } from '../../services/library.service';
@@ -17,6 +17,7 @@ const DocumentForm = ({ initialData, isEditMode }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [submitError, setSubmitError] = useState(null);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const fileInputRef = useRef(null);
 
   // Khi edit: hiển thị tên file hiện tại nếu có
@@ -57,6 +58,7 @@ const DocumentForm = ({ initialData, isEditMode }) => {
   const onSubmit = async (data) => {
     setIsSubmitting(true);
     setSubmitError(null);
+    setUploadProgress(0);
 
     // Validate: tạo mới bắt buộc phải có file
     if (!isEditMode && !selectedFile) {
@@ -66,6 +68,11 @@ const DocumentForm = ({ initialData, isEditMode }) => {
     }
 
     try {
+      const handleProgress = (event) => {
+        if (!event.total) return;
+        setUploadProgress(Math.round((event.loaded * 100) / event.total));
+      };
+
       if (isEditMode) {
         // Cập nhật metadata (title, description, category) và file nếu có
         await updateLibraryResource(
@@ -75,15 +82,23 @@ const DocumentForm = ({ initialData, isEditMode }) => {
             description: data.description,
             category: data.category,
           },
-          selectedFile
+          selectedFile,
+          handleProgress
         );
       } else {
         await createLibraryResource(
           { title: data.title, description: data.description, category: data.category },
-          selectedFile
+          selectedFile,
+          handleProgress
         );
       }
-      navigate('/tutor/library');
+      navigate('/tutor/library', {
+        state: {
+          message: isEditMode
+            ? 'Tài liệu đã được cập nhật.'
+            : 'Tải tài liệu thành công. Tài liệu đang chờ quản trị viên duyệt.',
+        },
+      });
     } catch (err) {
       const msg =
         err.response?.data?.error?.message ||
@@ -250,6 +265,25 @@ const DocumentForm = ({ initialData, isEditMode }) => {
         {submitError && (
           <div className="alert alert-danger rounded-3 border-0 mb-3" role="alert" style={{ fontSize: '14px' }}>
             {submitError}
+          </div>
+        )}
+
+        {isSubmitting && selectedFile && uploadProgress > 0 && (
+          <div className="mb-3" aria-label="Tiến trình upload">
+            <div className="d-flex justify-content-between small text-muted mb-1">
+              <span>Đang tải file</span>
+              <span>{uploadProgress}%</span>
+            </div>
+            <div className="progress" style={{ height: '8px' }}>
+              <div
+                className="progress-bar"
+                role="progressbar"
+                style={{ width: `${uploadProgress}%` }}
+                aria-valuenow={uploadProgress}
+                aria-valuemin="0"
+                aria-valuemax="100"
+              />
+            </div>
           </div>
         )}
 

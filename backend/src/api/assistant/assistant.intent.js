@@ -1,3 +1,11 @@
+/**
+ * ==========================================
+ * TẦNG 3: NÃO BỘ (Service & Intent Routing)
+ * ==========================================
+ * Nhiệm vụ: Phân tích câu hỏi của người dùng để phân loại ý định (Intent) chính xác, 
+ * từ đó định tuyến tới đúng công cụ (Tool) xử lý.
+ */
+
 const { isAddressPreferenceRequest } = require('./assistant.memory');
 
 const ASSISTANT_INTENTS = {

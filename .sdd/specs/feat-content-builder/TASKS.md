@@ -29,8 +29,8 @@ description: "Task list for CMS & Exam Builder"
 
 **Purpose**: Project initialization and basic structure
 
-- [ ] T002 [P] Cài đặt thư viện `multer` và `file-type`. Import động `file-type` trong `library.service.js`.
-- [ ] T003 [P] Tạo cấu hình Multer cho Library tại `backend/src/config/multer.js`.
+- [x] T002 [P] Cài đặt thư viện `multer` và `file-type`. Import động `file-type` trong `library.service.js`.
+- [x] T003 [P] Tạo cấu hình Multer cho Library tại `backend/src/config/multer.js`.
 
 ---
 
@@ -58,11 +58,11 @@ description: "Task list for CMS & Exam Builder"
 
 ### Implementation for User Story 1
 
-- [ ] T004 [US1] Tạo file `library.queries.js` với các hàm `getAllResources`, `createResource`.
-- [ ] T005 [US1] Implement chức năng Magic bytes validation và Supabase upload trong `library.service.js`.
-- [ ] T006 [US1] Thiết lập routes `library.routes.js` (GET/POST/PUT/DELETE) có tích hợp middleware `authenticate`.
-- [ ] T007 [P] [US1] Tạo React hook `useLibrary.js` và Component `ResourceUploadModal.jsx`.
-- [ ] T008 [US1] Xây dựng Frontend pages: `TutorLibraryPage.jsx`, `TutorLibraryCreatePage.jsx`.
+- [x] T004 [US1] Tạo file `library.queries.js` với các hàm `getAllResources`, `createResource`.
+- [x] T005 [US1] Implement chức năng Magic bytes validation và Supabase upload trong `library.service.js`.
+- [x] T006 [US1] Thiết lập routes `library.routes.js` (GET/POST/PUT/DELETE) có tích hợp middleware `authenticate`.
+- [x] T007 [P] [US1] Tạo React hook `useLibrary.js` và Component `ResourceUploadModal.jsx`.
+- [x] T008 [US1] Xây dựng Frontend pages: `TutorLibraryPage.jsx`, `TutorLibraryCreatePage.jsx`.
 
 **Checkpoint**: At this point, User Story 1 should be fully functional and testable independently
 

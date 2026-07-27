@@ -990,8 +990,8 @@ class SubmissionService {
       }
     }
 
-    const { v4: uuidv4 } = require('uuid');
-    const writingGroupId = uuidv4();
+    const { randomUUID } = require('node:crypto');
+    const writingGroupId = randomUUID();
     const writingFingerprint = grader === 'ai'
       ? buildWritingFingerprint({ testId: normalizedTestId, tasks: normalizedTasks })
       : null;

@@ -29,6 +29,9 @@ jest.mock('../../src/db/pool', () => ({
 }));
 
 describe('Integration Test: Public Endpoints for Content Library (L039)', () => {
+  const resourceId = '11111111-1111-4111-8111-111111111111';
+  const missingId = '22222222-2222-4222-8222-222222222222';
+
   beforeEach(() => {
     jest.clearAllMocks();
   });
@@ -38,7 +41,7 @@ describe('Integration Test: Public Endpoints for Content Library (L039)', () => 
       // EARS[Event]: WHEN Guest/Student requests the library list without token...
       const mockResources = [
         {
-          id: 'uuid-1',
+          id: resourceId,
           title: 'IELTS Cambridge 18',
           description: 'Practice test book',
           resource_type: 'pdf',
@@ -91,7 +94,7 @@ describe('Integration Test: Public Endpoints for Content Library (L039)', () => 
     it('should return 200 and resource data if resource is published', async () => {
       // EARS[Event]: WHEN user requests a specific published resource...
       const mockResource = {
-        id: 'uuid-1',
+        id: resourceId,
         title: 'IELTS Cambridge 18',
         resource_type: 'pdf',
         is_published: true
@@ -99,7 +102,7 @@ describe('Integration Test: Public Endpoints for Content Library (L039)', () => 
 
       libraryService.getResourceDetail.mockResolvedValue(mockResource);
 
-      const response = await request(app).get('/api/v1/library/uuid-1');
+      const response = await request(app).get(`/api/v1/library/${resourceId}`);
 
       // EARS[State-driven]: THEN it should return HTTP 200 with resource metadata
       expect(response.status).toBe(200);
@@ -109,7 +112,7 @@ describe('Integration Test: Public Endpoints for Content Library (L039)', () => 
         error: null,
         meta: null
       });
-      expect(libraryService.getResourceDetail).toHaveBeenCalledWith('uuid-1', null);
+      expect(libraryService.getResourceDetail).toHaveBeenCalledWith(resourceId, null);
     });
 
     it('should return 404 if resource does not exist or is unpublished', async () => {
@@ -118,7 +121,7 @@ describe('Integration Test: Public Endpoints for Content Library (L039)', () => 
         new AppError('Tài liệu không tồn tại hoặc đã bị ẩn.', 404, 'LIB_NOT_FOUND')
       );
 
-      const response = await request(app).get('/api/v1/library/uuid-missing');
+      const response = await request(app).get(`/api/v1/library/${missingId}`);
 
       // EARS[State-driven]: THEN it should return HTTP 404 with standard error format
       expect(response.status).toBe(404);

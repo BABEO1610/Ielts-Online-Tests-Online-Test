@@ -1,69 +1,69 @@
-# Data Model: Authentication
+# Mô hình Dữ liệu (Data Model): Authentication
 
-## Account
+## Tài khoản (Account)
 
-Backed by `users`.
+Dựa trên bảng `users`.
 
-Fields:
+Các trường (Fields):
 - `id` UUID.
-- `email` unique string.
-- `password_hash` nullable string; null for Google-only users.
+- `email` chuỗi (string) duy nhất.
+- `password_hash` chuỗi có thể null; null đối với người dùng chỉ dùng Google.
 - `full_name`, `avatar_url`.
-- `role`: `student`, `tutor`, `admin` plus legacy `user`.
+- `role`: `student`, `tutor`, `admin` cộng với `user` (legacy).
 - `status`: `pending`, `active`, `inactive`, `banned`.
 - `failed_login_attempts`, `locked_until`, `last_login_at`, `must_change_password`.
 - `target_band_score`, `target_test_date`.
 - `created_at`, `updated_at`.
 
-Validation:
-- Email unique and syntactically valid.
-- Password minimum 8 characters.
-- Active status required for normal login.
+Xác thực (Validation):
+- Email duy nhất và hợp lệ về cú pháp.
+- Mật khẩu tối thiểu 8 ký tự.
+- Trạng thái active là bắt buộc đối với đăng nhập thông thường.
 
-## Session
+## Phiên làm việc (Session)
 
-Backed by `user_sessions` and `v_active_sessions`.
+Dựa trên bảng `user_sessions` và `v_active_sessions`.
 
-Fields:
+Các trường:
 - `id`, `user_id`, `session_token`.
 - `ip_address`, `user_agent`.
 - `is_oauth`, `oauth_provider`.
 - `last_active_at`, `expires_at`, `revoked_at`.
 - `created_at`, `updated_at`.
 
-State transitions:
-- Created on successful login/OAuth.
-- Revoked on logout, admin revoke, role change, inactive/banned status, or max-session enforcement.
-- Active only when not revoked and not expired.
+Chuyển đổi trạng thái (State transitions):
+- Được tạo khi đăng nhập/OAuth thành công.
+- Bị thu hồi (revoked) khi đăng xuất, admin thu hồi, thay đổi vai trò (role), trạng thái inactive/banned, hoặc thực thi giới hạn số phiên tối đa.
+- Chỉ hoạt động (active) khi chưa bị thu hồi và chưa hết hạn.
 
-## Verification Credential
+## Chứng chỉ Xác thực (Verification Credential)
 
-Backed by `email_verification_tokens`.
+Dựa trên bảng `email_verification_tokens`.
 
-Fields: `id`, `user_id`, `token_hash`, `expires_at`, `used_at`, `created_at`.
+Các trường: `id`, `user_id`, `token_hash`, `expires_at`, `used_at`, `created_at`.
 
-State: unused -> used; expired tokens are rejected.
+Trạng thái: chưa sử dụng -> đã sử dụng; các token hết hạn sẽ bị từ chối.
 
-## Password Reset Credential
+## Chứng chỉ Đặt lại Mật khẩu (Password Reset Credential)
 
-Backed by `password_reset_tokens`.
+Dựa trên bảng `password_reset_tokens`.
 
-Fields: `id`, `user_id`, `token_hash`, `expires_at`, `used_at`, `created_at`.
+Các trường: `id`, `user_id`, `token_hash`, `expires_at`, `used_at`, `created_at`.
 
-State: unused -> used; expired/used/missing tokens are rejected.
+Trạng thái: chưa sử dụng -> đã sử dụng; các token hết hạn/đã dùng/bị thiếu sẽ bị từ chối.
 
-## Password History Entry
+## Mục Lịch sử Mật khẩu (Password History Entry)
 
-Backed by `password_history`.
+Dựa trên bảng `password_history`.
 
-Fields: `id`, `user_id`, `hash`, `reason`, `changed_from_ip`, `created_at`.
+Các trường: `id`, `user_id`, `hash`, `reason`, `changed_from_ip`, `created_at`.
 
-Validation: new password must not match last 3 hashes.
+Xác thực: mật khẩu mới không được trùng với 3 mã băm (hashes) gần nhất.
 
-## External Login Account
+## Tài khoản Đăng nhập Ngoài (External Login Account)
 
-Backed by `oauth_accounts`.
+Dựa trên bảng `oauth_accounts`.
 
-Fields inferred from query usage: `user_id`, `provider`, `provider_user_id`, `provider_email`, `linked_at`, `updated_at`.
+Các trường được suy ra từ truy vấn (query): `user_id`, `provider`, `provider_user_id`, `provider_email`, `linked_at`, `updated_at`.
 
-Relationship: one local account may have a Google provider link.
+Mối quan hệ (Relationship): một tài khoản cục bộ có thể có một liên kết cung cấp Google (Google provider link).

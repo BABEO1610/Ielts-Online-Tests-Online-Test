@@ -1,5 +1,4 @@
 const path = require('path');
-const fs = require('fs');
 const libraryQueries = require('../db/queries/library.queries');
 const AppError = require('../utils/AppError');
 const supabase = require('../config/supabase');
@@ -24,32 +23,22 @@ const MIME_TO_RESOURCE_TYPE = {
   'application/x-7z-compressed': 'other',
 };
 
+const LIBRARY_BUCKET = process.env.SUPABASE_LIBRARY_BUCKET || 'ieltszone_library';
+
 /**
  * Validate magic bytes của file (SEC-04)
  * file-type v19 là ESM-only → dùng dynamic import()
  * @param {Buffer} buffer - buffer của file
- * @param {string} originalname - tên file gốc
  * @returns {string} MIME type thực của file
  */
-async function validateFileMagicBytes(buffer, originalname) {
+async function validateFileMagicBytes(buffer) {
   const { fileTypeFromBuffer } = await import('file-type');
   const result = await fileTypeFromBuffer(buffer);
-
-  // file-type đôi khi không detect được archive rõ ràng,
-  // kiểm tra extension dự phòng để tránh bản rối
-  const ext = require('path').extname(originalname).toLowerCase();
-  const archiveExts = ['.zip', '.rar', '.7z'];
-  if (!result && archiveExts.includes(ext)) {
-    // Tin tưởng extension khởi nguồn từ multer đã filter MIME rồi
-    return 'application/zip';
-  }
 
   if (!result) {
     throw new AppError('Không thể xác định loại file. Vui lòng upload file hợp lệ.', 422, 'FILE_INVALID');
   }
   const allowed = Object.keys(MIME_TO_RESOURCE_TYPE);
-  // Cho phép qua nếu là archive (zip magic bytes = PK)
-  if (result.mime === 'application/zip') return result.mime;
   if (!allowed.includes(result.mime)) {
     throw new AppError(`Loại file không được hỗ trợ: ${result.mime}`, 422, 'FILE_TYPE_ERROR');
   }
@@ -61,27 +50,33 @@ async function validateFileMagicBytes(buffer, originalname) {
  * Xóa file khỏi Supabase Storage
  * @param {string} fileUrl - public URL của file trên Supabase
  */
-async function deleteFileFromSupabase(fileUrl) {
+async function deleteFileFromSupabase(fileUrl, suppressErrors = false) {
   try {
-    if (!fileUrl || !fileUrl.includes('supabase.co')) return;
+    if (!fileUrl || !fileUrl.includes('supabase.co')) return false;
     
-    // Extract file path from URL (after 'ieltszone_library/')
-    const bucketUrlPart = 'ieltszone_library/';
+    const bucketUrlPart = `${LIBRARY_BUCKET}/`;
     const pathIndex = fileUrl.indexOf(bucketUrlPart);
-    if (pathIndex === -1) return;
+    if (pathIndex === -1) {
+      throw new AppError('URL file Cloud không hợp lệ.', 502, 'STORAGE_URL_INVALID');
+    }
     
-    const filePath = fileUrl.substring(pathIndex + bucketUrlPart.length);
+    const filePath = decodeURIComponent(fileUrl.substring(pathIndex + bucketUrlPart.length));
     
     const { error } = await supabase
       .storage
-      .from('ieltszone_library')
+      .from(LIBRARY_BUCKET)
       .remove([filePath]);
       
     if (error) {
-      console.error('Supabase remove error:', error.message);
+      throw new AppError(`Không thể xóa file khỏi Cloud: ${error.message}`, 502, 'STORAGE_DELETE_ERROR');
     }
+    return true;
   } catch (err) {
-    console.error('Lỗi khi xóa file trên Supabase:', err);
+    if (suppressErrors) {
+      console.error('Lỗi khi dọn file trên Supabase:', err.message);
+      return false;
+    }
+    throw err;
   }
 }
 
@@ -90,16 +85,16 @@ async function deleteFileFromSupabase(fileUrl) {
  * @param {Object} file - multer memory file object
  * @returns {string} public URL của file
  */
-async function uploadFileToSupabase(file) {
+async function uploadFileToSupabase(file, contentType) {
   const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
   const ext = path.extname(file.originalname);
   const fileName = `${uniqueSuffix}${ext}`;
   
-  const { data, error } = await supabase
+  const { error } = await supabase
     .storage
-    .from('ieltszone_library')
+    .from(LIBRARY_BUCKET)
     .upload(fileName, file.buffer, {
-      contentType: file.mimetype,
+      contentType,
       upsert: false
     });
 
@@ -109,7 +104,7 @@ async function uploadFileToSupabase(file) {
 
   const { data: publicUrlData } = supabase
     .storage
-    .from('ieltszone_library')
+    .from(LIBRARY_BUCKET)
     .getPublicUrl(fileName);
 
   return publicUrlData.publicUrl;
@@ -123,6 +118,10 @@ async function listResources(filters) {
   return libraryQueries.getAllResources(filters || {});
 }
 
+async function listMyResources(tutorId, filters) {
+  return libraryQueries.getResourcesByUploader(tutorId, filters || {});
+}
+
 /**
  * Lấy chi tiết một tài liệu
  */
@@ -130,6 +129,18 @@ async function getResourceDetail(resourceId, tutorId) {
   const resource = await libraryQueries.getResourceById(resourceId, tutorId);
   if (!resource) {
     throw new AppError('Không tìm thấy tài liệu.', 404, 'RESOURCE_NOT_FOUND');
+  }
+  return resource;
+}
+
+async function getManagedResourceDetail(resourceId, userId, role) {
+  const resource = await libraryQueries.getManagedResourceById(
+    resourceId,
+    userId,
+    role === 'admin'
+  );
+  if (!resource) {
+    throw new AppError('Không tìm thấy tài liệu hoặc bạn không có quyền truy cập.', 404, 'RESOURCE_NOT_FOUND');
   }
   return resource;
 }
@@ -148,23 +159,26 @@ async function createResource(fields, file, tutorId) {
   }
 
   // Validate magic bytes (SEC-04)
-  const actualMime = await validateFileMagicBytes(file.buffer, file.originalname);
+  const actualMime = await validateFileMagicBytes(file.buffer);
   const resourceType = MIME_TO_RESOURCE_TYPE[actualMime] || 'other';
 
   // Upload lên Supabase
-  const fileUrl = await uploadFileToSupabase(file);
+  const fileUrl = await uploadFileToSupabase(file, actualMime);
 
-  const created = await libraryQueries.createResource({
-    title,
-    description,
-    resource_type: resourceType,
-    file_url: fileUrl,
-    file_size_bytes: file.size,
-    category: category || null,
-    uploaded_by: tutorId,
-  });
-
-  return created;
+  try {
+    return await libraryQueries.createResource({
+      title,
+      description,
+      resource_type: resourceType,
+      file_url: fileUrl,
+      file_size_bytes: file.size,
+      category: category || null,
+      uploaded_by: tutorId,
+    });
+  } catch (err) {
+    await deleteFileFromSupabase(fileUrl, true);
+    throw err;
+  }
 }
 
 /**
@@ -174,10 +188,11 @@ async function createResource(fields, file, tutorId) {
  * @param {Object} fields - { title, description, category }
  * @param {Object} [file] - multer file object (optional)
  */
-async function updateResource(resourceId, tutorId, fields, file) {
+async function updateResource(resourceId, tutorId, role, fields, file) {
   const { title, description, category } = fields;
 
-  const existing = await libraryQueries.getResourceById(resourceId, tutorId);
+  const isAdmin = role === 'admin';
+  const existing = await libraryQueries.getManagedResourceById(resourceId, tutorId, isAdmin);
   if (!existing) {
     throw new AppError('Không tìm thấy tài liệu hoặc bạn không có quyền chỉnh sửa.', 404, 'RESOURCE_NOT_FOUND');
   }
@@ -188,19 +203,31 @@ async function updateResource(resourceId, tutorId, fields, file) {
     category: category || null,
   };
 
+  let newFileUrl = null;
   if (file) {
     // Có file mới -> Validate và cập nhật DB, sau đó xóa file cũ
-    const actualMime = await validateFileMagicBytes(file.buffer, file.originalname);
+    const actualMime = await validateFileMagicBytes(file.buffer);
     updateData.resource_type = MIME_TO_RESOURCE_TYPE[actualMime] || 'other';
-    updateData.file_url = await uploadFileToSupabase(file);
+    newFileUrl = await uploadFileToSupabase(file, actualMime);
+    updateData.file_url = newFileUrl;
     updateData.file_size_bytes = file.size;
   }
 
-  const updated = await libraryQueries.updateResource(resourceId, tutorId, updateData);
+  let updated;
+  try {
+    updated = await libraryQueries.updateResource(resourceId, tutorId, updateData, isAdmin);
+  } catch (err) {
+    if (newFileUrl) await deleteFileFromSupabase(newFileUrl, true);
+    throw err;
+  }
+  if (!updated) {
+    if (newFileUrl) await deleteFileFromSupabase(newFileUrl, true);
+    throw new AppError('Tài liệu đã thay đổi hoặc không còn tồn tại.', 409, 'RESOURCE_CONFLICT');
+  }
 
   // Nếu cập nhật thành công và có file mới, xóa file cũ đi
   if (updated && file && existing.file_url) {
-    await deleteFileFromSupabase(existing.file_url);
+    await deleteFileFromSupabase(existing.file_url, true);
   }
 
   return updated;
@@ -209,22 +236,28 @@ async function updateResource(resourceId, tutorId, fields, file) {
 /**
  * Xóa tài liệu + file vật lý
  */
-async function deleteResource(resourceId, tutorId) {
-  const deleted = await libraryQueries.deleteResource(resourceId, tutorId);
+async function deleteResource(resourceId, tutorId, role) {
+  const deleted = await libraryQueries.deleteResource(resourceId, tutorId, role === 'admin');
   if (!deleted) {
     throw new AppError('Không tìm thấy tài liệu hoặc bạn không có quyền xóa.', 404, 'RESOURCE_NOT_FOUND');
   }
 
   // Xóa file vật lý sau khi DB đã thành công
   await deleteFileFromSupabase(deleted.file_url);
+  await libraryQueries.markStorageCleanupComplete(deleted.id);
 
   return deleted;
 }
 
 module.exports = {
   listResources,
+  listMyResources,
   getResourceDetail,
+  getManagedResourceDetail,
   createResource,
   updateResource,
   deleteResource,
+  validateFileMagicBytes,
+  uploadFileToSupabase,
+  deleteFileFromSupabase,
 };

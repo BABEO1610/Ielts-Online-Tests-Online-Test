@@ -1,3 +1,10 @@
+/**
+ * ==========================================
+ * UTILS: TRÍCH XUẤT TÊN NGƯỜI DÙNG (User Resolver)
+ * ==========================================
+ * Nhiệm vụ: Đọc Database hoặc Token để tìm ra tên gọi (Tên hiển thị) của người dùng hiện tại,
+ * giúp chatbot có thể gọi tên người dùng một cách thân thiện (ví dụ: Chào Nam!).
+ */
 const { pool } = require('../../db/pool');
 
 const MAX_DISPLAY_NAME_LENGTH = 40;
@@ -10,6 +17,7 @@ const PROFILE_SOURCES = [
   { table: 'admins', fields: ['preferred_name', 'display_name', 'full_name', 'username'] },
 ];
 
+// Kết quả mặc định trả về nếu không tìm thấy tên (gọi chung là "bạn")
 const emptyResult = (reason = 'missing_user') => ({
   displayName: 'bạn',
   fullName: null,
@@ -19,21 +27,25 @@ const emptyResult = (reason = 'missing_user') => ({
   dbError: null,
 });
 
+// Làm sạch tên: Xóa các thẻ HTML < >, loại bỏ khoảng trắng thừa, chặn lấy địa chỉ email làm tên
 const cleanName = (value) => {
   const text = String(value || '').replace(/[<>]/g, '').replace(/\s+/g, ' ').trim();
   if (!text || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(text)) return null;
   return text;
 };
 
+// Giới hạn độ dài tên không quá 40 ký tự
 const limitName = (value) => value.length > MAX_DISPLAY_NAME_LENGTH
   ? value.slice(0, MAX_DISPLAY_NAME_LENGTH).trim()
   : value;
 
+// Chuyển đổi tên đầy đủ (Nguyễn Văn Nam) thành tên gọi ngắn (Nam)
 const toDisplayName = (fullName) => {
   const parts = fullName.split(' ').filter(Boolean);
   return limitName(parts.length > 1 ? parts[parts.length - 1] : fullName);
 };
 
+// Đóng gói đối tượng chứa tên để trả về
 const buildNameResult = ({ fullName, source }) => ({
   displayName: toDisplayName(fullName),
   fullName: limitName(fullName),
@@ -43,10 +55,13 @@ const buildNameResult = ({ fullName, source }) => ({
   dbError: null,
 });
 
+// Lấy ID người dùng từ JWT
 const getUserId = (user = {}) => user?.id || user?.sub || null;
 
+// Lấy Metadata từ Supabase/JWT
 const getMetadata = (user = {}) => user?.user_metadata || user?.userMetadata || {};
 
+// Truy vấn lấy danh sách các cột trong một bảng DB
 const readColumns = async (table) => {
   const result = await pool.query(
     `SELECT column_name
@@ -57,6 +72,7 @@ const readColumns = async (table) => {
   return new Set(result.rows.map((row) => row.column_name));
 };
 
+// Truy vấn DB lấy tên người dùng từ các bảng profile/users
 const readProfileName = async ({ table, fields, userId }) => {
   const columns = await readColumns(table);
   if (!columns.has('id')) return null;
@@ -76,6 +92,7 @@ const readProfileName = async ({ table, fields, userId }) => {
   return field ? { value: cleanName(row[field]), source: `${table}.${field}` } : null;
 };
 
+// Nếu DB không có, thử tìm tên trong Metadata của JWT Token
 const resolveMetadataName = (user = {}) => {
   const metadata = getMetadata(user);
   const candidates = [
@@ -87,6 +104,7 @@ const resolveMetadataName = (user = {}) => {
   return match ? { value: cleanName(match[1]), source: match[0] } : null;
 };
 
+// Hàm chính: Gom tất cả lại, dò tìm trong DB trước, DB thất bại thì dò trong Token
 const resolveUserDisplayName = async (user) => {
   const userId = getUserId(user);
   if (!userId) return emptyResult('missing_user');

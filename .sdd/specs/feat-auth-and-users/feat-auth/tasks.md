@@ -1,195 +1,196 @@
-# Tasks: Authentication
+# Danh sách Công việc (Tasks): Authentication
 
-**Input**: Design documents from `.sdd/specs/feat-auth-and-users/feat-auth/`
+**Đầu vào (Input)**: Các tài liệu thiết kế từ `.sdd/specs/feat-auth-and-users/feat-auth/`
 
-**Prerequisites**: `plan.md`, `spec.md`, `research.md`, `data-model.md`, `contracts/api-contract.md`, `quickstart.md`
+**Yêu cầu Tiên quyết (Prerequisites)**: `plan.md`, `spec.md`, `research.md`, `data-model.md`, `contracts/api-contract.md`, `quickstart.md`
 
-**Tests**: Included because the feature spec defines independent testing and the project constitution requires service/query/API coverage.
+**Kiểm thử (Tests)**: Bao gồm bởi vì đặc tả tính năng yêu cầu kiểm thử độc lập và hiến pháp dự án yêu cầu bao phủ (coverage) cho service/query/API.
 
-**Organization**: Tasks are grouped by user story so each story can be implemented and tested independently.
+**Cách tổ chức (Organization)**: Các tasks được nhóm theo user story (câu chuyện người dùng) để mỗi story có thể được triển khai và kiểm thử độc lập.
 
-## Phase 1: Setup (Shared Infrastructure)
+## Giai đoạn 1: Thiết lập (Setup - Shared Infrastructure)
 
-**Purpose**: Confirm auth feature inputs, environment needs, and implementation boundaries.
+**Mục đích**: Xác nhận các đầu vào của tính năng auth, các yêu cầu môi trường, và ranh giới triển khai.
 
-- [x] T001 [P] Review authentication design inputs in `.sdd/specs/feat-auth-and-users/feat-auth/plan.md`
-- [x] T002 [P] Review authentication API contract in `.sdd/specs/feat-auth-and-users/feat-auth/contracts/api-contract.md`
-- [x] T003 [P] Review authentication validation scenarios in `.sdd/specs/feat-auth-and-users/feat-auth/quickstart.md`
-- [x] T004 [P] Confirm backend auth route map in `backend/src/routes/api/v1/auth.routes.js`
-- [x] T005 [P] Confirm frontend auth entry points in `frontend/src/pages/auth/Login.jsx`
-
----
-
-## Phase 2: Foundational (Blocking Prerequisites)
-
-**Purpose**: Shared account, token, session, validation, and response behavior used by all auth stories.
-
-**CRITICAL**: No user story work can begin until this phase is complete.
-
-- [x] T006 Verify user role/status enums and auth columns in `backend/src/db/migrations/001_create_enums.sql`
-- [x] T007 Verify account schema and target security fields in `backend/src/db/migrations/002_create_users.sql`
-- [x] T008 Verify session schema, active-session view, and OAuth session columns in `backend/src/db/migrations/003_create_sessions.sql`
-- [x] T009 Verify verification/reset token schema in `backend/src/db/migrations/005_create_tokens.sql`
-- [x] T010 Verify password history schema and indexes in `backend/src/db/migrations/004_create_pwd_history.sql`
-- [x] T011 [P] Add auth response envelope tests in `backend/tests/unit/controllers/auth.controller.test.js`
-- [x] T012 [P] Add token utility expiry/claim tests in `backend/tests/unit/utils/token.util.test.js`
-- [x] T013 [P] Add password hash/verify/history helper tests in `backend/tests/unit/utils/password.util.test.js`
-- [x] T014 [P] Verify React version drift noted by constitution in `.sdd/specs/feat-auth-and-users/feat-auth/plan.md`
-
-**Checkpoint**: Auth data model, validation primitives, and shared response protocol are ready.
+- [x] T001 [P] Xem xét các đầu vào thiết kế authentication trong `.sdd/specs/feat-auth-and-users/feat-auth/plan.md`
+- [x] T002 [P] Xem xét API contract của authentication trong `.sdd/specs/feat-auth-and-users/feat-auth/contracts/api-contract.md`
+- [x] T003 [P] Xem xét các kịch bản kiểm thử (validation scenarios) authentication trong `.sdd/specs/feat-auth-and-users/feat-auth/quickstart.md`
+- [x] T004 [P] Xác nhận sơ đồ tuyến (route map) auth backend trong `backend/src/routes/api/v1/auth.routes.js`
+- [x] T005 [P] Xác nhận các điểm vào (entry points) auth frontend trong `frontend/src/pages/auth/Login.jsx`
 
 ---
 
-## Phase 3: User Story 1 - Đăng ký và Xác thực Tài khoản (Priority: P1) MVP
+## Giai đoạn 2: Nền tảng (Foundational - Blocking Prerequisites)
 
-**Goal**: Guests can register with email/password/full name and activate accounts through a valid verification token.
+**Mục đích**: Chứa các hành vi dùng chung về account, token, session, validation, và phản hồi (response) cho tất cả các auth stories.
 
-**Independent Test**: Register a new email, verify the generated token, and confirm the account changes from `pending` to `active`.
+**ĐẶC BIỆT QUAN TRỌNG (CRITICAL)**: Không thể bắt đầu các user story nếu giai đoạn này chưa hoàn tất.
 
-### Tests for User Story 1
+- [x] T006 Xác minh các enums user role/status và auth columns trong `backend/src/db/migrations/001_create_enums.sql`
+- [x] T007 Xác minh lược đồ account và các trường bảo mật mục tiêu trong `backend/src/db/migrations/002_create_users.sql`
+- [x] T008 Xác minh lược đồ session, view active-session, và các cột OAuth session trong `backend/src/db/migrations/003_create_sessions.sql`
+- [x] T009 Xác minh lược đồ verification/reset token trong `backend/src/db/migrations/005_create_tokens.sql`
+- [x] T010 Xác minh lược đồ password history và các indexes trong `backend/src/db/migrations/004_create_pwd_history.sql`
+- [x] T011 [P] Thêm các bài test cho auth response envelope trong `backend/tests/unit/controllers/auth.controller.test.js`
+- [x] T012 [P] Thêm các bài test cho token utility expiry/claim trong `backend/tests/unit/utils/token.util.test.js`
+- [x] T013 [P] Thêm các bài test trợ giúp hash/verify/history mật khẩu trong `backend/tests/unit/utils/password.util.test.js`
+- [x] T014 [P] Xác minh độ lệch phiên bản React được ghi chú bởi hiến pháp trong `.sdd/specs/feat-auth-and-users/feat-auth/plan.md`
 
-- [x] T015 [P] [US1] Add registration happy-path and duplicate-email tests in `backend/tests/unit/services/auth.reg.test.js`
-- [x] T016 [P] [US1] Add verification token valid/used/expired tests in `backend/tests/unit/services/auth.verify.test.js`
-- [x] T017 [P] [US1] Add register controller validation tests in `backend/tests/unit/controllers/auth.controller.test.js`
-- [x] T018 [P] [US1] Add register form validation tests in `frontend/tests/components/auth/RegisterForm.test.jsx`
-- [x] T019 [P] [US1] Add verify email page tests in `frontend/tests/components/auth/VerifyEmailPage.test.jsx`
-
-### Implementation for User Story 1
-
-- [x] T020 [US1] Ensure `register` uses generic duplicate-account messaging and creates pending student accounts in `backend/src/services/auth.service.js`
-- [x] T021 [US1] Ensure verification tokens are hashed, expiring, and marked used in `backend/src/db/queries/tokens.queries.js`
-- [x] T022 [US1] Ensure registration and verification validators enforce email/password/name rules in `backend/src/controllers/auth.controller.js`
-- [x] T023 [US1] Ensure verification email sending is non-secret and environment-based in `backend/src/utils/email.util.js`
-- [x] T024 [US1] Ensure register form blocks password confirmation mismatch in `frontend/src/components/auth/RegisterForm.jsx`
-- [x] T025 [US1] Ensure verify email page handles success, expired, and invalid token states in `frontend/src/pages/auth/VerifyEmailPage.jsx`
-
-**Checkpoint**: US1 supports independent account creation and activation.
+**Cột mốc (Checkpoint)**: Data model, các khối validation cơ bản, và giao thức phản hồi chung đã sẵn sàng.
 
 ---
 
-## Phase 4: User Story 2 - Đăng nhập và Đi tới đúng Không gian làm việc (Priority: P1)
+## Giai đoạn 3: User Story 1 - Đăng ký và Xác thực Tài khoản (Priority: P1) MVP
 
-**Goal**: Active users can log in safely, sessions are created, and frontend redirects users by role.
+**Mục tiêu (Goal)**: Khách có thể đăng ký bằng email/mật khẩu/họ tên và kích hoạt (activate) tài khoản qua một verification token hợp lệ.
 
-**Independent Test**: Log in as student, tutor, and admin; confirm each user reaches the correct workspace and bad credentials do not reveal account existence.
+**Kiểm thử Độc lập (Independent Test)**: Đăng ký một email mới, xác thực token được tạo, và xác nhận account chuyển trạng thái từ `pending` sang `active`.
 
-### Tests for User Story 2
+### Kiểm thử cho User Story 1 (Tests for User Story 1)
 
-- [x] T026 [P] [US2] Add valid/invalid/status-blocked login tests in `backend/tests/unit/services/auth.login.test.js`
-- [x] T027 [P] [US2] Add failed-attempt lockout tests in `backend/tests/unit/services/auth.verifyLogin.test.js`
-- [x] T028 [P] [US2] Add session limit and oldest-session revoke tests in `backend/tests/unit/services/auth.login.test.js`
-- [x] T029 [P] [US2] Add login controller cookie/envelope tests in `backend/tests/unit/controllers/auth.controller.test.js`
-- [x] T030 [P] [US2] Add role redirect tests in `frontend/tests/components/auth/LoginForm.test.jsx`
-- [x] T031 [P] [US2] Add protected route redirect tests in `frontend/tests/components/auth/ProtectedRoute.test.jsx`
+- [x] T015 [P] [US1] Thêm các bài test happy-path và duplicate-email cho quá trình đăng ký trong `backend/tests/unit/services/auth.reg.test.js`
+- [x] T016 [P] [US1] Thêm các bài test cho verification token hợp lệ/đã dùng/hết hạn trong `backend/tests/unit/services/auth.verify.test.js`
+- [x] T017 [P] [US1] Thêm các bài test cho register controller validation trong `backend/tests/unit/controllers/auth.controller.test.js`
+- [x] T018 [P] [US1] Thêm các bài test cho register form validation trong `frontend/tests/components/auth/RegisterForm.test.jsx`
+- [x] T019 [P] [US1] Thêm các bài test cho trang verify email trong `frontend/tests/components/auth/VerifyEmailPage.test.jsx`
 
-### Implementation for User Story 2
+### Triển khai cho User Story 1 (Implementation for User Story 1)
 
-- [x] T032 [US2] Ensure login verifies active status, lockout state, and generic error messaging in `backend/src/services/auth.service.js`
-- [x] T033 [US2] Ensure failed login tracking and successful login reset run through parameterized queries in `backend/src/db/queries/users.queries.js`
-- [x] T034 [US2] Ensure max-three-session enforcement revokes oldest active session in `backend/src/db/queries/sessions.queries.js`
-- [x] T035 [US2] Ensure login controller sets secure cookies and returns safe user data only in `backend/src/controllers/auth.controller.js`
-- [x] T036 [US2] Ensure AuthContext stores safe user state and exposes login/logout/refreshUser in `frontend/src/context/AuthContext.jsx`
-- [x] T037 [US2] Ensure LoginForm redirects student/tutor/admin to correct workspace paths in `frontend/src/components/auth/LoginForm.jsx`
-- [x] T038 [US2] Ensure ProtectedRoute redirects unauthorized roles without rendering protected content in `frontend/src/components/auth/ProtectedRoute.jsx`
+- [x] T020 [US1] Đảm bảo `register` sử dụng thông báo duplicate-account chung và tạo tài khoản student dạng pending trong `backend/src/services/auth.service.js`
+- [x] T021 [US1] Đảm bảo các verification tokens được băm (hashed), có hết hạn, và đánh dấu là đã dùng (used) trong `backend/src/db/queries/tokens.queries.js`
+- [x] T022 [US1] Đảm bảo các validators của đăng ký và xác thực tuân thủ quy tắc email/mật khẩu/tên trong `backend/src/controllers/auth.controller.js`
+- [x] T023 [US1] Đảm bảo gửi email xác thực không chứa mật khẩu/bí mật và dựa trên cấu hình môi trường trong `backend/src/utils/email.util.js`
+- [x] T024 [US1] Đảm bảo form register chặn nếu xác nhận mật khẩu (password confirmation) không khớp trong `frontend/src/components/auth/RegisterForm.jsx`
+- [x] T025 [US1] Đảm bảo trang verify email xử lý các trạng thái thành công, hết hạn và invalid token trong `frontend/src/pages/auth/VerifyEmailPage.jsx`
 
-**Checkpoint**: US2 supports authenticated access and role-aware navigation independently.
+**Cột mốc**: US1 hỗ trợ việc tạo và kích hoạt tài khoản một cách độc lập.
 
 ---
 
-## Phase 5: User Story 3 - Khôi phục hoặc Đổi Mật khẩu (Priority: P2)
+## Giai đoạn 4: User Story 2 - Đăng nhập và Đi tới đúng Không gian làm việc (Priority: P1)
 
-**Goal**: Users can recover access through email reset and change passwords while authenticated.
+**Mục tiêu**: Active users có thể đăng nhập an toàn, sessions được tạo ra, và frontend điều hướng người dùng đúng theo role.
 
-**Independent Test**: Request reset for any email, reset with a valid token, reject reused/expired tokens, and change password with correct current password.
+**Kiểm thử Độc lập**: Đăng nhập dưới tư cách student, tutor, và admin; xác nhận mỗi người dùng truy cập đúng workspace và thông tin sai (bad credentials) không làm lộ việc account có tồn tại hay không.
 
-### Tests for User Story 3
+### Kiểm thử cho User Story 2
 
-- [x] T039 [P] [US3] Add forgot-password anti-enumeration tests in `backend/tests/unit/services/auth.forgot-pwd.test.js`
-- [x] T040 [P] [US3] Add reset token valid/expired/used tests in `backend/tests/unit/services/auth.reset.test.js`
-- [x] T041 [P] [US3] Add password history reuse tests in `backend/tests/db/queries/pwd.queries.test.js`
-- [x] T042 [P] [US3] Add change-password local and Google-only tests in `backend/tests/unit/services/auth.reset.test.js`
-- [x] T043 [P] [US3] Add forgot/reset/change password form tests in `frontend/tests/components/auth/ForgotPwdForm.test.jsx`
-- [x] T044 [P] [US3] Add reset password form tests in `frontend/tests/components/auth/ResetPwdForm.test.jsx`
+- [x] T026 [P] [US2] Thêm các bài test cho login hợp lệ/không hợp lệ/bị khóa trong `backend/tests/unit/services/auth.login.test.js`
+- [x] T027 [P] [US2] Thêm các bài test khóa (lockout) khi thử sai nhiều lần trong `backend/tests/unit/services/auth.verifyLogin.test.js`
+- [x] T028 [P] [US2] Thêm các bài test cho giới hạn session và thu hồi (revoke) session cũ nhất trong `backend/tests/unit/services/auth.login.test.js`
+- [x] T029 [P] [US2] Thêm các bài test cookie/envelope của login controller trong `backend/tests/unit/controllers/auth.controller.test.js`
+- [x] T030 [P] [US2] Thêm các bài test về role redirect trong `frontend/tests/components/auth/LoginForm.test.jsx`
+- [x] T031 [P] [US2] Thêm các bài test về protected route redirect trong `frontend/tests/components/auth/ProtectedRoute.test.jsx`
 
-### Implementation for User Story 3
+### Triển khai cho User Story 2
 
-- [x] T045 [US3] Ensure forgot-password always returns generic response and hashes reset token in `backend/src/services/auth.service.js`
-- [x] T046 [US3] Ensure reset-password rejects invalid, expired, used, and recent-password reuse cases in `backend/src/services/auth.service.js`
-- [x] T047 [US3] Ensure password updates and history inserts occur atomically where required in `backend/src/db/queries/pwd.queries.js`
-- [x] T048 [US3] Ensure change-password rejects Google-only accounts and wrong current passwords in `backend/src/services/auth.service.js`
-- [x] T049 [US3] Ensure reset/change validators enforce minimum password length in `backend/src/controllers/auth.controller.js`
-- [x] T050 [US3] Ensure frontend forgot/reset forms show generic/specific messages according to contract in `frontend/src/components/auth/ForgotPwdForm.jsx`
-- [x] T051 [US3] Ensure ChangePwdModal handles mismatch, short password, success, and API error states in `frontend/src/components/profile/ChangePwdModal.jsx`
+- [x] T032 [US2] Đảm bảo login xác minh trạng thái active, trạng thái khóa, và các lỗi đăng nhập chung trong `backend/src/services/auth.service.js`
+- [x] T033 [US2] Đảm bảo theo dõi các lần đăng nhập thất bại (failed login) và khôi phục về không khi login thành công qua parameterized queries trong `backend/src/db/queries/users.queries.js`
+- [x] T034 [US2] Đảm bảo áp đặt tối đa 3 sessions (max-three-session) sẽ thu hồi session đang hoạt động cũ nhất trong `backend/src/db/queries/sessions.queries.js`
+- [x] T035 [US2] Đảm bảo login controller thiết lập các secure cookies và chỉ trả về safe user data (không chứa mật khẩu) trong `backend/src/controllers/auth.controller.js`
+- [x] T036 [US2] Đảm bảo AuthContext lưu trữ user state an toàn và cung cấp các phương thức login/logout/refreshUser trong `frontend/src/context/AuthContext.jsx`
+- [x] T037 [US2] Đảm bảo LoginForm điều hướng (redirects) student/tutor/admin tới đúng workspace paths trong `frontend/src/components/auth/LoginForm.jsx`
+- [x] T038 [US2] Đảm bảo ProtectedRoute điều hướng các roles không được uỷ quyền (unauthorized) mà không render nội dung được bảo vệ trong `frontend/src/components/auth/ProtectedRoute.jsx`
 
-**Checkpoint**: US3 can be validated without Google OAuth.
-
----
-
-## Phase 6: User Story 4 - Tiếp tục với Google (Priority: P3)
-
-**Goal**: Guests can authenticate through Google, get a local account/session, and receive clear errors on provider failures.
-
-**Independent Test**: Start Google login, complete callback with valid provider profile, and confirm local user/session creation and role-aware redirect.
-
-### Tests for User Story 4
-
-- [x] T052 [P] [US4] Add Google redirect state cookie tests in `backend/tests/unit/controllers/auth.controller.test.js`
-- [x] T053 [P] [US4] Add Google callback success/failure tests in `backend/tests/unit/services/auth.oauth.test.js`
-- [x] T054 [P] [US4] Add OAuth account upsert tests in `backend/tests/unit/db/queries/users.queries.test.js`
-- [x] T055 [P] [US4] Add Google button rendering/navigation tests in `frontend/tests/components/auth/LoginForm.test.jsx`
-
-### Implementation for User Story 4
-
-- [x] T056 [US4] Ensure Google redirect builds URL from env config and sets state cookie in `backend/src/controllers/auth.controller.js`
-- [x] T057 [US4] Ensure Google callback validates state before exchanging code in `backend/src/controllers/auth.controller.js`
-- [x] T058 [US4] Ensure Google profile upsert creates or updates active student accounts and oauth links in `backend/src/db/queries/users.queries.js`
-- [x] T059 [US4] Ensure OAuth login creates sessions with `is_oauth` and `oauth_provider` in `backend/src/services/auth.service.js`
-- [x] T060 [US4] Ensure Google callback redirects success/error states to frontend routes in `backend/src/controllers/auth.controller.js`
-- [x] T061 [US4] Ensure Google login button uses `/api/v1/auth/google` and displays retry-friendly errors in `frontend/src/components/auth/GoogleLoginButton.jsx`
-
-**Checkpoint**: US4 adds OAuth without changing email/password auth behavior.
+**Cột mốc**: US2 hỗ trợ truy cập có xác thực và điều hướng theo vai trò một cách độc lập.
 
 ---
 
-## Phase 7: Polish & Cross-Cutting Concerns
+## Giai đoạn 5: User Story 3 - Khôi phục hoặc Đổi Mật khẩu (Priority: P2)
 
-**Purpose**: Governance, security hardening, and full validation across auth stories.
+**Mục tiêu**: Người dùng có thể khôi phục quyền truy cập qua reset email và đổi mật khẩu khi đang đăng nhập (authenticated).
 
-- [x] T062 [P] Verify no auth response exposes `password_hash`, reset tokens, verification tokens, or session secrets in `backend/src/controllers/auth.controller.js`
-- [x] T063 [P] Verify auth errors pass through centralized handler without stack traces in `backend/src/middleware/errorHandler.js`
-- [x] T064 [P] Verify auth rate limiters are applied to login, register, and forgot password in `backend/src/routes/api/v1/auth.routes.js`
-- [x] T065 Run backend auth tests and record results in `.sdd/specs/feat-auth-and-users/feat-auth/tasks.md`
-- [x] T066 Run frontend auth tests and record results in `.sdd/specs/feat-auth-and-users/feat-auth/tasks.md`
-- [x] T067 Execute quickstart scenarios and update findings in `.sdd/specs/feat-auth-and-users/feat-auth/quickstart.md`
+**Kiểm thử Độc lập**: Yêu cầu khôi phục (reset) với bất kỳ email nào, khôi phục thành công với một token hợp lệ, từ chối token đã dùng/hết hạn, và đổi mật khẩu với mật khẩu hiện tại chính xác.
+
+### Kiểm thử cho User Story 3
+
+- [x] T039 [P] [US3] Thêm các bài test chống dò tìm account cho forgot-password trong `backend/tests/unit/services/auth.forgot-pwd.test.js`
+- [x] T040 [P] [US3] Thêm các bài test reset token hợp lệ/hết hạn/đã dùng trong `backend/tests/unit/services/auth.reset.test.js`
+- [x] T041 [P] [US3] Thêm các bài test việc sử dụng lại lịch sử mật khẩu trong `backend/tests/db/queries/pwd.queries.test.js`
+- [x] T042 [P] [US3] Thêm các bài test change-password local và Google-only trong `backend/tests/unit/services/auth.reset.test.js`
+- [x] T043 [P] [US3] Thêm các bài test form forgot/reset/change password trong `frontend/tests/components/auth/ForgotPwdForm.test.jsx`
+- [x] T044 [P] [US3] Thêm các bài test reset password form trong `frontend/tests/components/auth/ResetPwdForm.test.jsx`
+
+### Triển khai cho User Story 3
+
+- [x] T045 [US3] Đảm bảo forgot-password luôn trả về phản hồi chung chung (generic response) và băm reset token trong `backend/src/services/auth.service.js`
+- [x] T046 [US3] Đảm bảo reset-password từ chối các trường hợp token invalid, expired, used, và sử dụng lại mật khẩu gần đây trong `backend/src/services/auth.service.js`
+- [x] T047 [US3] Đảm bảo việc cập nhật mật khẩu và chèn lịch sử (history) được thực hiện độc lập (atomically) khi yêu cầu trong `backend/src/db/queries/pwd.queries.js`
+- [x] T048 [US3] Đảm bảo change-password từ chối tài khoản Google-only và các trường hợp nhập sai mật khẩu hiện tại trong `backend/src/services/auth.service.js`
+- [x] T049 [US3] Đảm bảo reset/change validators yêu cầu chiều dài tối thiểu của mật khẩu trong `backend/src/controllers/auth.controller.js`
+- [x] T050 [US3] Đảm bảo frontend forgot/reset forms hiển thị thông báo generic/specific đúng theo API contract trong `frontend/src/components/auth/ForgotPwdForm.jsx`
+- [x] T051 [US3] Đảm bảo ChangePwdModal xử lý mismatch, mật khẩu quá ngắn, trạng thái thành công và các lỗi API trong `frontend/src/components/profile/ChangePwdModal.jsx`
+
+**Cột mốc**: US3 có thể được kiểm thử độc lập mà không cần Google OAuth.
 
 ---
 
-## Dependencies & Execution Order
+## Giai đoạn 6: User Story 4 - Tiếp tục với Google (Priority: P3)
 
-### Phase Dependencies
+**Mục tiêu**: Khách có thể xác thực thông qua Google, nhận được tài khoản/session cục bộ, và nhận lỗi rõ ràng khi provider xác thực không thành công.
 
-- Phase 1 has no dependencies.
-- Phase 2 depends on Phase 1 and blocks all user stories.
-- US1 and US2 are both P1; US1 is the MVP account-entry path.
-- US3 depends on foundational token/password infrastructure.
-- US4 depends on foundational session infrastructure.
-- Phase 7 depends on all selected user stories.
+**Kiểm thử Độc lập**: Bắt đầu đăng nhập Google, hoàn thành callback với thông tin provider hợp lệ, xác nhận đã tạo user/session cục bộ, và điều hướng theo vai trò (role-aware redirect).
 
-### User Story Dependencies
+### Kiểm thử cho User Story 4
 
-- US1: no story dependency after foundation.
-- US2: no story dependency after foundation, but manual login requires an active account from US1 or seeded data.
-- US3: no story dependency after foundation, but manual reset requires a user account.
-- US4: no story dependency after foundation, but uses same session creation path as US2.
+- [x] T052 [P] [US4] Thêm các bài test Google redirect state cookie trong `backend/tests/unit/controllers/auth.controller.test.js`
+- [x] T053 [P] [US4] Thêm các bài test Google callback success/failure trong `backend/tests/unit/services/auth.oauth.test.js`
+- [x] T054 [P] [US4] Thêm các bài test OAuth account upsert trong `backend/tests/unit/db/queries/users.queries.test.js`
+- [x] T055 [P] [US4] Thêm các bài test Google button rendering/navigation trong `frontend/tests/components/auth/LoginForm.test.jsx`
 
-### Parallel Opportunities
+### Triển khai cho User Story 4
 
-- T001-T005 can run in parallel.
-- T011-T014 can run in parallel after schema review.
-- Test tasks within each story marked `[P]` can run in parallel.
-- US3 and US4 can proceed in parallel after US1/US2 are stable enough for shared auth/session behavior.
+- [x] T056 [US4] Đảm bảo Google redirect xây dựng URL từ env config và thiết lập state cookie trong `backend/src/controllers/auth.controller.js`
+- [x] T057 [US4] Đảm bảo Google callback kiểm tra (validates) state trước khi trao đổi code (exchanging code) trong `backend/src/controllers/auth.controller.js`
+- [x] T058 [US4] Đảm bảo Google profile upsert tạo hoặc cập nhật các student accounts ở trạng thái active và link OAuth trong `backend/src/db/queries/users.queries.js`
+- [x] T059 [US4] Đảm bảo OAuth login tạo các sessions với trường `is_oauth` và `oauth_provider` trong `backend/src/services/auth.service.js`
+- [x] T060 [US4] Đảm bảo Google callback điều hướng (redirects) các trạng thái success/error về các tuyến (routes) trên frontend trong `backend/src/controllers/auth.controller.js`
+- [x] T061 [US4] Đảm bảo nút Google login sử dụng `/api/v1/auth/google` và hiển thị các lỗi dễ dàng thử lại (retry-friendly errors) trong `frontend/src/components/auth/GoogleLoginButton.jsx`
 
-## Parallel Example: User Story 1
+**Cột mốc**: US4 thêm tính năng OAuth mà không làm thay đổi luồng hoạt động của đăng nhập email/mật khẩu.
+
+---
+
+## Giai đoạn 7: Trau chuốt (Polish) & Các Vấn đề Cắt ngang (Cross-Cutting Concerns)
+
+**Mục đích**: Tính quản trị (Governance), tăng cường bảo mật, và validation đầy đủ cho tất cả các auth stories.
+
+- [x] T062 [P] Xác minh không phản hồi auth nào làm lộ `password_hash`, reset tokens, verification tokens, hoặc session secrets trong `backend/src/controllers/auth.controller.js`
+- [x] T063 [P] Xác minh các lỗi auth được đưa qua centralized handler mà không bị rò rỉ stack traces trong `backend/src/middleware/errorHandler.js`
+- [x] T064 [P] Xác minh auth rate limiters được áp dụng lên login, register, và forgot password trong `backend/src/routes/api/v1/auth.routes.js`
+- [x] T065 Chạy các backend auth tests và lưu lại kết quả vào `.sdd/specs/feat-auth-and-users/feat-auth/tasks.md`
+- [x] T066 Chạy các frontend auth tests và lưu lại kết quả vào `.sdd/specs/feat-auth-and-users/feat-auth/tasks.md`
+- [x] T067 Thực thi các kịch bản quickstart và cập nhật kết quả trong `.sdd/specs/feat-auth-and-users/feat-auth/quickstart.md`
+- [x] T068 [P] Triển khai tính năng ẩn/hiện mật khẩu (password visibility toggle hook) tái sử dụng trong `frontend/src/hooks/usePasswordToggle.js` và áp dụng cho toàn bộ auth forms
+
+---
+
+## Phụ thuộc & Thứ tự Thực thi (Dependencies & Execution Order)
+
+### Phụ thuộc theo Giai đoạn (Phase Dependencies)
+
+- Giai đoạn 1 không có sự phụ thuộc nào.
+- Giai đoạn 2 phụ thuộc vào Giai đoạn 1 và đóng vai trò chặn (blocks) tất cả các user stories.
+- US1 và US2 đều là P1; US1 là luồng (path) MVP đưa người dùng vào nền tảng.
+- US3 phụ thuộc vào hạ tầng nền tảng (foundational token/password infrastructure).
+- US4 phụ thuộc vào hạ tầng nền tảng (foundational session infrastructure).
+- Giai đoạn 7 phụ thuộc vào tất cả các user stories đã chọn.
+
+### Phụ thuộc theo User Story (User Story Dependencies)
+
+- US1: không phụ thuộc vào story khác sau giai đoạn foundation.
+- US2: không phụ thuộc vào story khác sau foundation, nhưng để login bằng tay yêu cầu một account đã được tạo (active) từ US1 hoặc từ dữ liệu mồi (seeded data).
+- US3: không phụ thuộc vào story khác sau foundation, nhưng reset bằng tay yêu cầu cần có user account.
+- US4: không phụ thuộc vào story khác sau foundation, nhưng sử dụng chung luồng session creation của US2.
+
+### Các Cơ hội Thực thi Song song (Parallel Opportunities)
+
+- T001-T005 có thể chạy song song.
+- T011-T014 có thể chạy song song sau khi xem xét lược đồ (schema review).
+- Các task test bên trong mỗi story có nhãn `[P]` có thể chạy song song.
+- US3 và US4 có thể được triển khai song song sau khi US1/US2 đủ ổn định (cung cấp chung nền tảng auth/session).
+
+## Ví dụ Song song (Parallel Example): User Story 1
 
 ```text
 Task: "Add registration happy-path and duplicate-email tests in backend/tests/unit/services/auth.reg.test.js"
@@ -197,23 +198,23 @@ Task: "Add verification token valid/used/expired tests in backend/tests/unit/ser
 Task: "Add register form validation tests in frontend/tests/components/auth/RegisterForm.test.jsx"
 ```
 
-## Implementation Strategy
+## Chiến lược Triển khai (Implementation Strategy)
 
-### MVP First
+### Theo Cấp độ Cơ bản Nhất (MVP First)
 
-1. Complete Phase 1 and Phase 2.
-2. Complete US1 registration/verification.
-3. Validate account activation independently.
+1. Hoàn tất Giai đoạn 1 và Giai đoạn 2.
+2. Hoàn tất đăng ký (registration)/xác thực (verification) của US1.
+3. Kiểm tra tính năng kích hoạt account độc lập.
 
-### Incremental Delivery
+### Giao hàng Theo đợt (Incremental Delivery)
 
-1. Deliver US1 account creation.
-2. Deliver US2 login/session/role navigation.
-3. Deliver US3 password recovery/change.
-4. Deliver US4 Google login.
+1. Bàn giao tính năng tạo account US1.
+2. Bàn giao tính năng đăng nhập/phiên (login/session/role navigation) US2.
+3. Bàn giao tính năng khôi phục/đổi mật khẩu US3.
+4. Bàn giao tính năng Google login US4.
 
-### Notes
+### Ghi chú (Notes)
 
-- Every task includes a file path and follows checklist format.
-- Do not return secrets or raw token values in API responses.
-- Do not add ORM usage; keep `pg` parameterized SQL.
+- Mọi task đều kèm theo đường dẫn file (file path) và tuân theo định dạng checklist format.
+- Không trả về secrets hoặc raw token values qua API responses.
+- Không sử dụng ORM; chỉ sử dụng `pg` parameterized SQL.

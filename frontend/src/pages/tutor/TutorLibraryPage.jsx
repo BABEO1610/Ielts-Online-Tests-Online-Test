@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import {
   fetchLibraryResources,
+  fetchMyLibraryResources,
   deleteLibraryResource,
 } from '../../services/library.service';
 import { useAuth } from '../../context/AuthContext';
@@ -528,6 +529,7 @@ const TutorLibraryView = ({
 
 const TutorLibraryPage = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useAuth();
   const [documents, setDocuments] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -536,24 +538,38 @@ const TutorLibraryPage = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selectedDocument, setSelectedDocument] = useState(null);
+  const [successMessage, setSuccessMessage] = useState(location.state?.message || null);
 
-  const loadDocuments = async () => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      const res = await fetchLibraryResources();
-      setDocuments(res.data || []);
-    } catch (err) {
-      const msg =
-        err.response?.data?.error?.message ||
-        'Không thể tải danh sách tài liệu. Vui lòng thử lại sau.';
-      setError(msg);
-    } finally {
-      setIsLoading(false);
+  useEffect(() => {
+    let cancelled = false;
+    Promise.all([fetchLibraryResources(), fetchMyLibraryResources()])
+      .then(([publicResponse, myResponse]) => {
+        if (cancelled) return;
+        const merged = new Map();
+        for (const doc of publicResponse.data || []) merged.set(doc.id, doc);
+        for (const doc of myResponse.data || []) merged.set(doc.id, doc);
+        setDocuments([...merged.values()]);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setError(
+          err.response?.data?.error?.message ||
+          'Không thể tải danh sách tài liệu. Vui lòng thử lại sau.'
+        );
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (location.state?.message) {
+      navigate(location.pathname, { replace: true, state: {} });
     }
-  };
-
-  useEffect(() => { loadDocuments(); }, []);
+  }, [location.pathname, location.state?.message, navigate]);
 
   const handleDeleteDocument = async (id) => {
     if (!window.confirm('Bạn có chắc chắn muốn xóa tài liệu này? Hành động không thể hoàn tác.')) return;
@@ -577,6 +593,17 @@ const TutorLibraryPage = () => {
 
   return (
     <>
+      {successMessage && (
+        <div className="alert alert-success alert-dismissible mx-auto mt-4 mb-0" style={{ maxWidth: '1200px' }}>
+          {successMessage}
+          <button
+            type="button"
+            className="btn-close"
+            aria-label="Đóng"
+            onClick={() => setSuccessMessage(null)}
+          />
+        </div>
+      )}
       <TutorLibraryView
         documents={documents}
         filteredDocuments={filteredDocuments}

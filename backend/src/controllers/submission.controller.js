@@ -1,7 +1,7 @@
 const SubmissionService = require('../services/submission.service');
 const AppError = require('../utils/AppError');
 const supabase = require('../config/supabase');
-const { v4: uuidv4 } = require('uuid');
+const { randomUUID } = require('node:crypto');
 const path = require('path');
 const { aiGradingConfig } = require('../config/aiGrading.config');
 
@@ -89,7 +89,7 @@ class SubmissionController {
         'audio/m4a': '.m4a',
       };
       const ext = extMap[mimeType] || path.extname(req.file.originalname) || '.audio';
-      const filename = `${uuidv4()}${ext}`;
+      const filename = `${randomUUID()}${ext}`;
 
       // Path trong Supabase bucket: speaking/{userId}/{uuid}.ext
       const storagePath = `speaking/${userId}/${filename}`;

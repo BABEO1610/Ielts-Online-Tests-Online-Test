@@ -500,3 +500,32 @@ Khi admin phân công giảng viên, trang "Nhật ký duyệt & thay đổi" hi
 - API health trả 200; một API process và một worker process đang chạy. Không xóa/sửa
   dữ liệu lịch sử, không chạy migration mới và không thêm bảng.
 
+---
+
+## [2026-07-27] | Codex | Khắc phục Tutor upload tài liệu (feat-content-builder)
+
+### Thay đổi
+
+- Xác định nguyên nhân chính: POST upload và Supabase/DB đã thành công, nhưng UI
+  chuyển về catalog public chỉ lọc `approved`, khiến tài liệu `pending` biến mất.
+- Thêm `GET /api/v1/library/mine` và `/mine/:id` có phân quyền để Tutor theo dõi,
+  chỉnh sửa tài liệu của mình ở mọi trạng thái duyệt; catalog public vẫn chỉ `approved`.
+- Thêm progress upload, thông báo “đang chờ duyệt”, bỏ header multipart thủ công để
+  trình duyệt tự tạo boundary; đồng bộ hook edit từ PATCH sang PUT.
+- Sửa validation controller phải dừng trước service, map lỗi Multer quá 200MB thành
+  HTTP 413, dùng MIME phát hiện từ magic bytes khi ghi Storage, và dọn object mới
+  nếu ghi metadata DB thất bại.
+- Bổ sung `deleted_at`/soft-delete cho metadata; thêm `storage_cleanup_pending` để
+  thao tác xóa file Cloud có thể retry an toàn khi Supabase tạm lỗi.
+- Thay các `require('uuid')` ESM không tương thích Jest bằng `crypto.randomUUID()` để
+  test route có thể khởi động.
+
+### Kiểm chứng
+
+- Backend unit/contract/integration library: 35/35 đạt với
+  `node --experimental-vm-modules`; service/query đạt 100% line/function và
+  87,37% branch coverage.
+- Backend public library integration: 4/4 đạt.
+- Frontend library service/hook: 6/6 đạt; ESLint các file thay đổi đạt.
+- Migration `028_harden_library_uploads.sql` đã áp dụng vào database development.
+

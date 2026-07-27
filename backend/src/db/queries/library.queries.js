@@ -31,12 +31,12 @@ async function getAllResources(filters = {}) {
   if (search) {
     conditions.push(`(title ILIKE $${idx} OR description ILIKE $${idx})`);
     values.push(`%${search}%`);
-    idx++;
   }
 
   // Filter out unpublished or pending/rejected resources from the public library
   conditions.push(`is_published = TRUE`);
   conditions.push(`review_status = 'approved'`);
+  conditions.push(`deleted_at IS NULL`);
 
   const whereClause = conditions.length > 0
     ? 'WHERE ' + conditions.join(' AND ')
@@ -58,26 +58,31 @@ async function getAllResources(filters = {}) {
  * @param {string} uploadedBy - UUID của tutor
  * @param {string|null} category - filter category (hoặc null = tất cả)
  */
-async function getResourcesByUploader(uploadedBy, category = null) {
+async function getResourcesByUploader(uploadedBy, filters = {}) {
+  const { category, search, resource_type } = filters || {};
+  const conditions = ['uploaded_by = $1', 'deleted_at IS NULL'];
+  const values = [uploadedBy];
+
   if (category) {
-    const result = await pool.query(
-      `SELECT id, title, description, resource_type, file_url, file_size_bytes,
-              category, is_published, review_status, created_at, updated_at
-       FROM library_resources
-       WHERE uploaded_by = $1 AND category = $2
-       ORDER BY updated_at DESC`,
-      [uploadedBy, category]
-    );
-    return result.rows;
+    values.push(category);
+    conditions.push(`category = $${values.length}`);
+  }
+  if (resource_type) {
+    values.push(resource_type);
+    conditions.push(`resource_type = $${values.length}`);
+  }
+  if (search) {
+    values.push(`%${search}%`);
+    conditions.push(`(title ILIKE $${values.length} OR description ILIKE $${values.length})`);
   }
 
   const result = await pool.query(
     `SELECT id, title, description, resource_type, file_url, file_size_bytes,
-            category, is_published, review_status, created_at, updated_at
+            category, is_published, review_status, uploaded_by, created_at, updated_at
      FROM library_resources
-     WHERE uploaded_by = $1
+     WHERE ${conditions.join(' AND ')}
      ORDER BY updated_at DESC`,
-    [uploadedBy]
+    values
   );
   return result.rows;
 }
@@ -94,7 +99,8 @@ async function getResourceById(id, uploadedBy) {
       `SELECT id, title, description, resource_type, file_url, file_size_bytes,
               category, is_published, review_status, created_at, updated_at
        FROM library_resources
-       WHERE id = $1 AND is_published = TRUE AND review_status = 'approved'`,
+       WHERE id = $1 AND is_published = TRUE AND review_status = 'approved'
+         AND deleted_at IS NULL`,
       [id]
     );
     return result.rows[0] || null;
@@ -104,8 +110,20 @@ async function getResourceById(id, uploadedBy) {
     `SELECT id, title, description, resource_type, file_url, file_size_bytes,
             category, is_published, review_status, created_at, updated_at
      FROM library_resources
-     WHERE id = $1 AND uploaded_by = $2`,
+     WHERE id = $1 AND uploaded_by = $2 AND deleted_at IS NULL`,
     [id, uploadedBy]
+  );
+  return result.rows[0] || null;
+}
+
+async function getManagedResourceById(id, uploadedBy, isAdmin = false) {
+  const result = await pool.query(
+    `SELECT id, title, description, resource_type, file_url, file_size_bytes,
+            category, is_published, review_status, uploaded_by, created_at, updated_at
+     FROM library_resources
+     WHERE id = $1 AND deleted_at IS NULL
+       AND ($3::boolean = TRUE OR uploaded_by = $2)`,
+    [id, uploadedBy, isAdmin]
   );
   return result.rows[0] || null;
 }
@@ -133,7 +151,7 @@ async function createResource(data) {
  * @param {string} uploadedBy - UUID tutor (ownership check)
  * @param {Object} data - { title, description, category, resource_type, file_url, file_size_bytes }
  */
-async function updateResource(id, uploadedBy, data) {
+async function updateResource(id, uploadedBy, data, isAdmin = false) {
   const { title, description, category, resource_type, file_url, file_size_bytes } = data;
   let query = `
     UPDATE library_resources
@@ -147,37 +165,54 @@ async function updateResource(id, uploadedBy, data) {
   }
 
   query += `
-    WHERE id = $${values.length + 1} AND uploaded_by = $${values.length + 2}
+    WHERE id = $${values.length + 1}
+      AND ($${values.length + 3}::boolean = TRUE OR uploaded_by = $${values.length + 2})
+      AND deleted_at IS NULL
     RETURNING id, title, description, resource_type, file_url, file_size_bytes,
               category, is_published, review_status, created_at, updated_at
   `;
-  values.push(id, uploadedBy);
+  values.push(id, uploadedBy, isAdmin);
 
   const result = await pool.query(query, values);
   return result.rows[0] || null;
 }
 
 /**
- * Xóa một tài liệu (hard delete — file_url phải được xóa ở service layer trước)
+ * Soft-delete metadata; the service removes the physical object separately.
  * @param {string} id - UUID
  * @param {string} uploadedBy - UUID tutor
  * @returns {boolean} true nếu xóa thành công
  */
-async function deleteResource(id, uploadedBy) {
+async function deleteResource(id, uploadedBy, isAdmin = false) {
   const result = await pool.query(
-    `DELETE FROM library_resources
-     WHERE id = $1 AND uploaded_by = $2
+    `UPDATE library_resources
+     SET deleted_at = COALESCE(deleted_at, NOW()),
+         storage_cleanup_pending = TRUE,
+         updated_at = NOW()
+     WHERE id = $1 AND ($3::boolean = TRUE OR uploaded_by = $2)
+       AND (deleted_at IS NULL OR storage_cleanup_pending = TRUE)
      RETURNING id, file_url`,
-    [id, uploadedBy]
+    [id, uploadedBy, isAdmin]
   );
   return result.rows[0] || null;
+}
+
+async function markStorageCleanupComplete(id) {
+  await pool.query(
+    `UPDATE library_resources
+     SET storage_cleanup_pending = FALSE, updated_at = NOW()
+     WHERE id = $1`,
+    [id]
+  );
 }
 
 module.exports = {
   getAllResources,
   getResourcesByUploader,
   getResourceById,
+  getManagedResourceById,
   createResource,
   updateResource,
   deleteResource,
+  markStorageCleanupComplete,
 };

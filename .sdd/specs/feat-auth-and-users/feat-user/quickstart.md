@@ -1,12 +1,12 @@
-# Quickstart: User Administration and Authorization
+# Khởi động Nhanh (Quickstart): User Administration and Authorization
 
-## Prerequisites
+## Yêu cầu Cần thiết (Prerequisites)
 
-- Migrated PostgreSQL database.
-- Active admin, tutor, and student accounts.
-- Backend and frontend configured with cookie credentials.
+- PostgreSQL database đã chạy migration.
+- Các tài khoản admin, tutor, và student đang hoạt động (active).
+- Backend và frontend đã được cấu hình với cookie credentials.
 
-## Run
+## Chạy (Run)
 
 ```powershell
 cd backend
@@ -20,28 +20,28 @@ npm test -- --run tests/components/auth/ProtectedRoute.test.jsx
 npm run dev
 ```
 
-## Validation Scenarios
+## Các Kịch bản Xác thực (Validation Scenarios)
 
-1. Log in as student and open `/admin`.
-   Expected: frontend redirects away; direct `/api/v1/admin/users` returns authorization error.
+1. Đăng nhập bằng tài khoản student và mở `/admin`.
+   Kết quả mong đợi: frontend điều hướng đi chỗ khác (redirects away); việc gọi trực tiếp `/api/v1/admin/users` trả về lỗi không có quyền (authorization error).
 
-2. Log in as tutor and open tutor workspace.
-   Expected: route renders for tutor; admin-only routes remain blocked.
+2. Đăng nhập bằng tài khoản tutor và mở không gian làm việc của tutor (tutor workspace).
+   Kết quả mong đợi: tuyến đường (route) hiển thị bình thường cho tutor; các tuyến đường chỉ dành cho admin (admin-only routes) vẫn bị chặn.
 
-3. Log in as admin and open `/admin/users`.
-   Expected: paginated table loads users with name, email, role, status, created date.
+3. Đăng nhập bằng tài khoản admin và mở `/admin/users`.
+   Kết quả mong đợi: bảng có phân trang tải danh sách người dùng kèm theo tên, email, role, status, và ngày tạo.
 
-4. Search by email/name and filter by role/status.
-   Expected: backend returns matching page and meta total; empty results show empty state.
+4. Tìm kiếm bằng email/tên và lọc bằng role/status.
+   Kết quả mong đợi: backend trả về đúng trang kết quả và tổng số meta; kết quả rỗng sẽ hiển thị trạng thái rỗng (empty state).
 
-5. Change another user's role.
-   Expected: role persists, target active sessions revoked, audit row created.
+5. Thay đổi role của người dùng khác.
+   Kết quả mong đợi: role được lưu lại, các phiên đang hoạt động của người dùng đó (target active sessions) bị thu hồi, tạo ra dòng log audit.
 
-6. Change another user's status to `inactive` or `banned`.
-   Expected: status persists, target active sessions revoked, audit row created.
+6. Thay đổi status của người dùng khác thành `inactive` hoặc `banned`.
+   Kết quả mong đợi: status được lưu lại, các phiên đang hoạt động của người dùng đó bị thu hồi, tạo ra dòng log audit.
 
-7. Attempt to change own role/status as admin.
-   Expected: API rejects and UI shows error.
+7. Cố gắng thay đổi role/status của chính mình bằng tài khoản admin.
+   Kết quả mong đợi: API từ chối và UI hiển thị lỗi.
 
-8. Open `/admin/sessions`, filter/search locally, and revoke a session.
-   Expected: session disappears and cannot refresh/authenticate again.
+8. Mở `/admin/sessions`, sử dụng bộ lọc/tìm kiếm tại phía giao diện, và thu hồi (revoke) một session.
+   Kết quả mong đợi: session biến mất khỏi danh sách và không thể refresh/xác thực lại được nữa.

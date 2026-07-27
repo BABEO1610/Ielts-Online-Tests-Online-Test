@@ -1,3 +1,10 @@
+/**
+ * ==========================================
+ * FILE CẤU HÌNH & HẰNG SỐ (Constants)
+ * ==========================================
+ * Nhiệm vụ: Chứa toàn bộ các biến cấu hình, mã lỗi, thông báo lỗi, 
+ * và bản đồ định tuyến ý định (INTENT_CONTEXT_MAP) để dùng chung cho toàn dự án.
+ */
 const ERROR_CODES = {
   LOGIN_REQUIRED: 'LOGIN_REQUIRED',
   FORBIDDEN: 'FORBIDDEN',
@@ -158,6 +165,7 @@ const INTENT_CONTEXT_MAP = {
   },
 };
 
+// Hàm tiện ích: Tạo đối tượng lỗi chuẩn kèm theo mã HTTP status tương ứng
 const createAssistantError = (code, message = ERROR_MESSAGES[code]) => {
   const error = new Error(message || ERROR_MESSAGES.INTERNAL_ERROR);
   error.code = code;

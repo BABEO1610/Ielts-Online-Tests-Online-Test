@@ -1,6 +1,4 @@
 const multer = require('multer');
-const path = require('path');
-const fs = require('fs');
 
 // Sử dụng memoryStorage để lưu tạm file vào RAM trước khi upload lên Supabase
 const storage = multer.memoryStorage();
@@ -12,6 +10,8 @@ const allowedMimes = [
   'audio/mp4',                     // m4a
   'audio/ogg',
   'audio/wav',
+  'audio/x-wav',
+  'audio/wave',
   'image/jpeg',
   'image/png',
   'image/gif',

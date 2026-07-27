@@ -57,7 +57,7 @@ const AdminLayout = () => {
   return (
     <div className="admin-shell">
       {/* ── Sidebar ───────────────────────────────────────────── */}
-      <aside className="admin-sidebar">
+      <aside className="admin-sidebar" translate="no">
         <Link to="/admin" className="admin-sidebar__brand">IELTSZone Admin</Link>
         <nav className="admin-sidebar__nav">
           {NAV_SECTIONS.map((section) => (

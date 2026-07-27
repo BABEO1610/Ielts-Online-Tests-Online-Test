@@ -17,6 +17,10 @@ const toSafeInt = (value) => {
   return Math.trunc(number);
 };
 
+/**
+ * normalizeAiUsageMetadata
+ * Chuẩn hóa số lượng token trả về từ API của AI (Gemini) thành format chung của dự án
+ */
 const normalizeAiUsageMetadata = (metadata) => {
   const meta = metadata || {};
   const promptTokens = toSafeInt(meta.promptTokenCount ?? meta.prompt_tokens);
@@ -37,6 +41,10 @@ const normalizeAiUsageMetadata = (metadata) => {
   };
 };
 
+/**
+ * normalizeOpenAiUsageMetadata
+ * Chuẩn hóa số lượng token trả về từ API của OpenAI (ChatGPT) thành format chung của dự án
+ */
 const normalizeOpenAiUsageMetadata = (usage) => {
   const u = usage || {};
   return {
@@ -56,6 +64,10 @@ const truncate = (value, maxLength) => {
   return String(value).slice(0, maxLength);
 };
 
+/**
+ * sanitizeDiagnostic
+ * Che giấu (Redact) thông tin nhạy cảm (URL, Nội dung bài làm) trước khi in lỗi ra Log
+ */
 const sanitizeDiagnostic = (value, maxLength = 500) => {
   if (!value) return null;
   return String(value)
@@ -68,6 +80,10 @@ const sanitizeDiagnostic = (value, maxLength = 500) => {
     .slice(0, maxLength);
 };
 
+/**
+ * recordAiStageMetric
+ * Ghi log tiến trình xử lý của AI (ví dụ: đang chấm bài, đang bóc băng audio...)
+ */
 const recordAiStageMetric = (payload = {}) => {
   const metric = {
     jobId: payload.jobId || null,
@@ -119,6 +135,10 @@ const insertAiUsageLog = async (values) => {
   );
 };
 
+/**
+ * recordAiUsageLog
+ * Ghi lại lịch sử sử dụng AI vào Database (Lưu trữ Token, Latency, Error) để thống kê chi phí
+ */
 const recordAiUsageLog = async (payload = {}) => {
   const usage = normalizeAiUsageMetadata(payload.usageMetadata);
   const feature = sanitizeFeature(payload.feature);

@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import DocumentForm from '../../components/library/DocumentForm';
-import { fetchLibraryResourceById } from '../../services/library.service';
+import { fetchMyLibraryResourceById } from '../../services/library.service';
 
 const TutorLibraryEditPage = () => {
   const { id } = useParams();
@@ -15,7 +15,7 @@ const TutorLibraryEditPage = () => {
       setIsLoading(true);
       setError(null);
       try {
-        const res = await fetchLibraryResourceById(id);
+        const res = await fetchMyLibraryResourceById(id);
         setDocumentData(res.data);
       } catch (err) {
         const msg =

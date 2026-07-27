@@ -1,3 +1,11 @@
+/**
+ * ==========================================
+ * TẦNG 2: ĐIỀU HƯỚNG & BẢO VỆ (Controller & Guardrails)
+ * ==========================================
+ * Nhiệm vụ: Xác thực người dùng, kiểm tra quyền hạn, điều hướng luồng dữ liệu (Stream/Sync) 
+ * và gọi xuống tầng Service.
+ */
+
 const redisClient = require('../../config/redis');
 const { findActiveSession } = require('../../db/queries/sessions.queries');
 const { verifyAccessToken } = require('../../utils/token.util');
@@ -8,7 +16,7 @@ const {
   ERROR_MESSAGES,
   HTTP_STATUS_BY_CODE,
 } = require('./assistant.constants');
-
+// hàm bộ trợ đóng gói và trả phản hồi lỗi chuẩn cho json
 const sendAssistantError = (res, code, message = ERROR_MESSAGES[code]) => {
   const status = HTTP_STATUS_BY_CODE[code] || 500;
   return res.status(status).json({
@@ -20,7 +28,7 @@ const sendAssistantError = (res, code, message = ERROR_MESSAGES[code]) => {
     intent: code,
   });
 };
-
+// đóng gói là trả về kết quả thành công cho api chat(answer, suggestedlinks, conversationID, grouding)
 const sendAssistantResult = (res, result) => {
   if (result.code) {
     return sendAssistantError(res, result.code, result.message);
@@ -40,14 +48,15 @@ const sendAssistantResult = (res, result) => {
     code: null,
   });
 };
-
+// Ghi dữ liệu dạng SSE( event:...\ndata:...\n\n)
 const writeSseEvent = (res, event, data) => {
   res.write(`event: ${event}\n`);
   res.write(`data: ${JSON.stringify(data)}\n\n`);
 };
-
+//trích xuất token xác thực từ cookies của http request( access_token)
 const getTokenFromRequest = (req) => req.cookies?.accessToken || req.cookies?.access_token || null;
-
+// xác thực danh tính người dùng gọi api
+// luồng sẽ là lấy tooken từ cookies -> giải mã jwt-> kiểm tra season còn hiệu lực trong redis or database , kiemer tra yêu cầu đổi mật khẩu. nếu hợp lệ trả về đối tượng user
 const resolveAuthenticatedUser = async (req) => {
   const token = getTokenFromRequest(req);
   if (!token) {
@@ -77,21 +86,17 @@ const resolveAuthenticatedUser = async (req) => {
     return { user: null, code: ERROR_CODES.LOGIN_REQUIRED };
   }
 
-  if (decoded.must_change_password) {
-    return { user: null, code: ERROR_CODES.FORBIDDEN };
-  }
 
   return {
     user: {
       id: decoded.sub,
       role: decoded.role,
       session_token: decoded.session_token,
-      must_change_password: decoded.must_change_password,
     },
     code: null,
   };
 };
-
+// kiểm tra có phải vai trò học viên không 
 const ensureStudent = (user) => {
   if (!user) {
     return ERROR_CODES.LOGIN_REQUIRED;
@@ -103,7 +108,7 @@ const ensureStudent = (user) => {
 
   return null;
 };
-
+// xử lý request đồng bộ -> ai tạo toàn bộ -> nhận về 1 lần json
 const chat = async (req, res) => {
   const validation = validateChatPayload(req.body);
   if (validation.error) {

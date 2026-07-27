@@ -1,3 +1,11 @@
+/**
+ * ==========================================
+ * TẦNG 3: NÃO BỘ (Service & Intent Routing)
+ * ==========================================
+ * Nhiệm vụ: Trái tim của trợ lý ảo. Xử lý logic nghiệp vụ chính, tổng hợp ngữ cảnh (Context), 
+ * phân loại ý định (Intent) và quyết định gọi AI hay gọi Database.
+ */
+
 const aiService = require('../../services/ai.service');
 const repository = require('./assistant.repository');
 const { evaluateGuardrails } = require('./assistant.guardrails');
@@ -28,6 +36,10 @@ const {
   createAssistantError,
 } = require('./assistant.constants');
 
+/**
+ * buildErrorResult
+ * Hàm tạo chuẩn dữ liệu lỗi trả về cho Frontend
+ */
 const buildErrorResult = (code, message = ERROR_MESSAGES[code]) => ({
   answer: null,
   suggestedLinks: [],
@@ -38,6 +50,10 @@ const buildErrorResult = (code, message = ERROR_MESSAGES[code]) => ({
   message,
 });
 
+/**
+ * buildGuardrailIntent
+ * Hàm chuyển đổi lỗi bảo mật (Guardrail) thành Intent tương ứng
+ */
 const buildGuardrailIntent = ({ guardrail, message, context }) => {
   if (guardrail.code === ERROR_CODES.OUT_OF_SCOPE) return ASSISTANT_INTENTS.OUT_OF_SCOPE;
   if (guardrail.code === ERROR_CODES.FORBIDDEN) return ERROR_CODES.FORBIDDEN;
@@ -65,6 +81,10 @@ const DEFAULT_SAFETY = {
   containsPrivateData: false,
 };
 
+/**
+ * buildSuccessResult
+ * Hàm tạo chuẩn dữ liệu thành công trả về cho Frontend (Kèm theo metadata như grounding, safety)
+ */
 const buildSuccessResult = ({
   answer,
   suggestedLinks = [],
@@ -108,6 +128,10 @@ const buildSuccessResult = ({
   code: null,
 });
 
+/**
+ * isLookupIntent
+ * Kiểm tra xem Intent hiện tại có phải là loại tìm kiếm (Tìm đề, Tìm bài giảng) hay không
+ */
 const isLookupIntent = (intent) =>
   intent === ASSISTANT_INTENTS.FIND_TEST || intent === ASSISTANT_INTENTS.FIND_LESSON;
 
@@ -128,6 +152,10 @@ const CONVERSATION_TOPIC_PATTERNS = [
   ['speaking part 3', /\b(speaking\s+)?part\s*3\b/],
 ];
 
+/**
+ * hasRoutingFollowUpCue
+ * Hàm phát hiện xem user có đang hỏi câu hỏi nối tiếp (VD: "cách làm bài này") không
+ */
 const hasRoutingFollowUpCue = (message) => {
   const text = normalizeText(message);
   return hasContextFollowUpCue(message) || [
@@ -139,6 +167,10 @@ const hasRoutingFollowUpCue = (message) => {
   ].some((pattern) => pattern.test(text));
 };
 
+/**
+ * inferSkillFromMessage
+ * Hàm nội suy kỹ năng (Reading, Listening...) từ tin nhắn của user
+ */
 const inferSkillFromMessage = (message) => {
   const text = normalizeText(message);
   const directSkill = ['reading', 'listening', 'writing', 'speaking'].find((skill) => text.includes(skill));
@@ -152,6 +184,10 @@ const inferSkillFromMessage = (message) => {
   return null;
 };
 
+/**
+ * inferTopicsFromMessage
+ * Hàm nội suy chủ đề (Skimming, Matching Headings...) từ tin nhắn
+ */
 const inferTopicsFromMessage = (message) => {
   const text = normalizeText(message);
   return CONVERSATION_TOPIC_PATTERNS
@@ -159,12 +195,20 @@ const inferTopicsFromMessage = (message) => {
     .map(([topic]) => topic);
 };
 
+/**
+ * didAssistantOfferPractice
+ * Kiểm tra xem trong các tin nhắn gần đây, Trợ lý có gợi ý bài tập/đề thi nào cho user không
+ */
 const didAssistantOfferPractice = (recentMessages = []) => [...recentMessages]
   .reverse()
   .filter((item) => item?.role === 'assistant' && item.content)
   .slice(0, 2)
   .some((item) => /\b(bai tap|bai luyen|practice test|practice exercise|practice|luyen tap|luyen phan nay|tim de|goi y de)\b/.test(normalizeText(item.content)));
 
+/**
+ * inferPreviousRoutingContext
+ * Trích xuất Intent và Kỹ năng ở câu hỏi trước đó để phục vụ cho các câu hỏi nối tiếp
+ */
 const inferPreviousRoutingContext = (recentMessages = [], baseContext = {}) => {
   const routableIntents = new Set([
     ASSISTANT_INTENTS.IELTS_KNOWLEDGE,
@@ -199,6 +243,10 @@ const inferPreviousRoutingContext = (recentMessages = [], baseContext = {}) => {
   };
 };
 
+/**
+ * buildRoutingContext
+ * Hàm tổng hợp toàn bộ ngữ cảnh (lịch sử, kỹ năng trước đó) để giúp phân loại Intent chính xác
+ */
 const buildRoutingContext = async ({ user, payload, sessionId }) => {
   const baseContext = { ...(payload.context || {}) };
   ['previousIntent', 'previousSkill', 'recentMessages', 'recentTopics', 'assistantOfferedPractice']
@@ -222,16 +270,32 @@ const buildRoutingContext = async ({ user, payload, sessionId }) => {
   }
 };
 
+/**
+ * isEmptyLookupContext
+ * Kiểm tra xem kết quả tìm kiếm Database trả về có bị trống (không tìm thấy gì) không
+ */
 const isEmptyLookupContext = (contextInjection) =>
   isLookupIntent(contextInjection.mode) && contextInjection.databaseResults.length === 0;
 
+/**
+ * limitDisplayLinks
+ * Giới hạn số lượng Link bài tập/đề thi hiển thị ra UI (Tránh hiển thị quá dài)
+ */
 const limitDisplayLinks = (links = []) => links.slice(0, ASSISTANT_DISPLAY_RESULT_LIMIT);
 
+/**
+ * getSourceTables
+ * Trích xuất tên các bảng Database đã được dùng để trả lời (phục vụ Debug/Metadata)
+ */
 const getSourceTables = (queryTable) => {
   if (!queryTable) return [];
   return [...new Set(String(queryTable).split('/').map((table) => table.trim()).filter(Boolean))];
 };
 
+/**
+ * buildGroundingMetadata
+ * Tạo Metadata cho biết câu trả lời này được lấy từ nguồn nào (Database, Knowledge Base...)
+ */
 const buildGroundingMetadata = (contextInjection = {}) => ({
   usedDatabase: Boolean(contextInjection.debug?.queryTable),
   usedKnowledgeBase: Boolean(contextInjection.debug?.usedKnowledgeBase || contextInjection.knowledgeResults?.length),
@@ -241,12 +305,20 @@ const buildGroundingMetadata = (contextInjection = {}) => ({
   knowledgeTopic: contextInjection.debug?.detectedTopic || null,
 });
 
+/**
+ * buildSafetyMetadata
+ * Tạo Metadata cho biết câu trả lời có vi phạm chính sách an toàn không
+ */
 const buildSafetyMetadata = (intent, response = {}) => ({
   ...DEFAULT_SAFETY,
   ...(response.safety || {}),
   outOfScope: Boolean(response.safety?.outOfScope || intent === ASSISTANT_INTENTS.OUT_OF_SCOPE),
 });
 
+/**
+ * buildLinkMeta
+ * Trích xuất Metadata của các đường link được đính kèm (Loại link, Title, Thumbnail)
+ */
 const buildLinkMeta = (contextInjection, links = contextInjection.suggestedLinks || []) => {
   const totalMatched = contextInjection.debug?.contextRowCount ?? links.length;
   const displayedCount = Math.min(links.length, ASSISTANT_DISPLAY_RESULT_LIMIT, totalMatched);
@@ -260,8 +332,16 @@ const buildLinkMeta = (contextInjection, links = contextInjection.suggestedLinks
   };
 };
 
+/**
+ * getResultTitle
+ * Lấy tiêu đề của kết quả tìm kiếm (từ Database)
+ */
 const getResultTitle = (item) => item.title || item.name || item.label || 'IELTS content';
 
+/**
+ * buildConversationalLookupLead
+ * Tạo câu mào đầu tự nhiên khi trả về kết quả tìm kiếm (VD: "Mình tìm thấy 3 đề thi cho bạn này:")
+ */
 const buildConversationalLookupLead = (contextInjection) => {
   const preferredAddress = normalizePreferredAddress(
     contextInjection.conversationPreferences?.preferredAddress
@@ -269,6 +349,10 @@ const buildConversationalLookupLead = (contextInjection) => {
   return preferredAddress ? `Được nè, ${preferredAddress}. ` : 'Được nhé. ';
 };
 
+/**
+ * buildRecentTopicBridge
+ * Tạo câu chuyển ý tự nhiên nối với chủ đề đang chat (VD: "Liên quan đến phần Reading bạn vừa hỏi...")
+ */
 const buildRecentTopicBridge = (contextInjection) => {
   const topics = contextInjection.conversationState?.recentTopics || [];
   if (!topics.length) return '';
@@ -279,12 +363,20 @@ const buildRecentTopicBridge = (contextInjection) => {
   return `Dựa trên phần mình vừa trao đổi với bạn về ${label}, `;
 };
 
+/**
+ * getLookupDisplayItems
+ * Lấy danh sách kết quả tìm kiếm để hiển thị (tối đa N kết quả)
+ */
 const getLookupDisplayItems = (contextInjection, items) => {
   const requestedQuantity = Number(contextInjection.debug?.requestedQuantity) || null;
   const count = Math.min(requestedQuantity || ASSISTANT_DISPLAY_RESULT_LIMIT, ASSISTANT_DISPLAY_RESULT_LIMIT);
   return items.slice(0, count);
 };
 
+/**
+ * buildLookupFallbackAnswer
+ * Tạo câu trả lời cứng (Fallback) khi tìm kiếm Database bị lỗi hoặc không tìm thấy
+ */
 const buildLookupFallbackAnswer = (contextInjection) => {
   const items = contextInjection.databaseResults || [];
   const lookupMissing = Boolean(contextInjection.debug?.lookupMissing);
@@ -316,7 +408,7 @@ const buildLookupFallbackAnswer = (contextInjection) => {
     msg += displayedItems.length === 1 ? '\nBạn có thể mở đề bằng link bên dưới nhé.' : '\nBạn muốn mở đề nào trước?';
     return msg;
   }
-  
+
   if (contextInjection.mode === ASSISTANT_INTENTS.FIND_LESSON) {
     const displayedItems = getLookupDisplayItems(contextInjection, items);
     if (lookupMissing) {
@@ -338,10 +430,14 @@ const buildLookupFallbackAnswer = (contextInjection) => {
     msg += '\nBạn có thể mở trang Library ở phần link gợi ý bên dưới.';
     return msg;
   }
-  
+
   return MISSING_DATA_MESSAGE;
 };
 
+/**
+ * buildDeterministicLookupResponse
+ * Đóng gói câu trả lời tìm kiếm tĩnh (Không dùng AI) để trả về cho Frontend
+ */
 const buildDeterministicLookupResponse = (contextInjection, overrides = {}) => ({
   answer: buildLookupFallbackAnswer(contextInjection),
   suggestedLinks: limitDisplayLinks(contextInjection.suggestedLinks || []),
@@ -355,6 +451,10 @@ const buildDeterministicLookupResponse = (contextInjection, overrides = {}) => (
   ...overrides,
 });
 
+/**
+ * getFallbackAnswer
+ * Lấy câu trả lời cứng dựa vào lỗi (Out of Scope, Forbidden...)
+ */
 const getFallbackAnswer = (contextInjection) => {
   if (isLookupIntent(contextInjection.mode)) return buildLookupFallbackAnswer(contextInjection);
   if (contextInjection.mode === ASSISTANT_INTENTS.POST_TEST_REVIEW) {
@@ -366,6 +466,10 @@ const getFallbackAnswer = (contextInjection) => {
   return 'Mình có thể hỗ trợ nội dung IELTS trên website như tìm test, lesson, study tips, navigation hoặc review đáp án sau khi nộp bài.';
 };
 
+/**
+ * buildIeltsKnowledgeFallback
+ * Tạo câu trả lời cứng dự phòng khi AI bị lỗi sinh text (Dùng trong tính năng Hỏi kiến thức)
+ */
 const buildIeltsKnowledgeFallback = (message, contextInjection = {}) => {
   const text = String(message || '').toLowerCase();
   const normalized = text.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
@@ -420,6 +524,10 @@ const buildIeltsKnowledgeFallback = (message, contextInjection = {}) => {
   return `${lead}mình chưa thể tạo một câu trả lời đủ chắc chắn cho câu này ngay lúc này. Bạn thử lại hoặc nêu kỹ năng cụ thể hay chủ đề tiếng Anh muốn học để mình hỗ trợ sát hơn nhé.`;
 };
 
+/**
+ * isGenericAssistantAnswer
+ * Kiểm tra xem AI có đang trả lời chung chung kiểu "Tôi không biết" không
+ */
 const isGenericAssistantAnswer = (answer) => {
   const text = String(answer || '').toLowerCase();
   return text.includes('mình có thể hỗ trợ nội dung ielts') ||
@@ -428,12 +536,20 @@ const isGenericAssistantAnswer = (answer) => {
     text.includes('review đáp án');
 };
 
+/**
+ * normalizeLookupGroundingText
+ * Chuẩn hóa đoạn Text giải thích kết quả tìm kiếm để AI dễ đọc
+ */
 const normalizeLookupGroundingText = (value) =>
   normalizeText(value)
     .replace(/[^a-z0-9]+/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
 
+/**
+ * lookupAnswerMentionsKnownResult
+ * Kiểm tra xem câu trả lời của AI có nhắc đến kết quả từ Database không
+ */
 const lookupAnswerMentionsKnownResult = (answer, rows = []) => {
   const normalizedAnswer = normalizeLookupGroundingText(answer);
   return rows.some((row) => {
@@ -442,6 +558,10 @@ const lookupAnswerMentionsKnownResult = (answer, rows = []) => {
   });
 };
 
+/**
+ * emitAssistantDebug
+ * Bắn Event log ra hệ thống (Phục vụ debug và lưu vết Pipeline)
+ */
 const emitAssistantDebug = (data) => {
   if (process.env.ASSISTANT_DEBUG !== 'true') return;
   console.info('[AssistantDebug]', {
@@ -515,6 +635,10 @@ const emitAssistantDebug = (data) => {
   });
 };
 
+/**
+ * safeCreateSession
+ * Tạo (hoặc lấy) Session ID cho phiên chat, bắt lỗi để không sập app nếu DB lỗi
+ */
 const safeCreateSession = async (userId, requestedSessionId = null) => {
   try {
     return await repository.createOrGetSession(userId, requestedSessionId);
@@ -524,6 +648,10 @@ const safeCreateSession = async (userId, requestedSessionId = null) => {
   }
 };
 
+/**
+ * safeSaveUserMessage
+ * Lưu tin nhắn của User vào DB một cách an toàn
+ */
 const safeSaveUserMessage = async (sessionId, message, userId) => {
   try {
     return await repository.saveUserMessage(sessionId, message, userId);
@@ -533,6 +661,10 @@ const safeSaveUserMessage = async (sessionId, message, userId) => {
   }
 };
 
+/**
+ * safeSaveAssistantMessage
+ * Lưu tin nhắn phản hồi của Trợ lý vào DB một cách an toàn
+ */
 const safeSaveAssistantMessage = async (sessionId, answer, userId) => {
   try {
     return await repository.saveAssistantMessage(sessionId, answer, userId);
@@ -542,6 +674,10 @@ const safeSaveAssistantMessage = async (sessionId, answer, userId) => {
   }
 };
 
+/**
+ * safeGetRecentMessages
+ * Lấy N tin nhắn gần nhất từ DB để làm Context cho AI
+ */
 const safeGetRecentMessages = async (userId, sessionId, limit = ROUTING_MEMORY_LIMIT) => {
   if (!userId || !sessionId) return [];
   try {
@@ -552,6 +688,10 @@ const safeGetRecentMessages = async (userId, sessionId, limit = ROUTING_MEMORY_L
   }
 };
 
+/**
+ * safeGetSessionPreference
+ * Lấy sở thích/cài đặt (Mục tiêu band điểm...) của User từ DB
+ */
 const safeGetSessionPreference = async (userId, sessionId) => {
   if (!userId || !sessionId || typeof repository.getSessionPreference !== 'function') {
     return { supported: false, preferredAddress: null };
@@ -564,6 +704,10 @@ const safeGetSessionPreference = async (userId, sessionId) => {
   }
 };
 
+/**
+ * safeSetSessionPreference
+ * Lưu sở thích/cài đặt của User vào DB
+ */
 const safeSetSessionPreference = async ({ userId, sessionId, preferredAddress }) => {
   if (!userId || !sessionId || typeof repository.setSessionPreference !== 'function') return false;
   try {
@@ -574,6 +718,10 @@ const safeSetSessionPreference = async ({ userId, sessionId, preferredAddress })
   }
 };
 
+/**
+ * resolveConversationDisplayName
+ * Lấy tên hiển thị của User để Trợ lý gọi (Từ tên thật, User ID hoặc xưng "bạn")
+ */
 const resolveConversationDisplayName = async ({ user, sessionId }) => {
   const storedPreference = await safeGetSessionPreference(user?.id, sessionId);
   const recentMessages = storedPreference.supported
@@ -588,6 +736,10 @@ const resolveConversationDisplayName = async ({ user, sessionId }) => {
   return resolveUserDisplayName(user);
 };
 
+/**
+ * buildPreferenceIntentResult
+ * Xử lý ngay lập tức các yêu cầu cài đặt sở thích (Return sớm không gọi AI)
+ */
 const buildPreferenceIntentResult = async ({ message, user, sessionId }) => {
   if (!isAddressPreferenceRequest(message)) return null;
   const isEnglish = /\b(?:call(?:ing)? me|stop calling|address me|remember (?:my name|what to call me)|what (?:do|should) you call me)\b/i.test(message);
@@ -635,6 +787,10 @@ const {
   buildOutOfScopeResponse,
 } = require('./assistant.responses');
 
+/**
+ * buildImmediateIntentResult
+ * Xử lý ngay lập tức các Ý định đơn giản (Chào hỏi, Chửi bậy...) (Return sớm không gọi AI)
+ */
 const buildImmediateIntentResult = (intent, userNameContext = null, user = null, message = '') => {
   if (intent === ASSISTANT_INTENTS.OUT_OF_SCOPE) {
     return {
@@ -665,6 +821,10 @@ const buildImmediateIntentResult = (intent, userNameContext = null, user = null,
   return null;
 };
 
+/**
+ * buildGuardrailResult
+ * Tạo kết quả trả về khi tin nhắn vi phạm chính sách bảo mật (Guardrail)
+ */
 const buildGuardrailResult = ({ message, context }) => {
   const guardrail = evaluateGuardrails({ message, context });
   if (guardrail.blocked) {
@@ -676,12 +836,20 @@ const buildGuardrailResult = ({ message, context }) => {
   return null;
 };
 
+/**
+ * preflightChatPayload
+ * Kiểm tra đầu vào, chặn các tin nhắn quá dài hoặc vi phạm chính sách trước khi chạy Pipeline
+ */
 const preflightChatPayload = (payload = {}) =>
   buildGuardrailResult({
     message: payload.message,
     context: payload.context || {},
   });
 
+/**
+ * buildImmediateContextResult
+ * Đóng gói kết quả trả về nếu đã có Context tĩnh mà không cần AI xử lý thêm
+ */
 const buildImmediateContextResult = (contextInjection) => {
   if (contextInjection.directAnswer) {
     return buildSuccessResult({
@@ -726,6 +894,10 @@ const buildImmediateContextResult = (contextInjection) => {
   return null;
 };
 
+/**
+ * normalizeAndSelfCheck
+ * Chuẩn hóa định dạng trả về của AI và tự kiểm tra (Self-Check) xem có lỗi format không
+ */
 const normalizeAndSelfCheck = ({ rawAnswer, contextInjection, allowPlainText = false }) => {
   const normalized = normalizeAssistantResponse({
     rawText: rawAnswer,
@@ -763,10 +935,18 @@ const normalizeAndSelfCheck = ({ rawAnswer, contextInjection, allowPlainText = f
   return { ...checked, finalResponseMode: 'ai' };
 };
 
+/**
+ * isInvalidKnowledgeResponse
+ * Kiểm tra xem câu trả lời kiến thức của AI có bị sai định dạng/trống không
+ */
 const isInvalidKnowledgeResponse = (response, contextInjection) =>
   contextInjection.mode === ASSISTANT_INTENTS.IELTS_KNOWLEDGE &&
   response.aiResponseValid === false;
 
+/**
+ * buildAssistantUsageContext
+ * Tạo cục Context chứa thông tin User/Route/Page để bơm vào AI Prompt
+ */
 const buildAssistantUsageContext = ({ payload, contextInjection, user }) => {
   const pageType = payload.context?.pageType;
   const isReview = pageType === 'review'
@@ -780,6 +960,10 @@ const buildAssistantUsageContext = ({ payload, contextInjection, user }) => {
   };
 };
 
+/**
+ * generateCheckedAnswer
+ * Gọi AI sinh text và kiểm tra/chuẩn hóa kết quả (Dùng cho luồng Chat thường)
+ */
 const generateCheckedAnswer = async ({ payload, contextInjection }) => {
   const prompt = buildPrompt({ message: payload.message, contextInjection });
   const rawAnswer = await aiService.generateAssistantAnswer({
@@ -792,6 +976,10 @@ const generateCheckedAnswer = async ({ payload, contextInjection }) => {
   return normalizeAndSelfCheck({ rawAnswer, contextInjection });
 };
 
+/**
+ * generateCheckedStreamAnswer
+ * Gọi AI sinh text dạng Stream và kiểm tra (Dùng cho luồng Stream ChatGPT)
+ */
 const generateCheckedStreamAnswer = async ({ payload, contextInjection }) => {
   const prompt = buildPrompt({ message: payload.message, contextInjection });
   let streamedText = '';
@@ -812,6 +1000,10 @@ const generateCheckedStreamAnswer = async ({ payload, contextInjection }) => {
   });
 };
 
+/**
+ * generateKnowledgeRetryAnswer
+ * Nếu AI trả lời hỏng lần 1, hàm này gọi AI thử lại lần 2
+ */
 const generateKnowledgeRetryAnswer = async ({ payload, contextInjection }) => {
   const recentConversation = (contextInjection.sessionMemory || [])
     .map((item) => `${item.role === 'user' ? 'User' : 'Assistant'}: ${item.content}`)
@@ -853,6 +1045,10 @@ const generateKnowledgeRetryAnswer = async ({ payload, contextInjection }) => {
   });
 };
 
+/**
+ * buildAiResult
+ * Đóng gói quá trình gọi AI (Gọi, Check lỗi, Gọi lại, Fallback) thành kết quả chuẩn
+ */
 const buildAiResult = async ({ payload, contextInjection, useStream }) => {
   let response;
   let aiRetryUsed = false;
@@ -931,6 +1127,10 @@ const buildAiResult = async ({ payload, contextInjection, useStream }) => {
   };
 };
 
+/**
+ * tracePipeline
+ * Ghi log toàn bộ luồng chạy của Orchestrator (Tốn bao nhiêu bước, Dùng AI không...)
+ */
 const tracePipeline = ({
   payload,
   user,
@@ -981,7 +1181,12 @@ const tracePipeline = ({
   });
 };
 
+/**
+ * runAssistantPipeline
+ * TRÁI TIM CỦA HỆ THỐNG: Orchestrator Pipeline chính kết nối tất cả các hàm
+ */
 const runAssistantPipeline = async ({ user, payload, useStream = false }) => {
+  // BƯỚC 1: Preflight & Guardrails (Bảo vệ vòng ngoài)
   const preflightResult = preflightChatPayload(payload);
   if (preflightResult) {
     tracePipeline({
@@ -997,8 +1202,10 @@ const runAssistantPipeline = async ({ user, payload, useStream = false }) => {
     return preflightResult;
   }
 
+  // BƯỚC 2: Session Management (Quản lý phiên chat)
   const sessionId = payload.sessionId || null;
   const routingContext = await buildRoutingContext({ user, payload, sessionId });
+  // BƯỚC 4: Intent Classification (Phân loại ý định đa tầng)
   const originalIntent = detectIntent({ message: payload.message, context: routingContext });
   let intent = originalIntent;
   let classifierUsed = false;
@@ -1011,6 +1218,7 @@ const runAssistantPipeline = async ({ user, payload, useStream = false }) => {
     return userNameContext;
   };
 
+  // BƯỚC 3: Preference (Cá nhân hóa - Bắt "Short-circuit")
   const preferenceResult = await buildPreferenceIntentResult({
     message: payload.message,
     user,
@@ -1053,7 +1261,7 @@ const runAssistantPipeline = async ({ user, payload, useStream = false }) => {
     });
     classifierUsed = true;
     intent = classifierResult.intent;
-    
+
     if (classifierResult.error) {
       const intentResult = buildImmediateIntentResult(ASSISTANT_INTENTS.CLARIFICATION, userNameContext, user);
       tracePipeline({ payload, user, userNameContext, ruleIntent: originalIntent, classifierUsed, classifierResult, answerProviderCalled: false, finalResponseMode: 'classifier_error_clarification' });
@@ -1071,6 +1279,7 @@ const runAssistantPipeline = async ({ user, payload, useStream = false }) => {
     return intentResult;
   }
 
+  // BƯỚC 5: Context Injection (Bơm ngữ cảnh / RAG)
   const contextInjection = await buildContextInjection({
     intent,
     message: payload.message,
@@ -1095,6 +1304,7 @@ const runAssistantPipeline = async ({ user, payload, useStream = false }) => {
     return contextResult;
   }
 
+  // BƯỚC 6: AI Generation & Fallback (Sinh chữ & Dự phòng)
   const result = await buildAiResult({ payload: { ...payload, user }, contextInjection, useStream });
   tracePipeline({
     payload,
@@ -1116,6 +1326,10 @@ const runAssistantPipeline = async ({ user, payload, useStream = false }) => {
   return result;
 };
 
+/**
+ * persistSuccessfulResult
+ * Lưu kết quả chat thành công vào Database
+ */
 const persistSuccessfulResult = async ({ user, payload, result }) => {
   if (result.code || !result.answer) return result;
   const sessionId = payload.sessionId || await safeCreateSession(user.id);
@@ -1124,6 +1338,10 @@ const persistSuccessfulResult = async ({ user, payload, result }) => {
   return { ...result, conversationId: sessionId, messageId: saved?.id || null };
 };
 
+/**
+ * handleChat
+ * API Handler: Xử lý request Chat bình thường (Không Stream)
+ */
 const handleChat = async ({ user, payload }) => {
   try {
     const preflightResult = preflightChatPayload(payload);
@@ -1132,6 +1350,8 @@ const handleChat = async ({ user, payload }) => {
     const sessionId = await safeCreateSession(user.id, payload.sessionId);
     const payloadWithSession = { ...payload, sessionId };
     const result = await runAssistantPipeline({ user, payload: payloadWithSession });
+
+    // BƯỚC 7 & 8: Lưu trữ (Persist) & Phản hồi (Response)
     return persistSuccessfulResult({ user, payload: payloadWithSession, result });
   } catch (error) {
     if (error.code && ERROR_MESSAGES[error.code]) {
@@ -1141,6 +1361,10 @@ const handleChat = async ({ user, payload }) => {
   }
 };
 
+/**
+ * handleChatStream
+ * API Handler: Xử lý request Chat Stream (Giống ChatGPT)
+ */
 const handleChatStream = async ({ user, payload, onEvent }) => {
   try {
     const preflightResult = preflightChatPayload(payload);
@@ -1149,6 +1373,8 @@ const handleChatStream = async ({ user, payload, onEvent }) => {
     const sessionId = await safeCreateSession(user.id, payload.sessionId);
     const payloadWithSession = { ...payload, sessionId };
     const result = await runAssistantPipeline({ user, payload: payloadWithSession, useStream: true });
+
+    // BƯỚC 7 & 8: Lưu trữ (Persist) & Phản hồi (Response Stream)
     const savedResult = await persistSuccessfulResult({ user, payload: payloadWithSession, result });
     emitStreamResult({ onEvent, result: savedResult });
     return savedResult;
@@ -1159,6 +1385,10 @@ const handleChatStream = async ({ user, payload, onEvent }) => {
   }
 };
 
+/**
+ * emitStreamResult
+ * Bắn từng mảnh chữ (chunk) của Stream về cho Frontend
+ */
 const emitStreamResult = ({ onEvent, result }) => {
   if (result.code) {
     onEvent('assistant.error', result);
@@ -1172,6 +1402,10 @@ const emitStreamResult = ({ onEvent, result }) => {
   onEvent('assistant.done', result);
 };
 
+/**
+ * getHistory
+ * API Handler: Lấy lịch sử phiên chat
+ */
 const getHistory = async (userId, conversationId = null) => {
   const rows = await repository.getHistory(userId, conversationId);
   return {
@@ -1185,6 +1419,10 @@ const getHistory = async (userId, conversationId = null) => {
   };
 };
 
+/**
+ * rateMessage
+ * API Handler: Đánh giá Like/Dislike cho tin nhắn
+ */
 const rateMessage = async ({ userId, messageId, rating, reason }) => {
   const result = await repository.rateAssistantMessage({ userId, messageId, rating, reason });
   if (result.saved) return { success: true, messageId: result.messageId, rating, code: null };
