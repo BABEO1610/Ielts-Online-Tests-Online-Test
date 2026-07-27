@@ -34,6 +34,7 @@ Chatbot **độc lập về nghiệp vụ, API và dữ liệu kết quả** v�
 │  assistantApi.js             │
 └──────────┬──────────────────┘
            │ POST /api/v1/assistant/chat/stream
+           │ (và các API phụ trợ: /chat, /history, /rating)
            ▼
 ┌─────────────────────────────┐
 │     Máy chủ (Express)        │
@@ -44,10 +45,17 @@ Chatbot **độc lập về nghiệp vụ, API và dữ liệu kết quả** v�
 │  ├─ assistant.service.js     │  ← luồng xử lý chính
 │  │   ├─ assistant.intent.js  │  ← phát hiện ý định (quy tắc + LLM)
 │  │   ├─ assistant.context.js │  ← chèn tri thức, CSDL, bộ nhớ
+│  │   │   ├─ assistant.knowledge-retriever.js
+│  │   │   ├─ assistant.lookup-parser.js
+│  │   │   └─ assistant.link-builder.js
 │  │   ├─ assistant.prompts.js │  ← tạo lời nhắc theo chế độ
-│  │   └─ assistant.selfcheck  │  ← kiểm tra phản hồi
-│  ├─ ai.service.js            │  ← gọi nhà cung cấp AI (Gemini/OpenAI theo cấu hình)
-│  └─ assistant.repository.js  │  ← lưu phiên/tin nhắn
+│  │   ├─ assistant.selfcheck.js ← kiểm tra phản hồi
+│  │   ├─ assistant.response.js│  ← chuẩn hoá phản hồi (cùng .responses.js)
+│  │   ├─ assistant.memory.js  │  ← quản lý bộ nhớ hội thoại
+│  │   ├─ assistant.user-resolver.js ← xử lý tên hiển thị
+│  │   └─ assistant.scope-classifier.js ← phân loại phạm vi
+│  ├─ ai.service.js            │  ← gọi nhà cung cấp AI (Gemini/OpenAI)
+│  └─ assistant.repository.js  │  ← lưu phiên, tin nhắn, lịch sử
 └──────────┬──────────────────┘
            │
            ▼
@@ -90,16 +98,16 @@ Chatbot **độc lập về nghiệp vụ, API và dữ liệu kết quả** v�
 
 ## 5. Bảo mật và rào chắn an toàn
 
-| Biện pháp | Mô tả |
-|---|---|
-| Xác thực | Cookie JWT + phiên đang hoạt động + vai trò học viên |
-| Giới hạn tần suất | 30 yêu cầu/phút/IP cho `/chat` và `/chat/stream` |
-| Chặn khi đang thi | Cả giao diện (ẩn nút) và máy chủ (rào chắn chặn) |
-| Chống bịa đặt | Tra cứu CSDL chỉ trả dữ liệu đã xuất bản, phản hồi dự phòng xác định trước |
-| Không chấm điểm | Rào chắn chặn yêu cầu chấm điểm/đưa ra band điểm cá nhân |
-| Không lộ cấu hình | `/status` chỉ trả `{ code: null, status: "ok" }` |
-| Kiểm tra đầu vào | Loại bỏ khoảng trắng thừa ở đầu/cuối tin nhắn + tối đa 2000 ký tự + danh sách cho phép của `pageType` |
-| Giới hạn phạm vi | Chỉ hỗ trợ IELTS/học tiếng Anh, từ chối nội dung ngoài phạm vi |
+| Biện pháp           | Mô tả                                                                                                                 |
+| --------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| Xác thực            | Cookie JWT + phiên đang hoạt động + vai trò học viên                                                            |
+| Giới hạn tần suất | 30 yêu cầu/phút/IP cho`/chat` và `/chat/stream`                                                                 |
+| Chặn khi đang thi   | Cả giao diện (ẩn nút) và máy chủ (rào chắn chặn)                                                              |
+| Chống bịa đặt     | Tra cứu CSDL chỉ trả dữ liệu đã xuất bản, phản hồi dự phòng xác định trước                            |
+| Không chấm điểm   | Rào chắn chặn yêu cầu chấm điểm/đưa ra band điểm cá nhân                                                  |
+| Không lộ cấu hình | `/status` chỉ trả `{ code: null, status: "ok" }`                                                                  |
+| Kiểm tra đầu vào  | Loại bỏ khoảng trắng thừa ở đầu/cuối tin nhắn + tối đa 2000 ký tự + danh sách cho phép của`pageType` |
+| Giới hạn phạm vi   | Chỉ hỗ trợ IELTS/học tiếng Anh, từ chối nội dung ngoài phạm vi                                                |
 
 ## 6. Cơ chế dự phòng khi AI lỗi
 
@@ -134,15 +142,15 @@ vẫn không hợp lệ:
 
 ## 8. Chatbot khác gì hệ thống chấm điểm bằng AI?
 
-| Tiêu chí | Chatbot (Trợ lý ảo) | Chấm điểm bằng AI |
-|---|---|---|
-| Mục đích | Hỗ trợ học, điều hướng, giải thích | Ước tính band luyện tập cho Writing/Speaking; không phải điểm IELTS chính thức |
-| Đầu vào | Tin nhắn trò chuyện + ngữ cảnh trang | Bài nộp Writing/Speaking |
-| Đầu ra | Văn bản trả lời + liên kết gợi ý | Điểm band + điểm tiêu chí + nhận xét |
-| Lưu trữ | `chatbot_messages` | `ai_grading_reports` |
-| Điểm cuối API | `/api/v1/assistant/chat` | `/api/v1/submissions/writing/:id/ai-grade` |
-| Cấu hình model | `AI_PROVIDER` + `AI_MODEL` | `AI_GRADING_PROVIDER` + `AI_GRADING_MODEL` và model transcription/evidence riêng |
-| Rào chắn | Không cho chấm điểm cá nhân trong chat | Không gọi chatbot; chỉ xử lý submission đã xác thực |
+| Tiêu chí       | Chatbot (Trợ lý ảo)                                                                             | Chấm điểm bằng AI                                                                     |
+| ---------------- | -------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| Mục đích      | Hỗ trợ học, điều hướng, giải thích                                                        | Ước tính band luyện tập cho Writing/Speaking; không phải điểm IELTS chính thức |
+| Đầu vào       | Tin nhắn trò chuyện + ngữ cảnh trang                                                          | Bài nộp Writing/Speaking                                                                |
+| Đầu ra         | Văn bản trả lời + liên kết gợi ý                                                           | Điểm band + điểm tiêu chí + nhận xét                                              |
+| Lưu trữ        | `chatbot_messages`                                                                               | `ai_grading_reports`                                                                    |
+| Điểm cuối API | `/api/v1/assistant/chat`, `/api/v1/assistant/chat/stream`, `/api/v1/assistant/history`, v.v. | `/api/v1/submissions/writing/:id/ai-grade`                                              |
+| Cấu hình model | `AI_PROVIDER` + `AI_MODEL`                                                                     | `AI_GRADING_PROVIDER` + `AI_GRADING_MODEL` và model transcription/evidence riêng    |
+| Rào chắn       | Không cho chấm điểm cá nhân trong chat                                                       | Không gọi chatbot; chỉ xử lý submission đã xác thực                              |
 
 ## 9. Các giới hạn đã biết
 

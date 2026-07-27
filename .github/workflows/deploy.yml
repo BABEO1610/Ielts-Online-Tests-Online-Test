@@ -18,7 +18,10 @@ jobs:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USERNAME }}
           password: ${{ secrets.VPS_PASSWORD }}
+          command_timeout: 30m
           script: |
+            set -e
+            
             # Di chuyển vào thư mục dự án trên VPS
             # Thay đổi đường dẫn này thành thư mục chứa code thật trên VPS của bạn
             cd /root/Ielts-Online-Tests-Online-Test

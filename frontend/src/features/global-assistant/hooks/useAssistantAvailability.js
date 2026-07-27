@@ -6,6 +6,7 @@ const ACTIVE_TEST_PATTERN = /^\/tests\/[^/]+\/(?:reading|listening|writing|speak
 const RESULT_PATTERN = /^\/results\/([^/]+)$/i;
 const REVIEW_PATTERN = /^\/results\/([^/]+)\/review$/i;
 
+// Phân tích URL hiện tại để xác định người dùng đang ở loại trang nào (đang thi, xem kết quả, hay thư viện...)
 const getPageType = (pathname) => {
   if (ACTIVE_TEST_PATTERN.test(pathname)) return 'active-test';
   if (REVIEW_PATTERN.test(pathname)) return 'review';
@@ -17,6 +18,7 @@ const getPageType = (pathname) => {
   return 'home';
 };
 
+// Trích xuất mã ID bài thi (attemptId) từ URL nếu người dùng đang ở trang kết quả hoặc trang ôn tập
 const getAttemptId = (pathname) => {
   const reviewMatch = pathname.match(REVIEW_PATTERN);
   if (reviewMatch?.[1]) return reviewMatch[1];
@@ -25,6 +27,7 @@ const getAttemptId = (pathname) => {
   return resultMatch?.[1] || null;
 };
 
+// Hook chính: Quyết định xem trợ lý ảo có được phép hiển thị không, có bị khóa không, và gom các thông tin ngữ cảnh hiện tại
 export const useAssistantAvailability = () => {
   const location = useLocation();
   const { isAuthenticated, isLoading, user } = useAuth();
