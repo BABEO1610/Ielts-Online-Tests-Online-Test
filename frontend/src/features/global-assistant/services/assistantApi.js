@@ -69,6 +69,9 @@ export const assistantApi = {
   sendChat: async ({ message, context, conversationId = null }) => {
     try {
       const response = await api.post('/assistant/chat', { message, context, conversationId });
+      return response.data;
+    } catch (error) {
+      return normalizeAssistantError(error);
     }
   },
 
