@@ -40,10 +40,7 @@ const RegisterForm = () => {
       return;
     }
 
-    if (!formData.email.endsWith('@gmail.com')) {
-      setErrorMsg('Chỉ chấp nhận email thuộc tên miền @gmail.com');
-      return;
-    }
+
 
     setLoading(true);
 
