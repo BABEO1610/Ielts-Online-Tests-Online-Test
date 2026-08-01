@@ -51,11 +51,7 @@ class SpeakingGradingRetryService {
     const byKey = await jobQueries.lookupJobByIdempotency(client, userId, key);
     const retryChain = await jobQueries.getRetryChain(client, root.id);
     if (byKey) return this.replay(root, byKey, retryChain);
-    const retryLimit = this.config.manualRetryLimit ?? 2;
     const latest = retryChain.at(-1) || root;
-    if (retryChain.length >= retryLimit) {
-      throw retryUnavailable(latest, `Bài này đã dùng hết ${retryLimit} lượt retry thủ công.`, 'RETRY_LIMIT_REACHED');
-    }
     if (latest.status !== 'failed') {
       throw retryUnavailable(latest, 'Bài đang chấm hoặc đã có kết quả, chưa thể retry.');
     }

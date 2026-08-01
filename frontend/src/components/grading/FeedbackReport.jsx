@@ -401,7 +401,7 @@ export const SpeakingFeedbackDetail = ({
           >
             {retrying
               ? 'Đang gửi yêu cầu...'
-              : `Chấm lại bằng AI (còn ${Math.max(0, (data.manualRetryLimit ?? 2) - (data.manualRetryCount ?? 0))} lượt)`}
+              : 'Chấm lại bằng AI'}
           </button>
           {retryError && <span className="text-danger" role="alert">{retryError}</span>}
         </div>
