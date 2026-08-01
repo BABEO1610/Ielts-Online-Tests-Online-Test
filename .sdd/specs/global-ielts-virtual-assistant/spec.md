@@ -1,185 +1,203 @@
 # Đặc tả tính năng: Trợ lý ảo IELTS toàn cục
 
-**Nhánh tính năng**: `feature-global-ielts-virtual-assistant/Datnt`
+**Ngày tạo**: 2026-08-01
+**Trạng thái**: Cốt lõi HIỆN CÓ với việc gia cố MỤC TIÊU và các quyết định vòng đời mở
+**Phân loại**: Các mục quy chuẩn được gắn nhãn `AS-BUILT`, `TARGET`, hoặc `NEEDS CLARIFICATION`.
 
-**Ngày tạo**: 2026-06-24
+## 1. Tổng quan tính năng và bối cảnh nghiệp vụ
 
-**Trạng thái**: Đã triển khai — vẫn còn công việc gia cố và xác thực trên môi trường thực tế
+IELTSZone cung cấp trợ lý hội thoại dành cho học viên đã xác thực để giải đáp câu hỏi IELTS/tiếng Anh, điều hướng trang web, tìm bài thi/tài liệu đã công bố, và xem lại bài thi đã nộp thuộc sở hữu. Trợ lý kết hợp phản hồi xác định/định tuyến, ngữ cảnh CSDL/kiến thức có kiểm soát, và nhà cung cấp AI. Trợ lý tách biệt hoàn toàn với chấm điểm AI và không được chấm hoặc dự đoán band Writing/Speaking cá nhân.
 
-**Đầu vào**: Trợ lý hội thoại toàn cục dành cho học viên IELTSZone, có khả năng trả lời câu hỏi về IELTS/việc học tiếng Anh, tìm bài thi và tài nguyên học tập đã xuất bản, xem lại các lượt làm bài đã nộp, hỗ trợ điều hướng trang web và ghi nhớ tùy chọn trong phạm vi cuộc hội thoại mà không thay thế các luồng chấm điểm Writing/Speaking chính thức.
+## 2. Phạm vi
 
-## Kịch bản người dùng và kiểm thử *(bắt buộc)*
+- Widget toàn cục dành cho học viên, ngoài bài thi đang làm.
+- Tin nhắn tối đa 2.000 ký tự qua endpoint JSON hoặc tương thích SSE.
+- Kiến thức IELTS/tiếng Anh, điều hướng, tìm bài thi/tài liệu đã công bố, và xem lại bài thi đã nộp.
+- Bộ nhớ gần đây theo phạm vi cuộc trò chuyện và cách xưng hô ưa thích.
+- Lịch sử/phiên/đánh giá theo phạm vi chủ sở hữu, dự phòng an toàn, liên kết, và trạng thái tối giản.
 
-### Câu chuyện người dùng 1 - Hỏi về IELTS và việc học tiếng Anh (Ưu tiên: P1)
+## 3. Ngoài phạm vi
 
-Một học viên đã xác thực đặt câu hỏi về kỹ năng IELTS, ngữ pháp, từ vựng, cách diễn đạt lại, tiêu chí band điểm hoặc chiến lược học tập và nhận được câu trả lời an toàn bằng ngôn ngữ của câu hỏi.
+- Chấm điểm Writing/Speaking cá nhân hoặc dự đoán band cá nhân.
+- Đáp án/gợi ý khi đang làm bài thi, nội dung chưa công bố/riêng tư/nội bộ, hoặc dữ liệu người dùng khác.
+- Trợ lý giảng viên/quản trị, RAG vector/embedding, cá nhân hóa dài hạn xuyên cuộc trò chuyện, hoặc chuyển đổi nhà cung cấp dự phòng.
+- Chấm điểm Writing bằng AI.
 
-**Lý do chọn mức ưu tiên này**: Đây là hành trình học tập độc lập có phạm vi rộng nhất và mang lại giá trị mà không cần tra cứu nội dung hoặc có sẵn một lượt làm bài.
+## 4. Tác nhân và tóm tắt phân quyền
 
-**Kiểm thử độc lập**: Hỏi “Cohesion và coherence khác nhau thế nào?” và nhận được lời giải thích phù hợp, không kèm mức điểm cá nhân, nội dung chính thức bịa đặt hoặc thao tác tra cứu trang web không liên quan.
+| Tác nhân | Phân quyền |
+|---|---|
+| Học viên đã xác thực | Có thể trò chuyện, stream, đọc lịch sử cuộc trò chuyện thuộc sở hữu, và đánh giá tin nhắn trợ lý thuộc sở hữu. |
+| Khách | Có thể thấy lời nhắc đăng nhập nhưng không thể gọi thao tác trợ lý thành công. |
+| Giảng viên/quản trị/vai trò khác | Không được phép sử dụng trợ lý học viên này chỉ vì có đặc quyền vai trò. |
 
-**Các kịch bản chấp nhận**:
+## 5. Câu chuyện người dùng và kiểm thử độc lập
 
-1. **Với điều kiện** học viên đã xác thực và không ở trong một bài thi đang diễn ra, **Khi** họ hỏi cách làm dạng True/False/Not Given, **Thì** trợ lý coi yêu cầu đó là kiến thức IELTS và trả lời dựa trên kiến thức đã được phê duyệt cùng kiến thức mô hình an toàn.
-2. **Với điều kiện** học viên hỏi yêu cầu của Writing Band 7, **Khi** trợ lý phản hồi, **Thì** trợ lý giải thích các tiêu chí chung và không khẳng định bài làm của học viên đạt band điểm cụ thể nào.
-3. **Với điều kiện** không có đoạn kiến thức tĩnh nào khớp nhưng nhà cung cấp câu trả lời đang khả dụng, **Khi** học viên đặt câu hỏi ngữ pháp hoặc từ vựng trong phạm vi, **Thì** trợ lý vẫn đưa ra câu trả lời hữu ích thay vì thông báo kỹ thuật của nhà cung cấp.
-4. **Với điều kiện** nhà cung cấp câu trả lời không khả dụng, **Khi** câu hỏi rõ ràng liên quan đến Reading, Writing Task 1, Speaking Part 2, Skimming hoặc Scanning, **Thì** trợ lý trả về hướng dẫn xác định trước tương ứng; các chủ đề khác trong phạm vi nhận phương án dự phòng chung an toàn.
-5. **Với điều kiện** các lượt hội thoại gần đây thuộc quyền sở hữu đề cập đến Skimming và Scanning, **Khi** học viên hỏi cách kết hợp “hai cái này”, **Thì** trợ lý sử dụng cả hai đối tượng được nhắc đến; nếu không có đối tượng tham chiếu rõ ràng, trợ lý đặt câu hỏi làm rõ.
+### Câu chuyện 1 — Hỏi câu hỏi IELTS/tiếng Anh an toàn (Ưu tiên: P1)
 
----
+Với tư cách học viên, tôi muốn được giải đáp ngắn gọn bằng ngôn ngữ của câu hỏi mà trợ lý không chấm bài cá nhân hay tiết lộ dữ liệu nội bộ.
 
-### Câu chuyện người dùng 2 - Tìm bài thi đã xuất bản và tài nguyên học tập (Ưu tiên: P2)
+**Kiểm thử độc lập**: Gửi câu hỏi tiếng Việt và tiếng Anh trong phạm vi cùng các yêu cầu chấm điểm, tiêm lệnh, dữ liệu riêng tư, và ngoài phạm vi; xác nhận định tuyến an toàn, trả lời/dự phòng cùng ngôn ngữ, và không có đầu ra bị cấm.
 
-Một học viên đã xác thực yêu cầu bài thi thử hoặc tài nguyên thư viện và chỉ nhận được nội dung đã xuất bản, thực sự tồn tại trong IELTSZone.
+**Kịch bản chấp nhận**:
 
-**Lý do chọn mức ưu tiên này**: Hành trình này kết nối học viên với nội dung có thể sử dụng ngay trên nền tảng, đồng thời yêu cầu nghiêm ngặt về mức độ bám sát nguồn dữ liệu và tính toàn vẹn của liên kết.
+1. **Cho trước** học viên đã xác thực và câu hỏi trong phạm vi tối đa 2.000 ký tự, **Khi** trợ lý xử lý, **Thì** trả câu trả lời bằng ngôn ngữ câu hỏi qua đường phản hồi được phép.
+2. **Cho trước** yêu cầu chấm/dự đoán band Writing/Speaking cá nhân hoặc tiết lộ prompt/khóa/mô hình/dữ liệu riêng tư, **Khi** rào chắn chạy, **Thì** yêu cầu bị từ chối trước khi gọi nhà cung cấp trả lời.
+3. **Cho trước** câu hỏi được hỗ trợ và nhà cung cấp thất bại, **Khi** có dự phòng xác định an toàn, **Thì** trả dự phòng đó mà không tiết lộ chẩn đoán nhà cung cấp.
 
-**Kiểm thử độc lập**: Hỏi “Có đề Reading về Environment không?” và nhận được các bài thi đã xuất bản phù hợp với liên kết nội bộ có thật, hoặc một phản hồi rõ ràng rằng không có kết quả.
+### Câu chuyện 2 — Tìm bài thi/tài liệu đã công bố và điều hướng (Ưu tiên: P1)
 
-**Các kịch bản chấp nhận**:
+Với tư cách học viên, tôi muốn nhận liên kết có căn cứ tới nội dung thực sự đã công bố trên IELTSZone.
 
-1. **Với điều kiện** có các bài thi thử đã xuất bản, **Khi** học viên yêu cầu một bài Reading, **Thì** phản hồi chứa số bài thi phù hợp có thật không vượt quá giới hạn hiển thị đã cấu hình, cùng các liên kết nội bộ tương ứng.
-2. **Với điều kiện** có các tài nguyên thư viện đã xuất bản, **Khi** học viên yêu cầu rõ ràng một tài nguyên Listening, **Thì** trợ lý tìm trong thư viện thay vì danh mục bài thi thử.
-3. **Với điều kiện** không có mục đã xuất bản nào phù hợp, **Khi** quá trình tra cứu hoàn tất, **Thì** trợ lý thông báo không tìm thấy dữ liệu phù hợp và không bịa đặt tiêu đề, liên kết, đáp án hoặc tài nguyên.
-4. **Với điều kiện** phản hồi của nhà cung cấp nêu tên một mục không có trong kết quả tra cứu, **Khi** các bước kiểm tra an toàn cho phản hồi được thực hiện, **Thì** câu trả lời cuối cùng được thay bằng câu trả lời xác định trước, có căn cứ từ cơ sở dữ liệu.
-5. **Với điều kiện** có chủ đề, kỹ năng, độ khó, cách sắp xếp hoặc số lượng trong yêu cầu, **Khi** quá trình tra cứu chạy, **Thì** bộ lọc được áp dụng trước mệnh đề giới hạn kết quả ở cơ sở dữ liệu, còn số lượng do người dùng yêu cầu được áp dụng sau khi xếp hạng.
-6. **Với điều kiện** ý định trước đó là tra cứu thư viện, **Khi** học viên nói “cái khác đi”, **Thì** việc định tuyến vẫn nằm trong hành trình thư viện; triển khai hiện tại không cam kết kế thừa loại tài nguyên hoặc loại trừ mục trước đó.
+**Kiểm thử độc lập**: Gieo dữ liệu đã công bố/phê duyệt và chưa công bố/chưa phê duyệt, yêu cầu tìm bài thi/tài liệu/điều hướng, và xác nhận chỉ các bản ghi đủ điều kiện/route đã biết xuất hiện; mô phỏng lỗi nhà cung cấp và xác nhận đầu ra xác định có căn cứ.
 
----
+**Kịch bản chấp nhận**:
 
-### Câu chuyện người dùng 3 - Xem lại một lượt làm bài đã nộp (Ưu tiên: P3)
+1. **Cho trước** nội dung đã công bố phù hợp, **Khi** học viên tìm kiếm, **Thì** chỉ trả bản ghi CSDL đủ điều kiện và liên kết nội bộ.
+2. **Cho trước** không có kết quả khớp chính xác, **Khi** có kết quả thay thế đủ điều kiện, **Thì** trình bày rõ ràng là gợi ý thay thế chứ không phải kết quả khớp bịa ra.
+3. **Cho trước** nhà cung cấp thất bại sau tra cứu có căn cứ, **Khi** hình thành kết quả, **Thì** văn bản xác định chỉ dùng kết quả CSDL đã biết.
 
-Một học viên trên trang kết quả hoặc xem lại hỏi lý do một đáp án bị sai và nhận được lời giải thích dựa trên lượt làm bài đã nộp thuộc quyền sở hữu cùng dữ liệu câu hỏi chính thức.
+### Câu chuyện 3 — Xem lại bài thi đã nộp thuộc sở hữu (Ưu tiên: P1)
 
-**Lý do chọn mức ưu tiên này**: Chức năng này có giá trị học tập cao nhưng phụ thuộc vào quyền sở hữu lượt làm bài, trạng thái đã nộp, ngữ cảnh trang và các lời giải thích hiện có.
+Với tư cách học viên, tôi muốn ngữ cảnh giải thích chính thức cho bài thi đã nộp của mình sau khi thi.
 
-**Kiểm thử độc lập**: Trên trang xem lại có một lượt làm bài đã nộp thuộc quyền sở hữu, hỏi “Vì sao câu 5 là B?” và nhận được lời giải thích được suy ra từ lượt làm bài và câu hỏi đó.
+**Kiểm thử độc lập**: Truy vấn bài đã nộp thuộc sở hữu, bài chưa nộp thuộc sở hữu, bài người khác, bài thiếu, và bài thiếu giải thích; xác nhận chỉ trường hợp bài đã nộp thuộc sở hữu mới có thể dùng dữ liệu câu hỏi/đáp án/giải thích chính thức.
 
-**Các kịch bản chấp nhận**:
+**Kịch bản chấp nhận**:
 
-1. **Với điều kiện** ngữ cảnh yêu cầu chứa một lượt làm bài đã nộp thuộc quyền sở hữu và một câu hỏi có thể nhận diện, **Khi** học viên yêu cầu giải thích, **Thì** trợ lý sử dụng đáp án đã nộp, đáp án chính thức, câu hỏi và lời giải thích hiện có.
-2. **Với điều kiện** một lượt làm bài chưa được nộp, **Khi** có yêu cầu xem lại, **Thì** trợ lý từ chối yêu cầu bằng `ATTEMPT_NOT_SUBMITTED` và không làm lộ đáp án.
-3. **Với điều kiện** lượt làm bài không thuộc về học viên đã xác thực, **Khi** có yêu cầu xem lại, **Thì** hệ thống coi lượt làm bài là không tồn tại và không làm lộ dữ liệu của lượt làm bài đó.
-4. **Với điều kiện** thiếu lời giải thích chính thức, **Khi** có yêu cầu xem lại, **Thì** trợ lý trả về `MISSING_EXPLANATION` thay vì tự bịa ra lời giải thích.
-5. **Với điều kiện** học viên vẫn ở cùng trang xem lại/kết quả và ngữ cảnh yêu cầu vẫn mang mã định danh lượt làm bài, **Khi** họ hỏi “còn câu 6?”, **Thì** trợ lý xác định câu 6 bằng ngữ cảnh yêu cầu hiện tại kết hợp với hội thoại gần đây. Mã định danh lượt làm bài không được tái tạo chỉ từ lịch sử trò chuyện.
+1. **Cho trước** bài đã nộp thuộc sở hữu có dấu thời gian nộp và giải thích chính thức, **Khi** yêu cầu xem lại từ ngữ cảnh kết quả/review, **Thì** trợ lý chỉ dùng ngữ cảnh chính thức đó.
+2. **Cho trước** bài chưa nộp hoặc bài người khác, **Khi** yêu cầu xem lại, **Thì** không tiết lộ dữ liệu đáp án/giải thích.
 
----
+### Câu chuyện 4 — Tiếp tục cuộc trò chuyện thuộc sở hữu (Ưu tiên: P2)
 
-### Câu chuyện người dùng 4 - Ghi nhớ cách xưng hô mong muốn (Ưu tiên: P4)
+Với tư cách học viên, tôi muốn các lượt gần đây và cách xưng hô ưa thích chỉ được nhớ trong cuộc trò chuyện của tôi.
 
-Một học viên thiết lập, gọi lại hoặc xóa cách xưng hô mong muốn cho cuộc hội thoại đang hoạt động thuộc quyền sở hữu.
+**Kiểm thử độc lập**: Tạo hai học viên/hai cuộc trò chuyện, đặt cách xưng hô hợp lệ 60 ký tự/tám từ trở xuống, hỏi tiếp, và xác nhận bộ nhớ/lịch sử/tùy chọn không bao giờ vượt ranh giới chủ sở hữu hoặc cuộc trò chuyện.
 
-**Lý do chọn mức ưu tiên này**: Chức năng này cải thiện tính liền mạch và cá nhân hóa mà không thay đổi kết quả học tập hoặc dữ liệu hồ sơ trên toàn tài khoản.
+**Kịch bản chấp nhận**:
 
-**Kiểm thử độc lập**: Gửi “Gọi tôi là Đạt”, xác nhận tùy chọn mà không gọi nhà cung cấp câu trả lời, sau đó gọi lại và xóa tùy chọn trong cùng cuộc hội thoại.
+1. **Cho trước** cuộc trò chuyện đang hoạt động thuộc sở hữu, **Khi** học viên gửi câu hỏi tiếp, **Thì** các lượt gần đây trong cuộc trò chuyện đó có thể giải quyết tham chiếu.
+2. **Cho trước** cách xưng hô ưa thích hợp lệ, **Khi** được đặt/gọi lại/xóa, **Thì** chỉ cuộc trò chuyện thuộc sở hữu đó bị ảnh hưởng.
+3. **Cho trước** mã cuộc trò chuyện người khác/đã đóng/sai định dạng, **Khi** được cung cấp, **Thì** không được dùng như cuộc trò chuyện của người yêu cầu.
 
-**Các kịch bản chấp nhận**:
+### Câu chuyện 5 — Đánh giá tin nhắn trợ lý (Ưu tiên: P2)
 
-1. **Với điều kiện** có một lệnh tùy chọn hợp lệ bằng tiếng Việt hoặc tiếng Anh, **Khi** giá trị không dài quá 60 ký tự và 8 từ, **Thì** giá trị được lưu cho cuộc hội thoại đang hoạt động thuộc quyền sở hữu và được xác nhận mà không gọi nhà cung cấp câu trả lời.
-2. **Với điều kiện** đã lưu một tùy chọn, **Khi** học viên hỏi trợ lý gọi mình là gì, **Thì** trợ lý nhắc lại cách xưng hô đã lưu mà không tạo tùy chọn mới.
-3. **Với điều kiện** đã lưu một tùy chọn, **Khi** học viên yêu cầu trợ lý ngừng sử dụng tùy chọn đó, **Thì** giá trị có cấu trúc được xóa và các lượt sau không sử dụng giá trị cũ.
-4. **Với điều kiện** một giá trị đề xuất vượt quá 60 ký tự hoặc 8 từ, **Khi** quá trình chuẩn hóa chạy, **Thì** quá trình này không trả về tùy chọn hợp lệ và không có cập nhật tùy chọn nào xảy ra.
-5. **Với điều kiện** một giá trị đề xuất chứa nội dung ghi đè chỉ dẫn hoặc trích xuất câu lệnh hệ thống, **Khi** quá trình trích xuất hoặc các lớp bảo vệ chạy, **Thì** nội dung đó không được lưu làm tùy chọn và không thể thay đổi các quy tắc an toàn.
-6. **Với điều kiện** câu “Câu ‘call me John’ nghĩa là gì?”, **Khi** câu này được xử lý, **Thì** nó vẫn là một câu hỏi học tiếng Anh và không thiết lập `John` làm tùy chọn.
-7. **Với điều kiện** Học viên A đăng xuất và Học viên B đăng nhập trong cùng một SPA, **Khi** tiện ích được gắn lại, **Thì** Học viên B không nhận bất kỳ mã cuộc hội thoại, lịch sử hoặc tùy chọn nào của Học viên A.
+Với tư cách học viên, tôi muốn đánh giá tin nhắn trợ lý lên/xuống và sửa đổi đánh giá đó.
 
----
+**Kiểm thử độc lập**: Đánh giá và đánh giá lại tin nhắn trợ lý thuộc sở hữu, sau đó thử đánh giá tin nhắn người dùng và tin nhắn người khác; xác nhận chỉ hàng trợ lý thuộc sở hữu bị thay đổi.
 
-### Câu chuyện người dùng 5 - Thực thi kiểm soát truy cập, xác thực dữ liệu và an toàn (Ưu tiên: P5)
+**Kịch bản chấp nhận**:
 
-Khách, vai trò không phải học viên, yêu cầu không hợp lệ, yêu cầu trong bài thi đang diễn ra và nội dung bị cấm đều bị từ chối trước khi các tác vụ được bảo vệ của trợ lý chạy.
+1. **Cho trước** tin nhắn trợ lý thuộc sở hữu, **Khi** gửi đánh giá `up` hoặc `down`, **Thì** đánh giá được lưu và đánh giá hợp lệ sau có thể thay thế.
+2. **Cho trước** tin nhắn người dùng, tin nhắn trợ lý người khác, giá trị không hợp lệ, hoặc thiếu mã định danh, **Khi** cố đánh giá, **Thì** không có hàng nào ngoài tin nhắn trợ lý được ủy quyền bị thay đổi.
 
-**Lý do chọn mức ưu tiên này**: Các biện pháp kiểm soát xuyên suốt này xác định ranh giới cho mọi hành trình khác và bảo vệ dữ liệu riêng tư, tính toàn vẹn của bài thi cùng việc sử dụng nhà cung cấp.
+## 6. Trường hợp biên
 
-**Kiểm thử độc lập**: Gửi dữ liệu yêu cầu trò chuyện hợp lệ nhưng không có cookie chứa mã truy cập và nhận `LOGIN_REQUIRED` mà không tạo cuộc hội thoại hoặc gọi nhà cung cấp câu trả lời.
+- Tin nhắn rỗng/khoảng trắng, đúng 2.000 ký tự, và trên 2.000 ký tự.
+- Client khai báo `active-test` so với client bỏ sót/phân loại sai trong khi bài thi thực sự đang hoạt động.
+- Cờ đã công bố tồn tại mà không có cờ phê duyệt, hoặc schema bảng thiếu trường công bố được nhận dạng.
+- Nhà cung cấp trả đầu ra rỗng/sai định dạng/không an toàn/không có căn cứ hoặc timeout.
+- Schema phiên/tin nhắn không khả dụng; chỉ một trong hai lần chèn tin nhắn người dùng/trợ lý thành công.
+- Kết nối SSE kết thúc với frame cuối chưa hoàn chỉnh hoặc ngắt sau khi nhà cung cấp hoàn tất.
+- Cách xưng hô ưa thích chứa trên 60 ký tự, trên tám từ, văn bản giống chỉ thị, hoặc yêu cầu xóa/đặt lại.
+- Lý do đánh giá cực dài vì chưa có giới hạn tối đa được định nghĩa.
 
-**Các kịch bản chấp nhận**:
+## 7. Quy tắc nghiệp vụ
 
-1. **Với điều kiện** dữ liệu yêu cầu hợp lệ đến từ khách, mã truy cập không hợp lệ, mã truy cập hết hạn hoặc phiên đã bị thu hồi, **Khi** một điểm cuối được bảo vệ của trợ lý được gọi, **Thì** điểm cuối trả về `LOGIN_REQUIRED` và không đi vào quy trình xử lý của trợ lý.
-2. **Với điều kiện** người dùng đã xác thực có vai trò không phải học viên hoặc mã truy cập yêu cầu đổi mật khẩu, **Khi** trợ lý được gọi, **Thì** trợ lý trả về `FORBIDDEN`.
-3. **Với điều kiện** ngữ cảnh yêu cầu có `pageType=active-test`, **Khi** yêu cầu trò chuyện hoặc luồng SSE được gửi, **Thì** hệ thống trả về `ASSISTANT_DISABLED_DURING_TEST` trước khi mở SSE hoặc gọi nhà cung cấp.
-4. **Với điều kiện** có hơn 30 yêu cầu trò chuyện từ một IP trong vòng một phút, **Khi** yêu cầu tiếp theo đến, **Thì** hệ thống trả về HTTP 429 với `RATE_LIMIT_EXCEEDED`.
-5. **Với điều kiện** tin nhắn rỗng, tin nhắn dài hơn 2000 ký tự, loại trang không hợp lệ hoặc mã cuộc hội thoại sai định dạng, **Khi** quá trình xác thực dữ liệu chạy, **Thì** hệ thống trả về `VALIDATION_ERROR` trước khi xử lý qua trợ lý.
-6. **Với điều kiện** một mã cuộc hội thoại hợp lệ thuộc sở hữu của người dùng khác, **Khi** mã này được cung cấp, **Thì** trợ lý bỏ qua mã đó rồi xác định hoặc tạo một cuộc hội thoại đang hoạt động thuộc quyền sở hữu mà không đọc hay ghi phiên của người khác.
-7. **Với điều kiện** có một yêu cầu trạng thái được bảo vệ, **Khi** học viên đã xác thực gọi yêu cầu này, **Thì** hệ thống chỉ trả về thông tin tình trạng hoạt động tối thiểu; khách bị từ chối và không có thông tin chi tiết nào về nhà cung cấp, mô hình, khóa hoặc môi trường bị lộ.
-8. **Với điều kiện** có yêu cầu chấm một bài Writing/Speaking cụ thể, tiết lộ cấu hình riêng tư, bịa nội dung chính thức, lấy đáp án trong khi thi hoặc thảo luận một chủ đề ngoài phạm vi bị chặn, **Khi** các lớp bảo vệ chạy, **Thì** yêu cầu bị từ chối trước các thao tác cơ sở dữ liệu/nhà cung cấp/lưu trữ không cần thiết.
+- **BR-CHAT-001 [AS-BUILT]**: Chỉ người dùng đã xác thực có vai trò `student` mới được sử dụng các thao tác chat, stream, lịch sử, trạng thái, hoặc đánh giá.
+- **BR-CHAT-002 [AS-BUILT]**: Tin nhắn chứa 1–2.000 ký tự đã trim và ngữ cảnh trang hợp lệ.
+- **BR-CHAT-003 [AS-BUILT]**: Phạm vi hỗ trợ là học IELTS/tiếng Anh, điều hướng IELTSZone, bài thi/tài liệu đã công bố, và xem lại bài thi đã nộp. Chấm điểm Writing/Speaking cá nhân và dự đoán band cá nhân bị từ chối.
+- **BR-CHAT-004 [AS-BUILT]**: Trợ lý không được dùng khi đang làm bài thi. Server hiện tin tưởng loại trang do client cung cấp; xác minh bài thi đang hoạt động phía server chưa được triển khai cho mọi yêu cầu.
+- **BR-CHAT-005 [AS-BUILT]**: Gợi ý bài thi/tài liệu chỉ dùng nội dung thỏa mãn điều kiện công bố/phê duyệt được nhận dạng. Các mục hiển thị trên trang client là ngữ cảnh không đáng tin cậy, không phải nguồn công bố.
+- **BR-CHAT-006 [AS-BUILT]**: Xem lại bài thi yêu cầu bài thuộc sở hữu người yêu cầu và đã nộp; chỉ ngữ cảnh câu hỏi/đáp án/giải thích chính thức đã lưu mới được dùng làm căn cứ xem lại.
+- **BR-CHAT-007 [AS-BUILT]**: Phiên, bộ nhớ gần đây, cách xưng hô ưa thích, lịch sử, tạo tin nhắn, và đánh giá đều thuộc phạm vi chủ sở hữu.
+- **BR-CHAT-008 [AS-BUILT]**: Bộ nhớ gần đây và cách xưng hô ưa thích thuộc phạm vi cuộc trò chuyện, không phải cá nhân hóa bền vững chia sẻ xuyên cuộc trò chuyện. Cách xưng hô tối đa 60 ký tự và tám từ, từ chối nội dung giống chỉ thị.
+- **BR-CHAT-009 [AS-BUILT]**: Thứ tự nguồn phản hồi là rào chắn/phản hồi xác định tức thì, điều hướng có kiểm soát hoặc ngữ cảnh CSDL, kiến thức IELTS tĩnh có phiên bản khi liên quan, tạo AI đã cấu hình khi cần, xác thực/tự kiểm tra, rồi dự phòng xác định an toàn khi được hỗ trợ.
+- **BR-CHAT-010 [AS-BUILT]**: Nhà cung cấp AI chỉ được dùng cho ý định cần ngôn ngữ tạo sau rào chắn/ngữ cảnh. Lời chào, thao tác tùy chọn, điều hướng, phản hồi thiếu ngữ cảnh, và một số đường tra cứu/thất bại là xác định.
+- **BR-CHAT-011 [AS-BUILT]**: Lưu tin nhắn thành công theo cơ chế nỗ lực tối đa: tin nhắn người dùng và tin nhắn trợ lý là hai lần ghi riêng biệt. Lỗi lưu trữ không ngăn trả câu trả lời an toàn và có thể dẫn đến không có lịch sử/mã tin nhắn bền vững.
+- **BR-CHAT-012 [TARGET]**: Một lượt thành công nên lưu cặp người dùng/trợ lý nguyên tử hoặc cho biết rõ kết quả bền vững; cặp một phần không nên bị ngầm coi là bền vững.
+- **BR-CHAT-013 [AS-BUILT]**: Đánh giá chỉ áp dụng cho tin nhắn trợ lý thuộc sở hữu, chấp nhận `up` hoặc `down`, và có thể được cập nhật bởi đánh giá hợp lệ sau.
+- **BR-CHAT-014 [AS-BUILT]**: Giới hạn tần suất và hạn mức hàng ngày là hai kiểm soát riêng biệt. Triển khai hiện tại thực thi 30 yêu cầu chat/stream mỗi IP mỗi phút; không thực thi giới hạn 50 tin nhắn mỗi người dùng mỗi ngày UTC đã tài liệu hóa.
+- **BR-CHAT-015 [TARGET]**: Thực thi hạn mức 50 tin nhắn mỗi học viên mỗi ngày UTC chỉ sau khi ngữ nghĩa tính toán hàng ngày được phê duyệt và kiểm thử.
+- **BR-CHAT-016 [AS-BUILT]**: Ngôn ngữ phản hồi theo ngôn ngữ câu hỏi hiện tại cho các đường tạo/dự phòng được hỗ trợ.
+- **BR-CHAT-017 [AS-BUILT]**: Trạng thái chỉ trả thông tin khả dụng tối giản và không được tiết lộ nhà cung cấp, mô hình, khóa, prompt, hoặc cấu hình nội bộ.
+- **BR-CHAT-018 [AS-BUILT]**: Dữ liệu riêng tư, chưa công bố, nội bộ, chéo chủ sở hữu, prompt, thông tin xác thực, nhà cung cấp/mô hình, và dữ liệu CSDL thô không được tiết lộ.
+- **BR-CHAT-019 [NEEDS CLARIFICATION]**: Thời hạn lưu giữ, ngữ nghĩa đóng/mở lại, xóa/xuất dữ liệu người dùng, và xóa lịch sử cuộc trò chuyện chưa được phê duyệt thành vòng đời hoàn chỉnh.
+- **BR-CHAT-020 [NEEDS CLARIFICATION]**: Độ dài tối đa và chính sách nội dung cho phép của `rating_reason` chưa được định nghĩa.
+- **BR-CHAT-021 [NEEDS CLARIFICATION]**: Tính toán hạn mức hàng ngày cho yêu cầu bị rào chắn chặn, lỗi nhà cung cấp, dự phòng xác định, và lỗi lưu trữ chưa được quyết định.
 
-### Các trường hợp biên
+## 8. Yêu cầu chức năng
 
-- Việc xác thực dữ liệu chạy trước xác thực danh tính đối với dữ liệu yêu cầu trò chuyện; vì vậy, dữ liệu yêu cầu không hợp lệ từ khách có thể nhận lỗi xác thực dữ liệu trước `LOGIN_REQUIRED`.
-- Tiện ích trong bài thi đang diễn ra bị ẩn trong giao diện hiện tại. `AssistantDisabledNotice` có trong mã nguồn nhưng không được kết xuất vì tiện ích thoát sớm khi không hiển thị.
-- SSE của ứng dụng truyền phản hồi cuối cùng, không truyền theo từng token: phía máy chủ hoàn tất kết quả cuối cùng, cố gắng lưu theo cơ chế nỗ lực tối đa, sau đó phát `assistant.start`, một `assistant.delta` chứa toàn bộ câu trả lời và `assistant.done`. Lỗi lưu trữ không ngăn việc gửi câu trả lời cuối cùng an toàn.
-- Nếu luồng của nhà cung cấp phát một phần văn bản nội bộ rồi gặp lỗi, phần văn bản đó không được phát tới trình duyệt; phương án dự phòng xác định trước đã hoàn tất sẽ được lưu và phát.
-- Phía giao diện phân tích được khung SSE cuối cùng ngay cả khi không có dòng trống kết thúc và không tự động lặp lại một yêu cầu luồng không chắc chắn thông qua điểm cuối JSON.
-- Nếu bộ phân loại phạm vi gặp lỗi, trợ lý yêu cầu làm rõ thay vì phỏng đoán.
-- Mã cuộc hội thoại của người khác, không tồn tại hoặc đã đóng không bao giờ cấp quyền cho cuộc hội thoại đó; dịch vụ xác định một cuộc hội thoại đang hoạt động thuộc quyền sở hữu hoặc tạo mới.
-- Bộ nhớ định tuyến gần đây lưu ý định, kỹ năng, chủ đề và tin nhắn, nhưng hiện chưa lưu loại tài nguyên thư viện/mã mục trước đó hoặc mã lượt làm bài cần xem lại dưới dạng các trường có cấu trúc.
+- **FR-CHAT-001 [AS-BUILT]**: Mọi endpoint phải phân giải token/phiên cookie hợp lệ và vai trò học viên trước hành vi được bảo vệ.
+- **FR-CHAT-002 [AS-BUILT]**: Xác thực payload chat phải thực thi hình dạng tin nhắn/ngữ cảnh/mã cuộc trò chuyện và giới hạn 2.000 ký tự.
+- **FR-CHAT-003 [AS-BUILT]**: Rào chắn phải chặn khai báo đang thi, chấm điểm/dự đoán band cá nhân, nội dung giả, yêu cầu prompt/dữ liệu riêng tư, và chủ đề rõ ràng ngoài phạm vi trước công việc phiên/nhà cung cấp.
+- **FR-CHAT-004 [TARGET]**: Server phải độc lập phát hiện bài thi đang hoạt động thuộc sở hữu cho mỗi yêu cầu chat thay vì chỉ dựa vào loại trang client.
+- **FR-CHAT-005 [AS-BUILT]**: Định tuyến ý định phải hỗ trợ kiến thức IELTS, mẹo học, điều hướng, tra cứu bài thi, tra cứu tài liệu, xem lại bài thi đã nộp, lời chào/tùy chọn, làm rõ, và xử lý ngoài phạm vi an toàn.
+- **FR-CHAT-006 [AS-BUILT]**: Truy vấn tra cứu phải áp dụng vị từ công bố/phê duyệt được nhận dạng và chỉ trả liên kết nội bộ có kiểm soát.
+- **FR-CHAT-007 [AS-BUILT]**: Truy vấn xem lại phải thực thi quyền sở hữu bài thi và dấu thời gian nộp trước khi đọc hàng đáp án/giải thích.
+- **FR-CHAT-008 [AS-BUILT]**: Bộ nhớ gần đây phải giới hạn theo các lượt cuộc trò chuyện gần đây, và cách xưng hô ưa thích phải được xác thực/lưu/đọc chỉ cho cuộc trò chuyện đang hoạt động thuộc sở hữu.
+- **FR-CHAT-009 [AS-BUILT]**: Đầu ra nhà cung cấp phải được chuẩn hóa, có căn cứ khi cần, tự kiểm tra nội dung bị cấm, và thay bằng dự phòng an toàn được hỗ trợ khi không hợp lệ hoặc không khả dụng.
+- **FR-CHAT-010 [AS-BUILT]**: Chat JSON phải trả kết quả cuối cùng; SSE hiện phát `assistant.start`, một `assistant.delta` chứa toàn bộ câu trả lời cuối cùng, rồi `assistant.done` (hoặc `assistant.error`).
+- **FR-CHAT-011 [AS-BUILT]**: Frontend phải phân tích frame SSE cuối cùng đã đệm tại EOF, tránh phát lại JSON tự động không chắc chắn, và cập nhật mã tin nhắn/đánh giá trợ lý từ sự kiện done.
+- **FR-CHAT-012 [AS-BUILT]**: Lịch sử phải trả tối đa 100 tin nhắn gần nhất từ cuộc trò chuyện đang hoạt động thuộc sở hữu theo thứ tự thời gian.
+- **FR-CHAT-013 [AS-BUILT]**: Xác thực/cập nhật đánh giá repository chỉ chấp nhận `up/down`, vai trò trợ lý, và phạm vi phiên thuộc sở hữu; cập nhật sau có thể ghi đè đánh giá/lý do.
+- **FR-CHAT-014 [AS-BUILT]**: Endpoint chat và stream phải thực thi 30 yêu cầu mỗi IP mỗi cửa sổ một phút.
+- **FR-CHAT-015 [TARGET]**: Triển khai hạn mức 50/ngày theo chủ sở hữu với bộ đếm nguyên tử và xử lý đã tài liệu hóa cho yêu cầu bị chặn/thất bại/dự phòng sau khi BR-CHAT-021 được giải quyết.
+- **FR-CHAT-016 [TARGET]**: Lưu cặp người dùng/trợ lý thành công nguyên tử với kết quả thất bại rõ ràng, thay thế hành vi hai-lần-ghi nỗ lực tối đa hiện tại.
+- **FR-CHAT-017 [TARGET]**: Bổ sung hành vi vòng đời đóng/xóa/xuất hoàn chỉnh sau khi BR-CHAT-019 được giải quyết.
+- **FR-CHAT-018 [TARGET]**: Giới hạn và xác thực lý do đánh giá sau khi BR-CHAT-020 được giải quyết.
 
-## Yêu cầu *(bắt buộc)*
+## 9. Yêu cầu phi chức năng
 
-### Yêu cầu chức năng
+- **NFR-CHAT-001 [AS-BUILT]**: Cách ly xác thực và quyền sở hữu phải bao phủ chat, stream, lịch sử, trạng thái, bộ nhớ/tùy chọn cuộc trò chuyện, lưu trữ, và đánh giá.
+- **NFR-CHAT-002 [TARGET]**: Độ trễ phản hồi xác định và hỗ trợ AI phải được đo riêng biệt tại p50/p95 dưới tải đã phê duyệt; không tuyên bố SLA phát hành cho đến khi ngưỡng được phê duyệt.
+- **NFR-CHAT-003 [AS-BUILT]**: Bảo vệ lạm dụng chat/stream là 30 yêu cầu mỗi IP mỗi phút và trả phản hồi giới hạn tần suất mà không thực hiện công việc nhà cung cấp.
+- **NFR-CHAT-004 [TARGET]**: Lời gọi nhà cung cấp phải có ngân sách timeout đã phê duyệt và hành vi dự phòng/lỗi an toàn; hành vi timeout tạo trợ lý hiện tại cần xác minh rõ ràng và kiểm thử.
+- **NFR-CHAT-005 [AS-BUILT]**: Phản hồi/trạng thái không được tiết lộ prompt hệ thống, khóa API, chi tiết nhà cung cấp/mô hình/cấu hình, dữ liệu chưa công bố/riêng tư, hoặc chẩn đoán nhà cung cấp/CSDL thô.
+- **NFR-CHAT-006 [AS-BUILT]**: Nhật ký sử dụng lưu metadata thời gian/token/lỗi giới hạn và phải giảm thiểu PII; nội dung prompt/câu trả lời thô không được ghi vào đo lường sử dụng.
+- **NFR-CHAT-007 [TARGET]**: Bền vững cặp cuộc trò chuyện phải nguyên tử hoặc được báo cáo rõ ràng; áp dụng migration phải được xác minh trước khi tuyên bố bền vững lịch sử/đánh giá.
+- **NFR-CHAT-008 [AS-BUILT]**: Client SSE phải chấp nhận thứ tự sự kiện single-delta đã tài liệu hóa và xử lý frame cuối tại EOF; hành vi phân tích streaming/nhiều dòng thực sự không được tuyên bố.
+- **NFR-CHAT-009 [TARGET]**: Điều khiển widget, cập nhật tin nhắn, trạng thái đăng nhập/lỗi/vô hiệu, và đánh giá phải vận hành được bằng bàn phím, có nhãn cho công nghệ hỗ trợ, và được bao phủ bởi kiểm thử trợ năng.
+- **NFR-CHAT-010 [TARGET]**: Thay đổi service/truy vấn/API phải có kiểm thử happy, negative, phân quyền, thất bại, và dự phòng với ít nhất 80% coverage logic service/nghiệp vụ; phần trăm hiện tại chưa được chứng minh.
+- **NFR-CHAT-011 [TARGET]**: Hạn mức hàng ngày và kiểm soát lưu giữ/vòng đời không thể vượt qua đánh giá phát hành cho đến khi BR-CHAT-019/021 được giải quyết và xác minh.
 
-- **FR-001**: Hệ thống PHẢI yêu cầu mã truy cập hợp lệ lấy từ cookie và một phiên đăng nhập đang hoạt động cho tất cả điểm cuối của trợ lý.
-- **FR-002**: Hệ thống PHẢI giới hạn các điểm cuối của trợ lý cho người dùng đã xác thực có vai trò `student`.
-- **FR-003**: Giao diện PHẢI hiển thị lời nhắc đăng nhập cho khách, ẩn tiện ích trên các tuyến của bài thi đang diễn ra và duy trì mã cuộc hội thoại thuộc quyền sở hữu khi bảng trò chuyện được đóng rồi mở lại.
-- **FR-004**: Phía máy chủ PHẢI từ chối các yêu cầu trò chuyện có ngữ cảnh khai báo `active-test`, độc lập với quy tắc hiển thị của phía giao diện.
-- **FR-005**: Hệ thống PHẢI xác thực tin nhắn không rỗng và dài tối đa 2000 ký tự, loại trang được cho phép, ngữ cảnh tùy chọn đã chuẩn hóa và mã cuộc hội thoại UUID tùy chọn.
-- **FR-006**: Hai điểm cuối trò chuyện PHẢI áp dụng giới hạn 30 yêu cầu trên mỗi IP trong một phút và từ chối yêu cầu vượt giới hạn trước khi bộ điều khiển xử lý.
-- **FR-007**: Hệ thống PHẢI phân biệt lời chào, điều hướng, kiến thức IELTS, tra cứu bài thi, tra cứu tài nguyên, xem lại sau bài thi, ngoài phạm vi, yêu cầu làm rõ và yêu cầu không xác định; các giá trị ý định nội bộ đã khai báo nhưng hiện không được bất kỳ nhánh định tuyến nào trả về KHÔNG ĐƯỢC mô tả trong tài liệu như kết quả công khai có thể đạt tới.
-- **FR-008**: Khi định tuyến xác định trước trả về không xác định, hệ thống PHẢI chỉ truyền phần hội thoại gần đây không đáng tin cậy đã được giới hạn và các gợi ý định tuyến do máy chủ suy ra cho bộ phân loại phạm vi, đồng thời chuyển sang yêu cầu làm rõ nếu bộ phân loại gặp lỗi.
-- **FR-009**: Hệ thống PHẢI trả lời lời chào, thao tác tùy chọn, yêu cầu làm rõ an toàn và điều hướng tĩnh mà không gọi nhà cung cấp câu trả lời.
-- **FR-010**: Hệ thống PHẢI truy xuất các đoạn kiến thức IELTS tĩnh có giới hạn cho yêu cầu kiến thức phù hợp và CÓ THỂ sử dụng kiến thức mô hình an toàn về IELTS/tiếng Anh nói chung khi không có đoạn nào khớp.
-- **FR-011**: Đối với phản hồi kiến thức không hợp lệ, hệ thống PHẢI thử lại tối đa một lần ở chế độ văn bản thuần; lỗi truyền tải/cấu hình của nhà cung cấp PHẢI sử dụng phương án dự phòng kiến thức xác định trước mà không chuyển đổi nhà cung cấp.
-- **FR-012**: Phương án dự phòng kiến thức xác định trước PHẢI hỗ trợ Skimming, Scanning, sự kết hợp của hai kỹ năng này, phần tổng quan Writing Task 1, Speaking Part 2 và Reading; kỹ năng không khớp sử dụng phản hồi chung an toàn.
-- **FR-013**: Việc tra cứu bài thi PHẢI chỉ sử dụng các bản ghi đã xuất bản từ danh mục bài thi, áp dụng bộ lọc phù hợp trước khi giới hạn, xếp hạng kết quả và chỉ hiển thị liên kết nội bộ được tạo từ các bản ghi trả về.
-- **FR-014**: Việc tra cứu tài nguyên PHẢI chỉ sử dụng các bản ghi đã xuất bản từ danh mục thư viện và KHÔNG ĐƯỢC kích hoạt chỉ vì học viên đang xem trang Library.
-- **FR-015**: Phản hồi tra cứu PHẢI chỉ nêu tên các mục được cơ sở dữ liệu trả về; kết quả rỗng hoặc không có căn cứ PHẢI được thay bằng phản hồi xác định trước về việc không có kết quả hoặc phản hồi có căn cứ từ cơ sở dữ liệu.
-- **FR-016**: Việc xem lại sau bài thi PHẢI yêu cầu mã lượt làm bài thuộc quyền sở hữu được cung cấp trong yêu cầu, lượt làm bài đã nộp, câu hỏi có thể nhận diện và ngữ cảnh đáp án/lời giải thích chính thức.
-- **FR-017**: Các lớp bảo vệ PHẢI chạy trước quy trình xử lý của trợ lý và chặn việc sử dụng trong bài thi đang diễn ra, chấm điểm Writing/Speaking cá nhân, bịa nội dung chính thức, trích xuất dữ liệu riêng tư/nội bộ, các yêu cầu ngoài phạm vi đã chỉ định và yêu cầu đáp án/gợi ý sớm.
-- **FR-018**: Việc tự kiểm tra phản hồi PHẢI từ chối dự đoán band điểm cá nhân, tuyên bố chấm điểm Writing/Speaking, nội dung chính thức giả, rò rỉ câu lệnh hệ thống và liên kết ngoài không an toàn.
-- **FR-019**: Các lượt trao đổi thành công NÊN được lưu dưới dạng một tin nhắn người dùng và một tin nhắn trợ lý trong cuộc hội thoại đang hoạt động thuộc quyền sở hữu khi lược đồ trợ lý hội thoại khả dụng.
-- **FR-020**: Việc xác định cuộc hội thoại, chèn tin nhắn, lấy lịch sử gần đây, truy cập tùy chọn và cập nhật đánh giá PHẢI bị giới hạn theo học viên đã xác thực và một cuộc hội thoại đang hoạt động.
-- **FR-021**: Các thao tác cách xưng hô mong muốn PHẢI hỗ trợ thiết lập, gọi lại và xóa bằng tiếng Việt lẫn tiếng Anh; áp dụng giới hạn 60 ký tự/8 từ; loại bỏ các hậu tố lịch sự được hỗ trợ; và từ chối nội dung giống chỉ dẫn.
-- **FR-022**: Việc xác định tên dùng trong lời chào PHẢI ưu tiên tùy chọn có cấu trúc của cuộc hội thoại đang hoạt động, sau đó là tên hồ sơ/tài khoản hợp lệ, tiếp theo là các giá trị siêu dữ liệu/tên người dùng an toàn và cuối cùng là cách gọi chung `bạn`; giá trị có dạng địa chỉ thư điện tử KHÔNG ĐƯỢC dùng làm tên.
-- **FR-023**: Điểm cuối luồng SSE PHẢI xác thực danh tính, xác thực dữ liệu và chạy các lớp bảo vệ trước tiêu đề SSE; sau khi hoàn thành kết quả và cố gắng lưu theo cơ chế nỗ lực tối đa, điểm cuối PHẢI phát sự kiện bắt đầu, một phần dữ liệu chứa câu trả lời cuối cùng và sự kiện hoàn tất, hoặc phát sự kiện lỗi nếu tiêu đề đã được gửi.
-- **FR-024**: Trình khách luồng SSE phía giao diện PHẢI xử lý khung cuối còn trong bộ đệm tại EOF và KHÔNG ĐƯỢC tự động gửi lại một yêu cầu luồng không chắc chắn thông qua điểm cuối JSON.
-- **FR-025**: Việc lựa chọn nhà cung cấp PHẢI tuân theo nhà cung cấp được chỉ định rõ; nếu không có thì ưu tiên Gemini đã cấu hình cho tác vụ trợ lý, cô lập mô hình riêng của từng nhà cung cấp và chỉ gửi khóa Gemini trong tiêu đề HTTP `x-goog-api-key`.
-- **FR-026**: Mọi lần gọi nhà cung cấp PHẢI ghi lại siêu dữ liệu sử dụng có giới hạn mà không lưu câu lệnh đầu vào, câu trả lời, khóa hoặc dữ liệu cá nhân không cần thiết dưới dạng thô trong nhật ký sử dụng.
-- **FR-027**: Điểm cuối trạng thái được bảo vệ PHẢI trả về thông tin hoạt động tối thiểu và KHÔNG ĐƯỢC tiết lộ nhà cung cấp, mô hình, mô hình được yêu cầu/thực tế, tên khóa, khóa hoặc cấu hình môi trường.
-- **FR-028**: Tính năng KHÔNG ĐƯỢC thực hiện chấm điểm Writing/Speaking chính thức, thay thế quy trình của giảng viên, tiết lộ đáp án của bài thi đang diễn ra, làm lộ bản ghi chưa xuất bản/riêng tư hoặc bổ sung cơ chế truy xuất dựa trên vectơ/phép nhúng.
+## 10. Thực thể chính
 
-### Các thực thể chính
+- **Cuộc trò chuyện**: Phiên đang hoạt động thuộc sở hữu học viên chứa cách xưng hô ưa thích tùy chọn và dấu thời gian vòng đời.
+- **Tin nhắn chat**: Tin nhắn người dùng hoặc trợ lý trong một cuộc trò chuyện, tùy chọn mang đánh giá/lý do trợ lý.
+- **Bộ nhớ cuộc trò chuyện**: Phép chiếu giới hạn của các lượt gần đây cộng tùy chọn xưng hô theo phạm vi cuộc trò chuyện.
+- **Kết quả nội dung đã công bố**: Bản ghi bài thi/tài liệu có kiểm soát đủ điều kiện gợi ý.
+- **Ngữ cảnh bài thi đã nộp**: Bài thi đã nộp thuộc sở hữu cùng dữ liệu câu hỏi/đáp án/giải thích chính thức.
+- **Bản ghi sử dụng AI**: Metadata cho sử dụng nhà cung cấp không chứa nội dung prompt/câu trả lời thô.
 
-- **Cuộc hội thoại với trợ lý**: Cuộc hội thoại thuộc sở hữu của học viên, có mã định danh, cách xưng hô mong muốn tùy chọn, thời gian bắt đầu và thời gian kết thúc tùy chọn.
-- **Tin nhắn trợ lý**: Tin nhắn của người dùng hoặc trợ lý thuộc một cuộc hội thoại, có nội dung, thời gian, số `token` tùy chọn và dữ liệu đánh giá tùy chọn.
-- **Bản ghi sử dụng AI**: Siêu dữ liệu về một lần gọi nhà cung cấp, bao gồm ngữ cảnh tính năng/thực thể, nhà cung cấp/mô hình, số `token` nếu có, trạng thái thành công/lỗi và độ trễ.
-- **Bài thi đã xuất bản**: Một mục trong danh mục bài thi chỉ có thể được đề xuất khi đã xuất bản và có thể được lọc theo tiêu đề, mô tả, kỹ năng, độ khó cùng các trường tra cứu được hỗ trợ.
-- **Tài nguyên thư viện đã xuất bản**: Một mục trong thư viện chỉ có thể được đề xuất khi đã xuất bản và có thể được lọc theo tiêu đề, mô tả, loại tài nguyên, danh mục nếu có và các cụm từ tìm kiếm.
-- **Lượt làm bài**: Lượt làm bài thuộc sở hữu của học viên, có trạng thái nộp quyết định việc xem lại có được phép hay không.
-- **Câu hỏi và đáp án đã nộp**: Nội dung câu hỏi chính thức, đáp án học viên đã nộp, đáp án đúng và lời giải thích hiện có được dùng làm căn cứ cho phần giải thích khi xem lại.
-- **Phiên học viên đã xác thực**: Phiên đăng nhập và danh tính học viên đã xác minh được dùng để giới hạn phạm vi của mọi thao tác trợ lý.
+## 11. Tiêu chí thành công
 
-## Tiêu chí thành công *(bắt buộc)*
+- **SC-CHAT-001 [TARGET]**: 100% nỗ lực lịch sử/phiên/đánh giá của khách/không-học-viên và chéo chủ sở hữu bị từ chối mà không tiết lộ dữ liệu được bảo vệ.
+- **SC-CHAT-002 [TARGET]**: Kiểm thử biên chấp nhận tin nhắn 2.000 ký tự và từ chối đầu vào rỗng hoặc 2.001 ký tự trước công việc nhà cung cấp.
+- **SC-CHAT-003 [TARGET]**: Kiểm thử nội dung đã công bố trả không có bản ghi chưa công bố/chưa phê duyệt/riêng tư xuyên suốt đường tra cứu bài thi và tài liệu.
+- **SC-CHAT-004 [TARGET]**: Kiểm thử xem lại bài thi tiết lộ ngữ cảnh chính thức chỉ cho bài đã nộp thuộc sở hữu và từ chối bài người khác/chưa nộp.
+- **SC-CHAT-005 [TARGET]**: Fixture nhà cung cấp rỗng/sai định dạng/không an toàn/thất bại chỉ tạo đầu ra an toàn đã xác thực hoặc lỗi có kiểm soát, không rò rỉ prompt/khóa/mô hình/cấu hình.
+- **SC-CHAT-006 [TARGET]**: Kiểm thử tương thích SSE quan sát đúng start → một full-answer delta → done cho hợp đồng hiện tại và phân tích frame EOF cuối cùng.
+- **SC-CHAT-007 [TARGET]**: Kiểm thử đánh giá cho phép đánh giá lại tin nhắn trợ lý thuộc sở hữu và từ chối tin nhắn người dùng/người khác không có cập nhật trái phép.
+- **SC-CHAT-008 [TARGET]**: Trước phát hành, coverage tự động tập trung đạt ít nhất 80%, kiểm tra trợ năng đạt, và cổng hạn mức hàng ngày/lưu giữ/nguyên tử hoặc được triển khai hoặc bị loại rõ ràng theo phạm vi đã phê duyệt.
 
-### Kết quả có thể đo lường
+## 12. Giả định
 
-- **SC-001**: 100% yêu cầu hợp lệ từ người chưa xác thực và người không có vai trò học viên bị từ chối trước khi tạo cuộc hội thoại, tra cứu nội dung hoặc gọi nhà cung cấp câu trả lời.
-- **SC-002**: 100% yêu cầu khai báo ngữ cảnh bài thi đang diễn ra bị từ chối trước khi SSE bắt đầu và trước mọi lần gọi nhà cung cấp câu trả lời hoặc lưu tin nhắn.
-- **SC-003**: 100% tiêu đề và liên kết bài thi/tài nguyên được hiển thị bắt nguồn từ kết quả tra cứu đã xuất bản; không chấp nhận bất kỳ mục danh mục hoặc liên kết ngoài bịa đặt nào.
-- **SC-004**: 100% câu trả lời xem lại yêu cầu một lượt làm bài đã nộp thuộc quyền sở hữu và dữ liệu câu hỏi chính thức; các trường hợp thuộc người khác, chưa nộp hoặc thiếu lời giải thích không được bịa đặt hoặc làm lộ đáp án.
-- **SC-005**: Lỗi nhà cung cấp/cấu hình đối với câu hỏi kiến thức trong phạm vi tạo ra phản hồi xác định trước an toàn thay vì HTTP 500 chưa xử lý hoặc cấu hình bị rò rỉ.
-- **SC-006**: Các thao tác thiết lập, gọi lại và xóa một cách xưng hô hợp lệ hoàn tất mà không gọi nhà cung cấp câu trả lời và không bao giờ vượt qua ranh giới quyền sở hữu cuộc hội thoại hoặc tài khoản.
-- **SC-007**: Việc đóng/mở lại bảng trò chuyện và tải lại lịch sử duy trì cuộc hội thoại hiện hành thuộc quyền sở hữu, trong khi thay đổi người dùng sẽ xóa tính liên tục của cuộc hội thoại phía trình khách.
-- **SC-008**: Bộ kiểm thử hành vi trên môi trường thực tế chứa chính xác 561 ca duy nhất, liên tục (`TC-001` đến `TC-561`), và mọi kiểm thử hồi quy trợ lý tự động được chọn đều vượt qua trước khi phát hành; các ca trên môi trường thực tế vẫn được đánh dấu rõ là đang chờ cho đến khi được thực thi.
+- Xác thực cookie/phiên hiện có vẫn là nguồn danh tính.
+- Cờ đã công bố/trường phê duyệt và dấu thời gian nộp bài vẫn khả dụng trong schema CSDL.
+- JSON kiến thức tĩnh là nội dung đáng tin cậy có quản lý phiên bản; tin nhắn gần đây, cách xưng hô ưa thích, ngữ cảnh trang, và mục hiển thị vẫn là đầu vào không đáng tin cậy.
+- Sự có mặt migration trong repository không chứng minh đã áp dụng trên bất kỳ môi trường nào.
 
-## Các giả định
+## 13. Phụ thuộc
 
-- Tính năng tái sử dụng hạ tầng cookie/JWT và phiên hoạt động hiện có của dự án; không đưa vào phương thức xác thực mới.
-- Việc hỗ trợ lược đồ trợ lý hội thoại PostgreSQL phụ thuộc vào tệp di trú `024_create_chatbot_history_tables.sql` được áp dụng trong từng môi trường đích. Tệp di trú tồn tại trong kho mã nguồn; sự hiện diện trong kho mã không chứng minh rằng nó đã được áp dụng trên môi trường.
-- Cho đến khi lược đồ đó khả dụng, việc lưu tin nhắn thành công được thực hiện theo cơ chế nỗ lực tối đa; phản hồi an toàn vẫn có thể được gửi với mã tin nhắn `null` khi không thể sử dụng kho lưu trữ.
-- Khóa AI là tùy chọn đối với các luồng xác định trước/tức thời. Câu trả lời dựa trên nhà cung cấp cần một khóa được hỗ trợ và đã cấu hình, trong khi yêu cầu kiến thức được hỗ trợ sẽ chuyển sang phương án dự phòng an toàn khi thiếu cấu hình.
-- Nguồn kiến thức hiện tại là cơ sở kiến thức JSON tĩnh có quản lý phiên bản kết hợp với kiến thức mô hình có giới hạn; tìm kiếm dựa trên vectơ và phép nhúng nằm ngoài phạm vi.
-- Cách xưng hô mong muốn nằm trong phạm vi cuộc hội thoại, không phải tùy chọn hồ sơ dài hạn dùng xuyên nhiều cuộc hội thoại.
-- Các câu hỏi tiếp nối về việc xem lại dựa vào ngữ cảnh trang phía giao diện hiện tại để tiếp tục cung cấp mã lượt làm bài.
-- Phía máy chủ hiện tin cậy giá trị `pageType` đã qua kiểm tra dữ liệu được gửi trong ngữ cảnh yêu cầu để áp dụng lớp bảo vệ bài thi đang diễn ra; việc xác minh lượt làm bài đang hoạt động do máy chủ suy ra không thuộc tính năng này.
-- SSE hiện truyền câu trả lời cuối cùng đã chuẩn hóa thay vì từng `token` từ nhà cung cấp.
+- Kho phiên xác thực, PostgreSQL, và migration cho lịch sử/đánh giá chatbot.
+- Bài thi/tài liệu đã công bố và dữ liệu bài thi đã nộp/câu hỏi.
+- Gateway AI dùng chung/đo lường sử dụng và nhà cung cấp đã cấu hình cho các đường tạo.
+- Widget frontend toàn cục, API client, và API trình duyệt tương thích SSE.
+- [eval-set.md](./eval-set.md), được giữ vì `backend/scripts/eval-assistant.js` đọc và cập nhật trực tiếp.
+
+## 14. Câu hỏi mở
+
+1. **BR-CHAT-019**: Hành vi lưu giữ, đóng/mở lại, xuất, và xóa áp dụng cho cuộc trò chuyện, tin nhắn, tùy chọn, và đánh giá là gì?
+2. **BR-CHAT-020**: Chính sách độ dài tối đa/nội dung nào áp dụng cho `rating_reason`?
+3. **BR-CHAT-021**: Yêu cầu nào tiêu tốn hạn mức 50/ngày MỤC TIÊU: chỉ lượt được chấp nhận, chặn rào chắn, lỗi nhà cung cấp, dự phòng xác định, và/hoặc lỗi lưu trữ?
