@@ -155,12 +155,16 @@ const gradeWriting = async (submission, taskType, opts = {}) => {
   if (!result.success) {
     logger.error('AI grading validation failed', {
       errors: result.errors,
+      rawText: rawText,
     });
-    throw new AppError(
-      AI_GRADE_ERRORS.AIGRADE_004.message,
+    const errorDetail = result.errors.join(', ');
+    const err = new AppError(
+      `${AI_GRADE_ERRORS.AIGRADE_004.message}: ${errorDetail}`,
       AI_GRADE_ERRORS.AIGRADE_004.status,
       'AIGRADE_004'
     );
+    err.rawText = rawText;
+    throw err;
   }
 
   return {
