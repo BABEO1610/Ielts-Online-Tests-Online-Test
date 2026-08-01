@@ -66,13 +66,27 @@ describe('aiGrading.config', () => {
       transcription_model: 'whisper-1',
     });
     expect(whisper.scoringConfigSha256).not.toBe(gemini.scoringConfigSha256);
+
+    const explicitGemini = loadAiGradingConfig({
+      ...enabledEnv,
+      OPENAI_API_KEY: 'test-only-key',
+      AI_TRANSCRIPTION_MODEL: 'gemini-3.5-flash-lite',
+    });
+    expect(explicitGemini.provider.manifest).toMatchObject({
+      transcription_provider: 'gemini',
+      transcription_model: 'gemini-3.5-flash-lite',
+    });
   });
 
-  test('enforces pinned S3 configuration in production', () => {
-    expect(() => loadAiGradingConfig({
+  test('supports the configured private Supabase bucket in production', () => {
+    expect(loadAiGradingConfig({
       ...enabledEnv,
       NODE_ENV: 'production',
       OBJECT_STORAGE_PROVIDER: 'supabase',
-    })).toThrow('must use S3');
+      SPEAKING_AUDIO_BUCKET: 'speaking-audio-private',
+    }).storage).toMatchObject({
+      provider: 'supabase',
+      bucket: 'speaking-audio-private',
+    });
   });
 });

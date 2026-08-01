@@ -223,11 +223,15 @@ class AiGradingWorker {
     if (retryable && job.attempt_count < job.max_attempts) {
       const base = this.config.retryBaseSeconds * (2 ** Math.max(0, job.attempt_count - 1));
       const jitter = Math.floor(base * 0.25 * this.random());
+      const retryAfter = Number.isFinite(Number(error.retryAfterSeconds))
+        ? Math.min(3600, Math.max(0, Math.ceil(Number(error.retryAfterSeconds))))
+        : 0;
+      const delaySeconds = Math.max(base + jitter, retryAfter);
       const scheduled = await jobQueries.scheduleRetry(this.pool, {
         jobId: job.id,
         workerId: this.workerId,
         generation: job.lease_generation,
-        runAfter: new Date(this.now() + (base + jitter) * 1000).toISOString(),
+        runAfter: new Date(this.now() + delaySeconds * 1000).toISOString(),
         errorCode: code,
         errorMessage: sanitizeDiagnostic(error.message, 500),
       });

@@ -130,6 +130,8 @@ const SpeakingTestScreen = ({ exam, practiceMode, customTimeLimit }) => {
   const [submission, setSubmission] = useState(() => restorePendingSpeakingSubmission());
   const [phase, setPhase] = useState(() => (submission ? 'result' : 'intro'));
   const [answers, setAnswers] = useState([]); // [{ part_number, question_index, temp_s3_key }]
+  const [retryingGrading, setRetryingGrading] = useState(false);
+  const [retryGradingError, setRetryGradingError] = useState(null);
   const submittingRef = useRef(false);
   const grading = useSpeakingGrading(submission?.speaking_group_id, {
     enabled: Boolean(submission?.job_id),
@@ -200,6 +202,28 @@ const SpeakingTestScreen = ({ exam, practiceMode, customTimeLimit }) => {
     }
   };
 
+  const handleRetryGrading = async () => {
+    if (!submission?.speaking_group_id || retryingGrading) return;
+    setRetryingGrading(true);
+    setRetryGradingError(null);
+    try {
+      const response = await gradingService.retrySpeakingGrading(submission.speaking_group_id);
+      setSubmission((current) => ({
+        ...current,
+        job_id: response.data?.job_id || current.job_id,
+        status: response.data?.status || 'queued',
+      }));
+      await grading.refresh();
+      grading.restartPolling();
+    } catch (error) {
+      setRetryGradingError(
+        error.response?.data?.error?.message || error.message || 'Không thể gửi yêu cầu AI chấm lại.'
+      );
+    } finally {
+      setRetryingGrading(false);
+    }
+  };
+
   // ===== Renders =====
 
   if (phase === 'intro') {
@@ -230,10 +254,23 @@ const SpeakingTestScreen = ({ exam, practiceMode, customTimeLimit }) => {
               : 'Bài đã được chuyển vào hàng chờ giáo viên.'}
           </p>
           {grading.data?.status === 'needs_review' && (
-            <div className="alert alert-warning mb-4">AI chưa đủ bằng chứng để phát band; bài đã được chuyển cho tutor.</div>
+            <div className="alert alert-warning mb-4">Đây là trạng thái AI legacy cần được quản trị viên xem xét; hệ thống không tự tạo lượt chấm tutor.</div>
           )}
           {grading.data?.status === 'failed' && (
-            <div className="alert alert-danger mb-4">Chấm AI thất bại. Hãy mở lịch sử bài làm để xem tùy chọn retry.</div>
+            <div className="alert alert-danger mb-4">
+              <div>Chấm AI thất bại. Bài vẫn giữ trong luồng AI.</div>
+              {grading.data.can_retry && (
+                <button
+                  type="button"
+                  className="btn btn-outline-danger rounded-pill mt-3"
+                  disabled={retryingGrading}
+                  onClick={handleRetryGrading}
+                >
+                  {retryingGrading ? 'Đang gửi yêu cầu...' : 'Chấm lại bằng AI'}
+                </button>
+              )}
+              {retryGradingError && <div className="mt-2" role="alert">{retryGradingError}</div>}
+            </div>
           )}
 
           {/* Divider mỏng */}

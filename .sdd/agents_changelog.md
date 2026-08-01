@@ -331,3 +331,9 @@
 | 2026-07-28 | TienThanh82 | (Multiple files) | **(Team Commit)**: sua feat content |
 | 2026-07-28 | manh12082005 | (Multiple files) | **(Team Commit)**: Update spec |
 
+## 2026-08-01 (Codex — AI Speaking runtime hardening)
+
+| Date | Agent | File Changed | Summary |
+|------|-------|-------------|---------|
+| 2026-08-01 | Codex | Backend, frontend, Docker/Compose, workflow, Speaking SDD và `docs/speaking-ai-vps-deployment.md` | **AI Speaking only:** thêm process `speaking-worker` dùng chung backend image, cài `ffmpeg`/`ffprobe`, deploy fail-fast qua preflight/migrate/runtime-check, bảo toàn retry metadata/Retry-After, validate MIME/codec/checksum/normalized WAV, khóa full-audio 3 Part và public transcript mapping, sửa signed-audio error/reload, retry polling canonical child, không handoff tutor, cập nhật quota production 15 trong env/spec và thêm VPS runbook. Giữ nguyên migration 030; không thêm migration. Xóa `backend/scratch_jobs.js` vì chứa credential hard-code từ trước. |
+

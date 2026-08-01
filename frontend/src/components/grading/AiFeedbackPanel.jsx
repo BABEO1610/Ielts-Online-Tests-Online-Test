@@ -5,7 +5,7 @@ import {
   getWritingCriterionLabel,
 } from './writingFeedback.helpers';
 
-const DISCLAIMER = 'AI Estimated Feedback — chỉ mang tính tham khảo';
+const DISCLAIMER = 'AI Estimated Band — chỉ mang tính tham khảo';
 
 const parseMaybeJson = (value) => {
   if (!value || typeof value !== 'string') return value || null;
@@ -173,6 +173,7 @@ const normalizeReport = (report) => {
     nextStudyAdvice: feedback.nextStudyAdvice || report?.nextStudyAdvice || '',
     wordCountFeedback: feedback.wordCountFeedback || report?.wordCountFeedback || '',
     bandWarning: report?.band_validation_warning || report?.bandValidationWarning || report?.bandWarning,
+    disclaimer: report?.disclaimer || DISCLAIMER,
   };
 };
 
@@ -437,7 +438,7 @@ const AiFeedbackPanel = ({ report, showDisclaimer = true, isPending = false }) =
   const isFailed = data.status === 'failed' || data.errorMessage;
   return (
     <div style={styles.panel}>
-      {showDisclaimer && <div style={styles.disclaimer}>{DISCLAIMER}</div>}
+      {showDisclaimer && <div style={styles.disclaimer}>{data.disclaimer}</div>}
       {isFailed && (
         <div style={styles.error}>
           {data.errorMessage || 'AI grading thất bại. Bài vẫn giữ trạng thái chờ xử lý.'}

@@ -61,6 +61,7 @@ class SpeakingEvidenceService {
     if (!this.storage) throw new AppError('Object storage chưa được cấu hình.', 503, 'STORAGE_NOT_CONFIGURED');
     const object = await this.storage.statObject({ key: submission.audio_storage_key });
     if (!object) throw new AppError('Không tìm thấy audio đã bind.', 422, 'AUDIO_OBJECT_MISSING');
+    if (!object.contentType) throw new AppError('Audio object thiếu MIME metadata.', 422, 'AUDIO_METADATA_INVALID');
     if (Number(object.size) !== Number(submission.audio_size_bytes)) {
       throw new AppError('Kích thước audio đã thay đổi sau khi bind.', 422, 'AUDIO_OBJECT_CHANGED');
     }
@@ -70,11 +71,11 @@ class SpeakingEvidenceService {
       throw new AppError('Checksum audio không khớp khai báo.', 422, 'AUDIO_SHA256_MISMATCH');
     }
     await this.assertLeaseAndSaveDigest({ submission, job, workerId, generation, audioSha256 });
-    return { sourceBuffer, audioSha256 };
+    return { sourceBuffer, audioSha256, contentType: object.contentType };
   }
 
-  async normalizeAudio(sourceBuffer, submission) {
-    const normalized = await this.normalizer.normalize(sourceBuffer);
+  async normalizeAudio(sourceBuffer, submission, contentType) {
+    const normalized = await this.normalizer.normalize(sourceBuffer, { expectedContentType: contentType });
     const declaredDuration = Number(submission.declared_duration_ms);
     const durationTolerance = Math.max(3000, declaredDuration * 0.1);
     if (Number.isFinite(declaredDuration)
@@ -163,7 +164,7 @@ class SpeakingEvidenceService {
     };
     const reusable = await artifactQueries.getReusableArtifact(this.pool, cacheKey);
     if (reusable) return reusable;
-    const normalized = await this.normalizeAudio(source.sourceBuffer, submission);
+    const normalized = await this.normalizeAudio(source.sourceBuffer, submission, source.contentType);
     const artifact = await this.getProcessingArtifact(cacheKey, job, normalized);
     if (['complete', 'partial'].includes(artifact.status)) return artifact;
     const collected = await this.collectEvidence(normalized, job, submission);

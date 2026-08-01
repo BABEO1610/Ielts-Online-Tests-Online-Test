@@ -88,7 +88,7 @@ Là tutor, tôi muốn claim nguyên tử một group `grader=tutor`, nghe audio
 - **SFR-004**: AI submission PHẢI có đúng tập Part `{1,2,3}` và resolve prompt chính thức từ database; không tin owner/object key/prompt text do client tự khai.
 - **SFR-005**: Hệ thống PHẢI preflight object ngoài transaction, sau đó atomically tạo ba submission và một root job; request trả HTTP 202 mà không gọi provider.
 - **SFR-006**: Idempotency/fingerprint PHẢI xử lý replay trước quota và bảo vệ request tuần tự lẫn đồng thời; mỗi object chỉ gắn một submission.
-- **SFR-007**: Original AI group PHẢI dùng quota chung tối đa 10 lượt/người/ngày UTC; automatic/manual retry hợp lệ không tính thêm.
+- **SFR-007**: Original AI group PHẢI dùng quota chung cấu hình bởi `AI_DAILY_GRADING_QUOTA` mỗi người/ngày UTC (production hiện là 15); automatic/manual retry hợp lệ không tính thêm.
 - **SFR-008**: Worker PHẢI claim bằng `SKIP LOCKED`, lease và fencing generation; heartbeat/artifact/report/final write từ generation cũ phải bị từ chối.
 - **SFR-009**: Trước provider call, bytes thật PHẢI được kiểm tra checksum, magic bytes, codec, size, duration, decode và speech evidence.
 - **SFR-010**: Pipeline PHẢI lưu ASR output riêng với display transcript; không sửa ngữ pháp transcript rồi dùng bản sửa làm evidence.

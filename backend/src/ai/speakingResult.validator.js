@@ -140,6 +140,13 @@ const validateSpeakingResult = (input, { allowFullAudio = false } = {}) => {
   validateAssessmentShape(input);
   const criteria = normalizeCriteria(input?.criteria);
   const overallBand = validateMode(input, criteria, allowFullAudio);
+  const partFeedback = normalizePartFeedback(input.part_feedback)
+    .sort((left, right) => left.part_number - right.part_number);
+  if (input.evidence_mode === 'full_audio'
+    && (partFeedback.length !== 3
+      || partFeedback.some((item, index) => item.part_number !== index + 1))) {
+    fail('Full audio phải có feedback cho đúng ba Part.');
+  }
   const calibrationVersion = input.calibration_version === null
     ? null : requireText(input.calibration_version, 'calibration_version', 80);
   if (CRITERIA.some((key) => criteria[key].band !== null) && !calibrationVersion) {
@@ -152,7 +159,7 @@ const validateSpeakingResult = (input, { allowFullAudio = false } = {}) => {
     requires_human_review: input.requires_human_review,
     criteria,
     overall_band: overallBand,
-    part_feedback: normalizePartFeedback(input.part_feedback),
+    part_feedback: partFeedback,
     text_based_feedback: normalizeTextFeedback(input.text_based_feedback, input.evidence_mode),
     disclaimer: requireText(input.disclaimer, 'disclaimer'),
     pipeline_version: requireText(input.pipeline_version, 'pipeline_version', 80),

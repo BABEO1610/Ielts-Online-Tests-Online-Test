@@ -10,6 +10,30 @@ const DEFAULT_OPENAI_MODEL = 'gpt-4o-mini';
 const DEFAULT_GEMINI_MODEL = 'gemini-flash-lite-latest';
 const GEMINI_PROVIDERS = new Set(['gemini', 'google', 'google-ai-studio']);
 const DEFAULT_TRANSCRIPTION_TIMEOUT_MS = 45000;
+const TRANSIENT_NETWORK_CODES = new Set([
+  'ECONNRESET', 'ECONNREFUSED', 'EHOSTUNREACH', 'ENETUNREACH', 'ENOTFOUND',
+  'EAI_AGAIN', 'ETIMEDOUT', 'UND_ERR_CONNECT_TIMEOUT', 'UND_ERR_HEADERS_TIMEOUT',
+]);
+
+const parseRetryAfterSeconds = (value, now = Date.now()) => {
+  if (value === null || value === undefined || value === '') return null;
+  const seconds = Number(value);
+  if (Number.isFinite(seconds) && seconds >= 0) return Math.min(3600, Math.ceil(seconds));
+  const retryAt = Date.parse(String(value));
+  if (!Number.isFinite(retryAt)) return null;
+  return Math.min(3600, Math.max(0, Math.ceil((retryAt - now) / 1000)));
+};
+
+const asTransientNetworkError = (error) => {
+  if (error?.retryable !== undefined || error?.name === 'AbortError') return error;
+  if (!(error instanceof TypeError) && !TRANSIENT_NETWORK_CODES.has(error?.code)) return error;
+  const transient = new Error('AI provider network request failed');
+  transient.code = 'AI_PROVIDER_NETWORK_ERROR';
+  transient.errorCode = 'AI_PROVIDER_NETWORK_ERROR';
+  transient.statusCode = 503;
+  transient.retryable = true;
+  return transient;
+};
 
 const getTranscriptionTimeoutMs = () => {
   const configured = Number.parseInt(process.env.AI_TRANSCRIPTION_TIMEOUT_MS, 10);
@@ -46,7 +70,7 @@ const fetchTranscription = async (url, options = {}) => {
       timeoutError.retryable = true;
       throw timeoutError;
     }
-    throw error;
+    throw asTransientNetworkError(error);
   } finally {
     clearTimeout(timeout);
   }
@@ -117,27 +141,34 @@ const sanitizeProviderError = (text) => {
     .slice(0, 700);
 };
 
-const buildProviderError = ({ provider, status, model, body }) => {
+const buildProviderError = ({ provider, status, model, body, retryAfter }) => {
   const sanitized = sanitizeProviderError(body);
+  const attachMetadata = (error) => {
+    error.providerStatus = Number(status);
+    error.retryable = Number(status) === 429 || Number(status) >= 500;
+    const retryAfterSeconds = parseRetryAfterSeconds(retryAfter);
+    if (retryAfterSeconds !== null) error.retryAfterSeconds = retryAfterSeconds;
+    return error;
+  };
 
   if (status === 429) {
-    return createAssistantError(
+    return attachMetadata(createAssistantError(
       ERROR_CODES.AI_QUOTA_EXCEEDED,
       `${provider} API đã hết quota hoặc chưa được cấp quota cho model "${model}". Hãy kiểm tra Google AI Studio quota/billing hoặc đổi sang API key/project còn quota.`
-    );
+    ));
   }
 
   if (status === 400 && sanitized.includes('User location is not supported')) {
-    return createAssistantError(
+    return attachMetadata(createAssistantError(
       ERROR_CODES.INTERNAL_ERROR,
       `Google đã chặn truy cập Gemini API từ khu vực của bạn (Việt Nam). Vui lòng bật phần mềm VPN (như 1.1.1.1 WARP hoặc ProtonVPN) trên máy tính của bạn và thử lại.`
-    );
+    ));
   }
 
-  return createAssistantError(
+  return attachMetadata(createAssistantError(
     ERROR_CODES.INTERNAL_ERROR,
     `${provider} API lỗi ${status} khi gọi model "${model}". ${sanitized || 'Không có response body.'}`
-  );
+  ));
 };
 
 const buildSystemPrompt = (mode) => (
@@ -420,6 +451,7 @@ const generateGeminiJsonAnswer = async ({
         status: response.status,
         model: geminiModel,
         body: await response.text(),
+        retryAfter: response.headers?.get?.('retry-after'),
       });
       await recordProviderUsage({
         usageContext,
@@ -448,6 +480,8 @@ const generateGeminiJsonAnswer = async ({
       .trim();
     if (!answer) throw createAssistantError(ERROR_CODES.INTERNAL_ERROR);
     return { answer, modelName: geminiModel, usageMetadata: data?.usageMetadata || null };
+  } catch (error) {
+    throw asTransientNetworkError(error);
   } finally {
     clearTimeout(timeout);
   }
@@ -873,6 +907,9 @@ const streamAssistantAnswer = async ({ mode, message, officialContext, systemPro
 
 const generateTranscript = async (audioUrl, usageContext = {}) => {
   const { openaiApiKey, geminiApiKey, geminiModel: configuredGeminiModel } = getAiConfig();
+  const configuredTranscriptionModel = process.env.AI_TRANSCRIPTION_MODEL;
+  const useOpenAiTranscription = configuredTranscriptionModel?.startsWith('whisper')
+    || (!configuredTranscriptionModel && Boolean(openaiApiKey));
   
   if (!openaiApiKey && !geminiApiKey) {
     throw createAssistantError(ERROR_CODES.AI_NOT_CONFIGURED, "Không tìm thấy OPENAI_API_KEY hay GEMINI_API_KEY.");
@@ -885,8 +922,8 @@ const generateTranscript = async (audioUrl, usageContext = {}) => {
   const arrayBuffer = await response.arrayBuffer();
   const contentType = response.headers.get('content-type') || 'audio/webm';
 
-  // If OpenAI is configured, prefer Whisper
-  if (openaiApiKey) {
+  if (useOpenAiTranscription) {
+    if (!openaiApiKey) throw createAssistantError(ERROR_CODES.AI_NOT_CONFIGURED);
     let ext = 'webm';
     if (contentType.includes('mp3') || contentType.includes('mpeg')) ext = 'mp3';
     if (contentType.includes('wav')) ext = 'wav';
@@ -895,8 +932,8 @@ const generateTranscript = async (audioUrl, usageContext = {}) => {
     const blob = new Blob([arrayBuffer], { type: contentType });
     const formData = new FormData();
     formData.append('file', blob, `audio.${ext}`);
-    const transcriptionModel = process.env.AI_TRANSCRIPTION_MODEL?.startsWith('whisper')
-      ? process.env.AI_TRANSCRIPTION_MODEL
+    const transcriptionModel = configuredTranscriptionModel?.startsWith('whisper')
+      ? configuredTranscriptionModel
       : 'whisper-1';
     formData.append('model', transcriptionModel);
 
@@ -916,6 +953,7 @@ const generateTranscript = async (audioUrl, usageContext = {}) => {
         status: whisperResponse.status,
         model: transcriptionModel,
         body: errorText,
+        retryAfter: whisperResponse.headers?.get?.('retry-after'),
       });
       await recordProviderUsage({
         usageContext,
@@ -942,7 +980,7 @@ const generateTranscript = async (audioUrl, usageContext = {}) => {
 
   // Fallback to Gemini
   const base64Audio = Buffer.from(arrayBuffer).toString('base64');
-  const configuredTranscriptionModel = process.env.AI_TRANSCRIPTION_MODEL;
+  if (!geminiApiKey) throw createAssistantError(ERROR_CODES.AI_NOT_CONFIGURED);
   const geminiModel = normalizeGeminiModel(
     configuredTranscriptionModel?.startsWith('gemini')
       ? configuredTranscriptionModel
@@ -982,6 +1020,7 @@ const generateTranscript = async (audioUrl, usageContext = {}) => {
       status: geminiResponse.status,
       model: geminiModel,
       body: errorText,
+      retryAfter: geminiResponse.headers?.get?.('retry-after'),
     });
     await recordProviderUsage({
       usageContext,

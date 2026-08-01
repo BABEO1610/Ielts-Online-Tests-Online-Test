@@ -535,7 +535,7 @@ components:
           enum: [queued, running, retry_wait, completed, needs_review, failed]
         stage:
           type: string
-          enum: [queued, validating_audio, analyzing, scoring, calibrating, finalizing]
+          enum: [queued, validating_audio, analyzing, scoring, calibrating, finalizing, completed, needs_review, failed]
         attempt_count:
           type: integer
           minimum: 0
@@ -723,6 +723,7 @@ components:
         - requires_human_review
         - overall_band
         - criteria
+        - part_feedback
         - text_based_feedback
         - disclaimer
         - pipeline_version
@@ -750,6 +751,8 @@ components:
           $ref: '#/components/schemas/SpeakingCriteria'
         part_feedback:
           type: array
+          minItems: 3
+          maxItems: 3
           items:
             type: object
             additionalProperties: false
