@@ -58,4 +58,35 @@ describe('SpeakingEvidenceService', () => {
     expect(() => assertEvidenceSize({ providerManifest: { text: 'x'.repeat(33000) } }))
       .toThrow('vượt giới hạn');
   });
+
+  test('rejects a downloaded object when its checksum differs from the bound upload digest', async () => {
+    const body = Buffer.from('changed-audio-bytes');
+    const storage = new FakeObjectStorageAdapter();
+    storage.putObject('private/audio.m4a', body, { contentType: 'audio/mp4' });
+    const pool = { query: jest.fn() };
+    const normalizer = { normalize: jest.fn() };
+    const service = new SpeakingEvidenceService({
+      pool,
+      storage,
+      normalizer,
+      transcriber: {},
+      speechEvidence: {},
+    });
+
+    await expect(service.processPart({
+      submission: {
+        id: 'submission-1',
+        audio_storage_key: 'private/audio.m4a',
+        audio_size_bytes: body.length,
+        declared_audio_sha256: crypto.createHash('sha256').update('original-audio').digest('hex'),
+      },
+      job: {
+        id: 'job-1', user_id: 'user-1', scoring_config_sha256: 'a'.repeat(64), pipeline_version: 'v1',
+      },
+      workerId: 'worker-1',
+      generation: 1,
+    })).rejects.toMatchObject({ errorCode: 'AUDIO_SHA256_MISMATCH' });
+    expect(normalizer.normalize).not.toHaveBeenCalled();
+    expect(pool.query).not.toHaveBeenCalled();
+  });
 });

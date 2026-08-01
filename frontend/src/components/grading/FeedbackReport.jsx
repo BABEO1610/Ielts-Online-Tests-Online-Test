@@ -16,7 +16,7 @@ const STATUS_LABELS = {
   queued: 'Đã xếp hàng',
   running: 'AI đang phân tích audio',
   retry_wait: 'Đang chờ thử lại',
-  needs_review: 'Đã chuyển tutor xác nhận',
+  needs_review: 'Trạng thái AI legacy cần xem xét',
   graded: 'Đã chấm',
   tutor_graded: 'Đã chấm',
 };
@@ -232,7 +232,46 @@ const getSpeakingCriterionRows = (aiFeedback) => {
   ];
 };
 
-const SpeakingPartCard = ({ part }) => (
+const classifyAudioError = (error) => {
+  const status = Number(error?.response?.status || 0);
+  const code = error?.response?.data?.error?.code || error?.response?.data?.error?.errorCode || '';
+  if ([401, 403].includes(status) || code === 'AUTH_PERM_001') {
+    return { code: 'AUDIO_FORBIDDEN', message: 'Bạn không có quyền nghe audio của Part này.' };
+  }
+  if (status === 404 || code === 'AUDIO_NOT_FOUND') {
+    return { code: 'AUDIO_MISSING', message: 'Không tìm thấy bản ghi âm của Part này.' };
+  }
+  if (status >= 500 || /STORAGE|SIGNED/i.test(code)) {
+    return { code: 'AUDIO_STORAGE_TEMPORARY', message: 'Dịch vụ lưu trữ audio tạm thời không khả dụng.' };
+  }
+  return { code: 'AUDIO_SIGNING_FAILED', message: 'Không thể tạo liên kết nghe audio an toàn.' };
+};
+
+const loadSignedAudioPart = async (part) => {
+  if (!part?.submissionId) {
+    return { ...part, audioUrl: '', audioState: 'missing', audioError: {
+      code: 'AUDIO_MISSING', message: 'Không có bản ghi âm cho Part này.',
+    } };
+  }
+  try {
+    const audioResponse = await gradingService.getAudioUrl(part.submissionId, 'speaking');
+    const url = audioResponse.data?.url || '';
+    if (!url) {
+      return { ...part, audioUrl: '', audioState: 'missing', audioError: {
+        code: 'AUDIO_MISSING', message: 'Không tìm thấy bản ghi âm của Part này.',
+      } };
+    }
+    return { ...part, audioUrl: url, audioState: 'ready', audioError: null };
+  } catch (error) {
+    return { ...part, audioUrl: '', audioState: 'error', audioError: classifyAudioError(error) };
+  }
+};
+
+const SpeakingPartCard = ({ part, onRetryAudio, onAudioPlaybackError }) => {
+  const transcript = part.aiPartFeedback?.display_transcript || part.transcript || '';
+  const partFeedback = part.aiPartFeedback?.feedback || part.aiPartFeedback?.summary || '';
+  const warnings = part.aiPartFeedback?.audio_quality_warnings || [];
+  return (
   <div className="card border shadow-none mb-3">
     <div className="card-header bg-white fw-bold">Part {part.partNumber}</div>
     <div className="card-body">
@@ -242,23 +281,46 @@ const SpeakingPartCard = ({ part }) => (
           {part.prompt || 'Không có đề bài.'}
         </p>
       </div>
+      {part.audioState === 'loading' && (
+        <div className="text-muted mb-3" role="status">Đang tạo liên kết audio an toàn...</div>
+      )}
       {part.audioUrl && (
         <div className="mb-3">
           <div className="fw-semibold mb-2">Bản ghi âm</div>
-          <audio controls src={part.audioUrl} className="w-100" />
+          <audio
+            controls
+            src={part.audioUrl}
+            className="w-100"
+            onError={() => onAudioPlaybackError?.(part)}
+          />
+        </div>
+      )}
+      {part.audioError && (
+        <div className="alert alert-warning py-2" role="alert">
+          <div>{part.audioError.message}</div>
+          {onRetryAudio && (
+            <button
+              type="button"
+              className="btn btn-sm btn-outline-dark mt-2"
+              disabled={part.audioState === 'loading'}
+              onClick={() => onRetryAudio(part)}
+            >
+              Thử tải lại audio Part {part.partNumber}
+            </button>
+          )}
         </div>
       )}
       <div className="mb-3">
         <div className="fw-semibold mb-2">Script / transcript</div>
         <p className="mb-0 bg-light rounded-3 p-3" style={{ whiteSpace: 'pre-wrap', lineHeight: 1.8 }}>
-          {part.transcript || 'Chưa có transcript.'}
+          {transcript || 'Chưa có transcript.'}
         </p>
       </div>
       {part.aiPartFeedback && (
         <div>
           <div className="fw-semibold mb-2">Nhận xét AI cho Part {part.partNumber}</div>
           <p className="mb-2" style={{ whiteSpace: 'pre-wrap', lineHeight: 1.7 }}>
-            {part.aiPartFeedback.summary || 'Chưa có nhận xét riêng cho part này.'}
+            {partFeedback || 'Chưa có nhận xét riêng cho part này.'}
           </p>
           {!!part.aiPartFeedback.strengths?.length && (
             <p className="mb-1"><strong>Điểm mạnh:</strong> {part.aiPartFeedback.strengths.join('; ')}</p>
@@ -266,28 +328,51 @@ const SpeakingPartCard = ({ part }) => (
           {!!part.aiPartFeedback.weaknesses?.length && (
             <p className="mb-0"><strong>Cần cải thiện:</strong> {part.aiPartFeedback.weaknesses.join('; ')}</p>
           )}
+          {!!warnings.length && (
+            <div className="alert alert-warning py-2 mt-3 mb-0">
+              <strong>Cảnh báo chất lượng audio:</strong> {warnings.join('; ')}
+            </div>
+          )}
         </div>
       )}
     </div>
   </div>
-);
+  );
+};
 
-export const SpeakingFeedbackDetail = ({ data, onRetry, retrying = false, retryError = null }) => {
+export const SpeakingFeedbackDetail = ({
+  data,
+  onRetry,
+  retrying = false,
+  retryError = null,
+  onRetryAudio,
+  onAudioPlaybackError,
+}) => {
   const aiFeedback = data.aiFeedback;
   const overall = data.overallSpeakingBand ?? aiFeedback?.overallBand ?? null;
   const badge = getScoreBadge(overall);
   const isAsync = Boolean(data.gradingStatus);
+  const scoredCriteria = [
+    'fluencyCoherence', 'lexicalResource', 'grammaticalRangeAccuracy', 'pronunciation',
+  ].map((key) => aiFeedback?.criterionScores?.[key]);
+  const hasCompleteEvidence = scoredCriteria.every((criterion) => (
+    Number.isFinite(Number(criterion?.band))
+    && (criterion?.evidence_status || criterion?.evidenceStatus) === 'sufficient'
+  ));
   const isPublishable = !isAsync || (
     data.gradingStatus === 'completed'
     && aiFeedback?.evidenceMode === 'full_audio'
     && overall !== null
+    && hasCompleteEvidence
   );
   const statusNotice = {
     queued: 'Bài đã vào hàng đợi. Hệ thống chưa công bố điểm.',
     running: 'Hệ thống đang kiểm tra audio và evidence. Hệ thống chưa công bố điểm.',
     retry_wait: 'Lỗi tạm thời; worker sẽ tự thử lại. Hệ thống chưa công bố điểm.',
-    needs_review: 'Evidence hiện tại chưa đủ để công bố band Speaking. Bài đã được chuyển cho tutor nghe audio và xác nhận.',
-    failed: 'Chấm tự động thất bại. Bạn có thể yêu cầu AI chấm lại.',
+    needs_review: 'Đây là trạng thái dữ liệu AI legacy cần được quản trị viên xem xét; hệ thống không tự tạo lượt chấm tutor.',
+    failed: data.canRetry
+      ? 'Chấm tự động thất bại. Bạn có thể yêu cầu AI chấm lại.'
+      : 'Chấm tự động thất bại và hiện không còn lượt chấm lại hợp lệ.',
   }[data.gradingStatus];
 
   return (
@@ -360,7 +445,12 @@ export const SpeakingFeedbackDetail = ({ data, onRetry, retrying = false, retryE
       <div className="row g-4">
         <div className="col-lg-5">
           {(data.parts || []).map(part => (
-            <SpeakingPartCard key={part.submissionId || part.partNumber} part={part} />
+            <SpeakingPartCard
+              key={part.submissionId || part.partNumber}
+              part={part}
+              onRetryAudio={onRetryAudio}
+              onAudioPlaybackError={onAudioPlaybackError}
+            />
           ))}
         </div>
         <div className="col-lg-7">
@@ -514,14 +604,7 @@ const FeedbackReport = ({ submissionId, type }) => {
       if (response.success) {
         let nextData = response.data;
         if (type === 'speaking' && Array.isArray(nextData?.parts)) {
-          const parts = await Promise.all(nextData.parts.map(async (part) => {
-            try {
-              const audioResponse = await gradingService.getAudioUrl(part.submissionId, 'speaking');
-              return { ...part, audioUrl: audioResponse.data?.url || '' };
-            } catch {
-              return part;
-            }
-          }));
+          const parts = await Promise.all(nextData.parts.map(loadSignedAudioPart));
           nextData = { ...nextData, parts };
         }
         setReportData(nextData);
@@ -535,11 +618,47 @@ const FeedbackReport = ({ submissionId, type }) => {
     }
   }, [submissionId, type]);
 
+  const updateSpeakingPart = useCallback((submissionPartId, updater) => {
+    setReportData((current) => current ? {
+      ...current,
+      parts: (current.parts || []).map((part) => (
+        part.submissionId === submissionPartId ? updater(part) : part
+      )),
+    } : current);
+  }, []);
+
+  const retrySpeakingAudio = useCallback(async (part) => {
+    updateSpeakingPart(part.submissionId, (current) => ({
+      ...current, audioUrl: '', audioState: 'loading', audioError: null,
+    }));
+    const refreshed = await loadSignedAudioPart(part);
+    updateSpeakingPart(part.submissionId, () => refreshed);
+  }, [updateSpeakingPart]);
+
+  const markSpeakingAudioExpired = useCallback((part) => {
+    updateSpeakingPart(part.submissionId, (current) => ({
+      ...current,
+      audioUrl: '',
+      audioState: 'error',
+      audioError: {
+        code: 'SIGNED_AUDIO_EXPIRED',
+        message: 'Liên kết audio đã hết hạn hoặc không còn hợp lệ. Hãy tải lại liên kết.',
+      },
+    }));
+  }, [updateSpeakingPart]);
+
   const retrySpeaking = useCallback(async () => {
     setRetrying(true);
     setRetryError(null);
     try {
-      await gradingService.retrySpeakingGrading(submissionId);
+      const response = await gradingService.retrySpeakingGrading(submissionId);
+      setReportData((current) => current ? {
+        ...current,
+        gradingStatus: response.data?.status || 'queued',
+        gradingStage: response.data?.stage || 'queued',
+        aiStatus: response.data?.status || 'queued',
+        canRetry: false,
+      } : current);
       await fetchFeedback();
     } catch (retryFailure) {
       setRetryError(
@@ -591,8 +710,12 @@ const FeedbackReport = ({ submissionId, type }) => {
     const handleGradingFailed = (data) => {
       const eventSubmissionId = data.submission_id || data.submissionId;
       if (eventSubmissionId === submissionId) {
-        setError('Chấm bài thất bại, quota đã được hoàn trả.');
-        setLoading(false);
+        if (type === 'speaking') {
+          void fetchFeedback();
+        } else {
+          setError('Chấm bài thất bại, quota đã được hoàn trả.');
+          setLoading(false);
+        }
       }
     };
 
@@ -604,18 +727,22 @@ const FeedbackReport = ({ submissionId, type }) => {
       socket.off('grading_complete', handleGradingComplete);
       socket.off('grading_failed', handleGradingFailed);
     };
-  }, [socket, submissionId, fetchFeedback]);
+  }, [socket, submissionId, fetchFeedback, type]);
 
   // Polling fallback
   useEffect(() => {
-    if (reportData?.aiStatus === 'pending' || reportData?.status === 'pending') {
+    const speakingActive = type === 'speaking'
+      && ['queued', 'running', 'retry_wait'].includes(reportData?.gradingStatus);
+    const writingActive = type !== 'speaking'
+      && (reportData?.aiStatus === 'pending' || reportData?.status === 'pending');
+    if (speakingActive || writingActive) {
       const interval = setInterval(() => {
         fetchFeedback();
       }, 10000);
       return () => clearInterval(interval);
     }
     return undefined;
-  }, [reportData?.aiStatus, reportData?.status, fetchFeedback]);
+  }, [reportData?.aiStatus, reportData?.gradingStatus, reportData?.status, fetchFeedback, type]);
 
   if (loading && !reportData) {
     return (
@@ -656,6 +783,8 @@ const FeedbackReport = ({ submissionId, type }) => {
         onRetry={retrySpeaking}
         retrying={retrying}
         retryError={retryError}
+        onRetryAudio={retrySpeakingAudio}
+        onAudioPlaybackError={markSpeakingAudioExpired}
       />
     );
   }

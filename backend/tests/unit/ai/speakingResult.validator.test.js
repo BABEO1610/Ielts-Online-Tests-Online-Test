@@ -36,6 +36,12 @@ const fullResult = () => ({
   disclaimer: 'Điểm ước tính, không phải điểm IELTS chính thức.',
   pipeline_version: 'speaking-v1',
   calibration_version: 'vi-v1',
+  part_feedback: [1, 2, 3].map((part_number) => ({
+    part_number,
+    display_transcript: `Transcript ${part_number}`,
+    feedback: `Feedback ${part_number}`,
+    audio_quality_warnings: [],
+  })),
 });
 
 describe('speakingResult.validator', () => {
@@ -59,13 +65,13 @@ describe('speakingResult.validator', () => {
     input.rawResponse = 'provider secret';
     input.reliability = { internal: 0.99 };
     input.criteria.fluency_coherence.internal_confidence = 0.99;
-    input.part_feedback = [{
+    input.part_feedback[0] = {
       part_number: 1,
       display_transcript: '<b>Hello</b>',
       feedback: '<script>unsafe</script>Useful',
       audio_quality_warnings: ['clipping'],
       raw_timestamps: [1, 2, 3],
-    }];
+    };
     const result = validateSpeakingResult(input, { allowFullAudio: true });
     expect(result.overall_band).toBe(6.5);
     expect(result.criteria.fluency_coherence.feedback).toBe('Phản hồi');
@@ -78,6 +84,22 @@ describe('speakingResult.validator', () => {
     expect(result).not.toHaveProperty('rawResponse');
     expect(result).not.toHaveProperty('reliability');
     expect(result.criteria.fluency_coherence).not.toHaveProperty('internal_confidence');
+  });
+
+  test('requires exactly one feedback entry for each Speaking Part in full-audio results', () => {
+    const missingPart = fullResult();
+    missingPart.part_feedback = missingPart.part_feedback.slice(0, 2);
+    expectErrorCode(
+      () => validateSpeakingResult(missingPart, { allowFullAudio: true }),
+      'SPEAKING_EVIDENCE_INVALID'
+    );
+
+    const duplicatePart = fullResult();
+    duplicatePart.part_feedback[2].part_number = 2;
+    expectErrorCode(
+      () => validateSpeakingResult(duplicatePart, { allowFullAudio: true }),
+      'SPEAKING_EVIDENCE_INVALID'
+    );
   });
 
   test('fails closed when full-audio publication is disabled', () => {

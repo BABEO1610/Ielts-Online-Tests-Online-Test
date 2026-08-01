@@ -1531,22 +1531,10 @@ class SubmissionService {
     }
 
     if (asyncStatus) {
-      const artifactRows = await pool.query(
-        `SELECT DISTINCT ON (speaking_submission_id)
-            speaking_submission_id, asr_transcript, display_transcript
-         FROM speaking_analysis_artifacts
-         WHERE speaking_submission_id = ANY($1::uuid[])
-           AND source_job_id = $2
-           AND status IN ('complete', 'partial')
-           AND deleted_at IS NULL
-         ORDER BY speaking_submission_id, created_at DESC`,
-        [partIds, asyncStatus.job_id]
-      );
-      const transcriptByPart = new Map(artifactRows.rows.map(artifact => [
-        artifact.speaking_submission_id,
-        artifact.display_transcript || artifact.asr_transcript || '',
-      ]));
       const result = asyncStatus.status === 'completed' ? asyncStatus.result : null;
+      const feedbackByPart = new Map((result?.part_feedback || []).map((item) => [
+        Number(item.part_number), item,
+      ]));
       const criteria = result?.criteria || {};
       const aiFeedback = result ? {
         id: result.report_id,
@@ -1581,18 +1569,21 @@ class SubmissionService {
         overallAiBand: result?.overall_band ?? null,
         overallTutorBand: null,
         aiStatus: asyncStatus.status,
-        tutorStatus: asyncStatus.status === 'needs_review' ? 'pending' : null,
+        tutorStatus: null,
         aiFeedback,
         tutorGrade: null,
-        parts: parts.map(part => ({
-          submissionId: part.id,
-          partNumber: part.part_number,
-          prompt: part.prompt_text || '',
-          promptText: part.prompt_text || '',
-          audioUrl: '',
-          transcript: transcriptByPart.get(part.id) || '',
-          aiPartFeedback: result?.part_feedback?.find(item => Number(item.part_number) === Number(part.part_number)) || null,
-        })),
+        parts: parts.map(part => {
+          const partFeedback = feedbackByPart.get(Number(part.part_number)) || null;
+          return {
+            submissionId: part.id,
+            partNumber: part.part_number,
+            prompt: part.prompt_text || '',
+            promptText: part.prompt_text || '',
+            audioUrl: '',
+            transcript: partFeedback?.display_transcript || '',
+            aiPartFeedback: partFeedback,
+          };
+        }),
       };
     }
     const aiColumns = await getAiReportColumns();

@@ -61,6 +61,7 @@ const useSpeakingGrading = (groupId, { enabled = true } = {}) => {
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
   const [isPolling, setIsPolling] = useState(false);
+  const [pollingGeneration, setPollingGeneration] = useState(0);
   const timerRef = useRef(null);
   const attemptRef = useRef(0);
 
@@ -80,9 +81,14 @@ const useSpeakingGrading = (groupId, { enabled = true } = {}) => {
     });
     void session.start();
     return () => session.stop();
-  }, [enabled, groupId, refresh]);
+  }, [enabled, groupId, refresh, pollingGeneration]);
 
-  return { data, error, isPolling, refresh };
+  const restartPolling = useCallback(() => {
+    setError(null);
+    setPollingGeneration((current) => current + 1);
+  }, []);
+
+  return { data, error, isPolling, refresh, restartPolling };
 };
 
 export default useSpeakingGrading;

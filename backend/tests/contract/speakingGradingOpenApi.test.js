@@ -80,4 +80,14 @@ describe('Speaking OpenAPI contract', () => {
       expect(response.headers['Cache-Control'].schema.const).toBe('private, no-store');
     });
   });
+
+  test('completed status exposes a terminal stage and exactly three Part feedback entries', () => {
+    const status = document.components.schemas.GradingStatusData;
+    expect(status.properties.stage.enum).toEqual(expect.arrayContaining(['completed', 'failed']));
+    expect(document.components.schemas.SpeakingResultBase.required).toContain('part_feedback');
+    expect(document.components.schemas.SpeakingResultBase.properties.part_feedback).toMatchObject({
+      minItems: 3,
+      maxItems: 3,
+    });
+  });
 });

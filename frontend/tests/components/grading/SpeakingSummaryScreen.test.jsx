@@ -21,6 +21,12 @@ describe('SpeakingSummaryScreen', () => {
     expect(onSubmit).not.toHaveBeenCalled();
   });
 
+  it('explains that an AI failure remains in the AI retry flow', () => {
+    render(<SpeakingSummaryScreen exam={exam} answers={completeAnswers} onSubmit={vi.fn()} />);
+    expect(screen.getByText(/giữ trong luồng AI/i)).toBeInTheDocument();
+    expect(screen.queryByText(/chuyển giáo viên/i)).not.toBeInTheDocument();
+  });
+
   it('auto-submits only once after an error and still allows a manual retry', async () => {
     const onSubmit = vi.fn()
       .mockRejectedValueOnce(new Error('Provider tạm thời không khả dụng'))

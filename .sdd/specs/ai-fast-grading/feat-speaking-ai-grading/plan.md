@@ -19,6 +19,14 @@ Giữ modular monolith nhưng tách API process và worker process từ cùng ba
 - **Frontend**: React 18/Vite, direct PUT signed URL, polling hook.
 - **Kiểm thử**: Jest/Supertest, OpenAPI contract test, Vitest/Testing Library.
 
+### Topology production
+
+- `backend` chạy duy nhất API process bằng `npm start`; không khởi động worker trong API.
+- `speaking-worker` chạy `npm run worker`, dùng chung image backend và `.env.production`, không publish port.
+- Backend image Alpine cài package `ffmpeg`, cung cấp cả `/usr/bin/ffmpeg` và `/usr/bin/ffprobe`.
+- Production dùng private Supabase bucket `speaking-audio-private`.
+- Deploy theo thứ tự fail-fast: validate Compose → build image → migration preflight → checksum migrations → up services → runtime checker.
+
 ## Kiểm tra Constitution
 
 - Identity/role chỉ lấy từ middleware; SQL tham số hóa và transaction ngắn.
@@ -171,8 +179,8 @@ frontend/src/
 3. Provider smoke thật đủ ba Part chưa có bằng chứng lặp lại cho môi trường phát hành.
 4. Transcriber hiện có thể chỉ trả plain transcript; structured timestamp/uncertainty chỉ triển khai khi gold-set/policy yêu cầu.
 5. Calibration bundle hiện chưa thực sự thay đổi scorer output; `AI_SPEAKING_PUBLISH_BANDS` phải giữ `false`.
-6. Provider 5xx có nguy cơ mất phân loại retryable khi đi qua gateway.
-7. Tutor detail requester context và learner error wording còn regression mở.
+6. Docker image chưa được build động trên máy phát triển nếu Docker Engine không chạy; static deployment tests và VPS verification vẫn bắt buộc.
+7. Tutor detail requester context (T034) còn mở và không thuộc learner AI runtime hotfix này.
 
 ## Quyết định artifact
 

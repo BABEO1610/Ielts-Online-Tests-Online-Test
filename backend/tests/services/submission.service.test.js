@@ -14,6 +14,16 @@ jest.mock('../../src/db/pool', () => ({
   }
 }));
 
+const mockGetSpeakingStatus = jest.fn();
+jest.mock('../../src/services/speakingSubmission.service', () => ({
+  getSpeakingSubmissionService: () => ({ getStatus: mockGetSpeakingStatus }),
+}));
+
+const mockCreateSignedDownload = jest.fn();
+jest.mock('../../src/storage/objectStorage.adapter', () => ({
+  createObjectStorageAdapter: () => ({ createSignedDownload: mockCreateSignedDownload }),
+}));
+
 const SubmissionService = require('../../src/services/submission.service');
 const { pool } = require('../../src/db/pool');
 const { gradeWriting } = require('../../src/ai/grading.service');
@@ -33,6 +43,8 @@ describe('SubmissionService', () => {
     pool.query.mockReset();
     pool.connect.mockReset();
     gradeWriting.mockReset();
+    mockGetSpeakingStatus.mockReset();
+    mockCreateSignedDownload.mockReset();
   });
 
   describe('submitFullWriting', () => {
@@ -281,8 +293,91 @@ describe('SubmissionService', () => {
     });
   });
 
+  describe('getSpeakingFeedbackDetail async projection', () => {
+    const groupId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+    const userId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+    const parts = [1, 2, 3].map((partNumber) => ({
+      id: `11111111-1111-4111-8111-11111111111${partNumber}`,
+      speaking_group_id: groupId,
+      user_id: userId,
+      part_number: partNumber,
+      prompt_text: `Prompt ${partNumber}`,
+      grader: 'ai',
+      submitted_at: '2026-08-01T00:00:00.000Z',
+      test_title: 'Speaking test',
+    }));
+
+    it('does not expose processing artifacts before the canonical job completes', async () => {
+      pool.query
+        .mockResolvedValueOnce({ rows: parts })
+        .mockResolvedValueOnce({ rows: parts.map((part) => ({
+          speaking_submission_id: part.id,
+          display_transcript: `private intermediate transcript ${part.part_number}`,
+        })) });
+      mockGetSpeakingStatus.mockResolvedValue({
+        job_id: 'job-1', status: 'running', stage: 'analyzing', can_retry: false,
+        manual_retry_count: 0, manual_retry_limit: 2, result: null,
+      });
+
+      const result = await SubmissionService.getSpeakingFeedbackDetail(groupId, userId);
+      expect(result.parts.map((part) => part.transcript)).toEqual(['', '', '']);
+    });
+
+    it('maps immutable completed display transcripts and feedback to the matching Part', async () => {
+      pool.query.mockResolvedValueOnce({ rows: parts }).mockResolvedValueOnce({ rows: [] });
+      mockGetSpeakingStatus.mockResolvedValue({
+        job_id: 'job-2', status: 'completed', stage: 'completed', can_retry: false,
+        manual_retry_count: 0, manual_retry_limit: 2,
+        result: {
+          overall_band: 6.5,
+          evidence_mode: 'full_audio',
+          criteria: {},
+          disclaimer: 'AI Estimated Band',
+          part_feedback: [3, 1, 2].map((partNumber) => ({
+            part_number: partNumber,
+            display_transcript: `Transcript ${partNumber}`,
+            feedback: `Feedback ${partNumber}`,
+            audio_quality_warnings: [],
+          })),
+        },
+      });
+
+      const result = await SubmissionService.getSpeakingFeedbackDetail(groupId, userId);
+      expect(result.parts.map((part) => part.transcript)).toEqual([
+        'Transcript 1', 'Transcript 2', 'Transcript 3',
+      ]);
+      expect(result.parts.map((part) => part.aiPartFeedback.feedback)).toEqual([
+        'Feedback 1', 'Feedback 2', 'Feedback 3',
+      ]);
+    });
+  });
+
   describe('getSpeakingAudioUrl', () => {
     const submissionId = '11111111-1111-4111-8111-111111111111';
+
+    it.each([
+      ['student owner', { id: 'user-1', role: 'student' }, false],
+      ['assigned tutor', { id: '22222222-2222-4222-8222-222222222222', role: 'tutor' }, true],
+      ['admin', { id: 'admin-1', role: 'admin' }, false],
+    ])('returns a fresh private signed URL to the %s', async (_label, requester, assignedTutorScope) => {
+      pool.query.mockResolvedValueOnce({ rows: [{
+        id: submissionId,
+        user_id: 'user-1',
+        assigned_tutor_scope: assignedTutorScope,
+        audio_storage_key: 'private/object-key',
+        audio_url: null,
+      }] });
+      mockCreateSignedDownload.mockResolvedValueOnce({
+        url: 'https://signed.invalid/audio', expiresAt: '2026-08-01T00:05:00.000Z',
+      });
+
+      await expect(SubmissionService.getSpeakingAudioUrl(submissionId, requester)).resolves.toEqual({
+        url: 'https://signed.invalid/audio', expires_at: '2026-08-01T00:05:00.000Z',
+      });
+      expect(mockCreateSignedDownload).toHaveBeenCalledWith(expect.objectContaining({
+        key: 'private/object-key',
+      }));
+    });
 
     it('should return the legacy URL only to the assigned tutor while the feature is disabled', async () => {
       const url = 'https://supabase.test/storage/v1/object/public/speaking-audio/speaking/user-1/uuid.webm';

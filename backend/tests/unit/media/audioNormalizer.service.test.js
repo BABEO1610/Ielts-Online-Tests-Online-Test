@@ -44,6 +44,13 @@ describe('audioNormalizer service', () => {
     })).toThrow(MediaError);
   });
 
+  test('rejects an audio codec outside the approved MP3, MP4/M4A and WAV families', () => {
+    expect(() => validateProbe({
+      format: { duration: '10' },
+      streams: [{ codec_type: 'audio', codec_name: 'vorbis', sample_rate: '48000', channels: 2 }],
+    })).toThrow('codec');
+  });
+
   test('rejects disallowed magic bytes before invoking media tools', async () => {
     const runner = jest.fn();
     const service = new AudioNormalizerService({
@@ -94,6 +101,38 @@ describe('audioNormalizer service', () => {
       'ffprobe',
       'ffmpeg',
     ]);
+    const ffmpegArgs = runner.mock.calls[2][1];
+    expect(ffmpegArgs).toEqual(expect.arrayContaining([
+      '-nostdin', '-vn', '-ac', '1', '-ar', '16000', '-c:a', 'pcm_s16le',
+    ]));
+  });
+
+  test('fails with MEDIA_TOOL_UNAVAILABLE when ffprobe is absent from both configured path and PATH', async () => {
+    const runner = jest.fn().mockRejectedValue(
+      new MediaError('spawn ffprobe ENOENT', 'MEDIA_TOOL_UNAVAILABLE')
+    );
+    const service = new AudioNormalizerService({
+      runner,
+      ffprobe: '/usr/bin/ffprobe',
+      fileTypeDetector: jest.fn().mockResolvedValue({ ext: 'wav', mime: 'audio/wav' }),
+    });
+
+    await expect(service.normalize(Buffer.alloc(64, 1))).rejects.toMatchObject({
+      code: 'MEDIA_TOOL_UNAVAILABLE',
+    });
+    expect(runner).toHaveBeenCalledTimes(2);
+  });
+
+  test('rejects a storage MIME that disagrees with the detected magic bytes', async () => {
+    const runner = jest.fn();
+    const service = new AudioNormalizerService({
+      runner,
+      fileTypeDetector: jest.fn().mockResolvedValue({ ext: 'wav', mime: 'audio/wav' }),
+    });
+
+    await expect(service.normalize(Buffer.alloc(64, 1), { expectedContentType: 'audio/mp4' }))
+      .rejects.toMatchObject({ code: 'AUDIO_MIME_MISMATCH' });
+    expect(runner).not.toHaveBeenCalled();
   });
 
   test('source never invokes a shell', () => {

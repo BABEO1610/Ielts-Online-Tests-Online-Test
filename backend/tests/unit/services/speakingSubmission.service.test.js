@@ -266,6 +266,8 @@ describe('SpeakingSubmissionService', () => {
     const service = new SpeakingSubmissionService({ pool, config });
     await expect(service.getStatus('55555555-5555-4555-8555-555555555555', {
       id: USER_ID, role: 'student',
-    })).resolves.toMatchObject({ status: 'completed', can_retry: false, manual_retry_count: 0 });
+    })).resolves.toMatchObject({
+      status: 'completed', stage: 'completed', can_retry: false, manual_retry_count: 0,
+    });
   });
 });

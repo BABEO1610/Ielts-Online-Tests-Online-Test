@@ -78,9 +78,8 @@ class SpeakingGradingService {
 
   async updateGroupStatus(client, groupId, userId, status) {
     const next = status === 'completed' ? 'ai_graded' : status === 'failed' ? 'grading_failed' : 'pending';
-    const tutor = status === 'needs_review' ? ", grader = 'tutor'" : '';
     await client.query(
-      `UPDATE speaking_submissions SET status = $2${tutor}, updated_at = NOW()
+      `UPDATE speaking_submissions SET status = $2, updated_at = NOW()
        WHERE speaking_group_id = $1 AND user_id = $3 AND deleted_at IS NULL`,
       [groupId, next, userId]);
   }

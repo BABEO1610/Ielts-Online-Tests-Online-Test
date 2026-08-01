@@ -37,7 +37,12 @@ const makeFullAudioResult = () => ({
     'fluency_coherence', 'lexical_resource',
     'grammatical_range_accuracy', 'pronunciation',
   ].map((key) => [key, { band: 6.5, evidence_status: 'sufficient', feedback: 'Đạt.' }])),
-  part_feedback: [],
+  part_feedback: [1, 2, 3].map((partNumber) => ({
+    part_number: partNumber,
+    display_transcript: `Transcript ${partNumber}`,
+    feedback: `Feedback ${partNumber}`,
+    audio_quality_warnings: [],
+  })),
   text_based_feedback: null,
   disclaimer: 'Kết quả đã hiệu chuẩn.',
   pipeline_version: 'provider-controlled',
@@ -104,6 +109,8 @@ describe('speaking grading successful finalization', () => {
       status: 'needs_review',
       workerId: 'worker-1',
     }));
+    const update = client.query.mock.calls.find(([sql]) => sql.includes('UPDATE speaking_submissions'));
+    expect(update[0]).not.toMatch(/grader\s*=\s*'tutor'/i);
     expect(client.query.mock.calls.map(([sql]) => sql)).toEqual(expect.arrayContaining(['BEGIN', 'COMMIT']));
     expect(client.release).toHaveBeenCalledTimes(1);
   });

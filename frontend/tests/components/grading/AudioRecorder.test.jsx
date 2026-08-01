@@ -206,7 +206,8 @@ describe('AudioRecorder Component', () => {
 
     const aiRadio = screen.getByRole('radio', { name: /AI Chấm điểm/i });
     expect(aiRadio).not.toBeDisabled();
-    expect(screen.getByText(/Tối đa 10 lượt\/ngày/i)).toBeInTheDocument();
+    expect(screen.getByText(/quota.*hệ thống/i)).toBeInTheDocument();
+    expect(screen.queryByText(/10 lượt\/ngày/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/Không giới hạn/i)).not.toBeInTheDocument();
   });
 

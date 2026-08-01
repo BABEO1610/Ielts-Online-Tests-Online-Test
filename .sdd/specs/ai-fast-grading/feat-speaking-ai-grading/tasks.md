@@ -36,8 +36,8 @@ description: "Công việc cho module chấm nhanh Speaking bằng AI"
 - [x] T014 [US2] Tạo worker claim/lease/heartbeat/process entrypoint tại `backend/src/jobs/aiGrading.worker.js` và `backend/src/worker.js`.
 - [x] T015 [US2] Tạo watchdog CAS, backoff/jitter và terminal recovery tại `backend/src/jobs/aiGrading.watchdog.js` cùng unit test.
 - [x] T016 [US2] Tạo idempotent manual child retry và canonical chain tại `backend/src/services/speakingGradingRetry.service.js`, `backend/src/controllers/speakingGrading.controller.js` và `backend/src/db/queries/aiGradingJobs.queries.js`.
-- [ ] T017 [US2] Bảo toàn lỗi provider 429/5xx/timeout và `retryable` xuyên `backend/src/services/ai.service.js`, `backend/src/ai/grading.service.js`, `backend/src/jobs/aiGrading.worker.js`; thêm adapter→gateway→worker tests và quyết định cách dùng `Retry-After`.
-- [ ] T018 [P] [US2] Sửa thông điệp lỗi/thiếu evidence để khẳng định retry/failed, không tự chuyển tutor; chỉ hiện “Chấm lại” khi `failed + can_retry=true` tại `frontend/src/components/grading/SpeakingSummaryScreen.jsx` và regression test liên quan.
+- [x] T017 [US2] Bảo toàn lỗi provider 429/5xx/timeout và `retryable` xuyên `backend/src/services/ai.service.js`, `backend/src/ai/grading.service.js`, `backend/src/jobs/aiGrading.worker.js`; thêm adapter→gateway→worker tests và tôn trọng `Retry-After` trong giới hạn 3600 giây.
+- [x] T018 [P] [US2] Sửa thông điệp lỗi/thiếu evidence để khẳng định retry/failed, không tự chuyển tutor; chỉ hiện “Chấm lại” khi `failed + can_retry=true` tại learner Speaking UI và regression test liên quan.
 
 ## Giai đoạn 4: Câu chuyện người dùng 3 — Evidence và scoring (P1)
 
@@ -73,12 +73,20 @@ description: "Công việc cho module chấm nhanh Speaking bằng AI"
 - [ ] T042 [US3] Chạy smoke provider thật bằng ba audio private và lưu bằng chứng `queued → running → completed/full_audio`, transcript, bốn band và Overall mà không chứa secret.
 - [ ] T043 Chạy toàn bộ targeted unit/integration/contract/frontend/build/lint sau T017–T042 và cập nhật trạng thái release trong module này.
 
+## Giai đoạn 7: Hardening runtime/deployment Speaking (hotfix độc lập calibration)
+
+- [x] T044 Cài `ffmpeg`/`ffprobe` trong backend image và thêm `speaking-worker` dùng chung image, không expose port tại `backend/Dockerfile.backend` và `docker-compose.prod.yml`.
+- [x] T045 Sắp xếp deploy fail-fast theo compose validation/build/preflight/migrate/up/runtime-check, không baseline và không in env tại `.github/workflows/deploy.yml`.
+- [x] T046 Tạo runtime checker allowlist cho flag/storage/model/media/migrations/index/job status tại `backend/scripts/check-speaking-runtime.js` cùng static/unit tests.
+- [x] T047 Sửa public transcript/Part mapping, terminal stage, signed-audio error/reload, retry polling canonical child và learner disclaimer tại backend/frontend cùng tests.
+- [x] T048 Tạo runbook merge-to-VPS, smoke provider thật và rollback không phá DB tại `docs/speaking-ai-vps-deployment.md`.
+
 ## Phụ thuộc và thứ tự
 
 1. T017 và T018 có thể xử lý độc lập; T026 phụ thuộc gold-set/policy ở T027 để được gọi là calibrated.
 2. T028/T029 là conditional tasks, chỉ triển khai khi evidence từ T027/T039 yêu cầu.
 3. T037–T042 là release gates; automated mock test không thay thế provider smoke hoặc approval.
-4. T043 chạy cuối cùng.
+4. T044–T048 là hotfix runtime độc lập với calibrated gates T026–T029; T043 chỉ được đóng sau khi toàn bộ release gates trong phạm vi của nó thực sự hoàn tất.
 
 ## Ma trận truy vết
 

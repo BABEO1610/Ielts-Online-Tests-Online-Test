@@ -24,7 +24,7 @@ const StatusBadge = ({ status }) => {
     running: { bg: '#fff3cd', color: '#664d03', label: 'AI đang phân tích' },
     retry_wait: { bg: '#fff3cd', color: '#664d03', label: 'Đang chờ thử lại' },
     completed: { bg: '#000', color: '#fff', label: 'AI đã hoàn tất' },
-    needs_review: { bg: '#cff4fc', color: '#055160', label: 'Chờ tutor xác nhận' },
+    needs_review: { bg: '#cff4fc', color: '#055160', label: 'Trạng thái AI legacy cần xem xét' },
   };
   const { bg, color, label } = config[status] || { bg: '#efefef', color: '#5e5e5e', label: status };
   return (
