@@ -2,7 +2,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const YAML = require('yaml');
 
-const contractPath = path.resolve(__dirname, '../../../.sdd/specs/ai-fast-grading/contracts/speaking-grading.openapi.yaml');
+const contractPath = path.resolve(__dirname, '../../../.sdd/specs/ai-fast-grading/feat-speaking-ai-grading/contracts/speaking-grading.openapi.yaml');
 const document = YAML.parse(fs.readFileSync(contractPath, 'utf8'));
 
 const walk = (value, callback) => {
