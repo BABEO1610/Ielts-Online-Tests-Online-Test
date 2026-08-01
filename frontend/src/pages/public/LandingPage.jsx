@@ -1,5 +1,6 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Sun, Moon } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import {
     motion,
@@ -87,6 +88,210 @@ const Counter = ({ to, suffix = '', prefix = '', decimals = 0, duration = 2 }) =
         </span>
     );
 };
+
+// ─── LANDING NAVBAR ───────────────────────────────────────────────────────────
+// Per DESIGN.md: canvas background, ink text, body-md-strong (16px/500), pill CTAs
+// Includes full nav links so guests can explore Listening/Reading/Writing/Speaking/Library
+import { useTheme } from '../../context/ThemeContext';
+
+const LandingNavbar = () => {
+    const { theme, toggleTheme } = useTheme();
+    const { user, logout } = useAuth();
+    const navigate = useNavigate();
+    const [scrolled, setScrolled] = useState(false);
+    const location = useLocation();
+
+    const handleLogout = async () => {
+        try {
+            await logout();
+            navigate('/');
+        } catch (error) {
+            console.error('Logout failed', error);
+        }
+    };
+
+    useEffect(() => {
+        const onScroll = () => setScrolled(window.scrollY > 20);
+        window.addEventListener('scroll', onScroll, { passive: true });
+        return () => window.removeEventListener('scroll', onScroll);
+    }, []);
+
+    const navLinks = [
+        { to: '/listening', label: 'Listening' },
+        { to: '/reading', label: 'Reading' },
+        { to: '/writing', label: 'Writing' },
+        { to: '/speaking', label: 'Speaking' },
+        { to: '/library', label: 'Library' },
+    ];
+
+    return (
+        <nav style={{
+            position: 'fixed', top: 0, left: 0, right: 0, zIndex: 100,
+            height: '68px',
+            padding: '0 32px',
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            // nav-bar: canvas bg, border-bottom on scroll
+            backgroundColor: scrolled ? 'rgba(255,255,255,0.96)' : 'var(--canvas)',
+            backdropFilter: scrolled ? 'blur(16px)' : 'none',
+            borderBottom: scrolled ? '1px solid #e2e2e2' : '1px solid transparent',
+            transition: 'border-color 0.3s ease, backdrop-filter 0.3s ease',
+            fontFamily: 'Inter, system-ui, sans-serif',
+        }}>
+            {/* Logo */}
+            <Link to="/" style={{ textDecoration: 'none' }}>
+                <span style={{
+                    fontWeight: 700, fontSize: '22px', color: 'var(--ink)',
+                    letterSpacing: '-0.02em',
+                    fontFamily: 'Inter, system-ui, sans-serif',
+                }}>
+                    IELTSZone
+                </span>
+            </Link>
+
+            {/* Center nav links — guests can visit all skill pages */}
+            <ul style={{
+                display: 'flex', alignItems: 'center', gap: '0',
+                listStyle: 'none', margin: 0, padding: 0,
+            }}>
+                {navLinks.map(({ to, label }) => {
+                    const isActive = location.pathname === to || location.pathname.startsWith(to + '/');
+                    return (
+                        <li key={to} style={{ position: 'relative' }}>
+                            <Link
+                                to={to}
+                                style={{
+                                    display: 'block',
+                                    padding: '6px 16px',
+                                    fontSize: '16px',
+                                    fontWeight: 500,
+                                    color: isActive ? 'var(--ink)' : 'var(--body)',
+                                    textDecoration: 'none',
+                                    fontFamily: 'Inter, system-ui, sans-serif',
+                                    transition: 'color 0.2s ease',
+                                    borderRadius: '999px',
+                                }}
+                                onMouseEnter={(e) => { if (!isActive) e.target.style.color = 'var(--ink)'; }}
+                                onMouseLeave={(e) => { if (!isActive) e.target.style.color = 'var(--body)'; }}
+                            >
+                                {label}
+                            </Link>
+                            {/* Active underline indicator */}
+                            {isActive && (
+                                <motion.div
+                                    layoutId="nav-indicator-landing"
+                                    style={{
+                                        position: 'absolute', bottom: '-2px', left: '16px',
+                                        right: '16px', height: '2px',
+                                        backgroundColor: 'var(--ink)', borderRadius: '2px',
+                                    }}
+                                    transition={{ type: 'spring', bounce: 0.2, duration: 0.5 }}
+                                />
+                            )}
+                        </li>
+                    );
+                })}
+            </ul>
+
+            {/* Right: auth CTAs */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                {/* Theme Toggle */}
+                <button
+                    onClick={toggleTheme}
+                    style={{
+                        backgroundColor: 'var(--canvas-soft)', color: 'var(--ink)',
+                        border: 'none', width: '40px', height: '40px',
+                        borderRadius: '999px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        cursor: 'pointer', fontSize: '18px'
+                    }}
+                >
+                    {theme === 'dark' ? <Sun size={18} strokeWidth={2.5} /> : <Moon size={18} strokeWidth={2.5} />}
+                </button>
+
+                {user ? (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        {(user.role === 'admin' || user.role === 'tutor') && (
+                            <Link
+                                to={user.role === 'admin' ? '/admin' : '/tutor/dashboard'}
+                                style={{
+                                    textDecoration: 'none', padding: '10px 20px', borderRadius: '999px',
+                                    fontSize: '15px', fontWeight: 500, color: 'var(--on-primary)',
+                                    backgroundColor: 'var(--primary)', fontFamily: 'Inter, system-ui, sans-serif'
+                                }}
+                            >
+                                Về bảng điều khiển
+                            </Link>
+                        )}
+                        <Link to="/profile" style={{
+                            display: 'flex', alignItems: 'center', gap: '8px',
+                            textDecoration: 'none', padding: '6px 16px', borderRadius: '999px',
+                            backgroundColor: 'var(--canvas-soft)', color: 'var(--ink)',
+                            fontFamily: 'Inter, system-ui, sans-serif', fontWeight: 500, fontSize: '15px'
+                        }}>
+                            {user.avatar_url ? (
+                                <img src={user.avatar_url} alt="Avatar" style={{ width: '24px', height: '24px', borderRadius: '50%', objectFit: 'cover' }} />
+                            ) : (
+                                <div style={{
+                                    width: '24px', height: '24px', borderRadius: '50%',
+                                    backgroundColor: 'var(--primary)', color: 'var(--on-primary)',
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                    fontSize: '12px'
+                                }}>
+                                    {user.full_name?.charAt(0).toUpperCase() || 'U'}
+                                </div>
+                            )}
+                            {user.full_name || 'Học viên'}
+                        </Link>
+                        <button
+                            onClick={handleLogout}
+                            style={{
+                                border: 'none', background: 'none', color: '#ff3b3b', cursor: 'pointer',
+                                fontSize: '15px', fontWeight: 500, fontFamily: 'Inter, system-ui, sans-serif'
+                            }}
+                        >
+                            Đăng xuất
+                        </button>
+                    </div>
+                ) : (
+                    <>
+                        <Link to="/login" style={{
+                            textDecoration: 'none',
+                            padding: '10px 20px',
+                            borderRadius: '999px',
+                            fontSize: '16px',
+                            fontWeight: 500,
+                            color: 'var(--ink)',
+                            fontFamily: 'Inter, system-ui, sans-serif',
+                            backgroundColor: 'var(--canvas-soft)',
+                            transition: 'background-color 0.2s ease',
+                        }}
+                            onMouseEnter={(e) => e.target.style.backgroundColor = 'var(--surface-pressed)'}
+                            onMouseLeave={(e) => e.target.style.backgroundColor = 'var(--canvas-soft)'}
+                        >
+                            Đăng nhập
+                        </Link>
+                        <MagneticButton>
+                            <Link to="/register" style={{
+                                textDecoration: 'none',
+                                display: 'inline-flex', alignItems: 'center',
+                                padding: '10px 20px', borderRadius: '999px',
+                                fontSize: '16px', fontWeight: 500,
+                                color: 'var(--canvas)', backgroundColor: 'var(--ink)',
+                                fontFamily: 'Inter, system-ui, sans-serif',
+                                transition: 'background-color 0.2s ease',
+                            }}
+                                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--black-elevated)'}
+                                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'var(--ink)'}
+                            >
+                                Đăng ký
+                            </Link>
+                        </MagneticButton>
+                    </>
+                )}
+            </div>
+        </nav>
+    );
+};
+
 // ─── Hero: Product mockup card (B&W design system) ───────────────────────────
 const HeroMockUI = () => {
     const bars = [
@@ -445,14 +650,14 @@ const LandingPage = () => {
                                 transition={{ delay: 0.5, duration: 0.7 }}
                                 style={{ display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap' }}
                             >
-                                <div style={{ display: 'flex' }}>
+                                <div style={{ display: 'flex', flexShrink: 0 }}>
                                     {['N', 'T', 'L', 'M', 'H'].map((init, i) => (
                                         <div key={i} style={{
                                             width: '32px', height: '32px', borderRadius: '9999px',
                                             backgroundColor: ['var(--ink)', 'var(--hairline-mid)', 'var(--body)', 'var(--ink)', 'var(--hairline-mid)'][i],
                                             display: 'flex', alignItems: 'center', justifyContent: 'center',
                                             color: 'var(--canvas)', fontWeight: 700, fontSize: '13px',
-                                            border: '2px solid #ffffff', marginLeft: i === 0 ? 0 : '-8px',
+                                            border: '2px solid #ffffff', marginLeft: i === 0 ? 0 : '-8px', flexShrink: 0,
                                         }}>{init}</div>
                                     ))}
                                 </div>
@@ -488,8 +693,9 @@ const LandingPage = () => {
                                 transition={{ delay: i * 0.1, duration: 0.6 }}
                             >
                                 <div style={{
-                                    fontSize: 'clamp(28px, 4vw, 44px)', fontWeight: 700,
+                                    fontSize: 'clamp(22px, 5vw, 44px)', fontWeight: 700,
                                     color: 'var(--ink)', letterSpacing: '-0.02em', lineHeight: 1,
+                                    whiteSpace: 'nowrap',
                                 }}>
                                     <Counter to={s.to} suffix={s.suffix} prefix={s.prefix || ''} decimals={s.decimals || 0} />
                                 </div>
@@ -824,84 +1030,84 @@ const LandingPage = () => {
             {/* ── FINAL CTA ── */}
             {/* hero-band-dark: ink bg per DESIGN.md */}
             {!user && (
-            <section style={{ padding: 'clamp(28px, 4vw, 48px) 32px clamp(60px, 8vw, 80px)', position: 'relative', zIndex: 1, backgroundColor: 'var(--canvas)' }}>
-                <div className="container">
-                    <motion.div
-                        initial={{ opacity: 0, y: 48, scale: 0.97 }}
-                        whileInView={{ opacity: 1, y: 0, scale: 1 }}
-                        viewport={{ once: true }}
-                        transition={{ duration: 0.8, ease }}
-                        style={{
-                            backgroundColor: 'var(--ink)',
-                            borderRadius: '16px',
-                            padding: 'clamp(48px, 6vw, 72px) clamp(28px, 6vw, 72px)',
-                            textAlign: 'center', position: 'relative', overflow: 'hidden',
-                        }}
-                    >
-                        {/* Subtle dot pattern on dark surface */}
-                        <div style={{
-                            position: 'absolute', inset: 0,
-                            backgroundImage: 'radial-gradient(rgba(255,255,255,0.08) 1px, transparent 1px)',
-                            backgroundSize: '32px 32px',
-                            pointerEvents: 'none',
-                        }} />
+                <section style={{ padding: 'clamp(28px, 4vw, 48px) 32px clamp(60px, 8vw, 80px)', position: 'relative', zIndex: 1, backgroundColor: 'var(--canvas)' }}>
+                    <div className="container">
+                        <motion.div
+                            initial={{ opacity: 0, y: 48, scale: 0.97 }}
+                            whileInView={{ opacity: 1, y: 0, scale: 1 }}
+                            viewport={{ once: true }}
+                            transition={{ duration: 0.8, ease }}
+                            style={{
+                                backgroundColor: 'var(--ink)',
+                                borderRadius: '16px',
+                                padding: 'clamp(48px, 6vw, 72px) clamp(28px, 6vw, 72px)',
+                                textAlign: 'center', position: 'relative', overflow: 'hidden',
+                            }}
+                        >
+                            {/* Subtle dot pattern on dark surface */}
+                            <div style={{
+                                position: 'absolute', inset: 0,
+                                backgroundImage: 'radial-gradient(rgba(255,255,255,0.08) 1px, transparent 1px)',
+                                backgroundSize: '32px 32px',
+                                pointerEvents: 'none',
+                            }} />
 
-                        <div style={{ position: 'relative', zIndex: 1 }}>
-                            <motion.div
-                                initial={{ scale: 0, rotate: -20 }} whileInView={{ scale: 1, rotate: 0 }}
-                                viewport={{ once: true }}
-                                transition={{ delay: 0.15, type: 'spring', stiffness: 200, damping: 14 }}
-                                style={{ fontSize: '48px', marginBottom: '22px' }}
-                            >🚀</motion.div>
+                            <div style={{ position: 'relative', zIndex: 1 }}>
+                                <motion.div
+                                    initial={{ scale: 0, rotate: -20 }} whileInView={{ scale: 1, rotate: 0 }}
+                                    viewport={{ once: true }}
+                                    transition={{ delay: 0.15, type: 'spring', stiffness: 200, damping: 14 }}
+                                    style={{ fontSize: '48px', marginBottom: '22px' }}
+                                >🚀</motion.div>
 
-                            {/* display-xxl: 52px/700 on dark */}
-                            <h2 style={{
-                                fontSize: 'clamp(28px, 4vw, 44px)', fontWeight: 700,
-                                color: 'var(--canvas)', letterSpacing: '-0.02em',
-                                lineHeight: 1.2, marginBottom: '16px',
-                            }}>
-                                Bắt đầu hành trình IELTS của bạn
-                            </h2>
-                            <p style={{
-                                fontSize: '18px', color: 'rgba(255,255,255,0.55)',
-                                maxWidth: '440px', margin: '0 auto 36px', lineHeight: '28px',
-                                fontWeight: 500,
-                            }}>
-                                Hoàn toàn miễn phí. Không cần thẻ tín dụng. Nhận phản hồi AI đầu tiên ngay trong 5 phút.
-                            </p>
+                                {/* display-xxl: 52px/700 on dark */}
+                                <h2 style={{
+                                    fontSize: 'clamp(28px, 4vw, 44px)', fontWeight: 700,
+                                    color: 'var(--canvas)', letterSpacing: '-0.02em',
+                                    lineHeight: 1.2, marginBottom: '16px',
+                                }}>
+                                    Bắt đầu hành trình IELTS của bạn
+                                </h2>
+                                <p style={{
+                                    fontSize: '18px', color: 'rgba(255,255,255,0.55)',
+                                    maxWidth: '440px', margin: '0 auto 36px', lineHeight: '28px',
+                                    fontWeight: 500,
+                                }}>
+                                    Hoàn toàn miễn phí. Không cần thẻ tín dụng. Nhận phản hồi AI đầu tiên ngay trong 5 phút.
+                                </p>
 
-                            <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap' }}>
-                                <MagneticButton>
-                                    {/* button-secondary (white pill) on dark band */}
-                                    <Link to="/register" style={{
+                                <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap' }}>
+                                    <MagneticButton>
+                                        {/* button-secondary (white pill) on dark band */}
+                                        <Link to="/register" style={{
+                                            display: 'inline-flex', alignItems: 'center',
+                                            padding: '14px 32px', borderRadius: '999px',
+                                            backgroundColor: 'var(--canvas)', color: 'var(--ink)',
+                                            fontWeight: 500, fontSize: '16px', textDecoration: 'none',
+                                            boxShadow: 'rgba(0,0,0,0.16) 0px 2px 8px 0px',
+                                            transition: 'background-color 0.2s ease',
+                                        }}
+                                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--canvas-soft)'}
+                                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'var(--canvas)'}
+                                        >
+                                            Đăng ký miễn phí ngay
+                                        </Link>
+                                    </MagneticButton>
+                                    <Link to="/login" style={{
                                         display: 'inline-flex', alignItems: 'center',
                                         padding: '14px 32px', borderRadius: '999px',
-                                        backgroundColor: 'var(--canvas)', color: 'var(--ink)',
+                                        border: '1px solid rgba(255,255,255,0.25)',
+                                        color: 'rgba(255,255,255,0.75)',
                                         fontWeight: 500, fontSize: '16px', textDecoration: 'none',
-                                        boxShadow: 'rgba(0,0,0,0.16) 0px 2px 8px 0px',
-                                        transition: 'background-color 0.2s ease',
-                                    }}
-                                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--canvas-soft)'}
-                                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'var(--canvas)'}
-                                    >
-                                        Đăng ký miễn phí ngay
+                                        transition: 'border-color 0.2s ease',
+                                    }}>
+                                        Đã có tài khoản
                                     </Link>
-                                </MagneticButton>
-                                <Link to="/login" style={{
-                                    display: 'inline-flex', alignItems: 'center',
-                                    padding: '14px 32px', borderRadius: '999px',
-                                    border: '1px solid rgba(255,255,255,0.25)',
-                                    color: 'rgba(255,255,255,0.75)',
-                                    fontWeight: 500, fontSize: '16px', textDecoration: 'none',
-                                    transition: 'border-color 0.2s ease',
-                                }}>
-                                    Đã có tài khoản
-                                </Link>
+                                </div>
                             </div>
-                        </div>
-                    </motion.div>
-                </div>
-            </section>
+                        </motion.div>
+                    </div>
+                </section>
             )}
 
             {/* ── FOOTER ── */}

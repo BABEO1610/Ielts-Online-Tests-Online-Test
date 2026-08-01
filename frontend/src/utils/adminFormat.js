@@ -17,10 +17,11 @@ export const formatDate = (iso) =>
 
 /** Human-readable file size from bytes. */
 export const formatBytes = (bytes) => {
-  if (!bytes && bytes !== 0) return '—';
+  const n = Number(bytes);
+  if (!Number.isFinite(n)) return '—';
   const units = ['B', 'KB', 'MB', 'GB'];
   let i = 0;
-  let v = bytes;
+  let v = n;
   while (v >= 1024 && i < units.length - 1) { v /= 1024; i += 1; }
   return `${v.toFixed(i === 0 ? 0 : 1)} ${units[i]}`;
 };
