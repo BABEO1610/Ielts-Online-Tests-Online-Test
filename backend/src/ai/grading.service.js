@@ -31,7 +31,7 @@ const { AI_GRADE_ERRORS, PROMPT_VERSION } = require('./aiGrading.constants');
 const AppError = require('../utils/AppError');
 const { sanitizeDiagnostic } = require('../services/aiUsage.service');
 
-const AI_TIMEOUT_MS = 30000;
+const AI_TIMEOUT_MS = 55000;
 const AI_NOT_CONFIGURED_MESSAGE =
   'Chấm AI chưa được cấu hình. Hãy khai báo GEMINI_API_KEY, GOOGLE_AI_API_KEY hoặc GOOGLE_API_KEY.';
 
