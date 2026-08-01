@@ -30,7 +30,6 @@ const register = async ({ email, password, full_name }) => {
     // Check if email already exists
     const existingUser = await findUserByEmail(email);
     if (existingUser) {
-        // User requested explicit message for existing accounts
         const error = new Error('Tài khoản đã tồn tại.');
         error.code = 'AUTH_REG_001';
         error.statusCode = 400;
@@ -78,7 +77,7 @@ const verifyEmail = async (rawToken) => {
 
     // 2. Find token in database (ensure it's not already used)
     const tokenRecord = await findVerificationToken(pool, tokenHash);
-    
+
     if (!tokenRecord) {
         // EARS[Unwanted]: Token not found or already used
         const error = new Error('Invalid or used verification token.');
@@ -145,7 +144,7 @@ const verifyLogin = async (email, password, ipAddress) => {
     if (!isPasswordValid) {
         // 4. If wrong, log failed attempt in DB
         await pool.query('SELECT handle_failed_login($1)', [user.id]);
-        
+
         await AuditLogService.logAction(user.id, 'login_failed', 'users', user.id, { email }, { reason: 'Sai mật khẩu' }, ipAddress);
         const error = new Error('Incorrect email or password.');
         error.code = 'AUTH_LOG_001';
@@ -169,7 +168,7 @@ const verifyLogin = async (email, password, ipAddress) => {
     const updatedUser = await findUserByEmail(email);
     const { password_hash, ...safeUser } = updatedUser;
     safeUser.has_password = !!password_hash;
-    
+
     return safeUser;
 };
 
@@ -203,15 +202,15 @@ const login = async (email, password, ipAddress, userAgent) => {
     await createSession(user.id, sessionToken, ipAddress, userAgent, expiresAt, false, null);
 
     // 5. Generate JWT tokens
-    const accessToken = generateAccessToken({ 
-        sub: user.id, 
-        role: user.role, 
-        session_token: sessionToken 
+    const accessToken = generateAccessToken({
+        sub: user.id,
+        role: user.role,
+        session_token: sessionToken
     });
-    
-    const refreshToken = generateRefreshToken({ 
-        sub: user.id, 
-        session_token: sessionToken 
+
+    const refreshToken = generateRefreshToken({
+        sub: user.id,
+        session_token: sessionToken
     });
 
     // 6. Audit log successful login (không log password, token)
@@ -258,7 +257,7 @@ const logout = async (sessionToken) => {
 const refreshToken = async (token) => {
     // 1. Verify the refresh token JWT
     const decoded = verifyRefreshToken(token);
-    
+
     if (!decoded) {
         // EARS[Unwanted]: If invalid or expired token
         const error = new Error('Session expired.');
@@ -312,7 +311,7 @@ const refreshToken = async (token) => {
  */
 const forgotPassword = async (email) => {
     const successMessage = { message: 'Nếu email tồn tại trong hệ thống, hướng dẫn reset password đã được gửi.' };
-    
+
     // 1. Find user by email
     const user = await findUserByEmail(email);
 
@@ -360,7 +359,7 @@ const resetPassword = async (rawToken, newPassword, ipAddress) => {
 
     // 2. Find the token in DB
     const tokenRecord = await findPasswordResetToken(pool, tokenHash);
-    
+
     if (!tokenRecord) {
         // EARS[Unwanted]: Token not found, expired, or already used
         const error = new Error('Invalid or expired reset token.');
@@ -482,15 +481,15 @@ const loginWithGoogle = async (googleProfile, ipAddress, userAgent) => {
     await createSession(userId, sessionToken, ipAddress, userAgent, expiresAt, true, 'google');
 
     // 7. Generate JWT tokens
-    const accessToken = generateAccessToken({ 
-        sub: userId, 
-        role: user.role, 
-        session_token: sessionToken 
+    const accessToken = generateAccessToken({
+        sub: userId,
+        role: user.role,
+        session_token: sessionToken
     });
-    
-    const refreshToken = generateRefreshToken({ 
-        sub: userId, 
-        session_token: sessionToken 
+
+    const refreshToken = generateRefreshToken({
+        sub: userId,
+        session_token: sessionToken
     });
 
     // 8. Return safeUser and tokens

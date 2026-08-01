@@ -7,7 +7,8 @@
 /* ── Shell layout ───────────────────────────────────────────── */
 .admin-shell {
   display: flex;
-  min-height: 100vh;
+  height: 100vh;
+  overflow: hidden;
   background-color: var(--canvas-soft);
 }
 
@@ -18,8 +19,6 @@
   border-right: 1px solid var(--surface-pressed);
   display: flex;
   flex-direction: column;
-  position: sticky;
-  top: 0;
   height: 100vh;
 }
 
@@ -90,6 +89,8 @@
   display: flex;
   flex-direction: column;
   min-width: 0;
+  height: 100vh;
+  overflow-y: auto;
 }
 
 .admin-topbar {

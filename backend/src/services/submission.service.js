@@ -990,8 +990,8 @@ class SubmissionService {
       }
     }
 
-    const { v4: uuidv4 } = require('uuid');
-    const writingGroupId = uuidv4();
+    const { randomUUID } = require('node:crypto');
+    const writingGroupId = randomUUID();
     const writingFingerprint = grader === 'ai'
       ? buildWritingFingerprint({ testId: normalizedTestId, tasks: normalizedTasks })
       : null;
@@ -1321,21 +1321,28 @@ class SubmissionService {
     const result = await pool.query(query, [userId]);
     const speakingGroupIds = result.rows.filter((row) => row.type === 'speaking').map((row) => row.id);
     const jobs = speakingGroupIds.length ? await pool.query(
-      `SELECT root.group_id,
-              COALESCE(child.id, root.id) AS job_id,
-              COALESCE(child.status, root.status) AS status,
-              COALESCE(child.stage, root.stage) AS stage,
-              COALESCE(child.attempt_count, root.attempt_count) AS attempt_count,
-              COALESCE(child.max_attempts, root.max_attempts) AS max_attempts,
-              (child.id IS NULL AND root.status = 'failed'
-                AND root.attempt_count = root.max_attempts
-                AND root.last_error_retryable IS TRUE) AS can_retry
-       FROM ai_grading_jobs root
-       LEFT JOIN ai_grading_jobs child
-         ON child.retry_of_job_id = root.id AND child.deleted_at IS NULL
-       WHERE root.user_id = $1 AND root.retry_of_job_id IS NULL
-         AND root.group_id = ANY($2::uuid[]) AND root.deleted_at IS NULL`,
-      [userId, speakingGroupIds]) : { rows: [] };
+      `WITH RECURSIVE retry_chain AS (
+         SELECT job.*, 0 AS retry_depth
+         FROM ai_grading_jobs job
+         WHERE job.user_id = $1 AND job.retry_of_job_id IS NULL
+           AND job.group_id = ANY($2::uuid[]) AND job.deleted_at IS NULL
+         UNION ALL
+         SELECT child.*, retry_chain.retry_depth + 1
+         FROM ai_grading_jobs child
+         JOIN retry_chain ON child.retry_of_job_id = retry_chain.id
+         WHERE child.deleted_at IS NULL
+       ), ranked AS (
+         SELECT retry_chain.*, ROW_NUMBER() OVER (
+           PARTITION BY group_id ORDER BY retry_depth DESC, created_at DESC
+         ) AS chain_rank
+         FROM retry_chain
+       )
+       SELECT group_id, id AS job_id, status, stage, attempt_count, max_attempts,
+              (status = 'failed' AND retry_depth < $3) AS can_retry,
+              retry_depth AS manual_retry_count
+       FROM ranked
+       WHERE chain_rank = 1`,
+      [userId, speakingGroupIds, aiGradingConfig.manualRetryLimit]) : { rows: [] };
     const jobByGroup = new Map(jobs.rows.map((job) => [String(job.group_id), job]));
     return result.rows.map(row => {
       const job = row.type === 'speaking' ? jobByGroup.get(String(row.id)) : null;
@@ -1362,6 +1369,7 @@ class SubmissionService {
       attemptCount: job?.attempt_count ?? null,
       maxAttempts: job?.max_attempts ?? null,
       canRetry: job?.can_retry === true,
+      manualRetryCount: job?.manual_retry_count ?? 0,
     });
     });
   }
@@ -1528,10 +1536,11 @@ class SubmissionService {
             speaking_submission_id, asr_transcript, display_transcript
          FROM speaking_analysis_artifacts
          WHERE speaking_submission_id = ANY($1::uuid[])
+           AND source_job_id = $2
            AND status IN ('complete', 'partial')
            AND deleted_at IS NULL
          ORDER BY speaking_submission_id, created_at DESC`,
-        [partIds]
+        [partIds, asyncStatus.job_id]
       );
       const transcriptByPart = new Map(artifactRows.rows.map(artifact => [
         artifact.speaking_submission_id,
@@ -1566,6 +1575,8 @@ class SubmissionService {
         gradingStatus: asyncStatus.status,
         gradingStage: asyncStatus.stage,
         canRetry: asyncStatus.can_retry,
+        manualRetryCount: asyncStatus.manual_retry_count,
+        manualRetryLimit: asyncStatus.manual_retry_limit,
         overallSpeakingBand: result?.overall_band ?? null,
         overallAiBand: result?.overall_band ?? null,
         overallTutorBand: null,

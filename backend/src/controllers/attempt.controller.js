@@ -4,6 +4,10 @@ class AttemptController {
   /**
    * POST /api/v1/tests/:id/attempts
    * Submit a completed test attempt.
+   * (Nhiệm vụ 1: Trích xuất Dữ liệu. Lấy testId từ URL và userId từ JWT để chống IDOR.
+   * Nhiệm vụ 2: Data Validation.
+   * Nhiệm vụ 3: Điều phối gọi Service.
+   * Nhiệm vụ 4: Format Response chuẩn.)
    *
    * Expected body:
    *   { answers: { [questionOrder]: string }, timeSpent: number, practiceMode?: boolean }
@@ -18,11 +22,13 @@ class AttemptController {
    */
   static async submitAttempt(req, res, next) {
     try {
+      // Nhiệm vụ 1: Trích xuất Dữ liệu (chỉ lấy userId từ JWT để chống IDOR)
       const testId = req.params.id;
       const userId = req.user.id; // IDOR: from JWT, not from body
       const { answers, timeSpent, practiceMode = false } = req.body;
 
       // ── Input validation ─────────────────────────────────────────────────
+      // Nhiệm vụ 2: Data Validation (answers phải là object, timeSpent không âm)
       if (answers === null || answers === undefined || typeof answers !== 'object' || Array.isArray(answers)) {
         return res.status(400).json({
           success: false,
@@ -42,6 +48,7 @@ class AttemptController {
         });
       }
 
+      // Nhiệm vụ 3: Điều phối gọi tầng Service xử lý
       const result = await AttemptService.submitAttempt(
         testId,
         userId,
@@ -50,6 +57,7 @@ class AttemptController {
         Boolean(practiceMode)
       );
 
+      // Nhiệm vụ 4: Format Response chuẩn dự án { success, data, error, meta }
       res.status(201).json({
         success: true,
         data: result,
@@ -74,10 +82,12 @@ class AttemptController {
   /**
    * GET /api/v1/attempts/:attemptId
    * Get attempt summary (band score, raw score, time spent).
+   * (Chặn lỗi IDOR bằng userId từ req.user.id. Nếu không thấy trả về 404)
    */
   static async getAttempt(req, res, next) {
     try {
       const { attemptId } = req.params;
+      // Chặn lỗi IDOR bằng cách trích xuất userId = req.user.id và truyền xuống Service
       const userId = req.user.id;
 
       const attempt = await AttemptService.getAttemptById(attemptId, userId);
@@ -105,10 +115,12 @@ class AttemptController {
   /**
    * GET /api/v1/attempts/:attemptId/detail
    * Get per-question breakdown of attempt (for answer review page).
+   * (Lấy dữ liệu chi tiết của 1 bài làm cụ thể bao gồm cả phần giải thích)
    */
   static async getAttemptDetail(req, res, next) {
     try {
       const { attemptId } = req.params;
+      // Chặn lỗi IDOR bằng cách trích xuất userId = req.user.id và truyền xuống Service
       const userId = req.user.id;
 
       const detail = await AttemptService.getAttemptDetail(attemptId, userId);
@@ -136,12 +148,14 @@ class AttemptController {
   /**
    * GET /api/v1/attempts?skill=reading
    * Get all attempts for the authenticated user, optionally filtered by skill.
+   * (Data Aggregator: Gọi 2 Service để gom lịch sử bài thi Trắc nghiệm và Tự luận lại với nhau, sau đó Sort theo ngày nộp mới nhất)
    */
   static async getHistory(req, res, next) {
     try {
       const userId = req.user.id;
       const { skill } = req.query;
 
+      // Data Aggregator (Trạm gom dữ liệu): Gọi 2 Service để gom lịch sử bài thi Trắc nghiệm và Tự luận lại với nhau
       const history = await AttemptService.getAttemptHistory(
         userId,
         skill || null

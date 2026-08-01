@@ -1,59 +1,59 @@
-# Data Model: User Administration and Authorization
+# Mô hình Dữ liệu (Data Model): User Administration and Authorization
 
-## User Account
+## Tài khoản Người dùng (User Account)
 
-Backed by `users`.
+Dựa trên bảng `users`.
 
-Admin list fields:
+Các trường hiển thị trong danh sách của Admin (Admin list fields):
 - `id`, `full_name`, `email`, `role`, `status`, `created_at`.
 
-Admin mutation fields:
+Các trường cho phép Admin thay đổi (Admin mutation fields):
 - `role`: `student`, `tutor`, `admin`.
 - `status`: `active`, `inactive`, `pending`, `banned`.
 
-Rules:
-- Only admins can list or mutate other users.
-- Admin cannot change own `role` or `status`.
-- Password/auth secrets are omitted from API response.
+Quy tắc (Rules):
+- Chỉ có admins mới có thể xem danh sách hoặc thay đổi người dùng khác.
+- Admin không thể tự thay đổi `role` hoặc `status` của chính mình.
+- Mật khẩu/thông tin xác thực (Password/auth secrets) bị loại bỏ khỏi API response.
 
-## Role
+## Vai trò (Role)
 
-Enum: `student`, `tutor`, `admin` with legacy `user` present in database enum.
+Enum: `student`, `tutor`, `admin` cùng với giá trị cũ `user` tồn tại trong database enum.
 
-Rules:
-- Frontend `ProtectedRoute` redirects authenticated users away from unauthorized role spaces.
-- Backend `authorize('admin')` protects admin endpoints.
+Quy tắc:
+- Ở phía frontend, `ProtectedRoute` điều hướng (redirects) những người dùng đã đăng nhập ra khỏi các không gian không thuộc thẩm quyền của họ.
+- Ở phía backend, middleware `authorize('admin')` bảo vệ các admin endpoints.
 
-## Account Status
+## Trạng thái Tài khoản (Account Status)
 
 Enum: `pending`, `active`, `inactive`, `banned`.
 
-State effects:
-- `active` can authenticate normally.
-- `pending`, `inactive`, and `banned` cannot complete normal login.
-- Changing to `inactive` or `banned` revokes active sessions.
+Hiệu ứng trạng thái (State effects):
+- `active` có thể đăng nhập bình thường.
+- `pending`, `inactive`, và `banned` không thể hoàn tất quá trình đăng nhập bình thường.
+- Thay đổi thành `inactive` hoặc `banned` sẽ thu hồi các phiên đăng nhập đang hoạt động (revokes active sessions).
 
-## Admin Action
+## Hành động của Admin (Admin Action)
 
-Backed by `audit_logs`.
+Dựa trên bảng `audit_logs`.
 
-Fields:
-- actor admin id.
-- target user/session id.
-- action: `role_changed`, `user_updated`, `user_deactivated`, or session-related action.
-- old/new values.
-- IP and timestamp.
+Các trường:
+- id của admin thực hiện (actor admin id).
+- id của người dùng/phiên bị tác động (target user/session id).
+- hành động (action): `role_changed`, `user_updated`, `user_deactivated`, hoặc hành động liên quan đến session.
+- các giá trị cũ/mới (old/new values).
+- IP và timestamp.
 
-## Active Session
+## Phiên Hoạt động (Active Session)
 
-Backed by `v_active_sessions`.
+Dựa trên view `v_active_sessions`.
 
-Fields:
+Các trường:
 - `id`, `user_id`, `email`, `full_name`.
 - `ip_address`, `user_agent`.
 - `is_oauth`, `oauth_provider`.
 - `last_active_at`, `expires_at`, `created_at`.
 
-State:
-- Active while `revoked_at IS NULL` and `expires_at > NOW()`.
-- Revoked by setting `revoked_at = NOW()`.
+Trạng thái (State):
+- Được coi là đang hoạt động (Active) khi `revoked_at IS NULL` và `expires_at > NOW()`.
+- Bị thu hồi (Revoked) bằng cách cập nhật `revoked_at = NOW()`.

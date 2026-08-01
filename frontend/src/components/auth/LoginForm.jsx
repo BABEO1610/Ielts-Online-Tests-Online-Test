@@ -2,12 +2,14 @@ import React, { useState } from 'react';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import GoogleLoginButton from './GoogleLoginButton';
+import { usePasswordToggle } from '../../hooks/usePasswordToggle';
 
 const LoginForm = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [pwdType, pwdVisible, togglePwd] = usePasswordToggle();
   const { login } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -86,15 +88,31 @@ const LoginForm = () => {
         <div className="d-flex justify-content-between align-items-center mb-xs">
           <label htmlFor="passwordInput" className="form-label mb-0">Mật khẩu</label>
         </div>
-        <input
-          type="password"
-          className="text-input"
-          id="passwordInput"
-          placeholder="••••••••"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          required
-        />
+        <div style={{ position: 'relative' }}>
+          <input
+            type={pwdType}
+            className="text-input"
+            id="passwordInput"
+            placeholder="••••••••"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            style={{ paddingRight: '2.5rem' }}
+            required
+          />
+          <button
+            type="button"
+            onClick={togglePwd}
+            aria-label={pwdVisible ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+            style={{
+              position: 'absolute', right: '12px', top: '50%',
+              transform: 'translateY(-50%)',
+              background: 'none', border: 'none', cursor: 'pointer',
+              color: '#6c757d', padding: '0 2px', lineHeight: 1
+            }}
+          >
+            <i className={`bi bi-eye${pwdVisible ? '-slash' : ''}`} />
+          </button>
+        </div>
       </div>
 
       <div className="mb-xl">

@@ -1,207 +1,207 @@
-# Tasks: User Profile
+# Danh sách Công việc (Tasks): User Profile
 
-**Input**: Design documents from `.sdd/specs/feat-auth-and-users/feat-profile/`
+**Đầu vào (Input)**: Các tài liệu thiết kế từ `.sdd/specs/feat-auth-and-users/feat-profile/`
 
-**Prerequisites**: `plan.md`, `spec.md`, `research.md`, `data-model.md`, `contracts/api-contract.md`, `quickstart.md`
+**Yêu cầu Tiên quyết (Prerequisites)**: `plan.md`, `spec.md`, `research.md`, `data-model.md`, `contracts/api-contract.md`, `quickstart.md`
 
-**Tests**: Included because the feature spec defines independent testing and the project constitution requires service/query/API coverage.
+**Kiểm thử (Tests)**: Bao gồm bởi vì đặc tả tính năng yêu cầu kiểm thử độc lập và hiến pháp dự án yêu cầu bao phủ (coverage) cho service/query/API.
 
-**Organization**: Tasks are grouped by user story so each story can be implemented and tested independently.
+**Cách tổ chức (Organization)**: Các tasks được nhóm theo user story để mỗi story có thể được triển khai và kiểm thử độc lập.
 
-## Phase 1: Setup (Shared Infrastructure)
+## Giai đoạn 1: Thiết lập (Setup - Shared Infrastructure)
 
-**Purpose**: Confirm profile inputs, API boundaries, and UI ownership.
+**Mục đích**: Xác nhận các đầu vào của profile, ranh giới API, và quyền quản lý UI.
 
-- [x] T001 [P] Review profile design inputs in `.sdd/specs/feat-auth-and-users/feat-profile/plan.md`
-- [x] T002 [P] Review profile API contract in `.sdd/specs/feat-auth-and-users/feat-profile/contracts/api-contract.md`
-- [x] T003 [P] Review profile validation scenarios in `.sdd/specs/feat-auth-and-users/feat-profile/quickstart.md`
-- [x] T004 [P] Confirm self-service user route map in `backend/src/routes/api/v1/users.routes.js`
-- [x] T005 [P] Confirm profile UI entry points in `frontend/src/pages/student/UserProfilePage.jsx`
-
----
-
-## Phase 2: Foundational (Blocking Prerequisites)
-
-**Purpose**: Shared profile schema, auth boundary, safe serialization, and upload infrastructure.
-
-**CRITICAL**: No user story work can begin until this phase is complete.
-
-- [x] T006 Verify profile fields on `users` schema in `backend/src/db/migrations/002_create_users.sql`
-- [x] T007 Verify `target_test_date` migration exists and is migration-managed in `backend/src/db/migrations/027_add_target_test_date.sql`
-- [x] T008 Remove runtime DDL from profile update query and rely on migrations only in `backend/src/db/queries/users.queries.js`
-- [x] T009 [P] Add profile safe-serialization tests in `backend/tests/unit/services/users.profile.test.js`
-- [x] T010 [P] Add users controller envelope/auth tests in `backend/tests/unit/controllers/users.controller.test.js`
-- [x] T011 [P] Add avatar middleware size/type tests in `backend/tests/unit/middleware/uploadImage.middleware.test.js`
-- [x] T012 [P] Verify React version drift noted by constitution in `.sdd/specs/feat-auth-and-users/feat-profile/plan.md`
-
-**Checkpoint**: Profile reads/writes can be implemented without leaking sensitive auth data or runtime schema mutation.
+- [x] T001 [P] Xem xét các đầu vào thiết kế profile trong `.sdd/specs/feat-auth-and-users/feat-profile/plan.md`
+- [x] T002 [P] Xem xét API contract của profile trong `.sdd/specs/feat-auth-and-users/feat-profile/contracts/api-contract.md`
+- [x] T003 [P] Xem xét các kịch bản kiểm thử profile trong `.sdd/specs/feat-auth-and-users/feat-profile/quickstart.md`
+- [x] T004 [P] Xác nhận sơ đồ tuyến đường tự phục vụ (self-service user route map) trong `backend/src/routes/api/v1/users.routes.js`
+- [x] T005 [P] Xác nhận các điểm vào giao diện (UI entry points) của profile trong `frontend/src/pages/student/UserProfilePage.jsx`
 
 ---
 
-## Phase 3: User Story 1 - Xem Hồ sơ Cá nhân (Priority: P1) MVP
+## Giai đoạn 2: Nền tảng (Foundational - Blocking Prerequisites)
 
-**Goal**: Authenticated users can view identity, role, status, avatar placeholder, learning goal fields, and account timestamps.
+**Mục đích**: Các yêu cầu dùng chung về profile schema, ranh giới xác thực, serialization an toàn, và hạ tầng upload.
 
-**Independent Test**: Log in and open `/profile`; verify profile fields render and unauthenticated users are redirected.
+**ĐẶC BIỆT QUAN TRỌNG (CRITICAL)**: Không thể bắt đầu các user story nếu giai đoạn này chưa hoàn tất.
 
-### Tests for User Story 1
+- [x] T006 Xác minh các trường của profile trên lược đồ `users` trong `backend/src/db/migrations/002_create_users.sql`
+- [x] T007 Xác minh migration cho `target_test_date` đã tồn tại và được quản lý bằng migration trong `backend/src/db/migrations/027_add_target_test_date.sql`
+- [x] T008 Loại bỏ runtime DDL khỏi truy vấn cập nhật profile và chỉ sử dụng migrations trong `backend/src/db/queries/users.queries.js`
+- [x] T009 [P] Thêm các bài test serialization an toàn cho profile trong `backend/tests/unit/services/users.profile.test.js`
+- [x] T010 [P] Thêm các bài test cho envelope/auth của users controller trong `backend/tests/unit/controllers/users.controller.test.js`
+- [x] T011 [P] Thêm các bài test kiểm tra loại và dung lượng cho avatar middleware trong `backend/tests/unit/middleware/uploadImage.middleware.test.js`
+- [x] T012 [P] Xác minh độ lệch phiên bản React được ghi nhận bởi hiến pháp trong `.sdd/specs/feat-auth-and-users/feat-profile/plan.md`
 
-- [x] T013 [P] [US1] Add get-profile safe data tests in `backend/tests/unit/services/users.profile.test.js`
-- [x] T014 [P] [US1] Add `GET /api/v1/users/me` auth and envelope tests in `backend/tests/unit/controllers/users.controller.test.js`
-- [x] T015 [P] [US1] Add AuthContext refresh profile tests in `frontend/tests/unit/context/AuthContext.test.jsx`
-- [x] T016 [P] [US1] Add profile identity and placeholder rendering tests in `frontend/tests/pages/UserProfilePage.test.jsx`
-
-### Implementation for User Story 1
-
-- [x] T017 [US1] Ensure `getProfile` strips `password_hash` and missing sensitive fields in `backend/src/services/users.service.js`
-- [x] T018 [US1] Ensure `findUserById` remains parameterized and returns required profile fields in `backend/src/db/queries/users.queries.js`
-- [x] T019 [US1] Ensure `getProfile` controller reads user id only from `req.user.id` in `backend/src/controllers/users.controller.js`
-- [x] T020 [US1] Ensure `refreshUser` loads `/users/me` and sets authenticated state correctly in `frontend/src/context/AuthContext.jsx`
-- [x] T021 [US1] Ensure profile page renders email, role, status, target fields, and fallback avatar in `frontend/src/pages/student/UserProfilePage.jsx`
-- [x] T022 [US1] Ensure unauthenticated profile access redirects through route guard in `frontend/src/App.jsx`
-
-**Checkpoint**: US1 can be demonstrated with only an authenticated account.
+**Cột mốc (Checkpoint)**: Các thao tác đọc/ghi profile có thể được triển khai mà không làm rò rỉ dữ liệu xác thực nhạy cảm hay thay đổi schema lúc thực thi (runtime schema mutation).
 
 ---
 
-## Phase 4: User Story 2 - Cập nhật Hồ sơ Học tập (Priority: P1)
+## Giai đoạn 3: User Story 1 - Xem Hồ sơ Cá nhân (Priority: P1) MVP
 
-**Goal**: Users can update full name, avatar URL, target IELTS band, and target test date.
+**Mục tiêu (Goal)**: Người dùng đã đăng nhập có thể xem định danh, role, status, avatar placeholder, các trường mục tiêu học tập (learning goal), và mốc thời gian của tài khoản.
 
-**Independent Test**: Edit profile fields, save, refresh page, and verify values persist.
+**Kiểm thử Độc lập (Independent Test)**: Đăng nhập và mở `/profile`; xác minh các trường profile hiển thị chính xác và người dùng chưa đăng nhập sẽ bị điều hướng.
 
-### Tests for User Story 2
+### Kiểm thử cho User Story 1
 
-- [x] T023 [P] [US2] Add target band validation tests in `backend/tests/unit/services/users.profile.test.js`
-- [x] T024 [P] [US2] Add profile update query tests in `backend/tests/unit/db/queries/users.queries.test.js`
-- [x] T025 [P] [US2] Add `PATCH /api/v1/users/me` tests in `backend/tests/unit/controllers/users.controller.test.js`
-- [x] T026 [P] [US2] Add profile edit form persistence tests in `frontend/tests/pages/UserProfilePage.test.jsx`
+- [x] T013 [P] [US1] Thêm các bài test trả về dữ liệu an toàn cho get-profile trong `backend/tests/unit/services/users.profile.test.js`
+- [x] T014 [P] [US1] Thêm các bài test xác thực (auth) và envelope cho `GET /api/v1/users/me` trong `backend/tests/unit/controllers/users.controller.test.js`
+- [x] T015 [P] [US1] Thêm các bài test về chức năng làm mới profile cho AuthContext trong `frontend/tests/unit/context/AuthContext.test.jsx`
+- [x] T016 [P] [US1] Thêm các bài test hiển thị danh tính profile và ảnh giữ chỗ (placeholder rendering) trong `frontend/tests/pages/UserProfilePage.test.jsx`
 
-### Implementation for User Story 2
+### Triển khai cho User Story 1
 
-- [x] T027 [US2] Ensure `updateProfile` validates target band 0.0-9.0 and 0.5 increments in `backend/src/services/users.service.js`
-- [x] T028 [US2] Ensure profile update supports setting and clearing `target_test_date` in `backend/src/db/queries/users.queries.js`
-- [x] T029 [US2] Ensure profile update endpoint accepts PUT and PATCH consistently in `backend/src/routes/api/v1/users.routes.js`
-- [x] T030 [US2] Ensure frontend normalizes band score and submits null date when cleared in `frontend/src/pages/student/UserProfilePage.jsx`
-- [x] T031 [US2] Ensure successful save refreshes AuthContext user state in `frontend/src/pages/student/UserProfilePage.jsx`
+- [x] T017 [US1] Đảm bảo `getProfile` loại bỏ `password_hash` và các trường nhạy cảm khác bị thiếu trong `backend/src/services/users.service.js`
+- [x] T018 [US1] Đảm bảo `findUserById` vẫn được tham số hóa và trả về các trường profile yêu cầu trong `backend/src/db/queries/users.queries.js`
+- [x] T019 [US1] Đảm bảo controller của `getProfile` chỉ đọc user id từ `req.user.id` trong `backend/src/controllers/users.controller.js`
+- [x] T020 [US1] Đảm bảo `refreshUser` gọi endpoint `/users/me` và thiết lập state đã xác thực chính xác trong `frontend/src/context/AuthContext.jsx`
+- [x] T021 [US1] Đảm bảo trang profile hiển thị email, role, status, các trường mục tiêu, và avatar fallback trong `frontend/src/pages/student/UserProfilePage.jsx`
+- [x] T022 [US1] Đảm bảo truy cập profile khi chưa đăng nhập bị điều hướng qua cơ chế route guard trong `frontend/src/App.jsx`
 
-**Checkpoint**: US2 persists learning profile fields independently of avatar upload.
-
----
-
-## Phase 5: User Story 3 - Tải lên Ảnh đại diện (Priority: P2)
-
-**Goal**: Users can upload a supported avatar image, receive an avatar URL, and save it to their profile.
-
-**Independent Test**: Upload a valid image under size limit, save profile, reload, and verify the avatar renders; invalid files are rejected.
-
-### Tests for User Story 3
-
-- [x] T032 [P] [US3] Add avatar upload controller success/failure tests in `backend/tests/unit/controllers/users.controller.test.js`
-- [x] T033 [P] [US3] Add avatar storage adapter tests in `backend/tests/unit/storage/objectStorage.adapter.test.js`
-- [x] T034 [P] [US3] Add upload file size/type tests in `backend/tests/unit/middleware/uploadImage.middleware.test.js`
-- [x] T035 [P] [US3] Add frontend avatar upload tests in `frontend/tests/pages/UserProfilePage.test.jsx`
-
-### Implementation for User Story 3
-
-- [x] T036 [US3] Ensure upload middleware rejects unsupported MIME types and files over policy limit in `backend/src/middleware/uploadImage.middleware.js`
-- [x] T037 [US3] Ensure `uploadAvatar` requires an uploaded file and user id from auth middleware in `backend/src/controllers/users.controller.js`
-- [x] T038 [US3] Ensure avatar storage returns stable public `avatar_url` values in `backend/src/services/avatarStorage.service.js`
-- [x] T039 [US3] Ensure frontend upload fills `avatar_url` and requires save confirmation in `frontend/src/pages/student/UserProfilePage.jsx`
-- [x] T040 [US3] Ensure avatar upload errors are visible and do not mutate saved profile state in `frontend/src/pages/student/UserProfilePage.jsx`
-
-**Checkpoint**: US3 can be validated without changing password or support history.
+**Cột mốc**: US1 có thể được trình diễn (demonstrated) chỉ cần một tài khoản đã xác thực.
 
 ---
 
-## Phase 6: User Story 4 - Quản lý Cài đặt Bảo mật (Priority: P2)
+## Giai đoạn 4: User Story 2 - Cập nhật Hồ sơ Học tập (Priority: P1)
 
-**Goal**: Logged-in users with local passwords can change passwords; Google-only users get clear guidance.
+**Mục tiêu**: Người dùng có thể cập nhật họ tên, avatar URL, điểm mục tiêu IELTS, và ngày thi mục tiêu.
 
-**Independent Test**: Change password with valid current password and reject mismatched/short/wrong-current cases.
+**Kiểm thử Độc lập**: Sửa các trường profile, lưu, làm mới trang, và xác minh các giá trị được lưu lại.
 
-### Tests for User Story 4
+### Kiểm thử cho User Story 2
 
-- [x] T041 [P] [US4] Add change-password local account tests in `backend/tests/unit/services/auth.reset.test.js`
-- [x] T042 [P] [US4] Add Google-only password guidance tests in `backend/tests/unit/services/auth.reset.test.js`
-- [x] T043 [P] [US4] Add profile security UI tests in `frontend/tests/pages/UserProfilePage.test.jsx`
-- [x] T044 [P] [US4] Add ChangePwdModal validation tests in `frontend/tests/components/profile/ChangePwdModal.test.jsx`
+- [x] T023 [P] [US2] Thêm các bài test cho xác thực điểm mục tiêu (target band validation) trong `backend/tests/unit/services/users.profile.test.js`
+- [x] T024 [P] [US2] Thêm các bài test cho truy vấn update profile trong `backend/tests/unit/db/queries/users.queries.test.js`
+- [x] T025 [P] [US2] Thêm các bài test cho `PATCH /api/v1/users/me` trong `backend/tests/unit/controllers/users.controller.test.js`
+- [x] T026 [P] [US2] Thêm các bài test về tính lưu giữ (persistence) của form sửa profile trong `frontend/tests/pages/UserProfilePage.test.jsx`
 
-### Implementation for User Story 4
+### Triển khai cho User Story 2
 
-- [x] T045 [US4] Ensure password change endpoint remains authenticated in `backend/src/routes/api/v1/auth.routes.js`
-- [x] T046 [US4] Ensure `changePassword` validates current password and rejects Google-only accounts in `backend/src/services/auth.service.js`
-- [x] T047 [US4] Ensure security settings page opens password modal from profile navigation in `frontend/src/pages/student/SecuritySettingsPage.jsx`
-- [x] T048 [US4] Ensure ChangePwdModal blocks mismatched or short passwords before request in `frontend/src/components/profile/ChangePwdModal.jsx`
-- [x] T049 [US4] Ensure ChangePwdModal surfaces API success and error states in `frontend/src/components/profile/ChangePwdModal.jsx`
+- [x] T027 [US2] Đảm bảo `updateProfile` xác thực điểm target band từ 0.0-9.0 và bước nhảy 0.5 trong `backend/src/services/users.service.js`
+- [x] T028 [US2] Đảm bảo thao tác cập nhật profile hỗ trợ cả việc thiết lập (setting) và xóa (clearing) `target_test_date` trong `backend/src/db/queries/users.queries.js`
+- [x] T029 [US2] Đảm bảo endpoint cập nhật profile chấp nhận cả PUT và PATCH một cách nhất quán trong `backend/src/routes/api/v1/users.routes.js`
+- [x] T030 [US2] Đảm bảo frontend chuẩn hóa điểm số band và gửi ngày null khi giá trị bị xóa trong `frontend/src/pages/student/UserProfilePage.jsx`
+- [x] T031 [US2] Đảm bảo thao tác lưu thành công sẽ làm mới user state của AuthContext trong `frontend/src/pages/student/UserProfilePage.jsx`
 
-**Checkpoint**: US4 reuses auth password behavior without duplicating backend logic.
-
----
-
-## Phase 7: User Story 5 - Xem Lịch sử Hỗ trợ (Priority: P3)
-
-**Goal**: Users can view previous support requests and admin replies, including an empty state.
-
-**Independent Test**: Open support history with and without requests; verify status, timestamps, content, and admin reply render.
-
-### Tests for User Story 5
-
-- [x] T050 [P] [US5] Add support history query tests in `backend/tests/unit/db/queries/support.queries.test.js`
-- [x] T051 [P] [US5] Add support history service/controller tests in `backend/tests/unit/controllers/users.controller.test.js`
-- [x] T052 [P] [US5] Add contact history modal rendering tests in `frontend/tests/components/profile/ContactHistoryModal.test.jsx`
-
-### Implementation for User Story 5
-
-- [x] T053 [US5] Ensure support history query filters by authenticated user id in `backend/src/db/queries/support.queries.js`
-- [x] T054 [US5] Ensure any support history endpoint returns standard envelope and no other users' data in `backend/src/controllers/users.controller.js`
-- [x] T055 [US5] Ensure ContactHistoryModal renders request content, status, created time, and admin reply in `frontend/src/components/profile/ContactHistoryModal.jsx`
-- [x] T056 [US5] Ensure empty support history renders a usable empty state in `frontend/src/components/profile/ContactHistoryModal.jsx`
-
-**Checkpoint**: US5 can be validated independently from profile editing.
+**Cột mốc**: US2 lưu giữ các trường của hồ sơ học tập độc lập với việc tải lên avatar.
 
 ---
 
-## Phase 8: Polish & Cross-Cutting Concerns
+## Giai đoạn 5: User Story 3 - Tải lên Ảnh đại diện (Priority: P2)
 
-**Purpose**: Governance, security hardening, and full validation across profile stories.
+**Mục tiêu**: Người dùng có thể tải lên một ảnh avatar được hỗ trợ, nhận về một avatar URL, và lưu nó vào profile.
 
-- [x] T057 [P] Verify no profile response exposes auth secrets in `backend/src/services/users.service.js`
-- [x] T058 [P] Verify all profile queries use parameterized SQL in `backend/src/db/queries/users.queries.js`
-- [x] T059 [P] Verify profile UI handles loading, success, error, and empty states in `frontend/src/pages/student/UserProfilePage.jsx`
-- [x] T060 Run backend profile tests and record results in `.sdd/specs/feat-auth-and-users/feat-profile/tasks.md`
-- [x] T061 Run frontend profile tests and record results in `.sdd/specs/feat-auth-and-users/feat-profile/tasks.md`
-- [x] T062 Execute quickstart scenarios and update findings in `.sdd/specs/feat-auth-and-users/feat-profile/quickstart.md`
+**Kiểm thử Độc lập**: Tải lên một ảnh hợp lệ với kích thước dưới giới hạn, lưu profile, tải lại trang, và xác minh avatar hiển thị; các file không hợp lệ sẽ bị từ chối.
+
+### Kiểm thử cho User Story 3
+
+- [x] T032 [P] [US3] Thêm các bài test thành công/thất bại của controller avatar upload trong `backend/tests/unit/controllers/users.controller.test.js`
+- [x] T033 [P] [US3] Thêm các bài test cho avatar storage adapter trong `backend/tests/unit/storage/objectStorage.adapter.test.js`
+- [x] T034 [P] [US3] Thêm các bài test kích thước/loại file tải lên trong `backend/tests/unit/middleware/uploadImage.middleware.test.js`
+- [x] T035 [P] [US3] Thêm các bài test frontend avatar upload trong `frontend/tests/pages/UserProfilePage.test.jsx`
+
+### Triển khai cho User Story 3
+
+- [x] T036 [US3] Đảm bảo upload middleware từ chối các định dạng MIME không hỗ trợ và file vượt quá giới hạn chính sách trong `backend/src/middleware/uploadImage.middleware.js`
+- [x] T037 [US3] Đảm bảo `uploadAvatar` yêu cầu có file tải lên và user id từ middleware xác thực trong `backend/src/controllers/users.controller.js`
+- [x] T038 [US3] Đảm bảo avatar storage trả về các giá trị `avatar_url` ổn định và công khai trong `backend/src/services/avatarStorage.service.js`
+- [x] T039 [US3] Đảm bảo upload phía frontend điền đầy đủ `avatar_url` và yêu cầu xác nhận lưu (save confirmation) trong `frontend/src/pages/student/UserProfilePage.jsx`
+- [x] T040 [US3] Đảm bảo các lỗi tải lên avatar hiển thị rõ ràng và không làm thay đổi state profile đã lưu trong `frontend/src/pages/student/UserProfilePage.jsx`
+
+**Cột mốc**: US3 có thể được kiểm thử mà không cần đổi mật khẩu hay có lịch sử hỗ trợ.
 
 ---
 
-## Dependencies & Execution Order
+## Giai đoạn 6: User Story 4 - Quản lý Cài đặt Bảo mật (Priority: P2)
 
-### Phase Dependencies
+**Mục tiêu**: Người dùng đăng nhập bằng mật khẩu cục bộ (local passwords) có thể đổi mật khẩu; Người dùng Google-only nhận được các hướng dẫn rõ ràng.
 
-- Phase 1 has no dependencies.
-- Phase 2 depends on Phase 1 and blocks all user stories.
-- US1 and US2 are P1 and form the MVP profile surface.
-- US3 and US4 depend on authenticated profile access from US1.
-- US5 depends on authenticated profile access from US1.
-- Phase 8 depends on all selected user stories.
+**Kiểm thử Độc lập**: Đổi mật khẩu với mật khẩu hiện tại đúng, và từ chối nếu không khớp/mật khẩu ngắn/sai mật khẩu hiện tại.
 
-### User Story Dependencies
+### Kiểm thử cho User Story 4
 
-- US1: no story dependency after foundation.
-- US2: depends on US1 profile read for refresh validation.
-- US3: depends on US1 authenticated access and optionally US2 save flow.
-- US4: depends on auth password endpoint and US1 profile navigation.
-- US5: depends on US1 authenticated access.
+- [x] T041 [P] [US4] Thêm các bài test đổi mật khẩu của tài khoản cục bộ trong `backend/tests/unit/services/auth.reset.test.js`
+- [x] T042 [P] [US4] Thêm các bài test hiển thị hướng dẫn đổi mật khẩu đối với tài khoản Google-only trong `backend/tests/unit/services/auth.reset.test.js`
+- [x] T043 [P] [US4] Thêm các bài test về giao diện cài đặt bảo mật trong `frontend/tests/pages/UserProfilePage.test.jsx`
+- [x] T044 [P] [US4] Thêm các bài test xác thực của ChangePwdModal trong `frontend/tests/components/profile/ChangePwdModal.test.jsx`
 
-### Parallel Opportunities
+### Triển khai cho User Story 4
 
-- T001-T005 can run in parallel.
-- T009-T012 can run in parallel after schema review.
-- Tests inside each user story marked `[P]` can run in parallel.
-- US3, US4, and US5 can proceed in parallel after US1 is stable.
+- [x] T045 [US4] Đảm bảo endpoint đổi mật khẩu vẫn cần xác thực (authenticated) trong `backend/src/routes/api/v1/auth.routes.js`
+- [x] T046 [US4] Đảm bảo `changePassword` xác thực mật khẩu hiện tại và từ chối các tài khoản Google-only trong `backend/src/services/auth.service.js`
+- [x] T047 [US4] Đảm bảo trang cài đặt bảo mật mở modal mật khẩu khi điều hướng từ profile trong `frontend/src/pages/student/SecuritySettingsPage.jsx`
+- [x] T048 [US4] Đảm bảo ChangePwdModal chặn việc mật khẩu không khớp hoặc quá ngắn trước khi gửi request đi trong `frontend/src/components/profile/ChangePwdModal.jsx`
+- [x] T049 [US4] Đảm bảo ChangePwdModal hiển thị được trạng thái báo lỗi hay thành công từ API trong `frontend/src/components/profile/ChangePwdModal.jsx`
 
-## Parallel Example: User Story 3
+**Cột mốc**: US4 tận dụng lại logic mật khẩu của phần auth mà không bị lặp lại ở phía backend.
+
+---
+
+## Giai đoạn 7: User Story 5 - Xem Lịch sử Hỗ trợ (Priority: P3)
+
+**Mục tiêu**: Người dùng có thể xem lại các yêu cầu hỗ trợ cũ cùng phản hồi của admin, bao gồm cả hiển thị rỗng (empty state).
+
+**Kiểm thử Độc lập**: Mở trang lịch sử hỗ trợ trong các trạng thái có và không có các yêu cầu (requests); xác minh status, timestamps, content, và admin reply render chính xác.
+
+### Kiểm thử cho User Story 5
+
+- [x] T050 [P] [US5] Thêm bài test query lấy lịch sử hỗ trợ trong `backend/tests/unit/db/queries/support.queries.test.js`
+- [x] T051 [P] [US5] Thêm bài test service/controller cho lịch sử hỗ trợ trong `backend/tests/unit/controllers/users.controller.test.js`
+- [x] T052 [P] [US5] Thêm bài test render của contact history modal trong `frontend/tests/components/profile/ContactHistoryModal.test.jsx`
+
+### Triển khai cho User Story 5
+
+- [x] T053 [US5] Đảm bảo truy vấn lấy lịch sử hỗ trợ sử dụng bộ lọc (filter) theo id người dùng đã xác thực trong `backend/src/db/queries/support.queries.js`
+- [x] T054 [US5] Đảm bảo bất kỳ endpoint lịch sử hỗ trợ nào đều trả về standard envelope và không chứa dữ liệu của người dùng khác trong `backend/src/controllers/users.controller.js`
+- [x] T055 [US5] Đảm bảo ContactHistoryModal hiển thị nội dung yêu cầu, trạng thái, thời gian tạo, và phản hồi của admin trong `frontend/src/components/profile/ContactHistoryModal.jsx`
+- [x] T056 [US5] Đảm bảo khi lịch sử hỗ trợ trống (empty) thì hiển thị trạng thái rỗng thân thiện cho người dùng trong `frontend/src/components/profile/ContactHistoryModal.jsx`
+
+**Cột mốc**: US5 có thể được xác thực một cách độc lập không liên quan đến việc sửa profile.
+
+---
+
+## Giai đoạn 8: Trau chuốt (Polish) & Các Vấn đề Cắt ngang (Cross-Cutting Concerns)
+
+**Mục đích**: Tính quản trị (Governance), bảo mật chặt chẽ hơn, và validation đầy đủ cho tất cả các profile stories.
+
+- [x] T057 [P] Xác minh không có response của profile nào làm lộ các auth secrets trong `backend/src/services/users.service.js`
+- [x] T058 [P] Xác minh toàn bộ profile queries đều dùng parameterized SQL trong `backend/src/db/queries/users.queries.js`
+- [x] T059 [P] Xác minh UI profile xử lý đúng các trạng thái loading, success, error, và empty trong `frontend/src/pages/student/UserProfilePage.jsx`
+- [x] T060 Chạy các bài test profile phía backend và ghi lại kết quả vào `.sdd/specs/feat-auth-and-users/feat-profile/tasks.md`
+- [x] T061 Chạy các bài test profile phía frontend và ghi lại kết quả vào `.sdd/specs/feat-auth-and-users/feat-profile/tasks.md`
+- [x] T062 Thực thi các kịch bản quickstart và cập nhật kết quả trong `.sdd/specs/feat-auth-and-users/feat-profile/quickstart.md`
+
+---
+
+## Phụ thuộc & Thứ tự Thực thi (Dependencies & Execution Order)
+
+### Phụ thuộc theo Giai đoạn (Phase Dependencies)
+
+- Giai đoạn 1 không có sự phụ thuộc nào.
+- Giai đoạn 2 phụ thuộc vào Giai đoạn 1 và đóng vai trò chặn (blocks) tất cả các user stories.
+- US1 và US2 là P1 và tạo thành phần cốt lõi (MVP profile surface) của profile.
+- US3 và US4 phụ thuộc vào quyền truy cập vào profile (authenticated profile access) của US1.
+- US5 phụ thuộc vào truy cập profile có xác thực (authenticated profile access) của US1.
+- Giai đoạn 8 phụ thuộc vào tất cả các user stories đã chọn.
+
+### Phụ thuộc theo User Story (User Story Dependencies)
+
+- US1: không phụ thuộc vào story khác sau giai đoạn foundation.
+- US2: phụ thuộc vào hàm lấy profile của US1 để validation việc làm mới (refresh).
+- US3: phụ thuộc truy cập có xác thực từ US1 và tuỳ chọn vào quy trình lưu dữ liệu (save flow) của US2.
+- US4: phụ thuộc vào auth password endpoint và điều hướng profile từ US1.
+- US5: phụ thuộc truy cập có xác thực từ US1.
+
+### Các Cơ hội Thực thi Song song (Parallel Opportunities)
+
+- T001-T005 có thể chạy song song.
+- T009-T012 có thể chạy song song sau khi xem xét lược đồ (schema review).
+- Các task test bên trong mỗi user story có nhãn `[P]` có thể chạy song song.
+- US3, US4, và US5 có thể tiến hành song song sau khi US1 đã ổn định.
+
+## Ví dụ Song song (Parallel Example): User Story 3
 
 ```text
 Task: "Add avatar upload controller success/failure tests in backend/tests/unit/controllers/users.controller.test.js"
@@ -209,24 +209,24 @@ Task: "Add avatar storage adapter tests in backend/tests/unit/storage/objectStor
 Task: "Add frontend avatar upload tests in frontend/tests/pages/UserProfilePage.test.jsx"
 ```
 
-## Implementation Strategy
+## Chiến lược Triển khai (Implementation Strategy)
 
-### MVP First
+### Theo Cấp độ Cơ bản Nhất (MVP First)
 
-1. Complete Phase 1 and Phase 2.
-2. Complete US1 profile read and US2 profile update.
-3. Validate `/profile` view/edit independently.
+1. Hoàn tất Giai đoạn 1 và Giai đoạn 2.
+2. Hoàn tất chức năng xem (read) của US1 và cập nhật (update) của US2.
+3. Xác thực khả năng xem/sửa tại `/profile` một cách độc lập.
 
-### Incremental Delivery
+### Giao hàng Theo đợt (Incremental Delivery)
 
-1. Deliver US1 profile viewing.
-2. Deliver US2 learning profile updates.
-3. Deliver US3 avatar upload.
-4. Deliver US4 password settings.
-5. Deliver US5 support history.
+1. Bàn giao chức năng xem profile US1.
+2. Bàn giao chức năng cập nhật mục tiêu học tập US2.
+3. Bàn giao chức năng tải lên avatar US3.
+4. Bàn giao phần cài đặt mật khẩu US4.
+5. Bàn giao lịch sử hỗ trợ US5.
 
-### Notes
+### Ghi chú (Notes)
 
-- Every task includes a file path and follows checklist format.
-- Keep identity from `req.user.id`; never accept profile user id from body/query.
-- Replace runtime schema mutation with migrations-only behavior before implementation completion.
+- Mọi task đều kèm theo đường dẫn file (file path) và tuân theo định dạng checklist format.
+- Lấy định danh từ `req.user.id`; không bao giờ chấp nhận cung cấp user id vào profile từ body/query.
+- Thay thế các đoạn code can thiệp (mutation) lược đồ lúc chạy (runtime schema mutation) bằng các thao tác quản lý dạng migrations-only trước khi hoàn thiện phần triển khai.

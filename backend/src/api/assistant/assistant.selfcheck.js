@@ -1,3 +1,11 @@
+/**
+ * ==========================================
+ * TẦNG 4: GIAO TIẾP AI & KIỂM DUYỆT (Prompts & Selfcheck)
+ * ==========================================
+ * Nhiệm vụ: Tự động kiểm duyệt (Self-check) lại câu trả lời của AI trước khi gửi cho user 
+ * xem có bịa đặt (Hallucination) hay vi phạm chuẩn mực không.
+ */
+
 const { ASSISTANT_INTENTS } = require('./assistant.intent');
 const { ERROR_MESSAGES, ERROR_CODES } = require('./assistant.constants');
 

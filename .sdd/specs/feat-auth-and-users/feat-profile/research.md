@@ -1,31 +1,31 @@
-# Research: User Profile
+# Nghiên cứu (Research): User Profile
 
-## Decision: Use `/users/me` as the profile boundary
+## Quyết định: Sử dụng `/users/me` làm ranh giới cho hồ sơ (profile boundary)
 
-**Rationale**: Existing route derives `userId` from auth middleware and returns a safe user object without `password_hash`.
+**Lý do (Rationale)**: Route hiện tại suy ra `userId` từ middleware auth và trả về một đối tượng user an toàn không chứa `password_hash`.
 
-**Alternatives considered**: Accept user id in request body/query; rejected because constitution forbids trusting identity from client input.
+**Các giải pháp thay thế đã xem xét**: Cho phép truyền id của người dùng vào request body/query; bị từ chối vì hiến pháp cấm việc tin tưởng định danh do phía client cung cấp (client input).
 
-## Decision: Store learning goals on `users`
+## Quyết định: Lưu trữ các mục tiêu học tập (learning goals) trong bảng `users`
 
-**Rationale**: `target_band_score` and `target_test_date` already exist on `users`; these fields belong to the user's long-lived profile.
+**Lý do**: `target_band_score` và `target_test_date` đã tồn tại sẵn trong bảng `users`; các trường này thuộc về hồ sơ lưu trữ lâu dài của người dùng.
 
-**Alternatives considered**: Separate `learning_goals` table; rejected for current scope because one current goal per user is enough.
+**Các giải pháp thay thế đã xem xét**: Tạo một bảng `learning_goals` riêng biệt; bị từ chối trong phạm vi hiện tại vì chỉ cần một mục tiêu (goal) duy nhất cho mỗi user.
 
-## Decision: Support both avatar URL and upload
+## Quyết định: Hỗ trợ cả cung cấp URL cho avatar và upload
 
-**Rationale**: UI allows entering a URL or uploading a file; upload returns an `avatar_url` that the user confirms by saving the profile.
+**Lý do**: Giao diện (UI) cho phép người dùng nhập một URL hoặc upload một file; tính năng upload sẽ trả về một `avatar_url` mà người dùng sẽ xác nhận khi lưu hồ sơ (saving the profile).
 
-**Alternatives considered**: Upload-only flow; rejected because existing UI and spec support manual URLs.
+**Các giải pháp thay thế đã xem xét**: Chỉ hỗ trợ upload; bị từ chối vì giao diện và đặc tả (spec) hiện tại đã hỗ trợ dùng URL thủ công.
 
-## Decision: Reuse auth password change
+## Quyết định: Tái sử dụng tính năng đổi mật khẩu (password change) của auth
 
-**Rationale**: Password-change validation, Google-only handling, password hashing, and audit logging already live in `auth.service.changePassword`.
+**Lý do**: Validation khi đổi mật khẩu, cách xử lý Google-only, việc băm (hashing) mật khẩu, và lưu vết (audit logging) hiện đã có trong `auth.service.changePassword`.
 
-**Alternatives considered**: Duplicate profile-specific password service; rejected to avoid inconsistent security behavior.
+**Các giải pháp thay thế đã xem xét**: Viết lặp lại một service xử lý mật khẩu riêng cho tính năng profile; bị từ chối nhằm tránh các hành vi bảo mật không nhất quán.
 
-## Decision: Render support history as read-only profile context
+## Quyết định: Hiển thị lịch sử hỗ trợ (support history) dưới dạng ngữ cảnh hồ sơ chỉ đọc (read-only)
 
-**Rationale**: Spec only requires viewing previous support requests and admin replies; creation/update belongs to support/contact feature.
+**Lý do**: Đặc tả (Spec) chỉ yêu cầu người dùng có thể xem các yêu cầu hỗ trợ cũ và phản hồi của admin; việc tạo/cập nhật (creation/update) thuộc về tính năng hỗ trợ/liên hệ (support/contact feature).
 
-**Alternatives considered**: Add profile support mutation endpoints; rejected as out of scope.
+**Các giải pháp thay thế đã xem xét**: Thêm các endpoints thay đổi dữ liệu (mutation) hỗ trợ riêng cho profile; bị từ chối vì nằm ngoài phạm vi (out of scope).

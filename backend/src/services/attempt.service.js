@@ -5,6 +5,7 @@ const { getBandScore } = require('../utils/scoring');
  * Normalize a fill-in-blank answer for grading.
  * Spec: trim + lowercase + remove leading/trailing punctuation + exact match.
  * NO fuzzy matching.
+ * (Hàm normalizeAnswer: Loại bỏ khoảng trắng 2 đầu -> Chuyển thành chữ thường -> Xóa các dấu câu ở 2 đầu -> Gộp khoảng trắng thừa ở giữa thành 1 khoảng trắng duy nhất)
  */
 function normalizeAnswer(answer) {
   if (!answer) return '';
@@ -21,6 +22,7 @@ function normalizeAnswer(answer) {
  * - MCQ: exact label match ("A" === "A") after normalizing.
  * - Fill-in-blank: normalized exact match. Supports correct_answers JSONB array.
  * NO fuzzy matching.
+ * (Hàm isAnswerCorrect: So sánh chính xác chuỗi đã normalize. Nếu DB là mảng JSONB thì duyệt mảng kiểm tra match từng phần tử)
  */
 function isAnswerCorrect(userAnswer, correctAnswer, correctAnswers) {
   const normalized = normalizeAnswer(userAnswer);
@@ -46,6 +48,12 @@ class AttemptService {
    *
    * IDOR: userId always from req.user.id (JWT), never from body.
    * Transaction: BEGIN → insert test_attempts → insert attempt_answers → COMMIT/ROLLBACK
+   * 
+   * (Nhiệm vụ 1: Verify test exists (Throw 404 nếu không có)
+   * Nhiệm vụ 2: Lấy toàn bộ câu hỏi và sort ORDER BY q.question_order ASC
+   * Nhiệm vụ 3: Grading Loop - Dùng normalizeAnswer và isAnswerCorrect để chấm
+   * Nhiệm vụ 4: Scoring - Cộng rawScore, tính scale quy đổi 40 câu, tính Band Score
+   * Nhiệm vụ 5: Mở Transaction lưu vào bảng test_attempts và attempt_answers)
    *
    * @param {string} testId
    * @param {string} userId      - from JWT, not request body
@@ -54,7 +62,7 @@ class AttemptService {
    * @param {boolean} practiceMode - true = untimed practice (still saved to DB with practice_mode=true)
    */
   static async submitAttempt(testId, userId, answers = {}, timeSpent = 0, practiceMode = false) {
-    // 0. Verify test exists
+    // Bước 1: Verify test exists (Throw 404 nếu không có)
     const testRes = await pool.query(
       `SELECT id, title, skill FROM mock_tests WHERE id = $1`,
       [testId]
@@ -65,7 +73,7 @@ class AttemptService {
       throw err;
     }
 
-    // 1. Fetch all questions for this test (via test_id — questions.test_id is directly set)
+    // Bước 2: Fetch Questions (lấy toàn bộ câu hỏi và ép ORDER BY q.question_order ASC)
     //    Schema: questions.test_id = mock_tests.id (set in createReadingTest)
     const questionsRes = await pool.query(
       `SELECT
@@ -86,7 +94,7 @@ class AttemptService {
       throw err;
     }
 
-    // 2. Grade each question
+    // Bước 3: Grading Loop (chấm điểm từng câu bằng normalizeAnswer và isAnswerCorrect)
     let rawScore = 0;
     const gradedAnswers = questions.map((q) => {
       const userAnswer = answers[q.question_order] || '';
@@ -115,12 +123,13 @@ class AttemptService {
       };
     });
 
+    // Bước 4: Scoring (tính tổng điểm thô, quy đổi scale 40 và tính Band Score)
     const totalQuestions = questions.length || 40;
     const normalizedRawScore = Math.min(rawScore, 40);
     const scaledRawScore = totalQuestions > 0 ? Math.round((normalizedRawScore / totalQuestions) * 40) : 0;
     const bandScore = getBandScore(testRes.rows[0].skill, scaledRawScore);
 
-    // 3. Persist inside ONE transaction
+    // Bước 5: Database Transaction (BEGIN -> INSERT -> COMMIT/ROLLBACK)
     //    Tables: test_attempts, attempt_answers (from 013 + 014 migrations)
     const client = await pool.connect();
     try {
@@ -179,6 +188,7 @@ class AttemptService {
    * IDOR: filters by user_id from JWT.
    *
    * Joins: test_attempts → mock_tests
+   * (Truy vấn 1 dòng duy nhất lấy điểm số và meta data)
    */
   static async getAttemptById(attemptId, userId) {
     const res = await pool.query(
@@ -226,6 +236,7 @@ class AttemptService {
    *
    * Joins: attempt_answers → questions (for question_text, explanation)
    * Schema: questions.question_text (col name in 009_create_tests_schema.sql)
+   * (Thực hiện Heavy JOIN kết nối attempt_answers và questions để lấy đề gốc và cột explanation)
    */
   static async getAttemptDetail(attemptId, userId) {
     // IDOR check first
@@ -288,6 +299,7 @@ class AttemptService {
    * Get attempt history for the authenticated user.
    * IDOR: only returns rows WHERE ta.user_id = userId.
    * practiceMode included so HistoryPage can show timed vs untimed.
+   * (Truy vấn bảng test_attempts JOIN nhẹ sang bảng mock_tests để lấy Title đề thi)
    *
    * @param {string} userId
    * @param {string|null} skill - filter by mt.skill ('reading' | 'listening' | null)

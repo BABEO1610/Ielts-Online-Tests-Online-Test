@@ -5,7 +5,16 @@ const path = require('node:path');
 const LOCK_NAME = 'ieltszone-schema-migrations-v1';
 const DEFAULT_DIR = path.join(__dirname, '../src/db/migrations');
 
-const checksum = (sql) => crypto.createHash('sha256').update(sql).digest('hex');
+const normalizeLineEndings = (sql) => String(sql).replace(/\r\n/g, '\n');
+const digest = (sql) => crypto.createHash('sha256').update(sql).digest('hex');
+const checksum = (sql) => digest(normalizeLineEndings(sql));
+const matchesRecordedChecksum = (sql, expectedChecksum) => {
+  const normalized = normalizeLineEndings(sql);
+  // Older Windows runs recorded CRLF bytes. Treat that representation as the
+  // same immutable SQL, but do not accept any other content difference.
+  return [digest(normalized), digest(normalized.replace(/\n/g, '\r\n'))]
+    .includes(expectedChecksum);
+};
 const migrationFiles = (dir = DEFAULT_DIR) => fs.readdirSync(dir)
   .filter((file) => file.endsWith('.sql'))
   .sort((left, right) => left.localeCompare(right, 'en'));
@@ -35,7 +44,7 @@ const appliedMigrations = async (client) => {
 const applyFile = async (client, dir, file, expectedChecksum) => {
   const sql = fs.readFileSync(path.join(dir, file), 'utf8');
   const actualChecksum = checksum(sql);
-  if (expectedChecksum && expectedChecksum !== actualChecksum) {
+  if (expectedChecksum && !matchesRecordedChecksum(sql, expectedChecksum)) {
     throw new Error(`Checksum mismatch for applied migration ${file}`);
   }
   if (expectedChecksum) return false;

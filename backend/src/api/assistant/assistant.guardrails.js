@@ -1,5 +1,13 @@
-const { ERROR_CODES, ERROR_MESSAGES } = require('./assistant.constants');
+/**
+ * ==========================================
+ * TẦNG 2: ĐIỀU HƯỚNG & BẢO VỆ (Controller & Guardrails)
+ * ==========================================
+ * Nhiệm vụ: Rào chắn an ninh (Guardrails). Kiểm tra xem câu hỏi có chứa từ khóa cấm, 
+ * có cố tình tấn công prompt injection hay hỏi lộ dữ liệu hệ thống không.
+ */
 
+const { ERROR_CODES, ERROR_MESSAGES } = require('./assistant.constants');
+// chuẩn hóa văn bản đầu vào. chuyển toàn bộ tin nhắn thành chữ thường, loại bỏ dấu tiếng vijet 
 const normalize = (text) =>
   String(text || '')
     .toLowerCase()
@@ -8,9 +16,9 @@ const normalize = (text) =>
     .replace(/đ/g, 'd')
     .replace(/Đ/g, 'd')
     .replace(/Ä‘/g, 'd');
-
+// kiểm tra chuỗi văn bản value có có chứa bất kì mẫu từ khóa( regax pattern) nào trong danh saschg hay không trả về true hoặc false.
 const containsAny = (value, patterns) => patterns.some((pattern) => pattern.test(value));
-
+// các câu hỏi ngoài phạm vi 
 const OUT_OF_SCOPE_PATTERNS = [
   /\bbitcoin\b/,
   /\bcrypto\b/,
@@ -39,7 +47,7 @@ const OUT_OF_SCOPE_PATTERNS = [
   /\b(medical advice|legal advice|financial advice|investment advice)\b/,
   /\b(suc khoe|y te|benh|thuoc|bac si|doctor|medicine|health advice)\b/,
 ];
-
+// nhận diện yêu cầu chấm bài writting/ speaking hoặc đoán điểm bandscore
 const WRITING_SPEAKING_GRADING_PATTERNS = [
   /\b(cham|grade|score|evaluate|danh gia)\b.*\b(writing|speaking|essay|bai noi|bai viet)\b/,
   /\b(writing|speaking|essay|bai noi|bai viet)\b.*\b(cham|grade|score|evaluate|danh gia)\b/,
@@ -47,7 +55,7 @@ const WRITING_SPEAKING_GRADING_PATTERNS = [
   /\b(du doan|predict|generate|cho|tinh)\b.*\bband\b/,
   /\bielts band\b/,
 ];
-
+// nhận diện ai bịa đề thi mới tạo đáp án giả hoặc đoán đề ngày mai
 const FAKE_CONTENT_PATTERNS = [
   /\b(fake|bia|make up|invent)\b.*\b(test|lesson|answer|explanation|dap an|giai thich|de)\b/,
   /\b(tao|generate|create)\b.*\b(de thi|bai test|mock test|ielts test|answer key|dap an|explanation|giai thich)\b/,
@@ -57,7 +65,7 @@ const FAKE_CONTENT_PATTERNS = [
   /\b(answer key|dap an)\b.*\b(cambridge|de chua lam|chua nop|chua lam)\b/,
   /\b(du doan|predict)\b.*\b(de ielts|de thi|real test|ngay mai)\b/,
 ];
-
+// bảo vệ an ninh hệ thống, chặn các câu hỏi cố tình soi promt nội bộ , xin api key, hỏi cấu hình admin để soi dữ liệu các nhân người khác
 const PRIVATE_DATA_PATTERNS = [
   /\b(system prompt|internal prompt|developer prompt|hidden prompt)\b/,
   /\b(api key|gemini api key|secret key|access token|refresh token|env|environment variable|config noi bo|cau hinh noi bo)\b/,
@@ -70,15 +78,15 @@ const PRIVATE_DATA_PATTERNS = [
   /\b(user khac|student khac|hoc vien khac)\b/,
   /\b(lich su chat|du lieu|email|attempt|bai lam)\b.*\b(user khac|student khac|hoc vien khac|ban khac|nguoi khac)\b/,
 ];
-
+// nhận diện hành vi đòi đáp án/ gợi ý đáp án trong lúc làm bài thi
 const REVIEW_DURING_TEST_PATTERNS = [
   /\b(dap an|answer|hint|goi y|giai thich|explanation)\b.*\b(dang lam|chua nop|in progress|during test)\b/,
   /\b(cho em|show me|tell me)\b.*\b(dap an|answer|hint)\b/,
 ];
-
+// hàm trung tâm tiếp nhận tin nhắn, context trang web
 const evaluateGuardrails = ({ message, context }) => {
   const normalized = normalize(message);
-
+  // tắt ai trong lúc làm bài thi 
   if (context?.pageType === 'active-test') {
     return {
       blocked: true,
@@ -86,7 +94,7 @@ const evaluateGuardrails = ({ message, context }) => {
       message: ERROR_MESSAGES[ERROR_CODES.ASSISTANT_DISABLED_DURING_TEST],
     };
   }
-
+  // chặn yêu cầu chấm writting , speaking
   if (containsAny(normalized, WRITING_SPEAKING_GRADING_PATTERNS)) {
     return {
       blocked: true,
@@ -94,7 +102,7 @@ const evaluateGuardrails = ({ message, context }) => {
       message: 'Mình chưa chấm Writing/Speaking hoặc tạo band score trong phase này.',
     };
   }
-
+  // chặn yêu cầu bịa đề, đáp án giả
   if (containsAny(normalized, FAKE_CONTENT_PATTERNS)) {
     return {
       blocked: true,
@@ -102,7 +110,7 @@ const evaluateGuardrails = ({ message, context }) => {
       message: 'Mình không tạo hoặc bịa test, lesson, đáp án hay giải thích mới.',
     };
   }
-
+  // chặn thông tin bảo mật dữ liệu riêng 
   if (containsAny(normalized, PRIVATE_DATA_PATTERNS)) {
     return {
       blocked: true,
@@ -110,7 +118,7 @@ const evaluateGuardrails = ({ message, context }) => {
       message: 'Mình không thể tiết lộ dữ liệu nội bộ, dữ liệu chưa công khai hoặc dữ liệu của người dùng khác.',
     };
   }
-
+  // chặn câu hỏi ngoài lề 
   if (containsAny(normalized, OUT_OF_SCOPE_PATTERNS)) {
     return {
       blocked: true,

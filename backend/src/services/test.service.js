@@ -77,9 +77,9 @@ class TestService {
     const { title, description, difficulty, duration, publishAt, audioUrl } = data;
     const skill = TestService.normalizeSkill(data);
     const passages = TestService.normalizePassages(data);
-    
+
     // Tutors cannot publish directly. Admin must approve.
-    const isPublished = false; 
+    const isPublished = false;
     const isDraft = !publishAt;
 
     let missingAnswer = false;
@@ -95,11 +95,11 @@ class TestService {
               } catch {
                 // Malformed legacy options are treated as having no manual-answer flag.
               }
-              
+
               // For MCQ single vs multi
               const hasCorrectStr = typeof q.correctAnswer === 'string' && q.correctAnswer.trim() !== '';
               const hasCorrectArr = Array.isArray(q.correctAnswers) && q.correctAnswers.length > 0;
-              
+
               if (requiresManualAnswer || (!hasCorrectStr && !hasCorrectArr)) {
                 missingAnswer = true;
                 break;
@@ -317,7 +317,7 @@ class TestService {
 
     return tests.map(test => {
       const testPassages = passages.filter(p => p.test_id === test.id);
-      
+
       const tasks = testPassages.map(p => {
         let instructionData = {};
         try {
@@ -327,7 +327,7 @@ class TestService {
         } catch {
           // ignore parsing error
         }
-        
+
         return {
           id: p.id,
           task_number: p.passage_number,
@@ -343,7 +343,7 @@ class TestService {
       // format date e.g. "Tháng 6, 2026"
       const dateObj = new Date(test.created_at);
       const dateStr = `Tháng ${dateObj.getMonth() + 1}, ${dateObj.getFullYear()}`;
-      
+
       let difficultyVi = 'Trung bình';
       if (test.difficulty === 'beginner') difficultyVi = 'Dễ';
       if (test.difficulty === 'advanced') difficultyVi = 'Khó';
@@ -367,7 +367,7 @@ class TestService {
     const testRes = await pool.query(`SELECT * FROM mock_tests WHERE id::text = $1 OR id::text = $2`, [id, normalizedId]);
     if (testRes.rows.length === 0) return null;
     const test = testRes.rows[0];
-    
+
     // Parse audio_url for listening tests
     const audioUrl = test.audio_url || null;
 
@@ -428,26 +428,26 @@ class TestService {
 
     const sections = test.skill === 'listening'
       ? passages.map((p, idx) => {
-          // Parse instruction JSONB for listening metadata
-          let metadata;
-          try {
-            metadata = typeof p.instruction === 'string' ? JSON.parse(p.instruction) : (p.instruction || {});
-          } catch {
-            metadata = {};
-          }
-          
-          return {
-            id: p.id,
-            sectionNumber: p.passageNumber,
-            title: p.title,
-            transcript: p.content || '',
-            showTranscript: metadata.show_transcript !== false,
-            startTime: metadata.start_time || null,
-            endTime: metadata.end_time || null,
-            defaultRange: `${idx * 10 + 1}-${idx * 10 + 10}`,
-            blocks: p.blocks
-          };
-        })
+        // Parse instruction JSONB for listening metadata
+        let metadata;
+        try {
+          metadata = typeof p.instruction === 'string' ? JSON.parse(p.instruction) : (p.instruction || {});
+        } catch {
+          metadata = {};
+        }
+
+        return {
+          id: p.id,
+          sectionNumber: p.passageNumber,
+          title: p.title,
+          transcript: p.content || '',
+          showTranscript: metadata.show_transcript !== false,
+          startTime: metadata.start_time || null,
+          endTime: metadata.end_time || null,
+          defaultRange: `${idx * 10 + 1}-${idx * 10 + 10}`,
+          blocks: p.blocks
+        };
+      })
       : undefined;
 
     return {
@@ -499,11 +499,11 @@ class TestService {
     const { title, description, difficulty, duration, publishAt, audioUrl } = data;
     const skill = TestService.normalizeSkill(data);
     const passages = TestService.normalizePassages(data);
-    
+
     // Tutors cannot publish directly. Admin must approve.
     // However, if an admin is updating, we might want to keep it published?
     // For now, any update resets it to pending review unless it's just a draft.
-    const isPublished = false; 
+    const isPublished = false;
 
     let missingAnswer = false;
     for (const passage of passages) {
@@ -518,10 +518,10 @@ class TestService {
               } catch {
                 // Malformed legacy options are treated as having no manual-answer flag.
               }
-              
+
               const hasCorrectStr = typeof q.correctAnswer === 'string' && q.correctAnswer.trim() !== '';
               const hasCorrectArr = Array.isArray(q.correctAnswers) && q.correctAnswers.length > 0;
-              
+
               if (requiresManualAnswer || (!hasCorrectStr && !hasCorrectArr)) {
                 missingAnswer = true;
                 break;
@@ -610,7 +610,7 @@ class TestService {
       }
 
       await client.query('COMMIT');
-      
+
       // Log action for update
       try {
         if (userId) {
@@ -627,7 +627,7 @@ class TestService {
       } catch (err) {
         console.warn('[TestService] Failed to insert audit log for test update:', err.message);
       }
-      
+
     } catch (error) {
       await client.query('ROLLBACK');
       throw error;
@@ -643,7 +643,7 @@ class TestService {
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
-      
+
       // Get test details before deletion for logging
       const res = await client.query('SELECT title, skill FROM mock_tests WHERE id = $1', [testId]);
       if (res.rows.length === 0) {
@@ -653,9 +653,9 @@ class TestService {
 
       // ON DELETE CASCADE will handle child records in test_passages, question_blocks, questions
       await client.query(`DELETE FROM mock_tests WHERE id = $1`, [testId]);
-      
+
       await client.query('COMMIT');
-      
+
       // Log deletion
       try {
         if (userId) {

@@ -95,30 +95,55 @@ const scheduleRetry = (db, input) => one(db,
     input.errorCode, input.errorMessage || null]);
 
 const getCanonicalJobForGroup = (db, { groupId, userId = null }) => one(db,
-  `SELECT root.*,
+  `WITH RECURSIVE retry_chain AS (
+     SELECT job.*, 0 AS retry_depth
+     FROM ai_grading_jobs job
+     WHERE job.group_id = $1 AND job.retry_of_job_id IS NULL AND job.deleted_at IS NULL
+       AND ($2::uuid IS NULL OR job.user_id = $2)
+     UNION ALL
+     SELECT child.*, retry_chain.retry_depth + 1
+     FROM ai_grading_jobs child
+     JOIN retry_chain ON child.retry_of_job_id = retry_chain.id
+     WHERE child.deleted_at IS NULL
+   ), root AS (
+     SELECT * FROM retry_chain WHERE retry_depth = 0
+   ), canonical AS (
+     SELECT * FROM retry_chain
+     ORDER BY retry_depth DESC, created_at DESC
+     LIMIT 1
+   )
+   SELECT root.*,
           root.id AS root_job_id,
-          child.id AS retry_job_id,
-          COALESCE(child.id, root.id) AS canonical_job_id,
-          COALESCE(child.status, root.status) AS canonical_status,
-          COALESCE(child.stage, root.stage) AS canonical_stage,
-          COALESCE(child.attempt_count, root.attempt_count) AS attempt_count,
-          COALESCE(child.max_attempts, root.max_attempts) AS max_attempts,
-          COALESCE(child.last_error_code, root.last_error_code) AS last_error_code,
-          COALESCE(child.last_error_message, root.last_error_message) AS canonical_error_message,
-          COALESCE(child.last_error_retryable, root.last_error_retryable) AS canonical_error_retryable,
-          COALESCE(child.updated_at, root.updated_at) AS canonical_updated_at
-   FROM ai_grading_jobs root
-   LEFT JOIN ai_grading_jobs child ON child.retry_of_job_id = root.id AND child.deleted_at IS NULL
-   WHERE root.group_id = $1 AND root.retry_of_job_id IS NULL AND root.deleted_at IS NULL
-     AND ($2::uuid IS NULL OR root.user_id = $2)
+          CASE WHEN canonical.retry_depth > 0 THEN canonical.id ELSE NULL END AS retry_job_id,
+          canonical.id AS canonical_job_id,
+          canonical.status AS canonical_status,
+          canonical.stage AS canonical_stage,
+          canonical.attempt_count AS attempt_count,
+          canonical.max_attempts AS max_attempts,
+          canonical.last_error_code AS last_error_code,
+          canonical.last_error_message AS canonical_error_message,
+          canonical.last_error_retryable AS canonical_error_retryable,
+          canonical.updated_at AS canonical_updated_at,
+          canonical.retry_depth AS manual_retry_count
+   FROM root CROSS JOIN canonical
    LIMIT 1`,
   [groupId, userId]);
 
-const findRetryChild = (db, rootJobId) => one(db,
-  `SELECT * FROM ai_grading_jobs
-   WHERE retry_of_job_id = $1 LIMIT 1`, [rootJobId]);
+const getRetryChain = async (db, rootJobId) => (await db.query(
+  `WITH RECURSIVE retry_chain AS (
+     SELECT job.*, 0 AS retry_depth
+     FROM ai_grading_jobs job
+     WHERE job.id = $1 AND job.retry_of_job_id IS NULL AND job.deleted_at IS NULL
+     UNION ALL
+     SELECT child.*, retry_chain.retry_depth + 1
+     FROM ai_grading_jobs child
+     JOIN retry_chain ON child.retry_of_job_id = retry_chain.id
+     WHERE child.deleted_at IS NULL
+   )
+   SELECT * FROM retry_chain
+   ORDER BY retry_depth ASC, created_at ASC`, [rootJobId])).rows;
 
-const insertRetryChild = (db, { rootJobId, idempotencyKey, expiresAt }) => one(db,
+const insertRetryChild = (db, { parentJobId, idempotencyKey, expiresAt }) => one(db,
   `INSERT INTO ai_grading_jobs (
      submission_type, group_id, user_id, idempotency_key, idempotency_expires_at,
      input_fingerprint, pipeline_version, scoring_config_sha256,
@@ -127,11 +152,11 @@ const insertRetryChild = (db, { rootJobId, idempotencyKey, expiresAt }) => one(d
    SELECT submission_type, group_id, user_id, $2, $3, input_fingerprint,
           pipeline_version, scoring_config_sha256, calibration_bundle_sha256, id, 1
    FROM ai_grading_jobs
-   WHERE id = $1 AND retry_of_job_id IS NULL AND status = 'failed'
-     AND attempt_count = max_attempts AND last_error_retryable IS TRUE AND deleted_at IS NULL
+    WHERE id = $1 AND status = 'failed'
+      AND deleted_at IS NULL
    ON CONFLICT (retry_of_job_id) WHERE retry_of_job_id IS NOT NULL DO NOTHING
    RETURNING *`,
-  [rootJobId, idempotencyKey, expiresAt]);
+  [parentJobId, idempotencyKey, expiresAt]);
 
 module.exports = {
   lookupJobByIdempotency,
@@ -144,6 +169,6 @@ module.exports = {
   finishJob,
   scheduleRetry,
   getCanonicalJobForGroup,
-  findRetryChild,
+  getRetryChain,
   insertRetryChild,
 };

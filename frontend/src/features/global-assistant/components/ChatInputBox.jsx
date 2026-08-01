@@ -1,17 +1,20 @@
 import { useState } from 'react';
 import { Send } from 'lucide-react';
 
+// Khung nhập tin nhắn chat
 const ChatInputBox = ({ disabled, isLoading, onSend }) => {
   const [value, setValue] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const isBusy = disabled || isLoading || isSubmitting;
 
+  // Xử lý gửi tin nhắn
   const sendCurrentMessage = async () => {
     const message = value.trim();
     if (!message || isBusy) return;
 
     setValue('');
     setIsSubmitting(true);
+    
     try {
       await onSend(message);
     } finally {
@@ -19,11 +22,13 @@ const ChatInputBox = ({ disabled, isLoading, onSend }) => {
     }
   };
 
+  // Lắng nghe sự kiện Submit form (nhấn nút Gửi)
   const handleSubmit = (event) => {
     event.preventDefault();
     sendCurrentMessage();
   };
 
+  // Lắng nghe sự kiện gõ phím Enter (bỏ qua nếu nhấn Shift+Enter hoặc đang gõ dấu tiếng Việt)
   const handleKeyDown = (event) => {
     if (
       event.key === 'Enter' &&

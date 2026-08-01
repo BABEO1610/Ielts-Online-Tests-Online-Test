@@ -1,6 +1,7 @@
 import { BookOpen, Bot } from 'lucide-react';
 import ChatMessageItem from './ChatMessageItem';
 
+// Component hiển thị danh sách các tin nhắn chat, bao gồm tin nhắn trống và trạng thái đang chờ (loading).
 const ChatMessageList = ({ messages, isLoading, onRate, listRef }) => {
   if (messages.length === 0 && !isLoading) {
     return (
@@ -17,6 +18,7 @@ const ChatMessageList = ({ messages, isLoading, onRate, listRef }) => {
       {messages.map((message) => (
         <ChatMessageItem key={message.id} message={message} onRate={onRate} />
       ))}
+      
       {isLoading && (
         <div className="assistant-message assistant-message--assistant">
           <div className="assistant-message__avatar" aria-hidden="true">

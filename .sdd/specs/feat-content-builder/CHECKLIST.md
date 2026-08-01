@@ -8,15 +8,15 @@
 
 - [ ] CHK001 Tạo DB schema `mock_tests`, `test_passages`, `question_blocks`, `questions`.
 - [ ] CHK002 Tạo DB schema `library_resources` và `audit_logs`.
-- [ ] CHK003 Cấu hình Supabase Storage (`supabase.storage.from('ieltszone_library')`).
-- [ ] CHK004 Cài đặt package `multer` và `file-type`.
+- [x] CHK003 Cấu hình Supabase Storage (`supabase.storage.from('ieltszone_library')`).
+- [x] CHK004 Cài đặt package `multer` và `file-type`.
 
 ## 2. Kho Tài nguyên & File (User Story 1)
 
-- [ ] CHK005 `library.service.js:validateFileMagicBytes()` check magic bytes bằng `file-type` (dynamic import). Không chỉ check đuôi file.
-- [ ] CHK006 Multer config giới hạn kích thước file.
-- [ ] CHK007 `library.service.js` MIME_TO_RESOURCE_TYPE whitelist chỉ cho phép pdf, audio, video, image, archive. File ngoài danh sách bị từ chối (HTTP 422).
-- [ ] CHK008 `library.queries.js:createResource()` lưu URL vào bảng `library_resources` với `file_url`, `file_size_bytes`, `resource_type`.
+- [x] CHK005 `library.service.js:validateFileMagicBytes()` check magic bytes bằng `file-type` (dynamic import). Không chỉ check đuôi file.
+- [x] CHK006 Multer config giới hạn kích thước file.
+- [x] CHK007 `library.service.js` MIME_TO_RESOURCE_TYPE whitelist chỉ cho phép pdf, audio, video, image, archive. File ngoài danh sách bị từ chối (HTTP 422).
+- [x] CHK008 `library.queries.js:createResource()` lưu URL vào bảng `library_resources` với `file_url`, `file_size_bytes`, `resource_type`.
 - [ ] CHK009 Frontend `TutorLibraryManagementPage.jsx` hiển thị danh sách file. `TutorLibraryPage.jsx` có filter/search.
 
 ## 3. Khung Đề thi & Cập nhật nội dung (User Story 2)
@@ -40,9 +40,9 @@
 
 ## 6. Bảo mật & Tối ưu (Cross-Cutting)
 
-- [ ] CHK020 `req.user.id` lấy từ `authenticate.js` middleware.
-- [ ] CHK021 `authorize(['tutor', 'admin'])` chặn role khác (HTTP 403).
-- [ ] CHK022 `library.service.js:createResource()` validate magic bytes TRƯỚC khi upload Supabase.
+- [x] CHK020 `req.user.id` lấy từ `authenticate.js` middleware.
+- [x] CHK021 `authorize(['tutor', 'admin'])` chặn role khác (HTTP 403).
+- [x] CHK022 `library.service.js:createResource()` validate magic bytes TRƯỚC khi upload Supabase.
 - [ ] CHK023 Quyết định thiết kế (Ponytail): Ưu tiên sử dụng Hard Delete thay vì Soft Delete hoặc Versioning phức tạp nhằm giữ hệ thống tinh gọn, bảo trì dễ dàng.
 
 ## Notes

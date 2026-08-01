@@ -1,12 +1,12 @@
-# API Contract: Audit Log and Change History
+# Hợp đồng API (API Contract): Audit Log and Change History
 
-All responses follow:
+Tất cả các phản hồi theo cấu trúc:
 
 ```json
 { "success": true, "data": {}, "error": null, "meta": {} }
 ```
 
-Errors follow:
+Các lỗi theo cấu trúc:
 
 ```json
 { "success": false, "data": null, "error": { "message": "..." }, "meta": {} }
@@ -14,15 +14,15 @@ Errors follow:
 
 ## GET `/api/v1/admin/audit-logs`
 
-Auth: admin.
+Xác thực (Auth): admin.
 
-Query:
-- `page` integer, default `1`.
-- `limit` integer, default `20`, max `100`.
-- `severity` optional: `suspicious`.
-- `actor_id`, `action`, `target_table`, `target_id`, `from`, `to`, `search` optional.
+Query (Tham số):
+- `page` số nguyên (integer), mặc định `1`.
+- `limit` số nguyên (integer), mặc định `20`, tối đa `100`.
+- `severity` tuỳ chọn: `suspicious`.
+- `actor_id`, `action`, `target_table`, `target_id`, `from`, `to`, `search` tuỳ chọn.
 
-Response data: array of activity log rows:
+Dữ liệu phản hồi (Response data): mảng (array) các dòng activity log:
 
 ```json
 {
@@ -30,7 +30,6 @@ Response data: array of activity log rows:
   "created_at": "2026-07-24T00:00:00.000Z",
   "actor": "Admin Name",
   "action": "login_failed",
-  "action_label": "Đăng nhập thất bại",
   "target": "user@example.com",
   "ip": "127.0.0.1",
   "severity": "suspicious",
@@ -38,11 +37,13 @@ Response data: array of activity log rows:
 }
 ```
 
+Lưu ý: `action_label` **không** được trả về trong phản hồi này. Frontend sẽ tự ánh xạ (maps) `action` thành một nhãn dễ đọc (human-readable label) bằng helper của chính nó. `action_label` chỉ có trong các endpoint của Change Log.
+
 ## GET `/api/v1/admin/audit-logs/stats`
 
-Auth: admin.
+Xác thực (Auth): admin.
 
-Response data:
+Dữ liệu phản hồi (Response data):
 
 ```json
 { "total": 120, "suspicious": 8, "failed_logins": 5 }
@@ -50,12 +51,12 @@ Response data:
 
 ## GET `/api/v1/admin/change-logs`
 
-Auth: admin.
+Xác thực (Auth): admin.
 
-Query:
+Query (Tham số):
 - `page`, `limit`, `action`, `status`, `search`, `from`, `to`.
 
-Response data: array of change log rows.
+Dữ liệu phản hồi (Response data): mảng các dòng change log.
 
 Meta:
 
@@ -70,20 +71,20 @@ Meta:
 
 ## GET `/api/v1/admin/change-logs/:id`
 
-Auth: admin.
+Xác thực (Auth): admin.
 
-Response data includes `old_value`, `new_value`, `can_undo`, `undone_at`, `undone_by`, and `undo_log_id`.
+Dữ liệu phản hồi bao gồm `old_value`, `new_value`, `can_undo`, `undone_at`, `undone_by`, và `undo_log_id`.
 
 ## POST `/api/v1/admin/change-logs/:id/undo`
 
-Auth: admin.
+Xác thực (Auth): admin.
 
-Behavior:
-- Restore supported `users.role` or `users.status` from source log old value.
-- Reject unsupported, already undone, stale, missing target, or self-targeted changes.
-- Insert `change_reverted` audit log.
+Hành vi (Behavior):
+- Khôi phục `users.role` hoặc `users.status` được hỗ trợ dựa vào giá trị cũ của dòng log gốc (source log old value).
+- Từ chối các thay đổi không hỗ trợ, đã bị undo, dữ liệu đã cũ (stale), không tìm thấy mục tiêu (missing target), hoặc thao tác tự nhắm vào chính mình (self-targeted changes).
+- Chèn (Insert) log audit `change_reverted`.
 
-Success data:
+Dữ liệu thành công (Success data):
 
 ```json
 {

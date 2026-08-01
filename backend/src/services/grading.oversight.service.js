@@ -39,7 +39,29 @@ const GradingOversightService = {
       if (!result) {
         throw new Error(`Writing submission ${id} not found`);
       }
-      // TODO: Trigger AI re-grading queue here (e.g., emit event, call AI service)
+      const { pool } = require('../db/pool');
+      const SubmissionService = require('./submission.service');
+      const tasksRes = await pool.query(
+        `SELECT ws.*, mt.title AS test_title
+         FROM writing_submissions ws
+         LEFT JOIN mock_tests mt ON mt.id = ws.test_id
+         WHERE ws.writing_group_id = $1 OR ws.id = $1`,
+        [id]
+      );
+      if (tasksRes.rows.length > 0) {
+        const persistedTasks = tasksRes.rows;
+        const userId = persistedTasks[0].user_id;
+        const writingGroupId = persistedTasks[0].writing_group_id || persistedTasks[0].id;
+        const testTitle = persistedTasks[0].test_title;
+        const jobRes = await pool.query(`SELECT * FROM ai_grading_jobs WHERE group_id = $1 LIMIT 1`, [writingGroupId]);
+        const writingJob = jobRes.rows[0] || null;
+        
+        process.nextTick(() => {
+          SubmissionService.processWritingTasksAsync(
+            userId, writingGroupId, testTitle, persistedTasks, writingJob, null
+          ).catch(err => console.error('Writing AI regrading failed', err));
+        });
+      }
       return result;
     }
 

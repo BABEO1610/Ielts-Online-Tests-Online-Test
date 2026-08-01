@@ -19,6 +19,11 @@ export async function fetchLibraryResources(paramsOrCategory) {
   return res.data; // { success, data, error, meta }
 }
 
+export async function fetchMyLibraryResources(params = {}) {
+  const res = await api.get(`${BASE}/mine`, { params });
+  return res.data;
+}
+
 /**
  * Lấy danh sách tài liệu với nhiều tham số (search, resource_type, category)
  * Phục vụ cho giao diện học viên (ContentLibraryPage)
@@ -42,12 +47,17 @@ export async function fetchLibraryResourceById(id) {
   return res.data;
 }
 
+export async function fetchMyLibraryResourceById(id) {
+  const res = await api.get(`${BASE}/mine/${id}`);
+  return res.data;
+}
+
 /**
  * Tạo tài liệu mới — gửi multipart/form-data
  * @param {{ title: string, description?: string, category?: string }} fields
  * @param {File} file - file object từ input
  */
-export async function createLibraryResource(fields, file) {
+export async function createLibraryResource(fields, file, onProgress) {
   const formData = new FormData();
   formData.append('title', fields.title);
   if (fields.description) formData.append('description', fields.description);
@@ -55,7 +65,7 @@ export async function createLibraryResource(fields, file) {
   if (file) formData.append('file', file);
 
   const res = await api.post(BASE, formData, {
-    headers: { 'Content-Type': 'multipart/form-data' },
+    onUploadProgress: onProgress,
   });
   return res.data;
 }
@@ -66,7 +76,7 @@ export async function createLibraryResource(fields, file) {
  * @param {{ title: string, description?: string, category?: string }} fields
  * @param {File} [file] - file object từ input (optional)
  */
-export async function updateLibraryResource(id, fields, file) {
+export async function updateLibraryResource(id, fields, file, onProgress) {
   const formData = new FormData();
   if (fields.title) formData.append('title', fields.title);
   if (fields.description) formData.append('description', fields.description);
@@ -74,7 +84,7 @@ export async function updateLibraryResource(id, fields, file) {
   if (file) formData.append('file', file);
 
   const res = await api.put(`${BASE}/${id}`, formData, {
-    headers: { 'Content-Type': 'multipart/form-data' },
+    onUploadProgress: onProgress,
   });
   return res.data;
 }

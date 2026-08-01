@@ -6,7 +6,7 @@
 
 **Status**: Final
 
-**Input**: User description: "Module 5 (Thành viên 5) - Quản trị Nội dung & Tạo đề"
+**Input**: User description: - Quản trị Nội dung & Tạo đề"
 
 ## User Scenarios & Testing *(mandatory)*
 

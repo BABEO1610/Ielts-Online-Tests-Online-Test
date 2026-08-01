@@ -1,6 +1,6 @@
 jest.mock('../../../src/db/queries/aiGradingJobs.queries', () => ({
   lookupJobByIdempotency: jest.fn(),
-  findRetryChild: jest.fn(),
+  getRetryChain: jest.fn(),
   insertRetryChild: jest.fn(),
 }));
 
@@ -35,17 +35,17 @@ const createDb = (root = {
 
 const serviceFor = (pool) => new SpeakingGradingRetryService({
   pool,
-  config: { enabled: true, idempotencyTtlSeconds: 86400 },
+  config: { enabled: true, idempotencyTtlSeconds: 86400, manualRetryLimit: 2 },
   now: () => Date.parse('2026-07-22T00:00:00Z'),
 });
 
 describe('Speaking manual retry state machine', () => {
   beforeEach(() => jest.clearAllMocks());
 
-  test('creates the only manual child after an exhausted retryable root', async () => {
+  test('creates the first manual child after any failed root', async () => {
     const { pool, client } = createDb();
     jobQueries.lookupJobByIdempotency.mockResolvedValue(null);
-    jobQueries.findRetryChild.mockResolvedValue(null);
+    jobQueries.getRetryChain.mockResolvedValue([]);
     jobQueries.insertRetryChild.mockResolvedValue({
       id: CHILD_ID,
       group_id: GROUP_ID,
@@ -59,7 +59,7 @@ describe('Speaking manual retry state machine', () => {
       userId: USER_ID,
       idempotencyKey: IDEMPOTENCY_KEY,
     })).resolves.toMatchObject({ job_id: CHILD_ID, status: 'queued', replayed: false });
-    expect(jobQueries.insertRetryChild).toHaveBeenCalledWith(client, expect.objectContaining({ rootJobId: ROOT_ID }));
+    expect(jobQueries.insertRetryChild).toHaveBeenCalledWith(client, expect.objectContaining({ parentJobId: ROOT_ID }));
     expect(client.query).toHaveBeenCalledWith(expect.stringMatching(/status = 'pending'.*grader = 'ai'/s), [GROUP_ID, USER_ID]);
     expect(client.query).toHaveBeenCalledWith('COMMIT');
   });
@@ -67,7 +67,7 @@ describe('Speaking manual retry state machine', () => {
   test('rolls back the child if all three failed parts cannot be reset atomically', async () => {
     const { pool, client } = createDb(undefined, [{ id: 'part-1' }]);
     jobQueries.lookupJobByIdempotency.mockResolvedValue(null);
-    jobQueries.findRetryChild.mockResolvedValue(null);
+    jobQueries.getRetryChain.mockResolvedValue([]);
     jobQueries.insertRetryChild.mockResolvedValue({ id: CHILD_ID, group_id: GROUP_ID, status: 'queued' });
 
     await expect(serviceFor(pool).retry({
@@ -83,18 +83,55 @@ describe('Speaking manual retry state machine', () => {
     jobQueries.lookupJobByIdempotency.mockResolvedValue({
       id: CHILD_ID,
       group_id: GROUP_ID,
+      user_id: USER_ID,
       retry_of_job_id: ROOT_ID,
       status: 'completed',
       stage: 'finalizing',
       idempotency_expires_at: '2026-07-23T00:00:00Z',
       created_at: '2026-07-22T00:00:00Z',
     });
+    jobQueries.getRetryChain.mockResolvedValue([{
+      id: CHILD_ID, group_id: GROUP_ID, user_id: USER_ID, retry_of_job_id: ROOT_ID,
+    }]);
 
     await expect(serviceFor(pool).retry({
       groupId: GROUP_ID,
       userId: USER_ID,
       idempotencyKey: IDEMPOTENCY_KEY,
     })).resolves.toMatchObject({ job_id: CHILD_ID, status: 'queued', stage: 'queued', replayed: true });
+    expect(jobQueries.insertRetryChild).not.toHaveBeenCalled();
+  });
+
+  test('creates a second manual retry from the failed first retry', async () => {
+    const { pool } = createDb();
+    jobQueries.lookupJobByIdempotency.mockResolvedValue(null);
+    jobQueries.getRetryChain.mockResolvedValue([{
+      id: CHILD_ID, group_id: GROUP_ID, user_id: USER_ID, retry_of_job_id: ROOT_ID, status: 'failed',
+    }]);
+    jobQueries.insertRetryChild.mockResolvedValue({
+      id: '55555555-5555-4555-8555-555555555555', group_id: GROUP_ID,
+      status: 'queued', stage: 'queued', created_at: '2026-07-22T00:00:00Z',
+    });
+
+    await expect(serviceFor(pool).retry({
+      groupId: GROUP_ID, userId: USER_ID, idempotencyKey: 'retry-request-key-0002',
+    })).resolves.toMatchObject({ status: 'queued', replayed: false });
+    expect(jobQueries.insertRetryChild).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+      parentJobId: CHILD_ID,
+    }));
+  });
+
+  test('stops after two manual retry jobs', async () => {
+    const { pool } = createDb();
+    jobQueries.lookupJobByIdempotency.mockResolvedValue(null);
+    jobQueries.getRetryChain.mockResolvedValue([
+      { id: CHILD_ID, group_id: GROUP_ID, user_id: USER_ID, retry_of_job_id: ROOT_ID, status: 'failed' },
+      { id: '55555555-5555-4555-8555-555555555555', group_id: GROUP_ID, user_id: USER_ID, retry_of_job_id: CHILD_ID, status: 'failed' },
+    ]);
+
+    await expect(serviceFor(pool).retry({
+      groupId: GROUP_ID, userId: USER_ID, idempotencyKey: 'retry-request-key-0003',
+    })).rejects.toMatchObject({ statusCode: 409, errorCode: 'RETRY_LIMIT_REACHED' });
     expect(jobQueries.insertRetryChild).not.toHaveBeenCalled();
   });
 

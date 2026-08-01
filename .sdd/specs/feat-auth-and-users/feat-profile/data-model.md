@@ -1,66 +1,66 @@
-# Data Model: User Profile
+# Mô hình Dữ liệu (Data Model): User Profile
 
-## Profile
+## Hồ sơ (Profile)
 
-Backed by `users`.
+Dựa trên bảng `users`.
 
-Fields shown:
+Các trường được hiển thị (Fields shown):
 - `id`, `email`, `full_name`, `avatar_url`.
 - `role`, `status`.
 - `target_band_score`, `target_test_date`.
 - `created_at`, `last_login_at`.
 
-Sensitive fields excluded:
+Các trường nhạy cảm bị loại trừ (Sensitive fields excluded):
 - `password_hash`.
 - token/session secrets.
-- reset/verification token data.
+- dữ liệu về reset/verification token.
 
-Validation:
-- User must be authenticated.
-- Account must exist.
-- Profile update accepts `full_name`, `avatar_url`, `target_band_score`, `target_test_date`.
+Xác thực (Validation):
+- User phải được đăng nhập (authenticated).
+- Tài khoản (Account) phải tồn tại.
+- Cập nhật hồ sơ chấp nhận `full_name`, `avatar_url`, `target_band_score`, `target_test_date`.
 
-## Learning Goal
+## Mục tiêu Học tập (Learning Goal)
 
-Stored on `users`.
+Lưu trữ trên bảng `users`.
 
-Fields:
-- `target_band_score` numeric nullable, 0.0 to 9.0, increments of 0.5.
-- `target_test_date` date nullable.
+Các trường:
+- `target_band_score` số (numeric) có thể null, từ 0.0 đến 9.0, bước nhảy 0.5.
+- `target_test_date` ngày (date) có thể null.
 
-State:
-- Unset -> set during onboarding or profile edit.
-- Set -> updated.
-- Set -> cleared by sending null date where supported.
+Trạng thái (State):
+- Unset (chưa thiết lập) -> set trong quá trình onboarding hoặc sửa hồ sơ.
+- Set -> updated (được cập nhật).
+- Set -> cleared (bị xóa) bằng cách gửi giá trị null cho ngày nếu được hỗ trợ.
 
-## Avatar Image
+## Ảnh Đại diện (Avatar Image)
 
-Fields:
-- Uploaded file: `avatar` multipart field.
-- Returned data: `avatar_url`.
+Các trường:
+- File tải lên (Uploaded file): trường multipart `avatar`.
+- Dữ liệu trả về (Returned data): `avatar_url`.
 
-Validation:
-- MIME type must be supported image type.
-- File size must not exceed 5 MB in frontend and backend policy.
+Xác thực:
+- MIME type phải là định dạng hình ảnh được hỗ trợ.
+- Kích thước file không được vượt quá 5 MB theo chính sách của frontend và backend.
 
-## Security Setting
+## Cài đặt Bảo mật (Security Setting)
 
-Derived from account auth state.
+Được suy ra từ trạng thái xác thực (auth state) của tài khoản.
 
-Fields:
-- `has_local_password`: inferred from nullable `password_hash`.
-- Password change payload uses old/new password.
+Các trường:
+- `has_local_password`: suy ra từ `password_hash` (có thể null).
+- Payload đổi mật khẩu (Password change payload) sử dụng mật khẩu cũ/mới.
 
-Rules:
-- Local-password users must provide correct current password.
-- Google-only users receive guidance to reset password by email.
+Quy tắc (Rules):
+- Người dùng có local-password phải cung cấp mật khẩu hiện tại chính xác.
+- Người dùng chỉ dùng Google (Google-only users) sẽ nhận được hướng dẫn đổi mật khẩu qua email.
 
-## Support Request History
+## Lịch sử Yêu cầu Hỗ trợ (Support Request History)
 
-Backed by support/contact query layer.
+Dựa trên truy vấn của tính năng hỗ trợ/liên hệ (support/contact query layer).
 
-Fields:
+Các trường:
 - Request id, subject/content, status, created timestamp.
-- Admin notes or reply message where available.
+- Ghi chú của Admin (Admin notes) hoặc nội dung trả lời (reply message) nếu có.
 
-Rule: empty history renders an empty state, not an error.
+Quy tắc: nếu lịch sử trống thì hiển thị trạng thái rỗng (empty state) thay vì trả về lỗi.

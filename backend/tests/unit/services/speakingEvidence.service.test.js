@@ -45,6 +45,9 @@ describe('SpeakingEvidenceService', () => {
     expect(result.status).toBe('partial');
     expect(result.asrTranscript).toBe('I goed home');
     expect(result.displayTranscript).toBe('I goed home');
+    expect(artifacts.getReusableArtifact).toHaveBeenCalledWith(pool, expect.objectContaining({
+      sourceJobId: 'job-1',
+    }));
     expect(artifacts.finalizeArtifact).toHaveBeenCalledWith(pool, expect.objectContaining({ status: 'partial' }));
     const [leaseSql] = pool.query.mock.calls[0];
     expect(leaseSql).toMatch(/job\.group_id = submission\.speaking_group_id/i);

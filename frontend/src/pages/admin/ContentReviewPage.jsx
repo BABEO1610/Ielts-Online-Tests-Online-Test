@@ -7,6 +7,12 @@ import { formatDateTime, formatBytes } from '../../utils/adminFormat';
 import TestPreviewModal from '../../components/admin/TestPreviewModal';
 import ResourcePreviewModal from '../../components/admin/ResourcePreviewModal';
 
+function daysUntil(iso) {
+  const diff = new Date(iso) - new Date();
+  const days = Math.ceil(diff / 86400000);
+  return days <= 0 ? 'Hôm nay' : `${days} ngày`;
+}
+
 const TABS = [
   { key: 'tests', label: 'Đề thi chờ duyệt' },
   { key: 'resources', label: 'Tài liệu chờ duyệt' },
@@ -26,10 +32,21 @@ const ContentReviewPage = () => {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const [t, r, s] = await Promise.all([fetchPendingTests(), fetchPendingResources(), fetchPublishSchedule()]);
-    setTests(t.data); setResources(r.data); setSchedule(s.data);
-    setIsSample(t.isSample || r.isSample || s.isSample);
-    setLoading(false);
+    try {
+      const [t, r, s] = await Promise.all([
+        fetchPendingTests(),
+        fetchPendingResources(),
+        fetchPublishSchedule(),
+      ]);
+      setTests(t.data ?? []);
+      setResources(r.data ?? []);
+      setSchedule(s.data ?? []);
+      setIsSample(t.isSample || r.isSample || s.isSample);
+    } catch (err) {
+      setActionError('Không thể tải dữ liệu. Vui lòng thử lại.');
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => { load(); }, [load]);
@@ -178,10 +195,6 @@ const ContentReviewPage = () => {
   );
 };
 
-function daysUntil(iso) {
-  const diff = new Date(iso) - new Date();
-  const days = Math.ceil(diff / 86400000);
-  return days <= 0 ? 'Hôm nay' : `${days} ngày`;
-}
+
 
 export default ContentReviewPage;

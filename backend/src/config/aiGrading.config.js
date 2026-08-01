@@ -108,6 +108,7 @@ const freezeConfig = (env, value) => Object.freeze({
   calibrationPublicKey: env.AI_CALIBRATION_PUBLIC_KEY || null,
   calibrationSignature: env.AI_CALIBRATION_SIGNATURE || null,
   idempotencyTtlSeconds: int(env.AI_IDEMPOTENCY_TTL_SECONDS, 86400, 'AI_IDEMPOTENCY_TTL_SECONDS'),
+  manualRetryLimit: int(env.AI_SPEAKING_MANUAL_RETRY_LIMIT, 2, 'AI_SPEAKING_MANUAL_RETRY_LIMIT'),
   dailyQuota: int(env.AI_DAILY_GRADING_QUOTA, 10, 'AI_DAILY_GRADING_QUOTA'),
   workerLeaseSeconds: int(env.AI_WORKER_LEASE_SECONDS, 120, 'AI_WORKER_LEASE_SECONDS'),
   workerPollMs: int(env.AI_WORKER_POLL_MS, 1000, 'AI_WORKER_POLL_MS'),

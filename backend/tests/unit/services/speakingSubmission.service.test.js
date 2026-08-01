@@ -24,6 +24,7 @@ const config = {
   scoringConfigSha256: 'b'.repeat(64),
   calibrationBundleSha256: null,
   idempotencyTtlSeconds: 86400,
+  manualRetryLimit: 2,
   dailyQuota: 10,
   storage: { provider: 'fake', signedUploadTtlSeconds: 300 },
   uploadToken: { activeKid: 'k1', keyring: { k1: KEY }, ttlSeconds: 300 },
@@ -223,5 +224,48 @@ describe('SpeakingSubmissionService', () => {
       idempotencyKey: 'submission-key-replay',
     })).resolves.toMatchObject({ status: 'queued', stage: 'queued', replayed: true });
     expect(pool.connect).not.toHaveBeenCalled();
+  });
+
+  test('offers the second recovery retry only after a failed first retry', async () => {
+    const pool = {
+      query: jest.fn(async (sql) => {
+        if (/MIN\(user_id::text\)/i.test(sql)) return { rows: [{ owner_id: USER_ID, assigned_to_tutor: false }] };
+        if (/WITH RECURSIVE retry_chain/i.test(sql)) {
+          return { rows: [{
+            root_job_id: 'root-job', canonical_job_id: 'retry-job-1', retry_job_id: 'retry-job-1',
+            canonical_status: 'failed', canonical_stage: 'analyzing', attempt_count: 1,
+            max_attempts: 1, manual_retry_count: 1, canonical_updated_at: '2026-07-22T00:00:00Z',
+          }] };
+        }
+        return { rows: [] };
+      }),
+    };
+    const service = new SpeakingSubmissionService({ pool, config });
+    await expect(service.getStatus('55555555-5555-4555-8555-555555555555', {
+      id: USER_ID, role: 'student',
+    })).resolves.toMatchObject({
+      status: 'failed', can_retry: true, manual_retry_count: 1, manual_retry_limit: 2,
+    });
+  });
+
+  test('never offers retry after a successful first attempt', async () => {
+    const pool = {
+      query: jest.fn(async (sql) => {
+        if (/MIN\(user_id::text\)/i.test(sql)) return { rows: [{ owner_id: USER_ID, assigned_to_tutor: false }] };
+        if (/WITH RECURSIVE retry_chain/i.test(sql)) {
+          return { rows: [{
+            root_job_id: 'root-job', canonical_job_id: 'root-job', retry_job_id: null,
+            canonical_status: 'completed', canonical_stage: 'finalizing', attempt_count: 1,
+            max_attempts: 2, manual_retry_count: 0, canonical_updated_at: '2026-07-22T00:00:00Z',
+          }] };
+        }
+        if (/FROM ai_grading_reports/i.test(sql)) return { rows: [] };
+        return { rows: [] };
+      }),
+    };
+    const service = new SpeakingSubmissionService({ pool, config });
+    await expect(service.getStatus('55555555-5555-4555-8555-555555555555', {
+      id: USER_ID, role: 'student',
+    })).resolves.toMatchObject({ status: 'completed', can_retry: false, manual_retry_count: 0 });
   });
 });

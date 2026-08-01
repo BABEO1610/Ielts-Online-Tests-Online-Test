@@ -12,6 +12,18 @@ describe('migration runner', () => {
     fs.writeFileSync(path.join(dir, 'README.md'), 'ignore');
     expect(migrationFiles(dir)).toEqual(['001_a.sql', '002_b.sql']);
     expect(checksum('SELECT 1;')).toMatch(/^[0-9a-f]{64}$/);
+    expect(checksum('SELECT 1;\n')).toBe(checksum('SELECT 1;\r\n'));
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+
+  test('accepts a historical CRLF checksum for otherwise identical SQL', async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'migrations-'));
+    const sql = 'SELECT 1;\r\n';
+    fs.writeFileSync(path.join(dir, '001.sql'), sql);
+    const historicalCrlfChecksum = require('node:crypto').createHash('sha256').update(sql).digest('hex');
+    const client = { query: jest.fn() };
+    await expect(applyFile(client, dir, '001.sql', historicalCrlfChecksum)).resolves.toBe(false);
+    expect(client.query).not.toHaveBeenCalled();
     fs.rmSync(dir, { recursive: true, force: true });
   });
 

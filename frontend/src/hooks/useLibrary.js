@@ -16,6 +16,8 @@ const useLibrary = () => {
       if (filters.page) params.append('page', filters.page);
       if (filters.limit) params.append('limit', filters.limit);
       if (filters.resource_type) params.append('resource_type', filters.resource_type);
+      if (filters.category) params.append('category', filters.category);
+      if (filters.search) params.append('search', filters.search);
       
       const response = await api.get(`/library?${params.toString()}`);
       return response.data;
@@ -73,7 +75,7 @@ const useLibrary = () => {
     setLoading(true);
     clearError();
     try {
-      const response = await api.patch(`/library/${id}`, data);
+      const response = await api.put(`/library/${id}`, data);
       return response.data;
     } catch (err) {
       setError(err.response?.data?.error || { message: 'Lỗi cập nhật tài liệu' });

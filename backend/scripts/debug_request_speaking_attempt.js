@@ -10,7 +10,6 @@ async function main() {
     sub: '00000000-0000-4000-8000-000000000001',
     role: 'student',
     session_token: 'debug-session-token',
-    must_change_password: false,
   });
 
   const response = await request(app)

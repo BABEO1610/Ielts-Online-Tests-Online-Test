@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import api from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
+import { usePasswordToggle } from '../../hooks/usePasswordToggle';
 
 const ChangePwdModal = ({ isOpen, onClose }) => {
   const { user } = useAuth();
@@ -11,6 +12,9 @@ const ChangePwdModal = ({ isOpen, onClose }) => {
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
+  const [oldPwdType, oldPwdVisible, toggleOld] = usePasswordToggle();
+  const [newPwdType, newPwdVisible, toggleNew] = usePasswordToggle();
+  const [confirmType, confirmVisible, toggleConfirm] = usePasswordToggle();
 
   if (!isOpen) return null;
 
@@ -126,34 +130,68 @@ const ChangePwdModal = ({ isOpen, onClose }) => {
                   <form onSubmit={handleSubmit} noValidate>
                     <div className="mb-3">
                       <label className="form-label fw-medium text-dark">Mật khẩu hiện tại</label>
-                      <input
-                        type="password"
-                        className="form-control form-control-lg rounded-3 bg-light border-0"
-                        placeholder="Nhập mật khẩu hiện tại"
-                        value={oldPassword}
-                        onChange={(e) => {
-                          setOldPassword(e.target.value);
-                          setErrorMsg('');
-                        }}
-                        required
-                        disabled={successMsg !== ''}
-                      />
+                      <div style={{ position: 'relative' }}>
+                        <input
+                          type={oldPwdType}
+                          className="form-control form-control-lg rounded-3 bg-light border-0"
+                          placeholder="Nhập mật khẩu hiện tại"
+                          value={oldPassword}
+                          onChange={(e) => {
+                            setOldPassword(e.target.value);
+                            setErrorMsg('');
+                          }}
+                          style={{ paddingRight: '2.5rem' }}
+                          required
+                          disabled={successMsg !== ''}
+                        />
+                        <button
+                          type="button"
+                          onClick={toggleOld}
+                          aria-label={oldPwdVisible ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+                          disabled={successMsg !== ''}
+                          style={{
+                            position: 'absolute', right: '12px', top: '50%',
+                            transform: 'translateY(-50%)',
+                            background: 'none', border: 'none', cursor: 'pointer',
+                            color: '#6c757d', padding: '0 2px', lineHeight: 1
+                          }}
+                        >
+                          <i className={`bi bi-eye${oldPwdVisible ? '-slash' : ''}`} />
+                        </button>
+                      </div>
                     </div>
 
                     <div className="mb-3">
                       <label className="form-label fw-medium text-dark">Mật khẩu mới</label>
-                      <input
-                        type="password"
-                        className={`form-control form-control-lg rounded-3 bg-light border-0 ${!isPasswordStrong ? 'is-invalid' : ''}`}
-                        placeholder="Tối thiểu 8 ký tự"
-                        value={newPassword}
-                        onChange={(e) => {
-                          setNewPassword(e.target.value);
-                          setErrorMsg('');
-                        }}
-                        required
-                        disabled={successMsg !== ''}
-                      />
+                      <div style={{ position: 'relative' }}>
+                        <input
+                          type={newPwdType}
+                          className={`form-control form-control-lg rounded-3 bg-light border-0 ${!isPasswordStrong ? 'is-invalid' : ''}`}
+                          placeholder="Tối thiểu 8 ký tự"
+                          value={newPassword}
+                          onChange={(e) => {
+                            setNewPassword(e.target.value);
+                            setErrorMsg('');
+                          }}
+                          style={{ paddingRight: '2.5rem' }}
+                          required
+                          disabled={successMsg !== ''}
+                        />
+                        <button
+                          type="button"
+                          onClick={toggleNew}
+                          aria-label={newPwdVisible ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+                          disabled={successMsg !== ''}
+                          style={{
+                            position: 'absolute', right: '12px', top: !isPasswordStrong ? 'calc(50% - 10px)' : '50%',
+                            transform: 'translateY(-50%)',
+                            background: 'none', border: 'none', cursor: 'pointer',
+                            color: '#6c757d', padding: '0 2px', lineHeight: 1
+                          }}
+                        >
+                          <i className={`bi bi-eye${newPwdVisible ? '-slash' : ''}`} />
+                        </button>
+                      </div>
                       {!isPasswordStrong && (
                         <div className="invalid-feedback fw-medium">
                           Mật khẩu phải có ít nhất 8 ký tự.
@@ -163,18 +201,35 @@ const ChangePwdModal = ({ isOpen, onClose }) => {
 
                     <div className="mb-4">
                       <label className="form-label fw-medium text-dark">Xác nhận mật khẩu mới</label>
-                      <input
-                        type="password"
-                        className={`form-control form-control-lg rounded-3 bg-light border-0 ${!isPasswordMatch ? 'is-invalid' : ''}`}
-                        placeholder="Nhập lại mật khẩu mới"
-                        value={confirmPassword}
-                        onChange={(e) => {
-                          setConfirmPassword(e.target.value);
-                          setErrorMsg('');
-                        }}
-                        required
-                        disabled={successMsg !== ''}
-                      />
+                      <div style={{ position: 'relative' }}>
+                        <input
+                          type={confirmType}
+                          className={`form-control form-control-lg rounded-3 bg-light border-0 ${!isPasswordMatch ? 'is-invalid' : ''}`}
+                          placeholder="Nhập lại mật khẩu mới"
+                          value={confirmPassword}
+                          onChange={(e) => {
+                            setConfirmPassword(e.target.value);
+                            setErrorMsg('');
+                          }}
+                          style={{ paddingRight: '2.5rem' }}
+                          required
+                          disabled={successMsg !== ''}
+                        />
+                        <button
+                          type="button"
+                          onClick={toggleConfirm}
+                          aria-label={confirmVisible ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+                          disabled={successMsg !== ''}
+                          style={{
+                            position: 'absolute', right: '12px', top: !isPasswordMatch ? 'calc(50% - 10px)' : '50%',
+                            transform: 'translateY(-50%)',
+                            background: 'none', border: 'none', cursor: 'pointer',
+                            color: '#6c757d', padding: '0 2px', lineHeight: 1
+                          }}
+                        >
+                          <i className={`bi bi-eye${confirmVisible ? '-slash' : ''}`} />
+                        </button>
+                      </div>
                       {!isPasswordMatch && (
                         <div className="invalid-feedback fw-medium">
                           Mật khẩu xác nhận không khớp.

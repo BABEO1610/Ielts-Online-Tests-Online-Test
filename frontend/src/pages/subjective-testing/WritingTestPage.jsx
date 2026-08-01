@@ -45,7 +45,7 @@ const WritingSubmitModal = ({ isOpen, isTimeUp, onConfirm, onCancel, isSubmittin
                   <p className="text-muted mb-4">Bạn có chắc chắn muốn nộp bài? Vui lòng chọn người chấm điểm.</p>
                 </>
               )}
-              
+
               <div className="d-flex flex-column gap-3 mb-4 text-start">
                 <label className={`p-3 rounded-3 border ${grader === 'ai' ? 'border-dark bg-light' : ''}`} style={{ cursor: 'pointer' }}>
                   <div className="form-check mb-0">
@@ -159,17 +159,17 @@ const WritingTestScreen = ({ exam, onSubmitSuccess, practiceMode, customTimeLimi
 
   return (
     <div className="bg-white" style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' }}>
-      <TimerBar 
-        durationMinutes={durationMinutes} 
-        customTimeLimit={customTimeLimit} 
-        onTimeUp={handleTimeUp} 
-        onSubmitEarly={handleSubmitEarly} 
-        practiceMode={practiceMode} 
-        hideReviewButton={true} 
+      <TimerBar
+        durationMinutes={durationMinutes}
+        customTimeLimit={customTimeLimit}
+        onTimeUp={handleTimeUp}
+        onSubmitEarly={handleSubmitEarly}
+        practiceMode={practiceMode}
+        hideReviewButton={true}
         submitDisabled={isSubmitDisabled}
         submitTitle={isSubmitting ? 'Đang nộp...' : (isSubmitDisabled ? 'Hoàn thành Task 1 & 2' : 'Nộp bài')}
       />
-      
+
       <div className="split-view" style={{ flex: 1, height: 'calc(100vh - 60px)', paddingBottom: '70px' }}>
         {/* Left Panel: Prompt */}
         <div className="split-left" style={{ backgroundColor: '#f9f9f9', overflowY: 'auto' }}>
@@ -204,7 +204,7 @@ const WritingTestScreen = ({ exam, onSubmitSuccess, practiceMode, customTimeLimi
           {activeTask.hint && (
             <div className="p-3 rounded-3" style={{ backgroundColor: '#e2e2e2', borderLeft: '3px solid #000' }}>
               <p className="mb-0 fw-medium text-dark" style={{ fontSize: '14px', fontFamily: 'UberMoveText, system-ui, sans-serif' }}>
-                💡 {activeTask.hint}
+                {activeTask.hint}
               </p>
             </div>
           )}
@@ -243,7 +243,7 @@ const WritingTestScreen = ({ exam, onSubmitSuccess, practiceMode, customTimeLimi
           {exam.tasks.map((task, idx) => {
             const isActive = activeTaskIndex === idx;
             return (
-              <div 
+              <div
                 key={task.id}
                 className={`bottom-nav-tab ${isActive ? 'active' : ''}`}
                 style={{ minWidth: '150px', justifyContent: 'center' }}
@@ -259,12 +259,12 @@ const WritingTestScreen = ({ exam, onSubmitSuccess, practiceMode, customTimeLimi
         </div>
       </div>
 
-      <WritingSubmitModal 
-        isOpen={showSubmitModal} 
-        isTimeUp={isTimeUp} 
-        onConfirm={submitAllTasks} 
-        onCancel={() => setShowSubmitModal(false)} 
-        isSubmitting={isSubmitting} 
+      <WritingSubmitModal
+        isOpen={showSubmitModal}
+        isTimeUp={isTimeUp}
+        onConfirm={submitAllTasks}
+        onCancel={() => setShowSubmitModal(false)}
+        isSubmitting={isSubmitting}
       />
     </div>
   );

@@ -85,7 +85,7 @@ Với tư cách là khách, tôi muốn đăng nhập bằng Google để có th
 
 ### Yêu cầu chức năng
 
-- **FR-001**: Hệ thống PHẢI cho phép khách đăng ký với họ tên, email hợp lệ, mật khẩu và xác nhận mật khẩu.
+- **FR-001**: Hệ thống PHẢI cho phép khách đăng ký với họ tên, địa chỉ email hợp lệ (bất kỳ domain nào), mật khẩu tối thiểu 8 ký tự và xác nhận mật khẩu.
 - **FR-002**: Hệ thống PHẢI yêu cầu tài khoản email/mật khẩu mới xác thực email trước khi truy cập các quyền xác thực bình thường.
 - **FR-003**: Hệ thống PHẢI thông báo rõ ràng khi người dùng đăng ký bằng email đã tồn tại. Việc ngăn chặn dò tìm tài khoản (Enumeration) bằng thông báo chung chung CHỈ áp dụng cho chức năng khôi phục mật khẩu.
 - **FR-004**: Hệ thống PHẢI cho phép người dùng đang hoạt động (active) đăng nhập bằng email và mật khẩu.
@@ -101,6 +101,7 @@ Với tư cách là khách, tôi muốn đăng nhập bằng Google để có th
 - **FR-014**: Hệ thống PHẢI cho phép người dùng đã đăng nhập (có mật khẩu cục bộ) đổi mật khẩu sau khi xác nhận mật khẩu hiện tại.
 - **FR-015**: Hệ thống PHẢI hỗ trợ đăng nhập bằng Google để tạo hoặc truy cập tài khoản, bao gồm xử lý lỗi rõ ràng khi xác thực phía nhà cung cấp thất bại.
 - **FR-016**: Hệ thống KHÔNG BAO GIỜ được lộ mật khẩu, mã khôi phục, hay mã bí mật phiên (session secrets) trong bất kỳ phản hồi nào tới người dùng.
+- **FR-017**: Hệ thống PHẢI cung cấp tính năng bật/tắt hiển thị mật khẩu (show/hide password toggle) tại tất cả các ô nhập mật khẩu trên giao diện để cải thiện trải nghiệm người dùng.
 
 ### Các thực thể chính (Key Entities)
 
@@ -127,6 +128,7 @@ Với tư cách là khách, tôi muốn đăng nhập bằng Google để có th
 ## Giả định
 
 - Người dùng có quyền truy cập vào hộp thư email liên kết với tài khoản của họ để xác thực và khôi phục mật khẩu.
+- Hệ thống chấp nhận bất kỳ địa chỉ email hợp lệ nào theo chuẩn RFC (không giới hạn domain cụ thể).
 - Đăng nhập bằng Email/mật khẩu vẫn là đường dẫn xác thực chính; Đăng nhập Google là một phương thức tiện ích bổ sung.
 - Vai trò do nền tảng ấn định và quyết định workspace (trang đích) sau khi đăng nhập.
 - Thời lượng phiên và thời lượng khóa tài khoản tuân theo chính sách bảo mật đã triển khai trong ứng dụng web.
