@@ -40,6 +40,27 @@ function TutorReadingFormPage({ testId }) {
     { id: 3, title: '', content: '', instruction: 'Read the passage below and answer Questions 27–40.', defaultRange: '27–40', blocks: [] }
   ]);
 
+  /** Map mọi biến thể type từ DB sang canonical QUESTION_TYPES value */
+  const normalizeBlockType = (rawType) => {
+    if (!rawType) return '';
+    const t = rawType.toLowerCase().replace(/[\s\-\/]/g, '_');
+    if (['multiple_choice', 'multiplechoice', 'mcq', 'multiple_choice_single'].includes(t)) return 'MULTIPLE_CHOICE_SINGLE';
+    if (['multiple_choice_multiple', 'multiple_choice_multi', 'mcq_multi', 'multiple_choice_multipleanswer'].includes(t)) return 'MULTIPLE_CHOICE_MULTI';
+    if (['true_false', 'true_false_not_given', 'true_false_ng', 'truefalse'].includes(t)) return 'TRUE_FALSE_NOT_GIVEN';
+    if (['yes_no', 'yes_no_not_given', 'yes_no_ng', 'yesno'].includes(t)) return 'YES_NO_NOT_GIVEN';
+    if (['sentence_completion', 'sentencecompletion'].includes(t)) return 'SENTENCE_COMPLETION';
+    if (['summary_completion', 'summarycompletion'].includes(t)) return 'SUMMARY_COMPLETION';
+    if (['note_completion', 'notes_completion', 'note_table_flowchart_completion', 'notecompletion', 'note_table_flow_chart_completion'].includes(t)) return 'NOTE_COMPLETION';
+    if (['matching_headings', 'matchingheadings'].includes(t)) return 'MATCHING_HEADINGS';
+    if (['matching_information', 'matchinginformation'].includes(t)) return 'MATCHING_INFORMATION';
+    if (['matching_features', 'matchingfeatures'].includes(t)) return 'MATCHING_FEATURES';
+    if (['matching_sentence_endings', 'matchingsentenceendings'].includes(t)) return 'MATCHING_SENTENCE_ENDINGS';
+    if (['short_answer', 'short_answer_questions', 'shortanswer', 'short_answer_questions'].includes(t)) return 'SHORT_ANSWER_QUESTIONS';
+    // Nếu đã là canonical type (tất cả chữ hoa, có trong list) thì trả về nguyên
+    if (QUESTION_TYPES.includes(rawType)) return rawType;
+    return rawType; // fallback: giữ nguyên để user chọn lại
+  };
+
   /**
    * Normalize a block fetched from DB (getTestById response) into the shape
    * that editors (MultipleChoiceEditor, MatchingEditor, etc.) expect.
@@ -49,10 +70,12 @@ function TutorReadingFormPage({ testId }) {
    */
   const normalizeBlockFromDB = (block) => {
     const blockId = Date.now() + Math.random();
+    // Chuẩn hóa type từ DB (legacy/snake_case) sang canonical QUESTION_TYPES value
+    const normalizedType = normalizeBlockType(block.type);
 
     // ── Multiple Choice (Legacy & Smart) ────────────────────────────────────
     // Per-question options stored in q.options as JSONB
-    if (['Multiple Choice', 'MULTIPLE_CHOICE_SINGLE', 'MULTIPLE_CHOICE_MULTI'].includes(block.type)) {
+    if (['MULTIPLE_CHOICE_SINGLE', 'MULTIPLE_CHOICE_MULTI'].includes(normalizedType)) {
       const questions = (block.questions || []).map((q, qi) => {
         // options: [{label:'A',text:'...'}, ...] or [{id,text},...] or [string,...]
         let rawOpts = q.options;
@@ -83,7 +106,7 @@ function TutorReadingFormPage({ testId }) {
         const correctAnswerIds = rawCA.map(ca => {
           const caStr = String(ca);
           // For smart mode, correctAnswers usually stores the label (e.g. "A", "B") directly.
-          if (['MULTIPLE_CHOICE_SINGLE', 'MULTIPLE_CHOICE_MULTI'].includes(block.type)) {
+          if (['MULTIPLE_CHOICE_SINGLE', 'MULTIPLE_CHOICE_MULTI'].includes(normalizedType)) {
              return caStr;
           }
           const match = normalizedOpts.find(o => o.text === caStr || String.fromCharCode(65 + normalizedOpts.indexOf(o)) === caStr || o.label === caStr);
@@ -95,15 +118,15 @@ function TutorReadingFormPage({ testId }) {
           id: Date.now() + qi * 100,
           text: q.text || '',
           explanation: q.explanation || '',
-          options: ['MULTIPLE_CHOICE_SINGLE', 'MULTIPLE_CHOICE_MULTI'].includes(block.type) ? smartOptionsObj : normalizedOpts,
+          options: ['MULTIPLE_CHOICE_SINGLE', 'MULTIPLE_CHOICE_MULTI'].includes(normalizedType) ? smartOptionsObj : normalizedOpts,
           correctAnswers: correctAnswerIds,
         };
       });
-      return { id: blockId, type: block.type, range: block.range || '', content: block.content || '', questions };
+      return { id: blockId, type: normalizedType, range: block.range || '', content: block.content || '', questions };
     }
 
     // ── TRUE_FALSE_NOT_GIVEN & YES_NO_NOT_GIVEN ─────────────────────────────
-    if (['TRUE_FALSE_NOT_GIVEN', 'YES_NO_NOT_GIVEN'].includes(block.type)) {
+    if (['TRUE_FALSE_NOT_GIVEN', 'YES_NO_NOT_GIVEN'].includes(normalizedType)) {
 
       const questions = (block.questions || []).map((q, qi) => {
         let rawOpts = q.options;
@@ -117,11 +140,11 @@ function TutorReadingFormPage({ testId }) {
           options: rawOpts || {},
         };
       });
-      return { id: blockId, type: block.type, range: block.range || '', content: block.content || '', questions };
+      return { id: blockId, type: normalizedType, range: block.range || '', content: block.content || '', questions };
     }
 
     // ── Matching types ───────────────────────────────────────────────────────
-    if (['Matching Headings', 'Matching Information', 'Matching Features', 'Matching Sentence Endings'].includes(block.type)) {
+    if (['MATCHING_HEADINGS', 'MATCHING_INFORMATION', 'MATCHING_FEATURES', 'MATCHING_SENTENCE_ENDINGS'].includes(normalizedType)) {
       // Block-level options pool: stored in first question's options JSONB, or block.options
       let rawOpts = block.options || (block.questions?.[0]?.options) || [];
       if (typeof rawOpts === 'string') { try { rawOpts = JSON.parse(rawOpts); } catch { rawOpts = []; } }
@@ -147,7 +170,7 @@ function TutorReadingFormPage({ testId }) {
         };
       });
 
-      return { id: blockId, type: block.type, range: block.range || '', content: block.content || '', options: normalizedOpts, questions };
+      return { id: blockId, type: normalizedType, range: block.range || '', content: block.content || '', options: normalizedOpts, questions };
     }
 
     // ── Completion / Short-answer types ──────────────────────────────────────
@@ -157,7 +180,7 @@ function TutorReadingFormPage({ testId }) {
       correctAnswer: q.correctAnswer || '',
       explanation: q.explanation || '',
     }));
-    return { id: blockId, type: block.type, range: block.range || '', content: block.content || '', questions };
+    return { id: blockId, type: normalizedType, range: block.range || '', content: block.content || '', questions };
   };
 
 
