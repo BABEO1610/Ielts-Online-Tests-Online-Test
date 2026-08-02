@@ -467,6 +467,7 @@ const handleGradingError = async (err, submissionId, requestId) => {
         requestId,
         errorCode: err.errorCode,
         message: err.message,
+        rawText: err.rawText,
       }),
     });
     const writingColumns = await getTableColumns(client, 'writing_submissions');

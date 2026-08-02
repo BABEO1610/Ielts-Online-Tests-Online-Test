@@ -127,6 +127,11 @@ const validateGradingResponse = (rawText) => {
     errors.push('taskNumber must be 1 or 2');
   }
 
+  // Fallback for Gemini sometimes naming it taskAchievement or taskResponse instead of taskAchievementOrResponse
+  if (!c.taskAchievementOrResponse && (c.taskAchievement || c.taskResponse)) {
+    c.taskAchievementOrResponse = c.taskAchievement || c.taskResponse;
+  }
+
   // Validate required criteria exist
   const requiredCriteria = [
     'taskAchievementOrResponse',

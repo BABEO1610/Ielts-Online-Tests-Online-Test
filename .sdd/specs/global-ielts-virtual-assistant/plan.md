@@ -1,203 +1,200 @@
 # Kế hoạch triển khai: Trợ lý ảo IELTS toàn cục
 
-**Nhánh**: `feature-global-ielts-virtual-assistant/Datnt` | **Ngày**: 2026-07-21 | **Đặc tả**: [spec.md](./spec.md)
+**Đặc tả**: [spec.md](./spec.md)
+**Trạng thái**: Đường cơ sở HIỆN CÓ với gia cố MỤC TIÊU; không tuyên bố sẵn sàng production
 
-**Đầu vào**: Đặc tả tính năng theo hiện trạng từ `.sdd/specs/global-ielts-virtual-assistant/spec.md`
+## 1. Tóm tắt
 
-**Phạm vi tài liệu**: Trợ lý ảo IELTS toàn cục
+Trợ lý là tính năng dành cho học viên đã xác thực để giải đáp IELTS/tiếng Anh, điều hướng, khám phá nội dung đã công bố, và xem lại bài thi đã nộp thuộc sở hữu. Pipeline hiện tại kết hợp phản hồi xác định với ngữ cảnh CSDL/tĩnh có kiểm soát và ngôn ngữ tạo bởi nhà cung cấp. Kế hoạch này ghi nhận triển khai như đã tìm thấy, tách riêng các mục tiêu chưa xây dựng, và hợp nhất các quyết định liên quan từ `CONTEXT.md`, `research.md`, `data-model.md`, `quickstart.md`, và hợp đồng API dạng prose.
 
-## Tóm tắt
+## 2. Bối cảnh kỹ thuật
 
-Trợ lý ảo IELTS toàn cục là một tiện ích (widget) chỉ dành cho học viên, được vận hành bởi chuỗi xử lý (pipeline) định hướng theo ý định (intent):
+| Lĩnh vực | Bằng chứng hiện tại |
+|---|---|
+| Backend | Module Node.js/Express trong `backend/src/api/assistant/` |
+| AI dùng chung | `backend/src/services/ai.service.js`, `backend/src/services/aiUsage.service.js` |
+| Lưu trữ | Truy vấn PostgreSQL trong `assistant.repository.js`; schema trong migration `024_create_chatbot_history_tables.sql` |
+| Kiến thức | JSON có quản lý phiên bản trong `backend/src/api/assistant/knowledge/` |
+| Frontend | Widget React trong `frontend/src/features/global-assistant/` |
+| Kiểm thử | Kiểm thử Jest backend, Vitest frontend, và `backend/scripts/eval-assistant.js` |
+| Hợp đồng | `contracts/assistant.openapi.yaml`; không tìm thấy consumer tự động trực tiếp trong đợt đánh giá này |
 
-```text
-Xác thực yêu cầu
-  → phân giải cookie/JWT + phiên đăng nhập đang hoạt động + vai trò học viên
-  → đánh giá các rào chắn tiền kiểm
-  → phân giải cuộc trò chuyện đang hoạt động thuộc quyền sở hữu
-  → đi theo lối tắt tùy chọn xưng hô hoặc định tuyến intent
-  → ngữ cảnh phiên có giới hạn + kiến thức tĩnh hoặc dữ liệu nền từ cơ sở dữ liệu
-  → phản hồi tức thời, phản hồi từ nhà cung cấp hoặc phương án dự phòng tất định
-  → tự kiểm tra phản hồi
-  → lưu dữ liệu thuộc quyền sở hữu theo cơ chế nỗ lực tối đa
-  → trả phản hồi JSON hoặc SSE của ứng dụng
-```
+Dependency frontend đã kiểm tra dùng React 19 và Vite 8. Điều này khác với đường cơ sở React 18 của Hiến chương và cần cập nhật Hiến chương rõ ràng hoặc quyết định tương thích; không được ngầm coi là tuân thủ.
 
-Tính năng sử dụng kiến thức tĩnh dạng JSON và các truy vấn PostgreSQL được tham số hóa. Tính năng không dùng truy xuất vectơ và không thực hiện chấm điểm Writing/Speaking chính thức. Điểm cuối truyền luồng hiện lưu đệm toàn bộ câu trả lời rồi phát một phần dữ liệu chứa toàn bộ câu trả lời; việc truyền từng `token` tới trình duyệt vẫn là công việc trong tương lai.
+## 3. Kiểm tra Hiến chương
 
-## Bối cảnh kỹ thuật
+| Nguyên tắc | Đánh giá |
+|---|---|
+| Bảo mật/quyền riêng tư | MỘT PHẦN: xác thực và lọc chủ sở hữu đã có; trạng thái đang thi khai báo bởi client không phải kiểm tra server có thẩm quyền. |
+| Nhất quán API | MỘT PHẦN: phản hồi trợ lý và xác thực thủ công chưa dùng thống nhất quy ước bao/middleware dùng chung. |
+| Kiểm thử trước/coverage | MỘT PHẦN: kiểm thử tập trung đã có; phần trăm coverage bắt buộc và bằng chứng smoke production chưa được chứng minh. |
+| Migration CSDL | MỘT PHẦN: migration 024 đã tồn tại; sự có mặt trong repository không chứng minh đã áp dụng trên môi trường. |
+| Đơn giản | ĐẠT cho thiết kế không-vector hiện tại; kiến thức tĩnh và SQL tham số hóa rõ ràng. |
 
-**Ngôn ngữ/Phiên bản**: Phía máy chủ (backend) dùng Node.js `>=20`; phía giao diện (frontend) dùng JavaScript/JSX; React và ReactDOM `19.2.6`; dải phiên bản Vite `^8.0.12` (được phân giải thành `8.0.16` khi kiểm chứng)
+Cổng phát hành vẫn mở cho ngữ nghĩa hạn mức hàng ngày, lưu giữ/vòng đời, bền vững cặp tin nhắn, thực thi bài thi đang hoạt động phía server, trợ năng, xác minh migration, và xác minh timeout nhà cung cấp.
 
-**Các phụ thuộc chính**: Express `5.2.1`, `pg 8.21.0`, `express-rate-limit 8.5.2`, `jsonwebtoken 9.0.3`, `ioredis 5.11.0`, React Router `7.17.0`, Axios `1.17.0`, Bootstrap `5.3.8`, Lucide React `1.22.0`. Các lời gọi tới nhà cung cấp dùng hàm `fetch` gốc của Node; kho mã không cài OpenAI/Gemini SDK hoặc `sanitize-html`.
-
-**Lưu trữ**: PostgreSQL 16 thông qua các truy vấn `pg` thuần. Các bảng do trợ lý sở hữu là `chatbot_sessions` và `chatbot_messages`; siêu dữ liệu nhà cung cấp dùng `ai_usage_logs`; các lượt đọc dữ liệu nền dùng `mock_tests`, `library_resources`, `test_attempts`, `questions` và `question_answers`. Migration `024_create_chatbot_history_tables.sql` đã tồn tại nhưng vẫn cần được áp dụng và xác minh riêng trên từng môi trường.
-
-**Kiểm thử**: Phía máy chủ (backend) dùng Jest `29.7.0` và phía giao diện (frontend) dùng dải phiên bản Vitest `^4.1.7` (được phân giải thành `4.1.8` khi kiểm chứng). Bộ kiểm thử hành vi chứa 561 trường hợp duy nhất. `eval-set.md` chứa 115 dòng bảng trước phần nhật ký (97 dòng thông thường cùng PM-01–PM-18) và các nhật ký kiểm chứng lịch sử; các số liệu lịch sử này chỉ là bản ghi, không thay thế được một lệnh hiện tại có thể tái lập.
-
-**Nền tảng đích**: SPA trên trình duyệt, được hỗ trợ bởi REST API Express và endpoint phản hồi tương thích SSE
-
-**Loại dự án**: Ứng dụng web gồm hai dự án `backend/` và `frontend/` tách biệt
-
-**Mục tiêu hiệu năng**: Giới hạn yêu cầu trò chuyện ở mức 30 yêu cầu/IP/phút; giới hạn độ dài tin nhắn ở 2000 ký tự; chấp nhận tối đa 20 mục đang hiển thị trên trang; giới hạn bộ nhớ định tuyến gần nhất ở 12 tin nhắn; mặc định hiển thị 3 đề xuất tra cứu.
-
-**Ràng buộc**: Chỉ dành cho học viên; không hỗ trợ trong lúc làm bài khi ngữ cảnh yêu cầu khai báo `active-test`; không chấm điểm Writing/Speaking chính thức; không dùng RAG dựa trên vector/embedding; không chuyển đổi dự phòng giữa các nhà cung cấp; chỉ dùng SQL thuần được tham số hóa; không đưa bí mật hoặc PII thô vào tài liệu/đầu ra kiểm thử; SSE chỉ phát phản hồi cuối thay vì truyền từng token.
-
-**Quy mô/Phạm vi**: 20 mô-đun JS phía máy chủ (backend) của trợ lý, 10 tệp JSON trong kho kiến thức (9 tệp nội dung và 1 tệp đăng ký — registry), 2 mô-đun dịch vụ AI dùng chung, 1 migration và 10 tệp tính năng phía giao diện (frontend), gồm 7 component, 1 hook, 1 service và 1 tệp CSS.
-
-## Cấu trúc dự án
-
-### Tài liệu (tính năng này)
+## 4. Kiến trúc hiện có
 
 ```text
-.sdd/specs/global-ielts-virtual-assistant/
-├── spec.md
-├── plan.md
-├── research.md
-├── data-model.md
-├── quickstart.md
-├── contracts/
-│   ├── assistant-api.md
-│   └── assistant.openapi.yaml
-├── tasks.md
-├── checklist.md
-├── CONTEXT.md
-├── eval-set.md
-├── production-test-suite.md
-├── RFC.md
-└── archive/
-    └── implementation-approach.legacy.md
+GlobalAssistantPanel / assistantApi
+  -> /api/v1/assistant (cũng được gắn tại /api/assistant)
+  -> assistant.routes.js (giới hạn tần suất trên chat/stream)
+  -> assistant.controller.js (kiểm tra cookie/phiên/học viên)
+  -> assistant.validation.js + assistant.guardrails.js
+  -> assistant.service.js
+       -> assistant.intent.js
+       -> assistant.context.js
+            -> assistant.repository.js (ngữ cảnh SQL đã công bố/thuộc sở hữu)
+            -> knowledge/*.json (ngữ cảnh tĩnh có phiên bản)
+       -> assistant.memory.js + assistant.prompts.js
+       -> ai.service.js khi cần ngôn ngữ tạo
+       -> assistant.response.js + assistant.selfcheck.js
+       -> lưu tin nhắn nỗ lực tối đa + metadata aiUsage.service.js
+  -> phản hồi JSON cuối cùng hoặc SSE start/full delta/done
 ```
 
-`research.md`, `data-model.md`, `contracts/` và `quickstart.md` là đầu ra Giai đoạn
-0/1 theo Speckit. RFC, bản ghi đánh giá và kho lưu trữ cũ là tài liệu giải thích/QA bổ
-sung; `production-test-suite.md` là hợp đồng hành vi mở rộng. Các snapshot cũ trong
-`eval-set.md` không được dùng làm kết quả hiện hành.
+## 5. Luồng yêu cầu và dữ liệu
 
-### Mã nguồn (thư mục gốc của kho mã)
+1. Route áp dụng bộ giới hạn trợ lý cho JSON chat và SSE stream.
+2. Controller phân giải cookie truy cập, trạng thái phiên/thu hồi đang hoạt động, trạng thái đổi mật khẩu, và vai trò `student`.
+3. Xác thực trim và giới hạn tin nhắn 2.000 ký tự và chuẩn hóa ngữ cảnh trang/cuộc trò chuyện.
+4. Rào chắn có thể trả từ chối xác định trước khi tạo phiên, lưu trữ, hoặc công việc nhà cung cấp.
+5. Service phân giải cuộc trò chuyện đang hoạt động thuộc sở hữu, áp dụng thao tác tùy chọn hoặc định tuyến ý định, rồi tải bộ nhớ giới hạn và ngữ cảnh có kiểm soát.
+6. Đường xác định trả lời trực tiếp. Đường được hỗ trợ khác gọi gateway AI đã cấu hình và xác thực/tự kiểm tra đầu ra.
+7. Trên các đường thất bại nhà cung cấp/xác thực được hỗ trợ, trả dự phòng xác định.
+8. Tin nhắn người dùng và trợ lý được chèn là hai thao tác nỗ lực tối đa riêng biệt. Do đó phản hồi có thể thành công mà không có lịch sử bền vững hay mã tin nhắn trợ lý.
+9. JSON trả đối tượng cuối cùng. SSE hiện đệm toàn bộ câu trả lời và phát một `assistant.delta`, không phải streaming từng token.
+
+## 6. Tóm tắt hợp đồng API
+
+| Phương thức/đường dẫn dưới cả hai mount trợ lý | Mục đích | Ràng buộc chính hiện tại |
+|---|---|---|
+| `POST /chat` | Phản hồi JSON cuối cùng | xác thực học viên; tối đa 2.000 ký tự; 30/IP/phút |
+| `POST /stream` | Phản hồi cuối cùng tương thích SSE | cùng xác thực; start, một full-answer delta, done/error |
+| `GET /history` | Lịch sử cuộc trò chuyện thuộc sở hữu | phiên đang hoạt động thuộc chủ sở hữu; 100 gần nhất theo thời gian |
+| `POST /messages/:messageId/rating` | Đánh giá tin nhắn trợ lý | tin nhắn trợ lý thuộc sở hữu; `up`/`down`; cho phép cập nhật |
+| `GET /status` | Khả dụng tối giản | học viên đã xác thực; không nhà cung cấp/mô hình/khóa/cấu hình |
+
+`contracts/assistant.openapi.yaml` được giữ tạm thời là hợp đồng máy đọc được.
+
+## 7. Tóm tắt mô hình dữ liệu
+
+Migration `backend/src/db/migrations/024_create_chatbot_history_tables.sql` định nghĩa mô hình lịch sử phiên/tin nhắn chatbot, chỉ mục, trường cách xưng hô, trường đánh giá, và dấu thời gian vòng đời. Truy vấn repository bổ sung đọc bài thi/tài liệu đã công bố và bài thi đã nộp/câu hỏi thuộc sở hữu.
+
+| Thực thể | Quy tắc sở hữu/toàn vẹn quan trọng |
+|---|---|
+| `chatbot_sessions` | Thuộc một học viên; trạng thái đang hoạt động/đã đóng; cách xưng hô thuộc phạm vi tại đây. |
+| `chatbot_messages` | Thuộc một phiên; vai trò phân biệt người dùng/trợ lý; trường đánh giá áp dụng cho tin nhắn trợ lý. |
+| bài thi/tài liệu đã công bố | Chỉ đủ điều kiện qua trường công bố/phê duyệt được nhận dạng. |
+| ngữ cảnh bài thi đã nộp | Yêu cầu quyền sở hữu người yêu cầu và trạng thái nộp non-null. |
+| nhật ký sử dụng AI | Metadata vận hành giới hạn; không phải nội dung prompt/câu trả lời thô. |
+
+Hai lần chèn tin nhắn hiện không nguyên tử. Lưu giữ, xóa/xuất, hành vi đóng/mở lại, và độ dài `rating_reason` vẫn chưa giải quyết.
+
+## 8. Máy trạng thái
 
 ```text
-backend/
-├── src/
-│   ├── api/assistant/
-│   │   ├── assistant.constants.js
-│   │   ├── assistant.context.js
-│   │   ├── assistant.controller.js
-│   │   ├── assistant.guardrails.js
-│   │   ├── assistant.intent.js
-│   │   ├── assistant.knowledge-base.js
-│   │   ├── assistant.knowledge-retriever.js
-│   │   ├── assistant.link-builder.js
-│   │   ├── assistant.lookup-parser.js
-│   │   ├── assistant.memory.js
-│   │   ├── assistant.prompts.js
-│   │   ├── assistant.repository.js
-│   │   ├── assistant.response.js
-│   │   ├── assistant.responses.js
-│   │   ├── assistant.routes.js
-│   │   ├── assistant.scope-classifier.js
-│   │   ├── assistant.selfcheck.js
-│   │   ├── assistant.service.js
-│   │   ├── assistant.user-resolver.js
-│   │   ├── assistant.validation.js
-│   │   └── knowledge-base/
-│   │       ├── registry.json
-│   │       └── 9 tệp nội dung JSON
-│   ├── services/
-│   │   ├── ai.service.js
-│   │   └── aiUsage.service.js
-│   └── db/migrations/
-│       └── 024_create_chatbot_history_tables.sql
-└── tests/unit/
-    ├── api/assistant.*.test.js
-    └── services/{ai.service,aiUsage.service}.test.js
+Yêu cầu
+  -> rejected_auth | rejected_validation | rejected_guardrail
+  -> accepted
+       -> deterministic_final
+       -> provider_pending -> validated_final
+                           -> deterministic_fallback | controlled_error
 
-frontend/
-├── src/
-│   ├── App.jsx
-│   └── features/global-assistant/
-│       ├── components/
-│       │   ├── AssistantDisabledNotice.jsx
-│       │   ├── ChatInputBox.jsx
-│       │   ├── ChatMessageItem.jsx
-│       │   ├── ChatMessageList.jsx
-│       │   ├── GlobalAssistantButton.jsx
-│       │   ├── GlobalAssistantPanel.jsx
-│       │   └── LoginRequiredPrompt.jsx
-│       ├── hooks/useAssistantAvailability.js
-│       ├── services/assistantApi.js
-│       └── globalAssistant.css
-└── tests/
-    ├── components/global-assistant/
-    └── services/assistantApi.test.js
+Cuộc trò chuyện: chưa có -> đang hoạt động -> đã đóng
+                               ^
+                               | service hiện có thể chọn/tạo phiên đang hoạt động khác
+
+Lưu trữ mỗi lượt được chấp nhận (hiện tại):
+  không có -> user_saved -> assistant_saved
+           \-> response_returned_without_complete_pair
 ```
 
-**Quyết định cấu trúc**: Giữ các mô-đun HTTP/chuỗi xử lý của trợ lý trong `backend/src/api/assistant/`, các mối quan tâm về nhà cung cấp/mức sử dụng trong các dịch vụ backend dùng chung và tiện ích trong một thư mục tính năng frontend. Công việc tài liệu này không bổ sung kiến trúc mới hoặc tạo bảng chatbot trùng lặp.
+Chuyển trạng thái đóng/mở lại/xóa cuộc trò chuyện chưa phải vòng đời hoàn chỉnh cho người dùng ngày hôm nay.
 
-## Các quyết định thiết kế theo hiện trạng
+## 9. Thiết kế bảo mật và quyền riêng tư
 
-### Xác thực và tiền kiểm
+- Mọi thao tác phân giải danh tính học viên đã xác thực; đọc/ghi repository bao gồm điều kiện chủ sở hữu.
+- Rào chắn từ chối chấm điểm/dự đoán band cá nhân, khai báo đang thi, trích xuất prompt/cấu hình, bịa nội dung chính thức, và yêu cầu dữ liệu riêng tư/chưa công bố/chéo chủ sở hữu.
+- Tra cứu đã công bố có căn cứ server; mục hiển thị trên client không phải bằng chứng công bố có thẩm quyền.
+- Xem lại bài thi kiểm tra cả quyền sở hữu bài và trạng thái đã nộp.
+- Trạng thái cố ý tối giản. Lỗi nhà cung cấp phải được chuẩn hóa thay vì trả thô.
+- Ngăn chặn đang thi hiện chưa hoàn chỉnh vì server tin tưởng `context.pageType`; công việc MỤC TIÊU phải truy vấn trạng thái bài thi đang hoạt động có thẩm quyền.
+- Nhật ký/đo lường phải giảm thiểu PII và loại trừ prompt, câu trả lời, thông tin xác thực, và cấu hình nội bộ.
 
-- Việc xác thực nội dung yêu cầu (payload) trò chuyện hiện chạy trước bước xác thực danh tính.
-- Bộ điều khiển (controller) đọc `accessToken` hoặc `access_token`, xác minh mã truy cập, tùy chọn kiểm tra thu hồi trên Redis khi Redis sẵn sàng, xác nhận phiên cơ sở dữ liệu đang hoạt động, chặn `must_change_password` và yêu cầu vai trò `student`.
-- Các rào chắn chạy qua `preflightChatPayload` trước khi phân giải cuộc trò chuyện và trước khi gửi tiêu đề phản hồi SSE.
-- Quyết định chặn lúc làm bài dựa trên `context.pageType` do phía máy khách (client) cung cấp và đã qua xác thực; tính năng này không tra cứu lượt làm bài đang hoạt động ở phía máy chủ.
+## 10. Chiến lược nhà cung cấp và dự phòng
 
-### Ý định (intent) và ngữ cảnh
+Xử lý xác định được ưu tiên cho từ chối rào chắn, lời chào/tùy chọn, điều hướng, làm rõ, thiếu ngữ cảnh xem lại, và trình bày tra cứu có căn cứ. Tạo nhà cung cấp dành cho ý định được hỗ trợ cần ngôn ngữ soạn thảo. Đầu ra tạo được chuẩn hóa và tự kiểm tra. Thất bại được hỗ trợ dùng văn bản xác định có căn cứ trong ngữ cảnh đã biết; chẩn đoán nhà cung cấp thô không bao giờ là đầu ra client. Ngân sách timeout tạo trợ lý rõ ràng và kiểm thử của nó là khoảng trống MỤC TIÊU.
 
-- Có 12 hằng số ý định được khai báo, nhưng định tuyến xác định trước không tạo ra đủ cả 12. `GENERAL_STUDY_TIPS` và `GRADING_REQUEST_SAFE_FEEDBACK` hiện không thể được trả về từ `detectIntent`; `WEBSITE_HELP` có thể bắt nguồn từ đầu ra của bộ phân loại.
-- Ý định chưa xác định có thể gọi bộ phân loại LLM có giới hạn, kèm cuộc trò chuyện gần đây không đáng tin cậy và các gợi ý định tuyến.
-- Bộ nhớ định tuyến của phiên lưu các tin nhắn gần đây cùng ý định (intent) trước đó được suy luận, kỹ năng và các chủ đề đã chọn. Bộ nhớ này không lưu loại/ID tài nguyên thư viện trước đó hoặc ID lượt làm bài cần xem lại dưới dạng ô dữ liệu (slot) có cấu trúc.
-- Thao tác đặt/nhắc lại/xóa cách xưng hô ưu tiên dùng lối tắt và trả về công khai ý định `IELTS_KNOWLEDGE`, còn chế độ nội bộ cuối cùng là `preference_memory`.
+## 11. Chiến lược lưu trữ
 
-### Dữ liệu nền và phương án dự phòng
+- Kiến thức tĩnh vẫn là JSON có quản lý phiên bản với registry.
+- Lịch sử và đánh giá cuộc trò chuyện dùng PostgreSQL sau migration 024.
+- Bộ nhớ gần đây được xây dựng lại từ cuộc trò chuyện đang hoạt động thuộc sở hữu; cách xưng hô chỉ lưu trên cuộc trò chuyện đó.
+- Ghi vẫn nỗ lực tối đa và độc lập. Thiết kế MỤC TIÊU nên làm cặp giao dịch hoặc cho biết bền vững rõ ràng.
+- Không có vector store hay chỉ mục embedding trong tính năng này.
 
-- FIND_TEST đọc các bài thi đã xuất bản trong `mock_tests`; FIND_LESSON đọc các tài nguyên đã xuất bản trong `library_resources`; POST_TEST_REVIEW đọc một lượt làm bài đã nộp thuộc quyền sở hữu cùng dữ liệu câu hỏi/câu trả lời.
-- Việc lọc từ khóa tra cứu được đưa vào SQL trước `ORDER BY/LIMIT`, sau đó mới xếp hạng và giới hạn số mục hiển thị.
-- Đầu ra tra cứu trống, chung chung hoặc không nhắc tới tiêu đề được trả về sẽ được thay bằng phản hồi tất định dựa trên dữ liệu nền.
-- Lời gọi kiến thức chỉ có thể thử lại một lần ở chế độ văn bản thuần sau khi nhận phản hồi kiến thức không hợp lệ. Lỗi nhà cung cấp/cấu hình đi thẳng tới phương án dự phòng tất định.
-- Phương án dự phòng tất định có các nhánh rõ ràng cho Skimming, Scanning, kết hợp Skimming/Scanning, tổng quan Writing Task 1, Speaking Part 2 và Reading. Không có nhánh dành riêng cho Listening.
+## 12. Thiết kế thử lại, idempotency, và đồng thời
 
-### Lưu dữ liệu và truyền luồng
+- Thao tác HTTP chat không có khóa idempotency client; client không được tự động phát lại yêu cầu không chắc chắn.
+- Frontend tránh phát lại JSON tự động sau thất bại SSE không chắc chắn.
+- Đánh giá có chủ đích cho phép cập nhật; ghi hợp lệ lặp lại thay thế giá trị/lý do hiện có.
+- Hạn mức hàng ngày chưa có triển khai. Tính toán MỤC TIÊU cần bộ đếm nguyên tử mỗi học viên mỗi ngày UTC và định nghĩa đã phê duyệt cho yêu cầu tính phí.
+- Lưu cặp tin nhắn cần một kiểm thử giao dịch/đồng thời để ngăn lượt một phần.
 
-- Việc tra cứu phiên ưu tiên cuộc trò chuyện đang hoạt động thuộc quyền sở hữu có tin nhắn được gửi gần đây nhất.
-- Việc chèn tin nhắn dùng `INSERT ... SELECT` với các điều kiện về chủ sở hữu và phiên đang hoạt động.
-- Lịch sử trả về tối đa 100 tin nhắn từ một cuộc trò chuyện đang hoạt động thuộc quyền sở hữu theo thứ tự thời gian.
-- Các thao tác của lớp truy cập dữ liệu (repository) được thực hiện theo cơ chế nỗ lực tối đa khi cột/bảng của lược đồ (schema) cũ không tồn tại; vì vậy, áp dụng migration là điều kiện triển khai tiên quyết để bảo đảm tính bền vững dữ liệu.
-- Luồng từ nhà cung cấp được tiêu thụ nội bộ. Ứng dụng cố gắng lưu kết quả hoàn chỉnh theo cơ chế nỗ lực tối đa trước khi phát `assistant.start`, một `assistant.delta` chứa toàn bộ câu trả lời và `assistant.done`; lỗi lưu dữ liệu có thể khiến ID tin nhắn là null nhưng không ngăn việc trả câu trả lời an toàn.
-- Bộ phân tích ở trình duyệt xử lý được khung dữ liệu cuối không có dòng trống kết thúc và tránh tự động thử lại JSON, nhưng chưa phải bộ phân tích SSE tổng quát hỗ trợ nhiều dòng/CRLF.
+## 13. Quan sát được
 
-## Theo dõi độ phức tạp
+- Đo lường sử dụng AI dùng chung ghi metadata thời gian/token/trạng thái/lỗi giới hạn.
+- Không ghi nhật ký tin nhắn thô, câu trả lời tạo, lịch sử phiên, prompt, khóa, hay cấu hình nhà cung cấp.
+- Bổ sung chỉ số cho đường xác định so với nhà cung cấp, timeout/dự phòng nhà cung cấp, lớp rào chắn, từ chối giới hạn tần suất, kết quả lưu trữ, và hạn mức hàng ngày chỉ sau khi nhãn được đánh giá PII/cardinality.
+- Phản hồi thành công không phải bằng chứng lưu trữ phiên/tin nhắn thành công; kết quả này cần chỉ số rõ ràng sau khi thiết kế bền vững được phê duyệt.
 
-| Sai lệch                                                       | Lý do tồn tại trong mã nguồn hiện tại                                                                                           | Việc cần làm tiếp theo                                                                                                                                       |
-| --------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| React 19 so với React 18 đã khóa                            | Các phụ thuộc frontend được nâng cấp nhưng không tham chiếu sửa đổi Hiến chương                                       | Nhóm cần quyết định: cập nhật RFC/Hiến chương đã được phê duyệt hoặc hạ phiên bản phụ thuộc                                               |
-| CSS tùy chỉnh đặt trong thư mục tính năng               | Kiểu hiển thị (style) được đặt cùng trợ lý thay vì trong một stylesheet CSS tùy chỉnh duy nhất theo Hiến chương     | Chuyển các quy tắc sang stylesheet bắt buộc hoặc phê duyệt RFC thay đổi quy ước                                                                      |
-| Nhiều cấu trúc phản hồi trợ lý                           | Bộ điều khiển riêng của tính năng phát triển độc lập với bao phản hồi API toàn cục                                   | Xác định một hợp đồng trợ lý tương thích ngược, sau đó bổ sung kiểm thử hợp đồng                                                           |
-| Xác thực và xử lý lỗi trực tiếp trong bộ điều khiển | Bộ điều khiển của trợ lý lặp lại các mối quan tâm của route được bảo vệ                                              | Chuyển sang luồng middleware/xử lý lỗi dùng chung mà không thay đổi ngữ nghĩa phân quyền                                                           |
-| Các tệp điều phối/lớp truy cập dữ liệu quá lớn       | Tính năng tích lũy định tuyến, phương án dự phòng, lưu dữ liệu và theo dấu (tracing) trong một số ít mô-đun      | Tái cấu trúc phía sau các bài kiểm thử hiện có; không đưa thêm lớp trừu tượng (abstraction) mới khi chưa có nhiệm vụ xác định phạm vi |
-| Chưa chứng minh cổng độ bao phủ                           | Các bộ kiểm thử tập trung đạt cung cấp bằng chứng hồi quy nhưng không có tỷ lệ phần trăm/danh mục hàm              | Tạo báo cáo độ bao phủ và khép các khoảng trống service/query trước khi coi cổng Hiến chương là đạt                                          |
-| Tên nhánh/đặc tả hiện tại khác quy ước quản trị     | Tính năng có trước đợt chuẩn hóa Speckit hiện tại và dùng tạo tác`spec.md` cố định của Speckit                    | Nhóm cần quyết định: đồng bộ tên trong một thay đổi phối hợp hoặc phê duyệt ngoại lệ quy ước có tài liệu                                 |
-| Cơ chế truyền luồng giả lập chỉ phát phản hồi cuối   | Ứng dụng ưu tiên chuẩn hóa/tự kiểm tra và lưu dữ liệu trước khi gửi tới trình duyệt                                  | Chỉ bổ sung truyền từng`token` sau khi xác định ngữ nghĩa lỗi một phần và lưu dữ liệu                                                          |
-| Thiếu các ô dữ liệu (slot) theo dõi có cấu trúc        | Bộ nhớ định tuyến theo dõi ý định/kỹ năng/chủ đề nhưng không theo dõi loại/ID tài nguyên hoặc ID lượt làm bài | Chỉ bổ sung nếu hành vi sản phẩm cần các lượt hỏi tiếp đó; phải bao phủ trường hợp quyền sở hữu và ngữ cảnh cũ                         |
+## 14. Chiến lược kiểm thử
 
-## Chiến lược xác thực
+- Kiểm thử unit backend: ranh giới xác thực, rào chắn, ý định/ngữ cảnh, lọc sở hữu/công bố repository, bộ nhớ/tùy chọn, phản hồi/tự kiểm tra, dự phòng service, xác thực/trạng thái/SSE controller.
+- Kiểm thử tích hợp backend: migration 024, cặp tin nhắn giao dịch, kiểm tra bài thi đang hoạt động có thẩm quyền, đồng thời hạn mức hàng ngày, và từ chối chéo chủ sở hữu.
+- Kiểm thử frontend: trạng thái đăng nhập/vô hiệu/lỗi, phân tích EOF SSE, hợp đồng single-delta, lịch sử/đánh giá, không phát lại không chắc chắn, và hành vi bàn phím/trình đọc màn hình.
+- Kiểm thử hợp đồng: xác thực cả hai mount route và `contracts/assistant.openapi.yaml` hoặc phê duyệt một mount/đường dẫn chuẩn duy nhất.
+- Đánh giá: `backend/scripts/eval-assistant.js` tiếp tục sử dụng `eval-set.md`; không gọi nhà cung cấp thật trong xác minh offline thông thường.
+- Xác minh phát hành phải dùng stub nhà cung cấp offline. Kiểm thử smoke production/nhà cung cấp là hoạt động có cổng riêng biệt và chưa được chạy tại đây.
 
-1. Xác thực rằng toàn bộ 561 ID trong bộ kiểm thử production là duy nhất, liên tục và mỗi dòng có tám cột.
-2. Đối chiếu mọi hành vi mới được ghi nhận với hàm hoặc bài kiểm thử sở hữu hành vi đó, đặc biệt là intent tùy chọn xưng hô, phân giải tên, cấu hình nhà cung cấp, quyền sở hữu cuộc trò chuyện và thứ tự SSE.
-3. Chạy các bài kiểm thử tập trung cho trợ lý/nhà cung cấp/mức sử dụng ở backend mà không gọi mạng thật hoặc ghi cơ sở dữ liệu.
-4. Chạy ba tệp kiểm thử frontend tập trung cho trợ lý.
-5. Chạy ESLint tập trung cho trợ lý, bản dựng (build) production của frontend, kiểm tra cú pháp backend, kiểm tra tính nhất quán Markdown và `git diff --check`.
-6. Không chạy migration 024, kiểm thử nhanh có xác thực trên môi trường thật hoặc lời gọi nhà cung cấp thật khi chưa có ủy quyền riêng cho môi trường.
+## 15. Triển khai và cấu hình
 
-## Kết quả kiểm chứng — test/lint cập nhật 2026-07-22
+- Dependency runtime bắt buộc bao gồm hạ tầng CSDL/phiên và gateway AI dùng chung đã cấu hình cho đường tạo.
+- Giới hạn tần suất hiện tại là 30 yêu cầu mỗi IP mỗi phút cho chat/stream. Hạn mức 50/học viên/ngày UTC được đề xuất chưa được cấu hình hay thực thi.
+- Xác minh migration 024 trên từng môi trường mà không chạy lệnh migration phá hủy trong đánh giá tài liệu.
+- Xác minh cả hai mount route trợ lý, đường dẫn cơ sở frontend, hành vi CSP/proxy SSE, và cấu hình timeout nhà cung cấp trước phát hành.
+- Không tiết lộ giá trị nhà cung cấp/mô hình/khóa qua trạng thái, nhật ký, tài liệu, hoặc cấu hình client.
 
-- Jest tập trung cho backend ngày 2026-07-22: ĐẠT — 15 bộ kiểm thử, 265 bài kiểm thử, 0 bỏ qua, 0 thất bại.
-- Vitest tập trung cho frontend ngày 2026-07-22: ĐẠT — 3 tệp, 7 bài kiểm thử, 0 bỏ qua, 0 thất bại.
-- ESLint tập trung cho trợ lý ở frontend ngày 2026-07-22: ĐẠT.
-- Bản dựng (build) production của frontend ngày 2026-07-22: ĐẠT với Vite 8.0.16; bundle JavaScript 2.886,27 kB (gzip 814,40 kB) vẫn có cảnh báo không chặn về kích thước phân đoạn (chunk).
-- Xác thực cú pháp backend ngày 2026-07-22: ĐẠT cho toàn bộ 22 tệp JavaScript của trợ lý/AI dùng chung.
-- ESLint tập trung cho trợ lý ở backend hiện đã chạy được vì `@eslint/js` đã có; lần đối chiếu 2026-07-22 còn 1 lỗi `no-useless-escape` tại `backend/src/api/assistant/assistant.response.js:24`, nên cổng lint vẫn CHƯA ĐẠT.
-- Khả năng truy vết chéo giữa các tạo tác (artifact): ĐẠT — toàn bộ 28 yêu cầu chức năng và 8 tiêu chí thành công được ánh xạ tới một hoặc nhiều nhiệm vụ trong tổng số 61 nhiệm vụ, không còn mâu thuẫn hành vi chưa giải quyết giữa đặc tả/kế hoạch/nhiệm vụ. Cổng Hiến chương được liệt kê riêng vẫn KHÔNG ĐẠT.
-- Kiểm tra hợp đồng tài liệu: ĐẠT — 561 trường hợp production duy nhất và liên tục trong 21 nhóm, 61 nhiệm vụ duy nhất, 30 mục trong danh sách kiểm tra (checklist) duy nhất, không còn chỗ giữ chỗ (placeholder) của mẫu và tất cả đường dẫn được tham chiếu bởi nhiệm vụ đã hoàn thành đều tồn tại. Thư mục đích của T060 đang mở là `backend/tests/integration/assistant/` chưa tồn tại; đích `frontend/src/styles/custom.css` bắt buộc theo Hiến chương cũng chưa tồn tại và đã được ghi nhận ở trên như một sai lệch.
-- Việc áp dụng migration 024, kiểm thử nhanh HTTP có xác thực/cơ sở dữ liệu thật/nhà cung cấp thật và PM-01–PM-18 vẫn CHƯA CHẠY vì cần quyền môi trường và thông tin xác thực.
+## 16. Khoảng trống đã biết và cổng phát hành
+
+| Khoảng trống | Phân loại | Cổng |
+|---|---|---|
+| Hạn mức 50/học viên/ngày và ngữ nghĩa tính toán | TARGET + NEEDS CLARIFICATION | Giải quyết BR-CHAT-021, triển khai bộ đếm nguyên tử, kiểm thử đồng thời. |
+| Kiểm tra bài thi đang hoạt động có thẩm quyền | TARGET | Truy vấn server và kiểm thử negative/phân quyền. |
+| Cặp tin nhắn người dùng/trợ lý nguyên tử | TARGET | Kiểm thử giao dịch và tiêm lỗi. |
+| Lưu giữ và vòng đời cuộc trò chuyện | NEEDS CLARIFICATION | Phê duyệt chính sách trước khi tuyên bố triển khai/phát hành. |
+| Giới hạn `rating_reason` | NEEDS CLARIFICATION | Phê duyệt và xác thực giới hạn. |
+| Timeout nhà cung cấp | TARGET | Định nghĩa ngân sách và kiểm thử dự phòng an toàn. |
+| Trợ năng và ngưỡng coverage | TARGET | Cần bằng chứng tự động. |
+| Migration/áp dụng và smoke nhà cung cấp | Chưa xác minh | Cần bằng chứng môi trường; chưa sẵn sàng production. |
+
+## 17. Ánh xạ yêu cầu-thành-phần
+
+| Nhóm yêu cầu | Thành phần |
+|---|---|
+| BR/FR-001..004 | `assistant.routes.js`, `assistant.controller.js`, `assistant.validation.js`, `assistant.guardrails.js`, truy vấn bài thi đang hoạt động TARGET |
+| BR/FR-005..007 | `assistant.intent.js`, `assistant.context.js`, `assistant.repository.js`, JSON kiến thức |
+| BR/FR-008 | `assistant.memory.js`, `assistant.repository.js` |
+| BR/FR-009..011 | `assistant.service.js`, `assistant.prompts.js`, `ai.service.js`, `assistant.response.js`, `assistant.selfcheck.js` |
+| BR/FR-012..013 | `assistant.repository.js`, `assistant.controller.js`, migration 024 |
+| BR/FR-014..016 | `backend/src/middleware/rateLimit.js`, kho hạn mức hàng ngày TARGET, lưu trữ giao dịch TARGET |
+| FR-017..018 | migration/repository/controller TARGET vòng đời và xác thực đánh giá |
+| NFR-001..011 | cách ly controller/repository, đo lường, kiểm thử widget/SSE frontend, kiểm tra migration và phát hành |
+
+## 18. Quyết định tạo vật
+
+- Giữ `spec.md`, `plan.md`, `tasks.md`, và `checklist.md` là bộ tính năng quy chuẩn.
+- Giữ `eval-set.md`: `backend/scripts/eval-assistant.js` đọc và cập nhật trực tiếp.
+- Giữ tạm `contracts/assistant.openapi.yaml`: đó là hợp đồng máy đọc được khả dụng, mặc dù không tìm thấy consumer tự động trực tiếp.
+- Các file đã gộp nội dung (`CONTEXT.md`, `research.md`, `data-model.md`, `quickstart.md`, `contracts/assistant-api.md`) và file QA (`production-test-suite.md`) đã được xóa theo kế hoạch chuẩn hóa.

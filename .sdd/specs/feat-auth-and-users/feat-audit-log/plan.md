@@ -24,7 +24,7 @@ Thiết kế backfill cho khả năng lưu vết kiểm toán (audit trail) hi�
 
 **Mục tiêu Hiệu suất (Performance Goals)**: Các truy vấn lấy danh sách activity/change-log hoàn thành dưới 3 giây đối với khối lượng hoạt động bình thường; số liệu thống kê suspicious và failed-login hiển thị trong vòng 10 giây.
 
-**Ràng buộc (Constraints)**: Chỉ dành cho Admin (Admin-only access); endpoint undo có thay đổi dữ liệu (mutating undo endpoint) yêu cầu middleware auth; sử dụng parameterized SQL; lịch sử audit chỉ ghi thêm (append-only); không chứa bí mật (no secrets) trong API responses.
+**Ràng buộc (Constraints)**: Chỉ dành cho Admin (Admin-only access); endpoint undo có thay đổi dữ liệu (mutating undo endpoint) yêu cầu middleware auth, chạy trong DB transaction và dùng row-level lock (`FOR UPDATE`); sử dụng parameterized SQL; lịch sử audit chỉ ghi thêm (append-only) và lưu trữ vĩnh viễn không tự động xóa (infinite retention); không chứa bí mật (no secrets) trong API responses. Các endpoint cần tuân thủ cấu trúc `/admin/activity-logs` và `/admin/change-logs`.
 
 **Quy mô/Phạm vi (Scale/Scope)**: Các sự kiện audit về Auth/security/admin dành cho người dùng, sessions, các hành động liên quan đến chấm điểm/nội dung (grading/content actions), với các đường dẫn đọc (read paths) phân trang bị giới hạn (capped) bởi các giới hạn query phía backend.
 
@@ -35,7 +35,7 @@ Thiết kế backfill cho khả năng lưu vết kiểm toán (audit trail) hi�
 - Tech stack: ĐẠT (PASS) cho Node 20, Express 5, PostgreSQL, raw `pg`; CHÚ Ý (WATCH) bởi vì frontend package hiện đang dùng React 19.2.6 trong khi hiến pháp lại ghi React 18.
 - Database rules: ĐẠT. `audit.queries.js` sử dụng parameterized SQL và UUID primary keys. Các dòng Audit là dạng ghi thêm (append-only); undo đánh dấu lên các dòng gốc (source rows) thay vì xóa (deletion).
 - API protocol: ĐẠT. Các Admin controllers trả về `{ success, data, error, meta }`.
-- Security: ĐẠT. Các tuyến `/api/v1/admin/activity-logs`, `/change-logs`, và undo sử dụng `authenticate` + `authorize('admin')`; actor được lấy từ middleware.
+- Security: ĐẠT. Các tuyến `/api/v1/admin/activity-logs`, `/api/v1/admin/change-logs`, và undo sử dụng `authenticate` + `authorize('admin')`; actor được lấy từ middleware `req.user`.
 - Code quality/testing: ĐẠT CÓ RỦI RO (PASS WITH RISK). Các bài test hiện tại đã bao phủ các khu vực audit service/query, nhưng các tasks triển khai phải giữ các functions mới trong giới hạn kích thước và duy trì 80% độ phủ (coverage).
 
 Kiểm tra lại sau thiết kế (Post-design re-check): ĐẠT NHƯNG ĐÃ GHI NHẬN RỦI RO. Kế hoạch không thêm ORM mới, bí mật (secrets), endpoint thay đổi dữ liệu không được bảo vệ (unguarded mutating endpoint), hoặc xóa cứng (hard delete). Sự lệch phiên bản React vẫn là một vấn đề cần khắc phục ở cấp độ dự án.

@@ -145,4 +145,66 @@ describe('Speaking manual retry state machine', () => {
     expect(client.query).toHaveBeenCalledWith('ROLLBACK');
     expect(jobQueries.insertRetryChild).not.toHaveBeenCalled();
   });
+
+  test('serializes concurrent manual retries so only one canonical child is created', async () => {
+    let lockTail = Promise.resolve();
+    let retryChain = [];
+    const pool = {
+      connect: jest.fn(async () => {
+        let unlock = null;
+        return {
+          query: jest.fn(async (sql) => {
+            const text = String(sql);
+            if (text.includes('SELECT * FROM ai_grading_jobs')) {
+              const previous = lockTail;
+              lockTail = new Promise((resolve) => { unlock = resolve; });
+              await previous;
+              return { rows: [{
+                id: ROOT_ID,
+                group_id: GROUP_ID,
+                user_id: USER_ID,
+                status: 'failed',
+              }] };
+            }
+            if (text === 'COMMIT' || text === 'ROLLBACK') {
+              unlock?.();
+              return { rows: [] };
+            }
+            if (text.includes('UPDATE speaking_submissions')) {
+              return { rows: [{ id: 'part-1' }, { id: 'part-2' }, { id: 'part-3' }] };
+            }
+            return { rows: [] };
+          }),
+          release: jest.fn(),
+        };
+      }),
+    };
+    jobQueries.lookupJobByIdempotency.mockResolvedValue(null);
+    jobQueries.getRetryChain.mockImplementation(async () => [...retryChain]);
+    jobQueries.insertRetryChild.mockImplementation(async (_client, input) => {
+      const child = {
+        id: CHILD_ID,
+        group_id: GROUP_ID,
+        user_id: USER_ID,
+        retry_of_job_id: input.parentJobId,
+        status: 'queued',
+        stage: 'queued',
+        created_at: '2026-07-22T00:00:00Z',
+      };
+      retryChain = [child];
+      return child;
+    });
+    const service = serviceFor(pool);
+
+    const outcomes = await Promise.allSettled([
+      service.retry({ groupId: GROUP_ID, userId: USER_ID, idempotencyKey: 'concurrent-retry-key-0001' }),
+      service.retry({ groupId: GROUP_ID, userId: USER_ID, idempotencyKey: 'concurrent-retry-key-0002' }),
+    ]);
+
+    expect(outcomes.filter((outcome) => outcome.status === 'fulfilled')).toHaveLength(1);
+    expect(outcomes.filter((outcome) => outcome.status === 'rejected')).toHaveLength(1);
+    expect(outcomes.find((outcome) => outcome.status === 'rejected').reason)
+      .toMatchObject({ errorCode: 'RETRY_ALREADY_CREATED' });
+    expect(jobQueries.insertRetryChild).toHaveBeenCalledTimes(1);
+  });
 });

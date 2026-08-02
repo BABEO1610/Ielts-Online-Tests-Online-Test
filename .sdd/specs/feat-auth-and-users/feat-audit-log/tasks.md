@@ -202,4 +202,4 @@ Task: "Add page rendering tests for suspicious and empty states in frontend/test
 
 - Mọi task đều kèm theo đường dẫn file (file path) và tuân theo định dạng checklist format.
 - Không giới thiệu việc sử dụng ORM.
-- Giữ lịch sử audit ở trạng thái chỉ ghi thêm (append-only); undo phải đánh dấu trên các dòng gốc (source rows) thay vì xóa chúng.
+- Giữ lịch sử audit ở trạng thái chỉ ghi thêm (append-only) và lưu trữ vĩnh viễn không tự động xóa (infinite retention); undo phải đánh dấu trên các dòng gốc (source rows) thay vì xóa chúng.

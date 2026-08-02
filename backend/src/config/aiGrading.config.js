@@ -35,6 +35,12 @@ const digestManifest = (manifest) => crypto
   .digest('hex');
 
 const getTranscriptionBinding = (env, providerModel) => {
+  if (env.AI_TRANSCRIPTION_MODEL?.startsWith('gemini')) {
+    return { provider: 'gemini', model: env.AI_TRANSCRIPTION_MODEL };
+  }
+  if (env.AI_TRANSCRIPTION_MODEL?.startsWith('whisper')) {
+    return { provider: 'openai', model: env.AI_TRANSCRIPTION_MODEL };
+  }
   if (env.OPENAI_API_KEY) {
     return {
       provider: 'openai',

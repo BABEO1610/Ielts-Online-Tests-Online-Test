@@ -270,7 +270,7 @@ const AudioRecorder = forwardRef(({ partNumber, onUploadComplete, maxDuration = 
                   disabled={submitStatus === 'submitting' || submitStatus === 'success'}
                 />
                 <label className="form-check-label" htmlFor="graderAi">
-                  AI Chấm điểm <span className="badge bg-info text-dark ms-1">Tối đa 10 lượt/ngày</span>
+                  AI Chấm điểm <span className="badge bg-info text-dark ms-1">Quota do hệ thống quản lý</span>
                 </label>
               </div>
             </div>

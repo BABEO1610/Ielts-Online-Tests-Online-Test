@@ -1,0 +1,1195 @@
+openapi: 3.1.0
+info:
+  title: Hợp đồng API chấm Speaking của IELTSZone
+  version: 0.3.0-ai-estimated
+  description: >-
+    Hợp đồng triển khai cho luồng Speaking grading bất đồng bộ: grader=ai trả đủ
+    bốn tiêu chí từ transcript + audio dưới nhãn AI Estimated Band hoặc failed;
+    không tự handoff tutor. Calibration/RFC vẫn là cổng cho mức đã hiệu chuẩn.
+servers:
+  - url: /api/v1/submissions
+security:
+  - cookieAuth: []
+
+paths:
+  /speaking/audio-uploads:
+    post:
+      summary: Cấp signed upload cho một Part
+      operationId: createSpeakingAudioUpload
+      x-allowed-roles: [student]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AudioUploadRequest'
+      responses:
+        '201':
+          description: Signed upload đã được cấp
+          headers:
+            Cache-Control:
+              required: true
+              schema:
+                type: string
+                const: private, no-store
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AudioUploadEnvelope'
+        '400':
+          $ref: '#/components/responses/ApiError'
+        '403':
+          $ref: '#/components/responses/ApiError'
+        '413':
+          $ref: '#/components/responses/ApiError'
+        '415':
+          $ref: '#/components/responses/ApiError'
+        '429':
+          $ref: '#/components/responses/ApiError'
+        '503':
+          $ref: '#/components/responses/ApiError'
+
+  /speaking/full:
+    post:
+      summary: Nộp ba Part bằng private upload; nhánh AI enqueue job, nhánh tutor vào hàng chờ
+      operationId: submitFullSpeakingAsync
+      x-allowed-roles: [student]
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FullSpeakingRequest'
+      responses:
+        '201':
+          description: Bài dùng grader=tutor đã được tạo và đưa vào hàng chờ tutor
+          headers:
+            Cache-Control:
+              required: true
+              schema:
+                type: string
+                const: private, no-store
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TutorSubmissionEnvelope'
+        '202':
+          description: Submission và job đã commit
+          headers:
+            Location:
+              required: true
+              schema:
+                type: string
+            Retry-After:
+              required: true
+              schema:
+                type: integer
+                minimum: 1
+            Cache-Control:
+              required: true
+              schema:
+                type: string
+                const: private, no-store
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AsyncJobEnvelope'
+        '400':
+          $ref: '#/components/responses/ApiError'
+        '403':
+          $ref: '#/components/responses/ApiError'
+        '409':
+          $ref: '#/components/responses/ApiError'
+        '410':
+          $ref: '#/components/responses/ApiError'
+        '422':
+          $ref: '#/components/responses/ApiError'
+        '429':
+          $ref: '#/components/responses/ApiError'
+        '503':
+          $ref: '#/components/responses/ApiError'
+
+  /speaking/{speakingGroupId}/grading-status:
+    get:
+      summary: Đọc trạng thái job và kết quả terminal
+      operationId: getSpeakingGradingStatus
+      x-allowed-roles: [student, tutor, admin]
+      x-authorization-scope: owner-or-assigned-tutor-or-admin
+      parameters:
+        - $ref: '#/components/parameters/SpeakingGroupId'
+      responses:
+        '200':
+          description: Trạng thái hiện tại
+          headers:
+            Cache-Control:
+              required: true
+              schema:
+                type: string
+                const: private, no-store
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GradingStatusEnvelope'
+        '400':
+          $ref: '#/components/responses/ApiError'
+        '403':
+          $ref: '#/components/responses/ApiError'
+        '404':
+          $ref: '#/components/responses/ApiError'
+
+  /speaking/{speakingGroupId}/retry-grading:
+    post:
+      summary: Dùng manual retry attempt duy nhất còn lại
+      operationId: retrySpeakingGrading
+      x-allowed-roles: [student]
+      x-authorization-scope: owner-only
+      parameters:
+        - $ref: '#/components/parameters/SpeakingGroupId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                reason:
+                  type: string
+                  const: user_requested_retry
+      responses:
+        '202':
+          description: Retry child đã được tạo hoặc replay
+          headers:
+            Location:
+              required: true
+              schema:
+                type: string
+            Retry-After:
+              required: true
+              schema:
+                type: integer
+                minimum: 1
+            Cache-Control:
+              required: true
+              schema:
+                type: string
+                const: private, no-store
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AsyncJobEnvelope'
+        '400':
+          $ref: '#/components/responses/ApiError'
+        '403':
+          $ref: '#/components/responses/ApiError'
+        '404':
+          $ref: '#/components/responses/ApiError'
+        '409':
+          $ref: '#/components/responses/ApiError'
+        '410':
+          $ref: '#/components/responses/ApiError'
+        '429':
+          $ref: '#/components/responses/ApiError'
+        '503':
+          $ref: '#/components/responses/ApiError'
+
+  /tutors/submissions/speaking/{speakingGroupId}/claim:
+    servers:
+      - url: /api/v1
+    post:
+      summary: Claim nguyên tử một group Speaking đang chờ tutor
+      operationId: claimSpeakingTutorReview
+      x-allowed-roles: [tutor]
+      x-authorization-scope: authenticated-tutor-atomic-claim
+      parameters:
+        - $ref: '#/components/parameters/SpeakingGroupId'
+      responses:
+        '200':
+          description: Group đã được gán cho tutor hiện tại hoặc replay cùng assignment
+          headers:
+            Cache-Control:
+              required: true
+              schema:
+                type: string
+                const: private, no-store
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TutorClaimEnvelope'
+        '400':
+          $ref: '#/components/responses/ApiError'
+        '403':
+          $ref: '#/components/responses/ApiError'
+        '404':
+          $ref: '#/components/responses/ApiError'
+        '409':
+          $ref: '#/components/responses/ApiError'
+
+  /tutors/submissions/speaking/{submissionId}/ai-prelim:
+    servers:
+      - url: /api/v1
+    post:
+      summary: Tạo bản chấm nháp AI đủ bốn tiêu chí để tutor chỉnh sửa
+      operationId: runSpeakingTutorAiPrelim
+      x-allowed-roles: [tutor, admin]
+      x-authorization-scope: assigned-tutor-or-admin
+      parameters:
+        - name: submissionId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Bản nháp tạm thời; không ghi report hoặc đổi trạng thái
+          headers:
+            Cache-Control:
+              required: true
+              schema:
+                type: string
+                const: private, no-store
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TutorAiPrelimEnvelope'
+        '400':
+          $ref: '#/components/responses/ApiError'
+        '403':
+          $ref: '#/components/responses/ApiError'
+        '404':
+          $ref: '#/components/responses/ApiError'
+        '422':
+          $ref: '#/components/responses/ApiError'
+        '503':
+          $ref: '#/components/responses/ApiError'
+
+  /{submissionId}/audio-url:
+    get:
+      summary: Cấp signed download URL ngắn hạn
+      operationId: getSpeakingAudioUrl
+      x-allowed-roles: [student, tutor, admin]
+      x-authorization-scope: owner-or-assigned-tutor-or-admin
+      parameters:
+        - name: submissionId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: type
+          in: query
+          required: true
+          schema:
+            type: string
+            const: speaking
+      responses:
+        '200':
+          description: Signed download URL
+          headers:
+            Cache-Control:
+              required: true
+              schema:
+                type: string
+                const: private, no-store
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AudioUrlEnvelope'
+        '400':
+          $ref: '#/components/responses/ApiError'
+        '403':
+          $ref: '#/components/responses/ApiError'
+        '404':
+          $ref: '#/components/responses/ApiError'
+
+components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: accessToken
+
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema:
+        type: string
+        minLength: 16
+        maxLength: 128
+    SpeakingGroupId:
+      name: speakingGroupId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+  responses:
+    ApiError:
+      description: Lỗi theo envelope chuẩn
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+
+  schemas:
+    AudioUploadRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - part_number
+        - content_type
+        - size_bytes
+        - sha256
+        - duration_ms
+      properties:
+        part_number:
+          type: integer
+          enum: [1, 2, 3]
+        content_type:
+          type: string
+          enum:
+            - audio/mpeg
+            - audio/mp3
+            - audio/mp4
+            - audio/x-m4a
+            - audio/wav
+            - audio/x-wav
+        size_bytes:
+          type: integer
+          minimum: 1
+          maximum: 52428800
+        sha256:
+          type: string
+          pattern: '^[0-9a-f]{64}$'
+          description: Checksum client khai báo; worker vẫn phải tự tính lại.
+        duration_ms:
+          type: integer
+          minimum: 1
+
+    AudioUploadData:
+      type: object
+      additionalProperties: false
+      required:
+        - upload_url
+        - upload_token
+        - required_headers
+        - upload_url_expires_at
+        - upload_token_expires_at
+        - max_size_bytes
+      properties:
+        upload_url:
+          type: string
+          format: uri
+        upload_token:
+          type: string
+          minLength: 32
+          description: Application token opaque AEAD; không phải storage key.
+        required_headers:
+          type: object
+          additionalProperties:
+            type: string
+        upload_url_expires_at:
+          type: string
+          format: date-time
+        upload_token_expires_at:
+          type: string
+          format: date-time
+        max_size_bytes:
+          type: integer
+          const: 52428800
+
+    FullSpeakingRequest:
+      type: object
+      additionalProperties: false
+      required: [test_id, grader, parts]
+      properties:
+        test_id:
+          type: string
+          format: uuid
+        grader:
+          type: string
+          enum: [ai, tutor]
+          description: "`ai` trả 202 cùng job; `tutor` trả 201 và không tạo AI job."
+        parts:
+          type: array
+          minItems: 3
+          maxItems: 3
+          items:
+            $ref: '#/components/schemas/SpeakingPartInput'
+          description: Service còn phải bảo đảm tập part_number đúng bằng 1,2,3.
+
+    SpeakingPartInput:
+      type: object
+      additionalProperties: false
+      required: [part_number, prompt_id, upload_token]
+      properties:
+        part_number:
+          type: integer
+          enum: [1, 2, 3]
+        prompt_id:
+          type: string
+          format: uuid
+          description: >-
+            test_passages.id; service phải kiểm đúng test_id/passage_number, mock_tests.skill=speaking
+            và test đang published/accessible cho learner.
+        upload_token:
+          type: string
+          minLength: 32
+
+    AsyncJobData:
+      type: object
+      additionalProperties: false
+      required:
+        - speaking_group_id
+        - job_id
+        - status
+        - stage
+        - status_url
+        - submitted_at
+      properties:
+        speaking_group_id:
+          type: string
+          format: uuid
+        job_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          const: queued
+        stage:
+          type: string
+          const: queued
+        status_url:
+          type: string
+        submitted_at:
+          type: string
+          format: date-time
+
+    TutorClaimData:
+      type: object
+      additionalProperties: false
+      required: [speaking_group_id, assigned_tutor_id, assignment_status, claimed_at]
+      properties:
+        speaking_group_id:
+          type: string
+          format: uuid
+        assigned_tutor_id:
+          type: string
+          format: uuid
+        assignment_status:
+          type: string
+          const: claimed
+        claimed_at:
+          type: string
+          format: date-time
+
+    TutorSubmissionData:
+      type: object
+      additionalProperties: false
+      required: [speaking_group_id, status, parts]
+      properties:
+        speaking_group_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          const: pending
+        parts:
+          type: array
+          minItems: 3
+          maxItems: 3
+          items:
+            type: object
+            additionalProperties: true
+
+    GradingStatusData:
+      type: object
+      additionalProperties: false
+      required:
+        - speaking_group_id
+        - job_id
+        - status
+        - stage
+        - attempt_count
+        - max_attempts
+        - is_terminal
+        - can_retry
+        - result
+        - updated_at
+      properties:
+        speaking_group_id:
+          type: string
+          format: uuid
+        job_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [queued, running, retry_wait, completed, needs_review, failed]
+        stage:
+          type: string
+          enum: [queued, validating_audio, analyzing, scoring, calibrating, finalizing, completed, needs_review, failed]
+        attempt_count:
+          type: integer
+          minimum: 0
+          maximum: 2
+        max_attempts:
+          type: integer
+          enum: [1, 2]
+        is_terminal:
+          type: boolean
+        can_retry:
+          type: boolean
+        result:
+          oneOf:
+            - $ref: '#/components/schemas/SpeakingResult'
+            - type: 'null'
+        updated_at:
+          type: string
+          format: date-time
+      allOf:
+        - if:
+            properties:
+              max_attempts:
+                const: 1
+            required: [max_attempts]
+          then:
+            properties:
+              attempt_count:
+                maximum: 1
+              can_retry:
+                const: false
+              status:
+                enum: [queued, running, completed, needs_review, failed]
+        - if:
+            properties:
+              max_attempts:
+                const: 2
+            required: [max_attempts]
+          then:
+            properties:
+              attempt_count:
+                maximum: 2
+        - if:
+            properties:
+              can_retry:
+                const: true
+            required: [can_retry]
+          then:
+            properties:
+              status:
+                const: failed
+              max_attempts:
+                const: 2
+              attempt_count:
+                const: 2
+        - oneOf:
+            - title: Queued job
+              properties:
+                status:
+                  const: queued
+                is_terminal:
+                  const: false
+                can_retry:
+                  const: false
+                result:
+                  type: 'null'
+              allOf:
+                - oneOf:
+                    - properties:
+                        max_attempts:
+                          const: 1
+                        attempt_count:
+                          const: 0
+                      required: [max_attempts, attempt_count]
+                    - properties:
+                        max_attempts:
+                          const: 2
+                        attempt_count:
+                          enum: [0, 1]
+                      required: [max_attempts, attempt_count]
+              required: [status, is_terminal, can_retry, result]
+            - title: Running job
+              properties:
+                status:
+                  const: running
+                is_terminal:
+                  const: false
+                can_retry:
+                  const: false
+                result:
+                  type: 'null'
+              allOf:
+                - oneOf:
+                    - properties:
+                        max_attempts:
+                          const: 1
+                        attempt_count:
+                          const: 1
+                      required: [max_attempts, attempt_count]
+                    - properties:
+                        max_attempts:
+                          const: 2
+                        attempt_count:
+                          enum: [1, 2]
+                      required: [max_attempts, attempt_count]
+              required: [status, is_terminal, can_retry, result]
+            - title: Automatic retry wait
+              properties:
+                status:
+                  const: retry_wait
+                max_attempts:
+                  const: 2
+                attempt_count:
+                  const: 1
+                is_terminal:
+                  const: false
+                can_retry:
+                  const: false
+                result:
+                  type: 'null'
+              required: [status, max_attempts, attempt_count, is_terminal, can_retry, result]
+            - title: Completed publishable job
+              properties:
+                status:
+                  const: completed
+                is_terminal:
+                  const: true
+                can_retry:
+                  const: false
+                attempt_count:
+                  minimum: 1
+                result:
+                  $ref: '#/components/schemas/FullAudioResult'
+              required: [status, is_terminal, can_retry, result]
+            - title: Legacy human-review state
+              properties:
+                status:
+                  const: needs_review
+                  description: Chỉ để đọc job lịch sử; worker learner mới không tạo trạng thái này.
+                is_terminal:
+                  const: true
+                can_retry:
+                  const: false
+                attempt_count:
+                  minimum: 1
+                result:
+                  oneOf:
+                    - type: 'null'
+                      description: Bắt buộc với learner owner theo IELTS-07.
+                    - $ref: '#/components/schemas/ReviewSpeakingResult'
+                      description: Chỉ assigned tutor/admin được nhận review reference.
+              required: [status, is_terminal, can_retry, result]
+            - title: Failed job
+              properties:
+                status:
+                  const: failed
+                is_terminal:
+                  const: true
+                attempt_count:
+                  minimum: 1
+                can_retry:
+                  type: boolean
+                result:
+                  type: 'null'
+              required: [status, is_terminal, can_retry, result]
+
+    SpeakingResult:
+      oneOf:
+        - $ref: '#/components/schemas/FullAudioResult'
+        - $ref: '#/components/schemas/PartialAudioReviewResult'
+        - $ref: '#/components/schemas/TranscriptOnlyReviewResult'
+
+    ReviewSpeakingResult:
+      oneOf:
+        - $ref: '#/components/schemas/PartialAudioReviewResult'
+        - $ref: '#/components/schemas/TranscriptOnlyReviewResult'
+
+    SpeakingResultBase:
+      type: object
+      additionalProperties: false
+      required:
+        - report_id
+        - assessment_type
+        - evidence_mode
+        - is_partial_assessment
+        - requires_human_review
+        - overall_band
+        - criteria
+        - part_feedback
+        - text_based_feedback
+        - disclaimer
+        - pipeline_version
+        - calibration_version
+        - generated_at
+      properties:
+        report_id:
+          type: string
+          format: uuid
+        assessment_type:
+          type: string
+          enum: [estimated, text_feedback_only]
+        evidence_mode:
+          type: string
+          enum: [full_audio, partial_audio, transcript_only]
+        is_partial_assessment:
+          type: boolean
+        requires_human_review:
+          type: boolean
+        overall_band:
+          oneOf:
+            - $ref: '#/components/schemas/Band'
+            - type: 'null'
+        criteria:
+          $ref: '#/components/schemas/SpeakingCriteria'
+        part_feedback:
+          type: array
+          minItems: 3
+          maxItems: 3
+          items:
+            type: object
+            additionalProperties: false
+            required: [part_number, display_transcript, feedback, audio_quality_warnings]
+            properties:
+              part_number:
+                type: integer
+                enum: [1, 2, 3]
+              display_transcript:
+                type: string
+              feedback:
+                type: string
+              audio_quality_warnings:
+                type: array
+                items:
+                  type: string
+        text_based_feedback:
+          oneOf:
+            - $ref: '#/components/schemas/TextBasedFeedback'
+            - type: 'null'
+        disclaimer:
+          type: string
+          minLength: 1
+        pipeline_version:
+          type: string
+          minLength: 1
+        calibration_version:
+          oneOf:
+            - type: string
+              minLength: 1
+            - type: 'null'
+        generated_at:
+          type: string
+          format: date-time
+
+    FullAudioResult:
+      allOf:
+        - $ref: '#/components/schemas/SpeakingResultBase'
+        - type: object
+          properties:
+            assessment_type:
+              const: estimated
+            evidence_mode:
+              const: full_audio
+            is_partial_assessment:
+              const: false
+            requires_human_review:
+              const: false
+            overall_band:
+              $ref: '#/components/schemas/Band'
+            criteria:
+              $ref: '#/components/schemas/AllCriteriaScored'
+            text_based_feedback:
+              type: 'null'
+            calibration_version:
+              type: string
+              minLength: 1
+              description: Version scorer ước lượng hoặc version calibration đã duyệt.
+
+    PartialAudioReviewResult:
+      oneOf:
+        - $ref: '#/components/schemas/PartialAudioScoredReviewResult'
+        - $ref: '#/components/schemas/PartialAudioUnscoredReviewResult'
+
+    PartialAudioScoredReviewResult:
+      allOf:
+        - $ref: '#/components/schemas/SpeakingResultBase'
+        - type: object
+          properties:
+            assessment_type:
+              const: estimated
+            evidence_mode:
+              const: partial_audio
+            is_partial_assessment:
+              const: true
+            requires_human_review:
+              const: true
+            overall_band:
+              type: 'null'
+            criteria:
+              $ref: '#/components/schemas/PartiallyScoredCriteria'
+            text_based_feedback:
+              type: 'null'
+            calibration_version:
+              type: string
+              minLength: 1
+
+    PartialAudioUnscoredReviewResult:
+      allOf:
+        - $ref: '#/components/schemas/SpeakingResultBase'
+        - type: object
+          properties:
+            assessment_type:
+              const: estimated
+            evidence_mode:
+              const: partial_audio
+            is_partial_assessment:
+              const: true
+            requires_human_review:
+              const: true
+            overall_band:
+              type: 'null'
+            criteria:
+              $ref: '#/components/schemas/AllCriteriaUnavailable'
+            text_based_feedback:
+              type: 'null'
+            calibration_version:
+              oneOf:
+                - type: string
+                  minLength: 1
+                - type: 'null'
+
+    TranscriptOnlyReviewResult:
+      allOf:
+        - $ref: '#/components/schemas/SpeakingResultBase'
+        - type: object
+          properties:
+            assessment_type:
+              const: text_feedback_only
+            evidence_mode:
+              const: transcript_only
+            is_partial_assessment:
+              const: true
+            requires_human_review:
+              const: true
+            overall_band:
+              type: 'null'
+            criteria:
+              $ref: '#/components/schemas/TranscriptOnlyCriteria'
+            text_based_feedback:
+              $ref: '#/components/schemas/TextBasedFeedback'
+            calibration_version:
+              type: 'null'
+
+    PartiallyScoredCriteria:
+      allOf:
+        - $ref: '#/components/schemas/SpeakingCriteria'
+        - not:
+            $ref: '#/components/schemas/AllCriteriaScored'
+        - not:
+            $ref: '#/components/schemas/AllCriteriaUnavailable'
+
+    SpeakingCriteria:
+      type: object
+      additionalProperties: false
+      required:
+        - fluency_coherence
+        - lexical_resource
+        - grammatical_range_accuracy
+        - pronunciation
+      properties:
+        fluency_coherence:
+          $ref: '#/components/schemas/Criterion'
+        lexical_resource:
+          $ref: '#/components/schemas/Criterion'
+        grammatical_range_accuracy:
+          $ref: '#/components/schemas/Criterion'
+        pronunciation:
+          $ref: '#/components/schemas/Criterion'
+
+    Criterion:
+      type: object
+      additionalProperties: false
+      required: [band, evidence_status, feedback]
+      properties:
+        band:
+          oneOf:
+            - $ref: '#/components/schemas/Band'
+            - type: 'null'
+        evidence_status:
+          type: string
+          enum: [sufficient, insufficient, unavailable]
+        feedback:
+          oneOf:
+            - type: string
+            - type: 'null'
+      allOf:
+        - if:
+            properties:
+              evidence_status:
+                enum: [insufficient, unavailable]
+            required: [evidence_status]
+          then:
+            properties:
+              band:
+                type: 'null'
+
+    AllCriteriaScored:
+      allOf:
+        - $ref: '#/components/schemas/SpeakingCriteria'
+        - type: object
+          properties:
+            fluency_coherence:
+              $ref: '#/components/schemas/ScoredCriterion'
+            lexical_resource:
+              $ref: '#/components/schemas/ScoredCriterion'
+            grammatical_range_accuracy:
+              $ref: '#/components/schemas/ScoredCriterion'
+            pronunciation:
+              $ref: '#/components/schemas/ScoredCriterion'
+
+    ScoredCriterion:
+      allOf:
+        - $ref: '#/components/schemas/Criterion'
+        - type: object
+          properties:
+            band:
+              $ref: '#/components/schemas/Band'
+            evidence_status:
+              const: sufficient
+
+    AllCriteriaUnavailable:
+      allOf:
+        - $ref: '#/components/schemas/SpeakingCriteria'
+        - type: object
+          properties:
+            fluency_coherence:
+              $ref: '#/components/schemas/UnscoredCriterion'
+            lexical_resource:
+              $ref: '#/components/schemas/UnscoredCriterion'
+            grammatical_range_accuracy:
+              $ref: '#/components/schemas/UnscoredCriterion'
+            pronunciation:
+              $ref: '#/components/schemas/UnscoredCriterion'
+
+    TranscriptOnlyCriteria:
+      allOf:
+        - $ref: '#/components/schemas/SpeakingCriteria'
+        - type: object
+          properties:
+            fluency_coherence:
+              $ref: '#/components/schemas/UnscoredNoFeedbackCriterion'
+            lexical_resource:
+              $ref: '#/components/schemas/UnscoredNoFeedbackCriterion'
+            grammatical_range_accuracy:
+              $ref: '#/components/schemas/UnscoredNoFeedbackCriterion'
+            pronunciation:
+              $ref: '#/components/schemas/UnscoredNoFeedbackCriterion'
+
+    UnscoredCriterion:
+      allOf:
+        - $ref: '#/components/schemas/Criterion'
+        - type: object
+          properties:
+            band:
+              type: 'null'
+            evidence_status:
+              enum: [insufficient, unavailable]
+
+    UnscoredNoFeedbackCriterion:
+      allOf:
+        - $ref: '#/components/schemas/UnscoredCriterion'
+        - type: object
+          properties:
+            feedback:
+              type: 'null'
+
+    TextBasedFeedback:
+      type: object
+      additionalProperties: false
+      required: [lexical, grammar, coherence, warning]
+      properties:
+        lexical:
+          type: string
+        grammar:
+          type: string
+        coherence:
+          type: string
+        warning:
+          type: string
+          minLength: 1
+
+    Band:
+      type: number
+      minimum: 0
+      maximum: 9
+      multipleOf: 0.5
+
+    AudioUrlData:
+      type: object
+      additionalProperties: false
+      required: [url, expires_at]
+      properties:
+        url:
+          type: string
+          format: uri
+        expires_at:
+          type: string
+          format: date-time
+
+    TutorAiPrelimData:
+      type: object
+      additionalProperties: false
+      required:
+        - suggestedOverallBand
+        - suggestedCriteria
+        - feedbackDraft
+        - keyProblems
+        - tutorNotes
+        - aiFeedback
+      properties:
+        suggestedOverallBand:
+          $ref: '#/components/schemas/Band'
+        suggestedCriteria:
+          type: object
+          additionalProperties: false
+          required: [fluencyScore, lexicalScore, grammarScore, pronunciationScore]
+          properties:
+            fluencyScore:
+              $ref: '#/components/schemas/Band'
+            lexicalScore:
+              $ref: '#/components/schemas/Band'
+            grammarScore:
+              $ref: '#/components/schemas/Band'
+            pronunciationScore:
+              $ref: '#/components/schemas/Band'
+        feedbackDraft:
+          type: string
+        keyProblems:
+          type: array
+          items:
+            type: string
+        tutorNotes:
+          type: string
+        aiFeedback:
+          type: object
+          additionalProperties: true
+
+    ApiError:
+      type: object
+      additionalProperties: false
+      required: [code, message]
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+        details:
+          oneOf:
+            - type: object
+              additionalProperties: true
+            - type: 'null'
+
+    SuccessEnvelopeBase:
+      type: object
+      additionalProperties: false
+      required: [success, data, error, meta]
+      properties:
+        success:
+          const: true
+        data: {}
+        error:
+          type: 'null'
+        meta:
+          type: object
+          additionalProperties: true
+
+    AudioUploadEnvelope:
+      allOf:
+        - $ref: '#/components/schemas/SuccessEnvelopeBase'
+        - type: object
+          required: [data]
+          properties:
+            data:
+              $ref: '#/components/schemas/AudioUploadData'
+
+    AsyncJobEnvelope:
+      allOf:
+        - $ref: '#/components/schemas/SuccessEnvelopeBase'
+        - type: object
+          required: [data]
+          properties:
+            data:
+              $ref: '#/components/schemas/AsyncJobData'
+
+    GradingStatusEnvelope:
+      allOf:
+        - $ref: '#/components/schemas/SuccessEnvelopeBase'
+        - type: object
+          required: [data]
+          properties:
+            data:
+              $ref: '#/components/schemas/GradingStatusData'
+
+    TutorClaimEnvelope:
+      allOf:
+        - $ref: '#/components/schemas/SuccessEnvelopeBase'
+        - type: object
+          required: [data]
+          properties:
+            data:
+              $ref: '#/components/schemas/TutorClaimData'
+
+    TutorSubmissionEnvelope:
+      allOf:
+        - $ref: '#/components/schemas/SuccessEnvelopeBase'
+        - type: object
+          required: [data]
+          properties:
+            data:
+              $ref: '#/components/schemas/TutorSubmissionData'
+
+    TutorAiPrelimEnvelope:
+      type: object
+      additionalProperties: false
+      required: [success, data, error, meta]
+      properties:
+        success:
+          const: true
+        data:
+          $ref: '#/components/schemas/TutorAiPrelimData'
+        error:
+          type: 'null'
+        meta:
+          type: object
+          additionalProperties: true
+
+    AudioUrlEnvelope:
+      allOf:
+        - $ref: '#/components/schemas/SuccessEnvelopeBase'
+        - type: object
+          required: [data]
+          properties:
+            data:
+              $ref: '#/components/schemas/AudioUrlData'
+
+    ErrorEnvelope:
+      type: object
+      additionalProperties: false
+      required: [success, data, error, meta]
+      properties:
+        success:
+          const: false
+        data:
+          type: 'null'
+        error:
+          $ref: '#/components/schemas/ApiError'
+        meta:
+          type: object
+          additionalProperties: true

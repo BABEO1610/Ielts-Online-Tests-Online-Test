@@ -2,7 +2,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const YAML = require('yaml');
 
-const contractPath = path.resolve(__dirname, '../../../.sdd/specs/ai-fast-grading/contracts/speaking-grading.openapi.yaml');
+const contractPath = path.resolve(__dirname, '../../../.sdd/specs/ai-fast-grading/feat-speaking-ai-grading/contracts/speaking-grading.openapi.yaml');
 const document = YAML.parse(fs.readFileSync(contractPath, 'utf8'));
 
 const walk = (value, callback) => {
@@ -78,6 +78,16 @@ describe('Speaking OpenAPI contract', () => {
     ];
     responses.forEach((response) => {
       expect(response.headers['Cache-Control'].schema.const).toBe('private, no-store');
+    });
+  });
+
+  test('completed status exposes a terminal stage and exactly three Part feedback entries', () => {
+    const status = document.components.schemas.GradingStatusData;
+    expect(status.properties.stage.enum).toEqual(expect.arrayContaining(['completed', 'failed']));
+    expect(document.components.schemas.SpeakingResultBase.required).toContain('part_feedback');
+    expect(document.components.schemas.SpeakingResultBase.properties.part_feedback).toMatchObject({
+      minItems: 3,
+      maxItems: 3,
     });
   });
 });

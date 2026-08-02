@@ -259,7 +259,7 @@ class SpeakingSubmissionService {
       speaking_group_id: groupId,
       job_id: job.canonical_job_id,
       status: job.canonical_status,
-      stage: job.canonical_stage,
+      stage: terminal ? job.canonical_status : job.canonical_stage,
       attempt_count: job.attempt_count,
       max_attempts: job.max_attempts,
       is_terminal: terminal,

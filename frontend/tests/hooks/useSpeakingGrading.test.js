@@ -28,4 +28,15 @@ describe('useSpeakingGrading', () => {
     expect(gradingService.getSpeakingGradingStatus).toHaveBeenCalledTimes(2);
     unmount();
   });
+
+  it.each(['completed', 'failed'])('stops immediately on %s', async (status) => {
+    gradingService.getSpeakingGradingStatus.mockResolvedValueOnce({ data: { status } });
+    const { result, unmount } = renderHook(() => useSpeakingGrading('group-1'));
+    await act(async () => { await Promise.resolve(); });
+    expect(result.current.data?.status).toBe(status);
+    expect(result.current.isPolling).toBe(false);
+    await act(async () => { await vi.advanceTimersByTimeAsync(30000); });
+    expect(gradingService.getSpeakingGradingStatus).toHaveBeenCalledTimes(1);
+    unmount();
+  });
 });

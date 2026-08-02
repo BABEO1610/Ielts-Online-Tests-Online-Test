@@ -154,9 +154,11 @@ function ReadingTestPage() {
   const [answers, setAnswers] = useState({});         // { [questionOrder]: string }
   const [currentQuestion, setCurrentQuestion] = useState(null);       // thứ tự câu hỏi đang được làm nổi bật
   const [activePassageNum, setActivePassageNum] = useState(allowedPassageNumbers[0]);
+  const [mobileTab, setMobileTab] = useState('passage');  // 'passage' | 'questions'
   const [showAutoSubmit, setShowAutoSubmit] = useState(false);
   const [showReview, setShowReview] = useState(false);
   const [startTime] = useState(Date.now());
+
 
   // ── Lấy dữ liệu đề thi ──────────────────────────────────────────────────────
   useEffect(() => {
@@ -291,10 +293,26 @@ function ReadingTestPage() {
         practiceMode={practiceMode}
       />
 
+      {/* Mobile Tab Switcher */}
+      <div className="d-flex d-md-none bg-white border-bottom p-2 gap-2 sticky-top" style={{ top: 56, zIndex: 1020 }}>
+        <button
+          className={`btn btn-sm flex-fill rounded-pill ${mobileTab === 'passage' ? 'btn-dark' : 'btn-outline-dark'}`}
+          onClick={() => setMobileTab('passage')}
+        >
+          📖 Bài đọc (P{activePassageNum})
+        </button>
+        <button
+          className={`btn btn-sm flex-fill rounded-pill ${mobileTab === 'questions' ? 'btn-dark' : 'btn-outline-dark'}`}
+          onClick={() => setMobileTab('questions')}
+        >
+          ✍️ Câu hỏi ({activeQuestions.length})
+        </button>
+      </div>
+
       {/* Giao diện chia đôi màn hình */}
       <div className="split-view" style={{ paddingBottom: '80px' }}>
         {/* Bên trái — Nội dung đoạn văn */}
-        <div className="split-left" id="reading-passage-panel">
+        <div className={`split-left ${mobileTab === 'passage' ? 'd-block' : 'd-none d-md-block'}`} id="reading-passage-panel">
           <p className="body-sm-strong mb-2" style={{ color: 'var(--mute)', textTransform: 'uppercase', letterSpacing: 1 }}>
             Passage {activePassageNum}
             {passages.find((p) => p.passageNumber === activePassageNum)?.title
@@ -312,7 +330,7 @@ function ReadingTestPage() {
         </div>
 
         {/* Bên phải — Câu hỏi */}
-        <div className="split-right" id="reading-questions-panel" style={{ paddingBottom: '80px' }}>
+        <div className={`split-right ${mobileTab === 'questions' ? 'd-block' : 'd-none d-md-block'}`} id="reading-questions-panel" style={{ paddingBottom: '80px' }}>
           {activeQuestions.length === 0 ? (
             <p style={{ color: 'var(--mute)', fontStyle: 'italic' }}>Không có câu hỏi cho passage này.</p>
           ) : (

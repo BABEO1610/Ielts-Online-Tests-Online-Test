@@ -14,6 +14,7 @@ const ENV_KEYS = [
   'GOOGLE_AI_API_KEY',
   'GOOGLE_API_KEY',
   'OPENAI_API_KEY',
+  'AI_TRANSCRIPTION_MODEL',
   'AI_TRANSCRIPTION_TIMEOUT_MS',
 ];
 const originalEnv = Object.fromEntries(ENV_KEYS.map((key) => [key, process.env[key]]));
@@ -174,6 +175,29 @@ describe('AI provider configuration', () => {
     await jest.advanceTimersByTimeAsync(5000);
     await transcription;
     jest.useRealTimers();
+  });
+
+  it('honors an explicit Gemini transcription model when both provider keys exist', async () => {
+    process.env.GEMINI_API_KEY = 'test-gemini-key';
+    process.env.OPENAI_API_KEY = 'test-openai-key';
+    process.env.AI_TRANSCRIPTION_MODEL = 'gemini-3.5-flash-lite';
+    global.fetch = jest.fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        arrayBuffer: jest.fn().mockResolvedValue(Buffer.from('audio')),
+        headers: { get: jest.fn(() => 'audio/wav') },
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: jest.fn().mockResolvedValue({
+          candidates: [{ content: { parts: [{ text: 'Test transcript' }] } }],
+        }),
+      });
+
+    await expect(aiService.generateTranscript('https://storage.invalid/audio'))
+      .resolves.toBe('Test transcript');
+    expect(global.fetch.mock.calls[1][0]).toContain('/gemini-3.5-flash-lite:generateContent');
+    expect(global.fetch.mock.calls[1][0]).not.toContain('openai.com');
   });
 
   it('hard-times-out JSON grading even when provider fetch ignores abort', async () => {

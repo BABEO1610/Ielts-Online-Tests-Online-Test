@@ -6,7 +6,18 @@ const path = require('node:path');
 const MAX_INPUT_BYTES = 50 * 1024 * 1024;
 const MAX_DURATION_SECONDS = 15 * 60;
 const MAX_PROCESS_OUTPUT_BYTES = 1024 * 1024;
-const ALLOWED_AUDIO_EXTENSIONS = new Set(['m4a', 'mp3', 'mp4', 'wav']);
+const ALLOWED_AUDIO_EXTENSIONS = new Set(['m4a', 'mp3', 'mp4', 'wav', 'webm', 'ogg']);
+const ALLOWED_AUDIO_CODECS = new Set([
+  'aac', 'alac', 'mp3', 'pcm_s16le', 'pcm_s24le', 'pcm_s32le', 'pcm_f32le',
+  'opus', 'vorbis', 'flac'
+]);
+const MIME_FAMILIES = new Map([
+  ['audio/mpeg', 'mp3'], ['audio/mp3', 'mp3'],
+  ['audio/mp4', 'mp4'], ['audio/x-m4a', 'mp4'],
+  ['audio/wav', 'wav'], ['audio/x-wav', 'wav'],
+  ['audio/webm', 'webm'], ['video/webm', 'webm'],
+  ['audio/ogg', 'ogg']
+]);
 
 class MediaError extends Error {
   constructor(message, code, { retryable = false } = {}) {
@@ -27,6 +38,19 @@ const assertAllowedAudioType = (detected) => {
     throw new MediaError('Magic bytes không thuộc MP3, M4A hoặc WAV được phép.', 'AUDIO_FORMAT_INVALID');
   }
   return { ext: detected.ext.toLowerCase(), mime: String(detected.mime || '').toLowerCase() };
+};
+
+const assertExpectedContentType = (detected, expectedContentType) => {
+  if (!expectedContentType) return;
+  const expectedFamily = MIME_FAMILIES.get(String(expectedContentType).split(';')[0].trim().toLowerCase());
+  const detectedFamily = detected.ext === 'mp3' ? 'mp3'
+    : detected.ext === 'wav' ? 'wav'
+      : ['m4a', 'mp4'].includes(detected.ext) ? 'mp4'
+      : detected.ext === 'webm' ? 'webm'
+      : detected.ext === 'ogg' ? 'ogg' : null;
+  if (!expectedFamily || expectedFamily !== detectedFamily) {
+    throw new MediaError('Storage MIME không khớp magic bytes của audio.', 'AUDIO_MIME_MISMATCH');
+  }
 };
 
 const runProcess = (command, args, { timeoutMs = 30000, spawnImpl = spawn } = {}) => new Promise((resolve, reject) => {
@@ -73,6 +97,9 @@ const validateProbe = (probe) => {
   }
   if (durationSeconds > MAX_DURATION_SECONDS) {
     throw new MediaError('Thời lượng audio vượt quá 15 phút.', 'AUDIO_DURATION_EXCEEDED');
+  }
+  if (!ALLOWED_AUDIO_CODECS.has(String(audio.codec_name || '').toLowerCase())) {
+    throw new MediaError('Audio codec không thuộc danh sách được phê duyệt.', 'AUDIO_CODEC_INVALID');
   }
   return { durationSeconds, codec: audio.codec_name || null, sampleRate: Number(audio.sample_rate) || null, channels: audio.channels || null };
 };
@@ -203,12 +230,13 @@ class AudioNormalizerService {
     this.fileTypeDetector = fileTypeDetector;
   }
 
-  async normalize(audioBuffer) {
+  async normalize(audioBuffer, { expectedContentType } = {}) {
     const input = Buffer.from(audioBuffer || []);
     if (!input.length || input.length > MAX_INPUT_BYTES) {
       throw new MediaError('Kích thước audio không hợp lệ.', 'AUDIO_SIZE_INVALID');
     }
     const detectedType = assertAllowedAudioType(await this.fileTypeDetector(input));
+    assertExpectedContentType(detectedType, expectedContentType);
     const workspace = await fs.mkdtemp(path.join(this.tempRoot, 'ielts-audio-'));
     const inputPath = path.join(workspace, 'input.audio');
     const outputPath = path.join(workspace, 'normalized.wav');

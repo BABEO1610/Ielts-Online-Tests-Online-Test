@@ -8,6 +8,12 @@
 
 **Đầu vào**: Mô tả của người dùng: "Tạo tài liệu đặc tả tính năng (backfill) từ ứng dụng web đã hoàn thành cho chức năng xác thực, bao gồm đăng ký, xác thực email, đăng nhập, đăng xuất, khôi phục mật khẩu, đổi mật khẩu, làm mới phiên (session refresh), điều hướng dựa trên vai trò, và đăng nhập qua Google."
 
+## Clarifications
+
+### Session 2026-08-02
+- Q: Đối với chức năng Phiên hoạt động (Session) và Refresh Token, Access Token / Refresh Token sẽ được lưu trữ ở đâu trên Client? → A: Cookie HttpOnly (Chống XSS, tự động đính kèm vào request, bảo mật nhất)
+- Q: Nếu người dùng đăng nhập bằng Google nhưng email đó đã từng được đăng ký bằng mật khẩu trước đây, hệ thống sẽ xử lý thế nào? → A: Tự động liên kết (merge) tài khoản Google vào tài khoản email đã có
+
 ## Kịch bản Người dùng & Kiểm thử *(bắt buộc)*
 
 ### Kịch bản 1 - Đăng ký và Xác thực Tài khoản (Độ ưu tiên: P1)
@@ -73,35 +79,38 @@ Với tư cách là khách, tôi muốn đăng nhập bằng Google để có th
 
 ### Các trường hợp ngoại lệ (Edge Cases)
 
-- Đăng ký bằng email đã sử dụng sẽ thông báo rõ ràng cho người dùng rằng tài khoản đã tồn tại (ưu tiên UX).
-- Tài khoản ở trạng thái pending, inactive (không hoạt động) hoặc banned (cấm) không thể hoàn tất đăng nhập bình thường.
-- Các nỗ lực đăng nhập sai liên tục sẽ bị khóa (block) tạm thời.
-- Nếu có phiên đăng nhập thứ tư đang kích hoạt cho cùng một tài khoản, hệ thống sẽ thu hồi phiên cũ nhất.
-- Token xác thực/khôi phục bị hết hạn, tái sử dụng hoặc bị thiếu sẽ bị từ chối với thông báo lỗi thân thiện.
+- Đăng nhập bằng Google bằng email đã có tài khoản (đăng ký bằng mật khẩu) sẽ tự động liên kết (merge) tài khoản Google vào tài khoản mật khẩu đó. Nếu là tài khoản Google mới, hệ thống sẽ gửi email chào mừng.
+- Đăng ký bằng email đã sử dụng sẽ thông báo rõ ràng cho người dùng rằng tài khoản đã tồn tại. Việc ngăn chặn dò tìm tài khoản (Enumeration) bằng thông báo chung chung CHỈ áp dụng cho chức năng khôi phục mật khẩu.
+- Tài khoản ở trạng thái `pending`, `banned` không thể hoàn tất đăng nhập (trả về lỗi phân quyền 403). Tài khoản `inactive` cũng không thể đăng nhập cho đến khi được admin kích hoạt lại hoặc tự đổi mật khẩu thành công.
+- Các nỗ lực đăng nhập sai liên tục (5 lần) sẽ bị khóa (block) tạm thời trong 15 phút.
+- Nếu có phiên đăng nhập thứ tư đang kích hoạt cho cùng một tài khoản, hệ thống sẽ tự động thu hồi phiên cũ nhất (duy trì tối đa 3 phiên).
+- Token xác thực/khôi phục bị hết hạn, tái sử dụng hoặc bị thiếu sẽ bị từ chối với thông báo lỗi rõ ràng. Thời hạn token: Verification (24h), Reset Password (1h), Access Token (15m), Refresh Token/Session (7 ngày).
 - Người dùng liên kết qua Google (không có mật khẩu cục bộ) sẽ được hướng dẫn dùng tính năng khôi phục mật khẩu thay vì đổi mật khẩu thông thường.
 - Người dùng đã đăng xuất hoặc hết hạn phiên sẽ bị chuyển hướng về trang đăng nhập trước khi xem các trang được bảo vệ.
+- Khi người dùng `inactive` đặt lại mật khẩu thành công bằng token, hệ thống tự động chuyển trạng thái tài khoản sang `active`.
 
 ## Yêu cầu *(bắt buộc)*
 
 ### Yêu cầu chức năng
 
-- **FR-001**: Hệ thống PHẢI cho phép khách đăng ký với họ tên, địa chỉ email hợp lệ (bất kỳ domain nào), mật khẩu tối thiểu 8 ký tự và xác nhận mật khẩu.
-- **FR-002**: Hệ thống PHẢI yêu cầu tài khoản email/mật khẩu mới xác thực email trước khi truy cập các quyền xác thực bình thường.
-- **FR-003**: Hệ thống PHẢI thông báo rõ ràng khi người dùng đăng ký bằng email đã tồn tại. Việc ngăn chặn dò tìm tài khoản (Enumeration) bằng thông báo chung chung CHỈ áp dụng cho chức năng khôi phục mật khẩu.
-- **FR-004**: Hệ thống PHẢI cho phép người dùng đang hoạt động (active) đăng nhập bằng email và mật khẩu.
-- **FR-005**: Hệ thống PHẢI điều hướng người dùng đã xác thực đến không gian làm việc khớp với vai trò hiện tại của họ.
-- **FR-006**: Hệ thống PHẢI từ chối đăng nhập đối với các tài khoản pending, inactive, banned, đang bị khóa tạm thời hoặc không được phép truy cập nền tảng.
-- **FR-007**: Hệ thống PHẢI theo dõi các lần đăng nhập thất bại và khóa tạm thời các trường hợp thất bại liên tục.
-- **FR-008**: Hệ thống PHẢI duy trì các phiên người dùng an toàn và hỗ trợ gia hạn (refresh) tự động khi phiên đó vẫn còn hiệu lực.
-- **FR-009**: Hệ thống PHẢI cho phép người dùng đăng xuất và kết thúc phiên hiện tại.
-- **FR-010**: Hệ thống PHẢI giới hạn số lượng phiên hoạt động đồng thời trên mỗi tài khoản và thu hồi phiên cũ nhất khi vượt quá giới hạn.
-- **FR-011**: Hệ thống PHẢI cho phép khách yêu cầu khôi phục mật khẩu qua email mà không làm lộ việc tài khoản đó có tồn tại hay không.
-- **FR-012**: Hệ thống PHẢI chỉ cho phép đặt lại mật khẩu với một chứng chỉ (token) hợp lệ, chưa sử dụng và chưa hết hạn.
-- **FR-013**: Hệ thống PHẢI ngăn người dùng sử dụng lại các mật khẩu đã dùng gần đây trong quá trình đặt lại mật khẩu.
+- **FR-001**: Hệ thống PHẢI cho phép khách đăng ký với `full_name`, `email` hợp lệ (bất kỳ domain nào), `password` tối thiểu 8 ký tự và xác nhận mật khẩu.
+- **FR-002**: Hệ thống PHẢI yêu cầu tài khoản email/mật khẩu mới xác thực email trước khi truy cập các quyền xác thực bình thường (verification token có hạn 24h).
+- **FR-003**: Hệ thống PHẢI thông báo rõ ràng lỗi khi người dùng đăng ký bằng email đã tồn tại. Việc ngăn chặn dò tìm tài khoản (Anti-enumeration) CHỈ áp dụng cho chức năng khôi phục mật khẩu.
+- **FR-004**: Hệ thống PHẢI cho phép người dùng đang hoạt động (`active`) đăng nhập bằng email và mật khẩu.
+- **FR-005**: Hệ thống PHẢI điều hướng người dùng đã xác thực đến không gian làm việc khớp với vai trò hiện tại (Student -> `/`, Tutor -> `/tutor/dashboard`, Admin -> `/admin`).
+- **FR-006**: Hệ thống PHẢI từ chối đăng nhập đối với các tài khoản `pending`, `inactive`, `banned` hoặc đang bị khóa tạm thời.
+- **FR-007**: Hệ thống PHẢI theo dõi các lần đăng nhập thất bại và khóa tạm thời (15 phút) sau 5 lần đăng nhập thất bại liên tiếp.
+- **FR-008**: Hệ thống PHẢI duy trì các phiên người dùng an toàn (sử dụng JWT lưu trong HttpOnly cookie) và hỗ trợ gia hạn tự động qua endpoint `/refresh-token` (kiểm tra refresh token và trạng thái tài khoản active).
+- **FR-009**: Hệ thống PHẢI cho phép người dùng đăng xuất (xóa cookie `accessToken` và `refreshToken`) và kết thúc phiên hiện tại.
+- **FR-010**: Hệ thống PHẢI giới hạn số lượng phiên hoạt động đồng thời trên mỗi tài khoản là 3 và thu hồi phiên cũ nhất khi vượt quá.
+- **FR-011**: Hệ thống PHẢI cho phép khách yêu cầu khôi phục mật khẩu qua email mà không làm lộ việc tài khoản đó có tồn tại hay không (trả về HTTP 200 kèm thông báo chung chung).
+- **FR-012**: Hệ thống PHẢI chỉ cho phép đặt lại mật khẩu với một chứng chỉ (token) hợp lệ, chưa sử dụng và chưa hết hạn (thời hạn 1 giờ).
+- **FR-013**: Hệ thống PHẢI ngăn người dùng sử dụng lại 3 mật khẩu đã dùng gần nhất trong quá trình đặt lại mật khẩu bằng giao dịch (atomic transaction).
 - **FR-014**: Hệ thống PHẢI cho phép người dùng đã đăng nhập (có mật khẩu cục bộ) đổi mật khẩu sau khi xác nhận mật khẩu hiện tại.
-- **FR-015**: Hệ thống PHẢI hỗ trợ đăng nhập bằng Google để tạo hoặc truy cập tài khoản, bao gồm xử lý lỗi rõ ràng khi xác thực phía nhà cung cấp thất bại.
-- **FR-016**: Hệ thống KHÔNG BAO GIỜ được lộ mật khẩu, mã khôi phục, hay mã bí mật phiên (session secrets) trong bất kỳ phản hồi nào tới người dùng.
-- **FR-017**: Hệ thống PHẢI cung cấp tính năng bật/tắt hiển thị mật khẩu (show/hide password toggle) tại tất cả các ô nhập mật khẩu trên giao diện để cải thiện trải nghiệm người dùng.
+- **FR-015**: Hệ thống PHẢI hỗ trợ đăng nhập bằng Google để tạo hoặc truy cập tài khoản, bao gồm xử lý lỗi mạng/callback bằng cách điều hướng về trang đăng nhập với mã lỗi rõ ràng.
+- **FR-016**: Hệ thống KHÔNG BAO GIỜ được lộ `password_hash`, mã khôi phục, hay mã bí mật phiên (session secrets) trong bất kỳ phản hồi nào tới người dùng. Token phải được băm SHA-256 trước khi lưu vào database.
+- **FR-017**: Hệ thống PHẢI cung cấp tính năng bật/tắt hiển thị mật khẩu tại tất cả các ô nhập mật khẩu trên giao diện (login, register, reset, change password).
+- **FR-018**: Hệ thống PHẢI lưu trữ Access Token và Refresh Token sử dụng cơ chế HttpOnly, Secure, SameSite Cookie (Strict cho form login thông thường, Lax cho OAuth callback).
 
 ### Các thực thể chính (Key Entities)
 
@@ -116,14 +125,14 @@ Với tư cách là khách, tôi muốn đăng nhập bằng Google để có th
 
 ### Kết quả có thể đo lường
 
-- **SC-001**: Ít nhất 95% các đăng ký hợp lệ hiển thị hướng dẫn xác thực email trong vòng dưới 5 giây.
-- **SC-002**: Ít nhất 95% các lần đăng nhập hợp lệ truy cập đúng workspace trong vòng dưới 3 giây sau khi gửi yêu cầu.
-- **SC-003**: 100% các trang được bảo vệ điều hướng người dùng chưa xác thực về trang đăng nhập trước khi hiển thị nội dung.
+- **SC-001**: Ít nhất 95% các đăng ký hợp lệ nhận phản hồi API thành công trong vòng dưới 5 giây (chưa tính độ trễ gửi email thực tế).
+- **SC-002**: Ít nhất 95% các lần đăng nhập hợp lệ nhận phản hồi API trong vòng dưới 3 giây.
+- **SC-003**: 100% các trang được bảo vệ điều hướng người dùng chưa xác thực về trang đăng nhập trước khi hiển thị nội dung (kiểm thử tự động).
 - **SC-004**: 100% các yêu cầu khôi phục mật khẩu hiển thị thông báo chống dò tìm bất kể tài khoản có tồn tại hay không.
-- **SC-005**: Các nỗ lực nhập sai mật khẩu liên tục sẽ bị khóa hoặc giới hạn lưu lượng (throttle) trong vòng 5 lần thất bại liên tiếp.
+- **SC-005**: Các nỗ lực nhập sai mật khẩu 5 lần liên tiếp sẽ bị khóa đăng nhập trong 15 phút.
 - **SC-006**: Không người dùng nào duy trì hơn 3 phiên hoạt động cùng một lúc.
-- **SC-007**: 100% các nỗ lực đặt lại mật khẩu bằng các chứng chỉ hết hạn, đã sử dụng hoặc không hợp lệ đều thất bại và không làm đổi mật khẩu.
-- **SC-008**: Người dùng có thể hoàn tất quy trình đặt lại mật khẩu hoặc đổi mật khẩu trong dưới 2 phút khi họ có đầy đủ thông tin yêu cầu.
+- **SC-007**: 100% các nỗ lực đặt lại mật khẩu bằng các chứng chỉ hết hạn, đã sử dụng hoặc không hợp lệ đều thất bại.
+- **SC-008**: Người dùng có thể hoàn tất quy trình đặt lại mật khẩu hoặc đổi mật khẩu trong dưới 2 phút (tính từ khi mở form có token hợp lệ).
 
 ## Giả định
 
