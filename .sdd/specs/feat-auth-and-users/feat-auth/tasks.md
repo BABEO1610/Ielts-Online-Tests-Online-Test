@@ -87,7 +87,7 @@
 - [x] T032 [US2] Đảm bảo login xác minh trạng thái active, trạng thái khóa, và các lỗi đăng nhập chung trong `backend/src/services/auth.service.js`
 - [x] T033 [US2] Đảm bảo theo dõi các lần đăng nhập thất bại (failed login) và khôi phục về không khi login thành công qua parameterized queries trong `backend/src/db/queries/users.queries.js`
 - [x] T034 [US2] Đảm bảo áp đặt tối đa 3 sessions (max-three-session) sẽ thu hồi session đang hoạt động cũ nhất trong `backend/src/db/queries/sessions.queries.js`
-- [x] T035 [US2] Đảm bảo login controller thiết lập các secure cookies và chỉ trả về safe user data (không chứa mật khẩu) trong `backend/src/controllers/auth.controller.js`
+- [x] T035 [US2] Đảm bảo login controller thiết lập các HttpOnly secure cookies và chỉ trả về safe user data (không chứa mật khẩu) trong `backend/src/controllers/auth.controller.js`
 - [x] T036 [US2] Đảm bảo AuthContext lưu trữ user state an toàn và cung cấp các phương thức login/logout/refreshUser trong `frontend/src/context/AuthContext.jsx`
 - [x] T037 [US2] Đảm bảo LoginForm điều hướng (redirects) student/tutor/admin tới đúng workspace paths trong `frontend/src/components/auth/LoginForm.jsx`
 - [x] T038 [US2] Đảm bảo ProtectedRoute điều hướng các roles không được uỷ quyền (unauthorized) mà không render nội dung được bảo vệ trong `frontend/src/components/auth/ProtectedRoute.jsx`
@@ -142,7 +142,7 @@
 
 - [x] T056 [US4] Đảm bảo Google redirect xây dựng URL từ env config và thiết lập state cookie trong `backend/src/controllers/auth.controller.js`
 - [x] T057 [US4] Đảm bảo Google callback kiểm tra (validates) state trước khi trao đổi code (exchanging code) trong `backend/src/controllers/auth.controller.js`
-- [x] T058 [US4] Đảm bảo Google profile upsert tạo hoặc cập nhật các student accounts ở trạng thái active và link OAuth trong `backend/src/db/queries/users.queries.js`
+- [x] T058 [US4] Đảm bảo Google profile upsert tạo hoặc tự động merge (nếu trùng email) các student accounts ở trạng thái active và link OAuth trong `backend/src/db/queries/users.queries.js`
 - [x] T059 [US4] Đảm bảo OAuth login tạo các sessions với trường `is_oauth` và `oauth_provider` trong `backend/src/services/auth.service.js`
 - [x] T060 [US4] Đảm bảo Google callback điều hướng (redirects) các trạng thái success/error về các tuyến (routes) trên frontend trong `backend/src/controllers/auth.controller.js`
 - [x] T061 [US4] Đảm bảo nút Google login sử dụng `/api/v1/auth/google` và hiển thị các lỗi dễ dàng thử lại (retry-friendly errors) trong `frontend/src/components/auth/GoogleLoginButton.jsx`

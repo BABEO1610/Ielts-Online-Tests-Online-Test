@@ -24,7 +24,7 @@ Thiết kế backfill cho các chức năng bảo vệ theo vai trò (role guard
 
 **Mục tiêu Hiệu suất (Performance Goals)**: 95% thao tác tìm kiếm/lọc người dùng phản hồi dưới 3 giây; admin có thể thu hồi (revoke) một session trong vòng 10 giây.
 
-**Ràng buộc (Constraints)**: Các route chỉ dành cho admin; id/role của người thao tác (actor) lấy từ auth middleware; admin không thể thay đổi role/status của chính mình; thay đổi status/role sẽ thu hồi các phiên đăng nhập (sessions) của mục tiêu; hành động được ghi lại vào nhật ký kiểm toán (audit trail).
+**Ràng buộc (Constraints)**: Các route chỉ dành cho admin; id/role của người thao tác (actor) lấy từ auth middleware; admin không thể thay đổi role/status của chính mình; thay đổi status/role sẽ thu hồi các phiên đăng nhập (sessions) của mục tiêu; tự động gỡ bỏ (unassign) các bài chấm chưa hoàn thành nếu Tutor bị giáng quyền xuống Student; hành động được ghi lại vào nhật ký kiểm toán (audit trail).
 
 **Quy mô/Phạm vi (Scale/Scope)**: Các roles gồm student/tutor/admin và các status tài khoản gồm pending/active/inactive/banned.
 

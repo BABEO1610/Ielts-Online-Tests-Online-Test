@@ -6,7 +6,7 @@
 
 ## Tóm tắt (Summary)
 
-Thiết kế backfill cho đăng ký, xác thực email, đăng nhập/đăng xuất, xử lý refresh token, khôi phục/đổi mật khẩu, điều hướng dựa trên vai trò (role-aware redirects), giới hạn session, khóa khi đăng nhập sai (failed-login lockout), và Google OAuth bằng cách sử dụng auth service Express hiện tại, các bảng PostgreSQL, JWT cookies, và các trang/context xác thực của React. Bao gồm tính năng bật/tắt hiển thị mật khẩu (password visibility toggle) có thể tái sử dụng để cải thiện UX trên frontend.
+Thiết kế backfill cho đăng ký, xác thực email, đăng nhập/đăng xuất, xử lý refresh token, khôi phục/đổi mật khẩu, điều hướng dựa trên vai trò (role-aware redirects), giới hạn session, khóa khi đăng nhập sai (failed-login lockout), và Google OAuth (có tự động merge tài khoản trùng email) bằng cách sử dụng auth service Express hiện tại, các bảng PostgreSQL, HttpOnly JWT cookies, và các trang/context xác thực của React. Bao gồm tính năng bật/tắt hiển thị mật khẩu (password visibility toggle) có thể tái sử dụng để cải thiện UX trên frontend.
 
 ## Bối cảnh Kỹ thuật (Technical Context)
 
@@ -24,7 +24,7 @@ Thiết kế backfill cho đăng ký, xác thực email, đăng nhập/đăng xu
 
 **Mục tiêu Hiệu suất (Performance Goals)**: 95% số lần đăng ký hợp lệ phản hồi trong vòng 5 giây; 95% số lần đăng nhập hợp lệ điều hướng (redirect) trong vòng 3 giây.
 
-**Ràng buộc (Constraints)**: Không được phép dò tìm tài khoản (account enumeration); tối đa 3 sessions hoạt động; reset tokens chỉ dùng một lần và có thời hạn; lịch sử mật khẩu ngăn chặn sử dụng lại 3 mật khẩu gần nhất; các mã bí mật (secrets) chỉ lưu trong env; không bao giờ trả về mật khẩu/tokens dạng raw.
+**Ràng buộc (Constraints)**: Không được phép dò tìm tài khoản (account enumeration) tại endpoint forgot-password; tối đa 3 sessions hoạt động; reset tokens chỉ dùng một lần và có thời hạn (1h); lịch sử mật khẩu ngăn chặn sử dụng lại 3 mật khẩu gần nhất; các mã bí mật (secrets) chỉ lưu trong env; không bao giờ trả về mật khẩu/tokens dạng raw. Cookie `sameSite` là `strict` đối với login/refresh và `lax` đối với Google OAuth callback. Yêu cầu có CSRF state parameter bảo vệ Google OAuth flow. Lỗi được xử lý qua centralized error handler để tránh rò rỉ stack traces.
 
 **Quy mô/Phạm vi (Scale/Scope)**: Xác thực bằng Email/mật khẩu và Google cho các roles: student, tutor, admin.
 

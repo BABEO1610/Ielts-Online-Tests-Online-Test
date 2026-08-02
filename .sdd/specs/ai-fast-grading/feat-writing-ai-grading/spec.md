@@ -65,20 +65,20 @@ Là học viên, tôi muốn xem lại kết quả từ lịch sử hoặc nhậ
 
 ### Yêu cầu chức năng
 
-- **WFR-001**: Mọi endpoint ghi dữ liệu PHẢI xác thực học viên và lấy `user_id` từ phiên đăng nhập.
-- **WFR-002**: Full submission PHẢI có đúng Task 1 và Task 2, không thiếu hoặc trùng `task_number`.
-- **WFR-003**: AI submission PHẢI kiểm tra tối thiểu 50 từ cho Task 1 và 100 từ cho Task 2 trước quota và provider call.
-- **WFR-004**: Nội dung Writing PHẢI được chuẩn hóa/sanitize nhưng không được làm thay đổi ý nghĩa bài viết.
-- **WFR-005**: AI submission PHẢI có `Idempotency-Key`; replay cùng payload trả kết quả cũ, còn cùng khóa khác payload hoặc cùng fingerprint khác khóa bị từ chối.
-- **WFR-006**: Hai submission cùng group và root grading job PHẢI được tạo nguyên tử; bài tutor không tạo AI job.
-- **WFR-007**: Original AI group PHẢI dùng quota chung tối đa 10 lượt/người/ngày UTC; replay hợp lệ không tính thêm.
-- **WFR-008**: Mọi lời gọi chấm PHẢI đi qua `backend/src/ai/grading.service.js`, có timeout, validate output và usage metadata an toàn.
-- **WFR-009**: Mỗi Task PHẢI có bốn criterion band hợp lệ và band tổng; không lưu raw provider output làm response công khai.
-- **WFR-010**: Overall Writing Band PHẢI do backend tính từ Task 1/Task 2 theo trọng số 1/3 và 2/3, làm tròn nửa band.
-- **WFR-011**: Chỉ khi cả hai Task thành công, group mới chuyển `ai_graded`; nếu có lỗi, `ai_status=failed` và Overall `null`.
-- **WFR-012**: API PHẢI dùng envelope `{ success, data, error, meta }`; chi tiết validation thuộc `error.details`, request ID thuộc `meta`.
-- **WFR-013**: Lịch sử và feedback PHẢI giới hạn theo owner/role và không trả stack trace, prompt thô, khóa provider hoặc diagnostic nhạy cảm.
-- **WFR-014**: Luồng chấm Writing hiện tại là xử lý nền trong API process; tài liệu không được mô tả nó như worker bền vững của Speaking khi chưa có thay đổi code tương ứng.
+- **FR-001**: Mọi endpoint ghi dữ liệu PHẢI xác thực học viên và lấy `user_id` từ phiên đăng nhập.
+- **FR-002**: Full submission PHẢI có đúng Task 1 và Task 2, không thiếu hoặc trùng `task_number`.
+- **FR-003**: AI submission PHẢI kiểm tra tối thiểu 50 từ cho Task 1 và 100 từ cho Task 2 trước quota và provider call.
+- **FR-004**: Nội dung Writing PHẢI được chuẩn hóa/sanitize nhưng không được làm thay đổi ý nghĩa bài viết.
+- **FR-005**: AI submission PHẢI có `Idempotency-Key`; replay cùng payload trả kết quả cũ, còn cùng khóa khác payload hoặc cùng fingerprint khác khóa bị từ chối.
+- **FR-006**: Hai submission cùng group và root grading job PHẢI được tạo nguyên tử; bài tutor không tạo AI job.
+- **FR-007**: Original AI group PHẢI dùng quota chung tối đa 10 lượt/người/ngày UTC; replay hợp lệ không tính thêm.
+- **FR-008**: Mọi lời gọi chấm PHẢI đi qua `backend/src/ai/grading.service.js`, có timeout, validate output và usage metadata an toàn.
+- **FR-009**: Mỗi Task PHẢI có bốn criterion band hợp lệ và band tổng; không lưu raw provider output làm response công khai.
+- **FR-010**: Overall Writing Band PHẢI do backend tính từ Task 1/Task 2 theo trọng số 1/3 và 2/3, làm tròn nửa band.
+- **FR-011**: Chỉ khi cả hai Task thành công, group mới chuyển `ai_graded`; nếu có lỗi, `ai_status=failed` và Overall `null`.
+- **FR-012**: API PHẢI dùng envelope `{ success, data, error, meta }`; chi tiết validation thuộc `error.details`, request ID thuộc `meta`.
+- **FR-013**: Lịch sử và feedback PHẢI giới hạn theo owner/role và không trả stack trace, prompt thô, khóa provider hoặc diagnostic nhạy cảm.
+- **FR-014**: Luồng chấm Writing hiện tại là xử lý nền trong API process; tài liệu không được mô tả nó như worker bền vững của Speaking khi chưa có thay đổi code tương ứng.
 
 ### Thực thể chính
 

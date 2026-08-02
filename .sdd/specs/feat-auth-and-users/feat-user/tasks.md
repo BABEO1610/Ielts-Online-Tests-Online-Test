@@ -95,7 +95,7 @@
 
 ### Kiểm thử cho User Story 3
 
-- [x] T030 [P] [US3] Thêm các bài test thay đổi role ở service, bao gồm việc từ chối tự thay đổi (self-change rejection) trong `backend/tests/unit/services/users.profile.test.js`
+- [x] T030 [P] [US3] Thêm các bài test thay đổi role ở service, bao gồm việc từ chối tự thay đổi (self-change rejection) và tự động unassign bài chấm của Tutor trong `backend/tests/unit/services/users.profile.test.js`
 - [x] T031 [P] [US3] Thêm các bài test thay đổi status ở service, bao gồm thu hồi session cho các trường hợp inactive/banned trong `backend/tests/unit/services/users.profile.test.js`
 - [x] T032 [P] [US3] Thêm các bài test admin role/status endpoint trong `backend/tests/unit/controllers/users.controller.test.js`
 - [x] T033 [P] [US3] Thêm các bài test về save/error của UserModals trong `frontend/tests/components/admin/UserModals.test.jsx`
@@ -103,7 +103,7 @@
 ### Triển khai cho User Story 3
 
 - [x] T034 [US3] Đảm bảo `changeUserRole` chặn hành động tự thay đổi và khi không tìm thấy mục tiêu (missing targets) trong `backend/src/services/users.service.js`
-- [x] T035 [US3] Đảm bảo `changeUserRole` thu hồi các sessions của user mục tiêu sau khi đổi role thành công trong `backend/src/services/users.service.js`
+- [x] T035 [US3] Đảm bảo `changeUserRole` thu hồi các sessions của user mục tiêu và tự động gỡ bỏ (unassign) các bài chấm nếu Tutor bị giáng quyền trong `backend/src/services/users.service.js`
 - [x] T036 [US3] Đảm bảo `changeUserStatus` chặn hành động tự thay đổi và khi không tìm thấy mục tiêu trong `backend/src/services/users.service.js`
 - [x] T037 [US3] Đảm bảo `changeUserStatus` thu hồi các sessions khi status đổi thành inactive hoặc banned trong `backend/src/services/users.service.js`
 - [x] T038 [US3] Đảm bảo các role/status endpoints validate dữ liệu từ request body trong `backend/src/controllers/admin.controller.js`
