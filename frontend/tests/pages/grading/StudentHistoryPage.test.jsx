@@ -204,7 +204,7 @@ describe('StudentHistoryPage', () => {
     });
     gradingService.retrySpeakingGrading.mockResolvedValue({ success: true });
     render(<MemoryRouter><StudentHistoryPage /></MemoryRouter>);
-    expect(await screen.findByText('Chờ tutor xác nhận')).toBeInTheDocument();
+    expect(await screen.findByText('Trạng thái AI legacy cần xem xét')).toBeInTheDocument();
     expect(screen.getAllByText('—')).toHaveLength(2);
     fireEvent.click(screen.getByRole('button', { name: 'Thử lại một lần' }));
     await waitFor(() => expect(gradingService.retrySpeakingGrading).toHaveBeenCalledWith('group-failed'));

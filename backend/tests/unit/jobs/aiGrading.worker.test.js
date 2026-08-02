@@ -37,6 +37,14 @@ const worker = () => new AiGradingWorker({
 describe('AI grading worker fencing and retry', () => {
   beforeEach(() => jest.clearAllMocks());
 
+  test('does not claim jobs when the Speaking async feature flag is disabled', async () => {
+    const instance = worker();
+    instance.config = { ...instance.config, enabled: false };
+
+    await expect(instance.runOnce()).resolves.toEqual({ status: 'disabled' });
+    expect(jobQueries.claimNextJob).not.toHaveBeenCalled();
+  });
+
   test('claims only a Speaking job and passes the persisted generation', async () => {
     jobQueries.claimNextJob.mockResolvedValue({ ...job });
     const instance = worker();
@@ -75,6 +83,75 @@ describe('AI grading worker fencing and retry', () => {
     expect(isRetryable(Object.assign(new Error('bad checksum'), { errorCode: 'AUDIO_SHA256_MISMATCH' }))).toBe(false);
     expect(isRetryable(Object.assign(new Error('bad bundle'), { errorCode: 'CALIBRATION_SIGNATURE_INVALID' }))).toBe(false);
     expect(isRetryable(Object.assign(new Error('invalid score'), { errorCode: 'SPEAKING_EVIDENCE_INVALID' }))).toBe(false);
+  });
+
+  test('honors provider Retry-After for a retryable 5xx failure', async () => {
+    jobQueries.claimNextJob.mockResolvedValue({ ...job });
+    jobQueries.scheduleRetry.mockResolvedValue({ id: job.id });
+    const instance = worker();
+    instance.processJob = jest.fn().mockRejectedValue(Object.assign(
+      new Error('provider unavailable'),
+      { statusCode: 500, providerStatus: 503, retryable: true, retryAfterSeconds: 30 }
+    ));
+
+    await expect(instance.runOnce()).resolves.toEqual({ status: 'retry_wait' });
+    expect(jobQueries.scheduleRetry).toHaveBeenCalledWith(instance.pool, expect.objectContaining({
+      runAfter: '2026-07-22T00:00:30.000Z',
+    }));
+  });
+
+  test('fails terminally after the provider retry budget is exhausted', async () => {
+    jobQueries.claimNextJob.mockResolvedValue({ ...job, attempt_count: 2, max_attempts: 2 });
+    const instance = worker();
+    instance.processJob = jest.fn().mockRejectedValue(Object.assign(
+      new Error('provider unavailable'),
+      { statusCode: 500, retryable: true }
+    ));
+    instance.grading.finalizeFailed.mockResolvedValue({ status: 'failed' });
+
+    await expect(instance.runOnce()).resolves.toEqual({ status: 'failed' });
+    expect(jobQueries.scheduleRetry).not.toHaveBeenCalled();
+    expect(instance.grading.finalizeFailed).toHaveBeenCalledWith(expect.objectContaining({
+      provider: expect.objectContaining({ retryable: true }),
+    }));
+  });
+
+  test('retries a provider timeout while attempt budget remains', async () => {
+    jobQueries.claimNextJob.mockResolvedValue({ ...job });
+    jobQueries.scheduleRetry.mockResolvedValue({ id: job.id });
+    const instance = worker();
+    instance.processJob = jest.fn().mockRejectedValue(Object.assign(
+      new Error('provider timed out'),
+      { errorCode: 'AI_PROVIDER_TIMEOUT', retryable: true }
+    ));
+
+    await expect(instance.runOnce()).resolves.toEqual({ status: 'retry_wait' });
+    expect(jobQueries.scheduleRetry).toHaveBeenCalledTimes(1);
+  });
+
+  test('downloads and analyzes all three Speaking Parts before scoring', async () => {
+    jobQueries.heartbeatJob.mockResolvedValue({ id: job.id });
+    const instance = worker();
+    instance.evidence = {
+      processPart: jest.fn(async ({ submission }) => ({
+        id: `artifact-${submission.part_number}`,
+        status: 'complete',
+        display_transcript: `Transcript ${submission.part_number}`,
+      })),
+    };
+    const parts = [1, 2, 3].map((partNumber) => ({
+      id: `part-${partNumber}`,
+      part_number: partNumber,
+      prompt_text: `Prompt ${partNumber}`,
+      audio_storage_key: `private/part-${partNumber}.m4a`,
+    }));
+
+    await expect(instance.analyzeParts(job, parts)).resolves.toEqual([
+      expect.objectContaining({ id: 'artifact-1', part_number: 1, status: 'complete' }),
+      expect.objectContaining({ id: 'artifact-2', part_number: 2, status: 'complete' }),
+      expect.objectContaining({ id: 'artifact-3', part_number: 3, status: 'complete' }),
+    ]);
+    expect(instance.evidence.processPart).toHaveBeenCalledTimes(3);
   });
 
   test('publishes an estimated full-audio result without requiring a calibration bundle', async () => {

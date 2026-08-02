@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, NavLink, useNavigate, Outlet } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { Menu, X } from 'lucide-react';
 import ChangePwdModal from '../components/profile/ChangePwdModal';
 
 const SIDEBAR_WIDTH = 220;
@@ -8,10 +9,11 @@ const SIDEBAR_WIDTH = 220;
 const getInitials = (name = '') =>
   name.split(' ').slice(-1)[0]?.charAt(0)?.toUpperCase() || '?';
 
-const SidebarLink = ({ to, label, badge }) => (
+const SidebarLink = ({ to, label, badge, onClick }) => (
   <NavLink
     to={to}
     end
+    onClick={onClick}
     style={({ isActive }) => ({
       display: 'flex',
       alignItems: 'center',
@@ -61,82 +63,89 @@ const SidebarSection = ({ title, children }) => (
   </div>
 );
 
-const TutorSidebar = () => {
+const TutorSidebar = ({ isOpen, onClose }) => {
   return (
-    <aside
-      style={{
-        position: 'fixed', top: 0, left: 0, bottom: 0,
-        width: `${SIDEBAR_WIDTH}px`,
-        backgroundColor: '#fff',
-        borderRight: '1px solid #e8e8e8',
-        overflowY: 'auto',
-        zIndex: 90,
-        display: 'flex',
-        flexDirection: 'column',
-        padding: '16px 10px',
-        fontFamily: 'UberMoveText, system-ui, sans-serif',
-      }}
-    >
-      <div style={{ flex: 1 }}>
-        {/* Logo */}
-        <Link
-          to="/tutor/dashboard"
-          style={{ textDecoration: 'none', padding: '4px 14px 20px', display: 'flex', alignItems: 'center', gap: '8px' }}
-        >
-          <span style={{
-            fontFamily: 'UberMove, system-ui, sans-serif',
-            fontWeight: 700, fontSize: '20px', color: '#c92a2a', // Màu đỏ giống hình
-          }}>
-            IELTSZone
-          </span>
-          <span style={{
-            display: 'inline-block',
-            backgroundColor: '#000', color: '#fff',
-            fontSize: '11px', fontWeight: 700,
-            padding: '2px 8px', borderRadius: '999px',
-          }}>
-            Tutor
-          </span>
-        </Link>
+    <>
+      {/* Mobile backdrop */}
+      <div
+        className={`tutor-sidebar-backdrop${isOpen ? ' show' : ''}`}
+        onClick={onClose}
+      />
 
-        {/* TỔNG QUAN */}
-        <SidebarSection title="Tổng quan">
-          <SidebarLink to="/tutor/dashboard" label="Tổng quan" />
-          <SidebarLink to="/tutor/activity-log" label="Nhật ký hoạt động" />
-        </SidebarSection>
+      <aside
+        className={`tutor-sidebar${isOpen ? ' open' : ''}`}
+      >
+        <div style={{ flex: 1 }}>
+          {/* Logo & Mobile Close */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 14px 20px' }}>
+            <Link
+              to="/tutor/dashboard"
+              onClick={onClose}
+              style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '8px' }}
+            >
+              <span style={{
+                fontFamily: 'UberMove, system-ui, sans-serif',
+                fontWeight: 700, fontSize: '20px', color: '#c92a2a',
+              }}>
+                IELTSZone
+              </span>
+              <span style={{
+                display: 'inline-block',
+                backgroundColor: '#000', color: '#fff',
+                fontSize: '11px', fontWeight: 700,
+                padding: '2px 8px', borderRadius: '999px',
+              }}>
+                Tutor
+              </span>
+            </Link>
+            <button
+              onClick={onClose}
+              className="tutor-mobile-close-btn"
+              aria-label="Close sidebar"
+            >
+              <X size={20} />
+            </button>
+          </div>
 
-        {/* CHẤM BÀI */}
-        <SidebarSection title="Chấm bài">
-          <SidebarLink to="/grading/tutor/queue" label="Hàng chờ chấm" />
-          <SidebarLink to="/grading/tutor/schedule" label="Lịch sử chấm" />
-          <SidebarLink to="/grading/tutor/ai-reference" label="AI tham khảo" />
-        </SidebarSection>
+          {/* TỔNG QUAN */}
+          <SidebarSection title="Tổng quan">
+            <SidebarLink to="/tutor/dashboard" label="Tổng quan" onClick={onClose} />
+            <SidebarLink to="/tutor/activity-log" label="Nhật ký hoạt động" onClick={onClose} />
+          </SidebarSection>
 
-        {/* TÀI NGUYÊN */}
-        <SidebarSection title="Tài nguyên">
-          <SidebarLink to="/tutor/tests" label="Ngân hàng đề" />
-          <SidebarLink to="/tutor/library" label="Thư viện tài liệu" />
-        </SidebarSection>
+          {/* CHẤM BÀI */}
+          <SidebarSection title="Chấm bài">
+            <SidebarLink to="/grading/tutor/queue" label="Hàng chờ chấm" onClick={onClose} />
+            <SidebarLink to="/grading/tutor/schedule" label="Lịch sử chấm" onClick={onClose} />
+            <SidebarLink to="/grading/tutor/ai-reference" label="AI tham khảo" onClick={onClose} />
+          </SidebarSection>
 
-        {/* CÀI ĐẶT */}
-        <SidebarSection title="Cài đặt">
-          <SidebarLink to="/tutor/profile" label="Cài đặt" />
-        </SidebarSection>
-      </div>
+          {/* TÀI NGUYÊN */}
+          <SidebarSection title="Tài nguyên">
+            <SidebarLink to="/tutor/tests" label="Ngân hàng đề" onClick={onClose} />
+            <SidebarLink to="/tutor/library" label="Thư viện tài liệu" onClick={onClose} />
+          </SidebarSection>
 
-      <div style={{
-        padding: '16px 14px',
-        borderTop: '1px solid #e8e8e8',
-        fontSize: '11px', color: '#888',
-      }}>
-        <div style={{ marginBottom: '4px' }}>IELTSZone - v1.0</div>
-        <div>Bảng điều khiển quản trị</div>
-      </div>
-    </aside>
+          {/* CÀI ĐẶT */}
+          <SidebarSection title="Cài đặt">
+            <SidebarLink to="/tutor/profile" label="Cài đặt" onClick={onClose} />
+          </SidebarSection>
+        </div>
+
+        <div style={{
+          padding: '16px 14px',
+          borderTop: '1px solid #e8e8e8',
+          fontSize: '11px', color: '#888',
+        }}>
+          <div style={{ marginBottom: '4px' }}>IELTSZone - v1.0</div>
+          <div>Bảng điều khiển quản trị</div>
+        </div>
+      </aside>
+    </>
   );
 };
 
-const TutorTopbar = () => {
+const TutorTopbar = ({ onToggleMobileNav }) => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -149,22 +158,19 @@ const TutorTopbar = () => {
 
   return (
     <>
-      <header
-        style={{
-          position: 'fixed',
-          top: 0, left: `${SIDEBAR_WIDTH}px`, right: 0,
-          height: '56px',
-          backgroundColor: '#fff',
-          borderBottom: '1px solid #e8e8e8',
-          zIndex: 80,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '0 28px',
-          fontFamily: 'UberMoveText, system-ui, sans-serif',
-        }}
-      >
-        <div /> {/* Trống bên trái */}
+      <header className="tutor-topbar">
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <button
+            onClick={onToggleMobileNav}
+            className="tutor-mobile-toggle-btn"
+            aria-label="Toggle menu"
+          >
+            <Menu size={20} />
+          </button>
+          <span style={{ fontSize: '15px', fontWeight: 600, display: 'inline-block' }} className="d-lg-none">
+            IELTSZone Tutor
+          </span>
+        </div>
 
         {/* Right — User dropdown */}
         <div style={{ position: 'relative' }}>
@@ -193,8 +199,8 @@ const TutorTopbar = () => {
                 {getInitials(user?.full_name)}
               </div>
             )}
-            <span style={{ color: '#000', marginLeft: '4px' }}>
-              {user?.full_name || 'Huong Duong'}
+            <span style={{ color: '#000', marginLeft: '4px' }} className="d-none d-sm-inline">
+              {user?.full_name || 'Giảng viên'}
             </span>
           </button>
 
@@ -256,15 +262,96 @@ const TutorTopbar = () => {
 };
 
 const TutorLayout = () => {
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+
   return (
     <div style={{ backgroundColor: '#f7f7f7', minHeight: '100vh', fontFamily: 'UberMoveText, system-ui, sans-serif' }}>
-      <TutorSidebar />
-      <TutorTopbar />
+      <style>{`
+        .tutor-sidebar {
+          position: fixed; top: 0; left: 0; bottom: 0;
+          width: ${SIDEBAR_WIDTH}px;
+          background-color: #fff;
+          border-right: 1px solid #e8e8e8;
+          overflow-y: auto;
+          z-index: 999;
+          display: flex;
+          flex-direction: column;
+          padding: 16px 10px;
+          transition: transform 0.25s ease-in-out;
+        }
+        .tutor-topbar {
+          position: fixed;
+          top: 0; left: ${SIDEBAR_WIDTH}px; right: 0;
+          height: 56px;
+          background-color: #fff;
+          border-bottom: 1px solid #e8e8e8;
+          z-index: 80;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 0 28px;
+        }
+        .tutor-main-content {
+          margin-left: ${SIDEBAR_WIDTH}px;
+          margin-top: 56px;
+          padding: 24px;
+        }
+        .tutor-mobile-toggle-btn {
+          display: none;
+          background: transparent;
+          border: 1px solid #e8e8e8;
+          border-radius: 8px;
+          padding: 6px 10px;
+          cursor: pointer;
+        }
+        .tutor-mobile-close-btn {
+          display: none;
+          background: transparent;
+          border: none;
+          padding: 4px;
+          cursor: pointer;
+          color: #666;
+        }
+        .tutor-sidebar-backdrop {
+          display: none;
+          position: fixed;
+          top: 0; left: 0; right: 0; bottom: 0;
+          background: rgba(0, 0, 0, 0.5);
+          z-index: 998;
+        }
+        @media (max-width: 992px) {
+          .tutor-sidebar {
+            transform: translateX(-100%);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+          }
+          .tutor-sidebar.open {
+            transform: translateX(0);
+          }
+          .tutor-sidebar-backdrop.show {
+            display: block;
+          }
+          .tutor-topbar {
+            left: 0;
+            padding: 0 16px;
+          }
+          .tutor-main-content {
+            margin-left: 0;
+            padding: 16px;
+          }
+          .tutor-mobile-toggle-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+          }
+          .tutor-mobile-close-btn {
+            display: inline-flex;
+          }
+        }
+      `}</style>
+      <TutorSidebar isOpen={mobileNavOpen} onClose={() => setMobileNavOpen(false)} />
+      <TutorTopbar onToggleMobileNav={() => setMobileNavOpen(prev => !prev)} />
 
-      <main style={{
-        marginLeft: `${SIDEBAR_WIDTH}px`,
-        marginTop: '56px',
-      }}>
+      <main className="tutor-main-content">
         <Outlet />
       </main>
     </div>
@@ -272,3 +359,4 @@ const TutorLayout = () => {
 };
 
 export default TutorLayout;
+

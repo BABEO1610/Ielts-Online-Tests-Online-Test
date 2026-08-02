@@ -67,23 +67,22 @@ const assignSubmission = async (actorId, submissionId, type, tutorId) => {
     targetTable,
     submissionId,
     {
-      tutor_id:        submission.assigned_tutor_id || null,
-      tutor_name:      submission.tutor_name        || null,
-      tutor_email:     submission.tutor_email       || null,
-      student_name:    submission.student_name      || null,
+      tutor_id: submission.assigned_tutor_id || null,
+      tutor_name: submission.tutor_name || null,
+      tutor_email: submission.tutor_email || null,
+      student_name: submission.student_name || null,
       submission_type: type,
     },
     {
-      tutor_id:        updatedSubmission.assigned_tutor_id || null,
-      tutor_name:      updatedSubmission.tutor_name        || null,
-      tutor_email:     updatedSubmission.tutor_email       || null,
-      student_name:    updatedSubmission.student_name      || null,
+      tutor_id: updatedSubmission.assigned_tutor_id || null,
+      tutor_name: updatedSubmission.tutor_name || null,
+      tutor_email: updatedSubmission.tutor_email || null,
+      student_name: updatedSubmission.student_name || null,
       submission_type: type,
     },
     null,
     true
   );
-
   return updatedSubmission;
 };
 

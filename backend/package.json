@@ -20,7 +20,8 @@
     "migrate": "node scripts/migrate.js",
     "test:api": "newman run \"DemoNewMan/IeltsZone Test API.postman_collection.json\" -e \"DemoNewMan/IeltsZone.postman_environment.json\" -r htmlextra",
     "assistant:inspect-schema": "node scripts/assistant-inspect-schema.js",
-    "assistant:debug-db": "node scripts/assistant-debug-db.js"
+    "assistant:debug-db": "node scripts/assistant-debug-db.js",
+    "speaking:runtime-check": "node scripts/check-speaking-runtime.js"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1092.0",
@@ -41,7 +42,8 @@
     "nodemailer": "^8.0.10",
     "pg": "^8.21.0",
     "uuid": "^14.0.1",
-    "winston": "^3.11.0"
+    "winston": "^3.11.0",
+    "ws": "^8.21.1"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

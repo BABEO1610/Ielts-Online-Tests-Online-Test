@@ -46,4 +46,21 @@ describe('AI grading provider configuration', () => {
       apiKey: 'test-key',
     }));
   });
+
+  it('preserves retry metadata while projecting a provider 5xx into the grading error contract', async () => {
+    aiService.generateGeminiJsonAnswer.mockRejectedValueOnce(Object.assign(
+      new Error('provider temporarily unavailable'),
+      { statusCode: 500, providerStatus: 503, retryable: true, retryAfterSeconds: 40 }
+    ));
+
+    await expect(gradeWriting({
+      response_text: 'A short test response.',
+      prompt_text: 'Discuss both views.',
+    }, 'task2')).rejects.toMatchObject({
+      errorCode: 'AIGRADE_003',
+      providerStatus: 503,
+      retryable: true,
+      retryAfterSeconds: 40,
+    });
+  });
 });

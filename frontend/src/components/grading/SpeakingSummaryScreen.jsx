@@ -96,7 +96,7 @@ const GraderOptions = ({ grader, isSubmitting, setGrader }) => (
         disabled={isSubmitting}
         onChange={setGrader}
         title="AI chấm điểm"
-        description="Nhận kết quả phân tích bất đồng bộ; thiếu bằng chứng sẽ được chuyển giáo viên."
+        description="Nhận kết quả phân tích bất đồng bộ; lỗi tạm thời được tự thử lại và bài vẫn giữ trong luồng AI."
         value="ai"
       />
     </div>

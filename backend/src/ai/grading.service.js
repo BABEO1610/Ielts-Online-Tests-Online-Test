@@ -31,15 +31,26 @@ const { AI_GRADE_ERRORS, PROMPT_VERSION } = require('./aiGrading.constants');
 const AppError = require('../utils/AppError');
 const { sanitizeDiagnostic } = require('../services/aiUsage.service');
 
-const AI_TIMEOUT_MS = 30000;
+const AI_TIMEOUT_MS = 55000;
 const AI_NOT_CONFIGURED_MESSAGE =
   'Chấm AI chưa được cấu hình. Hãy khai báo GEMINI_API_KEY, GOOGLE_AI_API_KEY hoặc GOOGLE_API_KEY.';
+
+const copyRetryMetadata = (target, source) => {
+  ['retryable', 'retryAfterSeconds', 'providerStatus'].forEach((key) => {
+    if (source?.[key] !== undefined) target[key] = source[key];
+  });
+  return target;
+};
 
 const transcribeSpeakingAudio = async (audioInput, usageContext = {}) => {
   const transcript = await generateTranscript(audioInput, usageContext);
   const config = getAiConfig();
-  const provider = config.openaiApiKey ? 'openai' : 'gemini';
   const configuredModel = process.env.AI_TRANSCRIPTION_MODEL;
+  const provider = configuredModel?.startsWith('gemini')
+    ? 'gemini'
+    : configuredModel?.startsWith('whisper')
+      ? 'openai'
+      : config.openaiApiKey ? 'openai' : 'gemini';
   const model = provider === 'openai'
     ? (configuredModel?.startsWith('whisper') ? configuredModel : 'whisper-1')
     : normalizeGeminiModel(configuredModel?.startsWith('gemini')
@@ -55,10 +66,13 @@ const transcribeSpeakingAudio = async (audioInput, usageContext = {}) => {
 const callGeminiGrading = async (systemPrompt, userPrompt, usageContext = {}, options = {}) => {
   const { geminiApiKey, geminiModel: configuredGeminiModel } = getAiConfig();
   if (!geminiApiKey) {
-    throw new AppError(
+    const error = new AppError(
       AI_NOT_CONFIGURED_MESSAGE,
       503, 'AIGRADE_003'
     );
+    error.retryable = false;
+    error.causeCode = 'AI_NOT_CONFIGURED';
+    throw error;
   }
 
   const geminiModel = normalizeGeminiModel(
@@ -80,11 +94,11 @@ const callGeminiGrading = async (systemPrompt, userPrompt, usageContext = {}, op
     return { rawText: answer, modelName };
   } catch (err) {
     if (err.name === 'AbortError') {
-      throw new AppError(
+      throw copyRetryMetadata(new AppError(
         AI_GRADE_ERRORS.AIGRADE_003.message,
         AI_GRADE_ERRORS.AIGRADE_003.status,
         'AIGRADE_003'
-      );
+      ), { ...err, retryable: true });
     }
     logger.error('Gemini grading API error', {
       model: geminiModel,
@@ -92,20 +106,20 @@ const callGeminiGrading = async (systemPrompt, userPrompt, usageContext = {}, op
     });
     if (err.errorCode === 'AI_QUOTA_EXCEEDED'
       || err.code === 'AI_QUOTA_EXCEEDED') {
-      throw new AppError(
+      throw copyRetryMetadata(new AppError(
         AI_GRADE_ERRORS.AIGRADE_008.message,
         AI_GRADE_ERRORS.AIGRADE_008.status,
         'AIGRADE_008'
-      );
+      ), err);
     }
     if (err.code === 'AI_NOT_CONFIGURED' || err.statusCode) {
-      throw new AppError(
+      throw copyRetryMetadata(new AppError(
         err.code === 'AI_NOT_CONFIGURED'
           ? AI_NOT_CONFIGURED_MESSAGE
           : err.message,
         err.statusCode || AI_GRADE_ERRORS.AIGRADE_003.status,
         'AIGRADE_003'
-      );
+      ), err);
     }
     throw err;
   }
@@ -141,12 +155,16 @@ const gradeWriting = async (submission, taskType, opts = {}) => {
   if (!result.success) {
     logger.error('AI grading validation failed', {
       errors: result.errors,
+      rawText: rawText,
     });
-    throw new AppError(
-      AI_GRADE_ERRORS.AIGRADE_004.message,
+    const errorDetail = result.errors.join(', ');
+    const err = new AppError(
+      `${AI_GRADE_ERRORS.AIGRADE_004.message}: ${errorDetail}`,
       AI_GRADE_ERRORS.AIGRADE_004.status,
       'AIGRADE_004'
     );
+    err.rawText = rawText;
+    throw err;
   }
 
   return {
