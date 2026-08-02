@@ -9,7 +9,7 @@
  * - User Request: Success UI with primary/success text and card layout.
  * - User Request: Initial fetch of GET /submissions/:id/feedback
  */
-import React from 'react';
+
 import { render, screen, waitFor, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import FeedbackReport from '../../../components/grading/FeedbackReport';
@@ -46,10 +46,10 @@ describe('FeedbackReport Component', () => {
   });
 
   it('renders pending state initially when loading', async () => {
-    gradingService.getFeedback.mockImplementation(() => new Promise(() => {})); // pending promise
-    
+    gradingService.getFeedback.mockImplementation(() => new Promise(() => { })); // pending promise
+
     render(<FeedbackReport submissionId="sub-1" type="writing" />);
-    
+
     expect(screen.getByText('Bài làm của bạn đang được chấm...')).toBeInTheDocument();
     expect(document.querySelector('.spinner-border')).toBeInTheDocument();
   });
@@ -102,7 +102,7 @@ describe('FeedbackReport Component', () => {
     await waitFor(() => {
       expect(screen.getAllByText('7.5').length).toBeGreaterThan(0);
     });
-    
+
     expect(screen.getByText('Graded by Tutor')).toBeInTheDocument();
     expect(screen.getByText('Excellent work.')).toBeInTheDocument();
   });
@@ -149,7 +149,7 @@ describe('FeedbackReport Component', () => {
     });
 
     const { unmount } = render(<FeedbackReport submissionId="sub-1" type="writing" />);
-    
+
     await waitFor(() => {
       expect(mockSocket.on).toHaveBeenCalledWith('grading_complete', expect.any(Function));
     });
@@ -168,7 +168,7 @@ describe('FeedbackReport Component', () => {
     });
 
     render(<FeedbackReport submissionId="sub-1" type="writing" />);
-    
+
     await waitFor(() => {
       expect(gradingService.getFeedback).toHaveBeenCalledTimes(1);
     });
@@ -191,7 +191,7 @@ describe('FeedbackReport Component', () => {
     });
 
     render(<FeedbackReport submissionId="sub-1" type="writing" />);
-    
+
     await waitFor(() => {
       expect(gradingService.getFeedback).toHaveBeenCalledTimes(1);
     });
@@ -212,7 +212,7 @@ describe('FeedbackReport Component', () => {
     });
 
     render(<FeedbackReport submissionId="sub-1" type="writing" />);
-    
+
     await waitFor(() => {
       expect(gradingService.getFeedback).toHaveBeenCalledTimes(1);
     });

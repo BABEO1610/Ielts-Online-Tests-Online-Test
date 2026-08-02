@@ -113,17 +113,17 @@ Các cổng này không chặn xây nền tảng fail-closed/shadow, nhưng ch�
 
 Bảng dưới đây ghi lại hiện trạng tại thời điểm audit ban đầu để giải thích vì sao kiến trúc đích được chọn. Trạng thái sau triển khai và các cổng còn mở được đối chiếu riêng ở phần Constitution và checklist; không dùng bảng baseline này làm mô tả runtime hiện tại.
 
-| Khu vực | Hiện trạng | Hệ quả production |
-|---|---|---|
-| Upload audio | Backend nhận toàn bộ file qua `multer.memoryStorage()` và tạo public URL | Tốn RAM, audio cá nhân có thể bị truy cập bằng URL dài hạn |
-| Định dạng browser | UI ưu tiên `audio/mp4`, fallback `audio/webm`; constraint G-03 chỉ khóa mp3/m4a/wav | Chrome/WebM không thể release nếu chưa sửa constraint hoặc có RFC/transcode policy |
-| Submit Speaking | Sau `COMMIT`, request vẫn chờ ba lần STT và một lần grading | Dễ timeout, retry trùng và giữ DB connection lâu |
-| Transcript | `speaking_submissions.transcript` chỉ giữ chuỗi cuối | Không có timestamp, confidence, provider version hoặc lịch sử evidence |
-| Scoring | Grader chỉ nhận transcript nhưng vẫn bắt buộc Pronunciation | Điểm không có bằng chứng audio nhưng vẫn được tính Overall |
-| Idempotency | Cache/lookup trước khi insert; Speaking gọi `force: true` | Hai request đồng thời có thể gọi provider và tạo report thừa |
-| Trạng thái lỗi | `submission_status` chưa có `grading_failed` | Bài có thể giữ `pending` dù provider đã thất bại |
-| Quyền nghe audio | Controller/service có logic signed URL nhưng route chưa mount và tutor scope chưa giới hạn assignment | Chỉ đổi URL không sửa ownership query vẫn tạo IDOR |
-| Migration | Script hiện chạy lại mọi file và không ghi version/checksum | Không đủ an toàn để áp dụng trực tiếp trên production |
+| Khu vực           | Hiện trạng                                                                                            | Hệ quả production                                                                  |
+| -------------------| -------------------------------------------------------------------------------------------------------| ------------------------------------------------------------------------------------|
+| Upload audio      | Backend nhận toàn bộ file qua `multer.memoryStorage()` và tạo public URL                              | Tốn RAM, audio cá nhân có thể bị truy cập bằng URL dài hạn                         |
+| Định dạng browser | UI ưu tiên `audio/mp4`, fallback `audio/webm`; constraint G-03 chỉ khóa mp3/m4a/wav                   | Chrome/WebM không thể release nếu chưa sửa constraint hoặc có RFC/transcode policy |
+| Submit Speaking   | Sau `COMMIT`, request vẫn chờ ba lần STT và một lần grading                                           | Dễ timeout, retry trùng và giữ DB connection lâu                                   |
+| Transcript        | `speaking_submissions.transcript` chỉ giữ chuỗi cuối                                                  | Không có timestamp, confidence, provider version hoặc lịch sử evidence             |
+| Scoring           | Grader chỉ nhận transcript nhưng vẫn bắt buộc Pronunciation                                           | Điểm không có bằng chứng audio nhưng vẫn được tính Overall                         |
+| Idempotency       | Cache/lookup trước khi insert; Speaking gọi `force: true`                                             | Hai request đồng thời có thể gọi provider và tạo report thừa                       |
+| Trạng thái lỗi    | `submission_status` chưa có `grading_failed`                                                          | Bài có thể giữ `pending` dù provider đã thất bại                                   |
+| Quyền nghe audio  | Controller/service có logic signed URL nhưng route chưa mount và tutor scope chưa giới hạn assignment | Chỉ đổi URL không sửa ownership query vẫn tạo IDOR                                 |
+| Migration         | Script hiện chạy lại mọi file và không ghi version/checksum                                           | Không đủ an toàn để áp dụng trực tiếp trên production                              |
 
 ## Kiến trúc đích
 
@@ -352,20 +352,20 @@ Các thay đổi chính:
 
 ## Đối chiếu Constitution sau triển khai foundation
 
-| Cổng | Hiện trạng | Hành động trong plan |
-|---|---|---|
-| Node 20, Express 5, PostgreSQL/raw `pg` | Đạt | Giữ nguyên |
-| React 18 | Không đạt do code dùng React 19 | RFC hoặc hạ phiên bản; không giải quyết ngầm trong feature này |
-| AI Grading = Claude | Không đạt do code dùng Gemini | RFC hoặc thay provider trước rollout production |
-| Mọi AI call qua grading service | Đạt cho đường grading mới | Worker/transcriber gọi adapter do `grading.service.js` điều phối; chatbot ngoài grading không thuộc feature này |
-| Production storage S3 | **Một phần/không đạt cho rollout** | Có adapter private S3/Supabase và không trả public object key, nhưng runtime demo dùng Supabase; phải chọn S3 theo Constitution hoặc có RFC chấp nhận Supabase trước production |
-| Upload magic bytes ≤ 50 MB, mp3/m4a/wav | Đạt cho format đang khóa; WebM chưa được phép | Backend kiểm magic byte/size/duration/checksum; browser không có MIME được duyệt phải bị chặn cho tới RFC G-03 |
-| `grading_failed`, retry, idempotency | **Một phần** | Job state, enum, unique constraint, fencing và watchdog có test; phân loại provider 5xx xuyên gateway/worker còn mở ở T077 |
-| Soft-delete/timestamps | Đạt trong phạm vi reader đã audit | Submission/report/artifact/job và `tutor_feedback_reports` có soft-delete; history/detail/export/stats bỏ row đã xóa |
-| API envelope, auth, centralized errors | **Một phần** | Speaking contract/role guard có test, nhưng lỗi Writing ngắn chưa đúng envelope (T070) và tutor detail controller chưa truyền requester context (T073) |
-| Tổ chức code ≤300 dòng/file, ≤40 dòng/hàm | **Một phần** | Backend feature mới và hook/summary mới đạt, nhưng các màn hình frontend kế thừa đã tích hợp feature vẫn vượt giới hạn; T059 còn mở |
-| Tên nhánh/tạo tác Speckit | **Chưa đạt governance** | Nhánh hiện tại và tên `spec.md` kế thừa khác quy ước Hiến chương; phải đồng bộ bằng thay đổi phối hợp hoặc RFC, không tự đổi trong lượt tài liệu này |
-| Coverage ≥80%, mock AI | Provider mock đạt; coverage chưa đo | Đo coverage nghiệp vụ mới và đặt gate CI bằng T056 trước production |
+| Cổng                                      | Hiện trạng                                    | Hành động trong plan                                                                                                                                                            |
+| -------------------------------------------| -----------------------------------------------| ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Node 20, Express 5, PostgreSQL/raw `pg`   | Đạt                                           | Giữ nguyên                                                                                                                                                                      |
+| React 18                                  | Không đạt do code dùng React 19               | RFC hoặc hạ phiên bản; không giải quyết ngầm trong feature này                                                                                                                  |
+| AI Grading = Claude                       | Không đạt do code dùng Gemini                 | RFC hoặc thay provider trước rollout production                                                                                                                                 |
+| Mọi AI call qua grading service           | Đạt cho đường grading mới                     | Worker/transcriber gọi adapter do `grading.service.js` điều phối; chatbot ngoài grading không thuộc feature này                                                                 |
+| Production storage S3                     | **Một phần/không đạt cho rollout**            | Có adapter private S3/Supabase và không trả public object key, nhưng runtime demo dùng Supabase; phải chọn S3 theo Constitution hoặc có RFC chấp nhận Supabase trước production |
+| Upload magic bytes ≤ 50 MB, mp3/m4a/wav   | Đạt cho format đang khóa; WebM chưa được phép | Backend kiểm magic byte/size/duration/checksum; browser không có MIME được duyệt phải bị chặn cho tới RFC G-03                                                                  |
+| `grading_failed`, retry, idempotency      | **Một phần**                                  | Job state, enum, unique constraint, fencing và watchdog có test; phân loại provider 5xx xuyên gateway/worker còn mở ở T077                                                      |
+| Soft-delete/timestamps                    | Đạt trong phạm vi reader đã audit             | Submission/report/artifact/job và `tutor_feedback_reports` có soft-delete; history/detail/export/stats bỏ row đã xóa                                                            |
+| API envelope, auth, centralized errors    | **Một phần**                                  | Speaking contract/role guard có test, nhưng lỗi Writing ngắn chưa đúng envelope (T070) và tutor detail controller chưa truyền requester context (T073)                          |
+| Tổ chức code ≤300 dòng/file, ≤40 dòng/hàm | **Một phần**                                  | Backend feature mới và hook/summary mới đạt, nhưng các màn hình frontend kế thừa đã tích hợp feature vẫn vượt giới hạn; T059 còn mở                                             |
+| Tên nhánh/tạo tác Speckit                 | **Chưa đạt governance**                       | Nhánh hiện tại và tên `spec.md` kế thừa khác quy ước Hiến chương; phải đồng bộ bằng thay đổi phối hợp hoặc RFC, không tự đổi trong lượt tài liệu này                            |
+| Coverage ≥80%, mock AI                    | Provider mock đạt; coverage chưa đo           | Đo coverage nghiệp vụ mới và đặt gate CI bằng T056 trước production                                                                                                             |
 
 ## Các cổng Constitution/release còn mở
 
