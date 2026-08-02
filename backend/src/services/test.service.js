@@ -124,8 +124,8 @@ class TestService {
       // 1. Insert Test (with audio_url for listening tests)
       const testRes = await client.query(
         `INSERT INTO mock_tests (title, description, skill, difficulty, duration_minutes, is_published, publish_at, created_by, audio_url, review_status, submitted_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'pending', NOW()) RETURNING id`,
-        [title, description, skill, difficulty, duration, isPublished, publishAt || null, userId, audioUrl || null]
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'pending', CASE WHEN $10::boolean THEN NULL ELSE NOW() END) RETURNING id`,
+        [title, description, skill, difficulty, duration, isPublished, publishAt || null, userId, audioUrl || null, isDraft]
       );
       const testId = testRes.rows[0].id;
 
@@ -504,6 +504,7 @@ class TestService {
     // However, if an admin is updating, we might want to keep it published?
     // For now, any update resets it to pending review unless it's just a draft.
     const isPublished = false;
+    const isDraft = !publishAt;
 
     let missingAnswer = false;
     for (const passage of passages) {
@@ -544,11 +545,12 @@ class TestService {
       await client.query('BEGIN');
 
       // 1. Update Test (including audio_url for listening tests)
+      // ponytail: reset review_status to pending so admin can see it again after tutor edits
       await client.query(
         `UPDATE mock_tests 
-         SET title = $1, description = $2, skill = $3, difficulty = $4, duration_minutes = $5, is_published = $6, publish_at = $7, audio_url = $8, updated_at = NOW(), review_status = 'pending', submitted_at = NOW() 
-         WHERE id = $9`,
-        [title, description, skill, difficulty, duration, isPublished, publishAt || null, audioUrl || null, testId]
+         SET title = $1, description = $2, skill = $3, difficulty = $4, duration_minutes = $5, is_published = $6, publish_at = $7, audio_url = $8, review_status = 'pending', submitted_at = CASE WHEN $9::boolean THEN NULL ELSE NOW() END, updated_at = NOW() 
+         WHERE id = $10`,
+        [title, description, skill, difficulty, duration, isPublished, publishAt || null, audioUrl || null, isDraft, testId]
       );
 
       // 2. Delete existing nested records before rebuilding the test.

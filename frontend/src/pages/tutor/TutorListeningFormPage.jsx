@@ -19,6 +19,35 @@ const LISTENING_QUESTION_TYPES = [
   'Notes Completion',
 ];
 
+// Map internal parser type codes → dropdown display strings
+// ponytail: only codes that parseSmartText actually emits
+const PARSER_TYPE_TO_DISPLAY = {
+  MULTIPLE_CHOICE_SINGLE: 'Multiple Choice',
+  MULTIPLE_CHOICE_MULTI: 'Multiple Choice',
+  MATCHING_INFORMATION: 'Matching',
+  MATCHING_HEADINGS: 'Matching',
+  SENTENCE_COMPLETION: 'Sentence Completion',
+  NOTES_COMPLETION: 'Notes Completion',
+  NOTE_COMPLETION: 'Note/Table/Flow-chart Completion',
+  TRUE_FALSE_NOT_GIVEN: 'Note/Table/Flow-chart Completion', // no direct match, best fallback
+  YES_NO_NOT_GIVEN: 'Note/Table/Flow-chart Completion',
+  FORM_COMPLETION: 'Form Completion',
+  SHORT_ANSWER: 'Short-answer Questions',
+};
+
+const normalizeBlockType = (type) => PARSER_TYPE_TO_DISPLAY[type] || type || '';
+
+// ponytail: old data sometimes stored serialized questions JSON in content field.
+// If content looks like a JSON array/object, discard it — it's garbage legacy data.
+const sanitizeBlockContent = (content) => {
+  if (!content || typeof content !== 'string') return content || '';
+  const trimmed = content.trim();
+  if (trimmed.startsWith('[') || trimmed.startsWith('{')) {
+    try { JSON.parse(trimmed); return ''; } catch { /* not JSON, keep it */ }
+  }
+  return content;
+};
+
 const DEFAULT_SECTIONS = [
   { id: 1, title: '', transcript: '', showTranscript: true, defaultRange: '1-10', blocks: [] },
   { id: 2, title: '', transcript: '', showTranscript: true, defaultRange: '11-20', blocks: [] },
@@ -75,7 +104,11 @@ function TutorListeningFormPage({ testId }) {
               transcript: section.transcript || '',
               showTranscript: section.showTranscript !== false,
               defaultRange: section.defaultRange || `${idx * 10 + 1}-${idx * 10 + 10}`,
-              blocks: section.blocks || [],
+              blocks: (section.blocks || []).map(b => ({
+                ...b,
+                type: normalizeBlockType(b.type),
+                content: sanitizeBlockContent(b.content),
+              })),
             })));
           }
         }
@@ -107,9 +140,17 @@ function TutorListeningFormPage({ testId }) {
   };
 
   const handleBulkAddConfirm = (newBlocks) => {
+    const normalized = newBlocks.map((b, i) => ({
+      id: b.id ?? Date.now() + i,
+      type: normalizeBlockType(b.type),
+      range: b.range || b.groupRange || '',
+      content: b.content || b.instruction || '',
+      questions: b.questions || [],
+      options: b.options || [],
+    }));
     setSections(prev => prev.map(s => {
       if (s.id === showBulkAdd.targetSectionId) {
-        return { ...s, blocks: [...s.blocks, ...newBlocks] };
+        return { ...s, blocks: [...s.blocks, ...normalized] };
       }
       return s;
     }));
