@@ -37,6 +37,32 @@ import '../../styles/objective-testing.css';
 
 // ─── Hàm tiện ích ────────────────────────────────────────────────────────────
 /**
+ * Parse JSON array câu hỏi legacy từ block.content hoặc q.text.
+ * Format: [{"qNum":N, "qText":"..."}, ...] hoặc [{"questionNum":N, "questionText":"..."}]
+ * Trả về Map<questionOrder, text> nếu là JSON legacy, null nếu là HTML thông thường.
+ */
+function parseJsonQArray(str) {
+  if (!str) return null;
+  const trimmed = str.trimStart();
+  if (!trimmed.startsWith('[') && !trimmed.startsWith('{')) return null;
+  try {
+    const parsed = JSON.parse(str);
+    if (!Array.isArray(parsed)) return null;
+    // Kiểm tra có phải mảng câu hỏi không (có qNum/questionNum)
+    const hasQNum = parsed.some((item) => item && (item.qNum != null || item.questionNum != null));
+    if (!hasQNum) return null;
+    const map = {};
+    parsed.forEach((item) => {
+      if (!item) return;
+      const num = item.qNum ?? item.questionNum;
+      if (num != null) map[num] = item.qText || item.questionText || item.text || '';
+    });
+    return map;
+  } catch {
+    return null;
+  }
+}
+/**
  * Làm phẳng danh sách passages + questions từ cấu trúc dữ liệu API thực tế.
  * Trả về { passages (đã lọc), questions (phẳng, sắp xếp theo questionOrder) }
  * (Hàm flattenTestData: Data Parser để phân tách và chuẩn hóa dữ liệu JSON từ Backend)
@@ -77,6 +103,12 @@ function flattenTestData(testData, allowedPassageNumbers) {
         // bỏ qua
       }
 
+      // block.content: HTML hợp lệ thì dùng làm blockHtmlContent,
+      // còn nếu là JSON array câu hỏi legacy → dùng làm legacyQTextMap, không render HTML
+      const legacyFromBlock = parseJsonQArray(block.content);
+      const blockHtmlContent = legacyFromBlock ? null : (block.content || null);
+      const legacyQTextMap = legacyFromBlock || {};
+
       (block.questions || []).forEach((q, qIdx) => {
         // Chuẩn hóa options: backend lưu dạng JSONB (mảng {label,text} hoặc chuỗi thông thường)
         let options = [];
@@ -86,15 +118,22 @@ function flattenTestData(testData, allowedPassageNumbers) {
           try { options = JSON.parse(q.options); } catch { options = []; }
         }
 
+        // q.text có thể là JSON array (do backend getQuestionText fallback sang block.content)
+        // → parse lấy text đúng theo questionOrder, fallback sang legacyQTextMap từ block.content
+        const legacyFromQText = parseJsonQArray(q.text);
+        const qText = legacyFromQText
+          ? (legacyFromQText[q.questionOrder] || legacyQTextMap[q.questionOrder] || '')
+          : (q.text || legacyQTextMap[q.questionOrder] || '');
+
         questions.push({
           id: q.id,
           order: q.questionOrder, // khớp với tên field từ backend
           passageNumber: passage.passageNumber,
           blockId: block.id,
-          // blockContent chỉ được render phía trên câu hỏi đầu tiên của mỗi block
-          blockContent: qIdx === 0 ? (block.content || null) : null,
+          // blockContent chỉ được render phía trên câu hỏi đầu tiên của mỗi block (chỉ khi là HTML, không phải JSON)
+          blockContent: qIdx === 0 ? blockHtmlContent : null,
           type: blockQType,
-          text: q.text || '',
+          text: qText,
           options,
         });
       });
