@@ -31,7 +31,7 @@
 - [x] T008 Loại bỏ runtime DDL khỏi truy vấn cập nhật profile và chỉ sử dụng migrations trong `backend/src/db/queries/users.queries.js`
 - [x] T009 [P] Thêm các bài test serialization an toàn cho profile trong `backend/tests/unit/services/users.profile.test.js`
 - [x] T010 [P] Thêm các bài test cho envelope/auth của users controller trong `backend/tests/unit/controllers/users.controller.test.js`
-- [x] T011 [P] Thêm các bài test kiểm tra loại và dung lượng cho avatar middleware trong `backend/tests/unit/middleware/uploadImage.middleware.test.js`
+- [x] T011 [P] Thêm các bài test kiểm tra loại (JPG, PNG, WebP) và dung lượng (max 2MB) cho avatar middleware trong `backend/tests/unit/middleware/uploadImage.middleware.test.js`
 - [x] T012 [P] Xác minh độ lệch phiên bản React được ghi nhận bởi hiến pháp trong `.sdd/specs/feat-auth-and-users/feat-profile/plan.md`
 
 **Cột mốc (Checkpoint)**: Các thao tác đọc/ghi profile có thể được triển khai mà không làm rò rỉ dữ liệu xác thực nhạy cảm hay thay đổi schema lúc thực thi (runtime schema mutation).
@@ -104,7 +104,7 @@
 
 ### Triển khai cho User Story 3
 
-- [x] T036 [US3] Đảm bảo upload middleware từ chối các định dạng MIME không hỗ trợ và file vượt quá giới hạn chính sách trong `backend/src/middleware/uploadImage.middleware.js`
+- [x] T036 [US3] Đảm bảo upload middleware từ chối các định dạng MIME không hỗ trợ (chỉ cho phép JPG, PNG, WebP) và file vượt quá giới hạn 2MB trong `backend/src/middleware/uploadImage.middleware.js`
 - [x] T037 [US3] Đảm bảo `uploadAvatar` yêu cầu có file tải lên và user id từ middleware xác thực trong `backend/src/controllers/users.controller.js`
 - [x] T038 [US3] Đảm bảo avatar storage trả về các giá trị `avatar_url` ổn định và công khai trong `backend/src/services/avatarStorage.service.js`
 - [x] T039 [US3] Đảm bảo upload phía frontend điền đầy đủ `avatar_url` và yêu cầu xác nhận lưu (save confirmation) trong `frontend/src/pages/student/UserProfilePage.jsx`

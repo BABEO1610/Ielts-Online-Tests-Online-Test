@@ -8,6 +8,11 @@
 
 **Đầu vào**: Mô tả của người dùng: "Tạo tài liệu đặc tả tính năng (backfill) từ ứng dụng web đã hoàn thành cho chức năng quản lý hồ sơ, bao gồm xem danh tính tài khoản, chỉnh sửa chi tiết hồ sơ, ảnh đại diện (avatar), điểm IELTS mục tiêu, ngày thi mục tiêu, thiết lập mục tiêu khi mới onboarding, cài đặt bảo mật, đổi mật khẩu và lịch sử hỗ trợ cá nhân."
 
+## Clarifications
+
+### Session 2026-08-02
+- Q: Đối với tính năng upload Avatar (lưu local theo ADR-004), giới hạn dung lượng và định dạng cho phép cụ thể là gì để tránh lạm dụng bộ nhớ? → A: Tối đa 2MB, chỉ cho phép JPG/PNG/WebP
+
 ## Kịch bản Người dùng & Kiểm thử *(bắt buộc)*
 
 ### Kịch bản 1 - Xem Hồ sơ Cá nhân (Độ ưu tiên: P1)
@@ -104,7 +109,7 @@ Với tư cách là người dùng đã đăng nhập, tôi muốn xem các yêu
 - **FR-002**: Hệ thống PHẢI loại bỏ thông tin mật khẩu và các dữ liệu xác thực nhạy cảm khác khỏi dữ liệu hồ sơ hiển thị cho người dùng.
 - **FR-003**: Hệ thống PHẢI cho phép người dùng cập nhật họ tên.
 - **FR-004**: Hệ thống PHẢI cho phép người dùng cập nhật ảnh đại diện bằng cách nhập URL hình ảnh hoặc tải lên một hình ảnh được hỗ trợ.
-- **FR-005**: Hệ thống PHẢI từ chối việc tải lên các ảnh đại diện vượt quá kích thước cho phép hoặc định dạng hình ảnh không được hỗ trợ.
+- **FR-005**: Hệ thống PHẢI từ chối việc tải lên các ảnh đại diện vượt quá kích thước 5MB hoặc có định dạng không được hỗ trợ (chỉ chấp nhận JPG/PNG/WebP/GIF).
 - **FR-006**: Hệ thống PHẢI cho phép người dùng đặt, cập nhật hoặc xóa ngày thi mục tiêu.
 - **FR-007**: Hệ thống PHẢI cho phép người dùng đặt điểm IELTS mục tiêu từ 0.0 đến 9.0 với các mức tăng 0.5.
 - **FR-008**: Hệ thống PHẢI từ chối điểm mục tiêu không hợp lệ kèm theo thông báo rõ ràng cho người dùng.

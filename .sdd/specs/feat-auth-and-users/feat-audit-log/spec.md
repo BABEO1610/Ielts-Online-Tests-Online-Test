@@ -8,6 +8,11 @@
 
 **Đầu vào**: Mô tả của người dùng: "Tạo tài liệu đặc tả tính năng (backfill) từ ứng dụng web đã hoàn thành cho chức năng nhật ký hệ thống (audit logging), bao gồm nhật ký bảo mật/hoạt động, nhật ký thay đổi của admin, bộ lọc, hiển thị các hành động đáng ngờ, xem chi tiết, hoàn tác (undo) các thay đổi được hỗ trợ, và thống kê audit."
 
+## Clarifications
+
+### Session 2026-08-02
+- Q: Audit Log sẽ sinh ra lượng dữ liệu rất lớn theo thời gian. Chính sách lưu trữ (retention policy) của hệ thống là gì? → A: Lưu vĩnh viễn trong PostgreSQL chính (Thiết kế đơn giản, chấp nhận DB lớn)
+
 ## Kịch bản Người dùng & Kiểm thử *(bắt buộc)*
 
 ### Kịch bản 1 - Ghi lại các hành động nhạy cảm (Độ ưu tiên: P1)
@@ -76,32 +81,32 @@ Với tư cách là admin, tôi muốn hoàn tác các thay đổi về vai trò
 ### Các trường hợp ngoại lệ (Edge Cases)
 
 - Lỗi không tạo được audit log được coi là lỗi hệ thống đối với các hành động yêu cầu tính truy vết.
-- Các nhật ký có thể có `actor` là system (hệ thống) khi không có người dùng cụ thể thao tác.
-- Một số hành động không có giá trị trước/sau nhưng vẫn cần một dòng nhật ký có thể đọc được.
-- Phân loại đáng ngờ (suspicious) bao gồm các hành động nhạy cảm bảo mật như: đăng nhập thất bại, khóa tài khoản, vô hiệu hóa, đổi vai trò, admin đổi mật khẩu người khác và bị từ chối quyền.
-- Chức năng Hoàn tác (Undo) chỉ được hỗ trợ cho một số thay đổi vai trò/trạng thái người dùng nhất định.
-- Chức năng Hoàn tác phát hiện xung đột nếu đối tượng đã bị thay đổi lần nữa sau khi nhật ký nguồn được tạo.
+- Các nhật ký có thể có `actor` là system (hệ thống, actor_id = null) khi không có người dùng cụ thể thao tác (ví dụ: cron jobs).
+- Một số hành động không có giá trị trước/sau nhưng vẫn cần một dòng nhật ký có thể đọc được (hỗ trợ lưu JSONB).
+- Phân loại mức độ nghiêm trọng (severity) chỉ gồm 2 mức: `normal` và `suspicious`. Các hành động `suspicious` (đáng ngờ) bao gồm: `login_failed`, `account_locked`, `user_deactivated`, `role_changed`, `password_changed_by_admin`, và `permission_denied`.
+- Chức năng Hoàn tác (Undo) chỉ được hỗ trợ cho các hành động thay đổi trạng thái và vai trò: `role_changed`, `user_deactivated`, `user_updated` (chỉ khi đổi status).
+- Chức năng Hoàn tác phát hiện xung đột nếu đối tượng đã bị thay đổi lần nữa (stale state) bằng cách so sánh giá trị hiện tại của user với `new_value` trong log gốc bằng row-level lock (`FOR UPDATE`). Nếu không khớp, từ chối undo.
 - Phân trang và bộ lọc vẫn hoạt động ổn định khi lượng nhật ký lớn.
 
 ## Yêu cầu *(bắt buộc)*
 
 ### Yêu cầu chức năng
 
-- **FR-001**: Hệ thống PHẢI ghi lại các hành động nhạy cảm bảo mật và quản trị với người thực hiện, hành động, đối tượng, thời gian, và ngữ cảnh IP (nếu có).
-- **FR-002**: Hệ thống PHẢI ghi lại các giá trị cũ và mới cho những thay đổi mà việc so sánh trước/sau có ý nghĩa.
-- **FR-003**: Hệ thống PHẢI cho phép admin xem nhật ký hoạt động có phân trang.
-- **FR-004**: Hệ thống PHẢI cho phép admin lọc nhật ký hoạt động theo mức độ đáng ngờ (suspicious severity).
-- **FR-005**: Hệ thống PHẢI gắn nhãn (label) các hành động audit bằng ngôn ngữ thân thiện với người dùng.
+- **FR-001**: Hệ thống PHẢI ghi lại các hành động hệ thống (auth, admin, content, grading) với người thực hiện, hành động, đối tượng, thời gian, và IP (client IP hoặc proxy IP, được chuẩn hóa về IPv4).
+- **FR-002**: Hệ thống PHẢI ghi lại các giá trị cũ và mới bằng định dạng JSONB cho những thay đổi có cập nhật trường dữ liệu (ví dụ: role, status).
+- **FR-003**: Hệ thống PHẢI cho phép admin xem nhật ký hoạt động có phân trang (mặc định page=1, limit=20).
+- **FR-004**: Hệ thống PHẢI cho phép admin lọc nhật ký hoạt động theo mức độ nghiêm trọng (`normal` hoặc `suspicious`).
+- **FR-005**: Hệ thống PHẢI gắn nhãn (label) các hành động audit bằng ngôn ngữ thân thiện (Tiếng Việt, ví dụ: 'Đăng nhập thất bại', 'Sửa đề thi').
 - **FR-006**: Hệ thống PHẢI hiển thị các dòng nhật ký hoạt động với thời gian, người thực hiện, hành động, đối tượng, IP, mức độ nghiêm trọng và ghi chú.
-- **FR-007**: Hệ thống PHẢI cho phép admin xem nhật ký thay đổi có phân trang.
+- **FR-007**: Hệ thống PHẢI cho phép admin xem nhật ký thay đổi có phân trang (mặc định page=1, limit=20).
 - **FR-008**: Hệ thống PHẢI cho phép admin tìm kiếm hoặc lọc nhật ký thay đổi theo hành động.
 - **FR-009**: Hệ thống PHẢI cho phép admin mở chi tiết một nhật ký thay đổi với các giá trị trước/sau.
 - **FR-010**: Hệ thống PHẢI tóm tắt tổng số thay đổi, số thay đổi có thể hoàn tác, và số thay đổi đã hoàn tác trên trang lịch sử.
-- **FR-011**: Hệ thống PHẢI cho phép hoàn tác (undo) chỉ với những thay đổi về người dùng được hỗ trợ, có thể hoàn tác và chưa bị hoàn tác.
-- **FR-012**: Hệ thống PHẢI ngăn chặn hoàn tác khi trạng thái của đối tượng không còn khớp với thay đổi đã ghi log.
-- **FR-013**: Hệ thống PHẢI ngăn chặn admin hoàn tác các thay đổi trên chính tài khoản của họ.
-- **FR-014**: Hệ thống PHẢI tạo ra một mục nhật ký audit mới mỗi khi một thay đổi bị hoàn tác.
-- **FR-015**: Hệ thống PHẢI giữ nguyên mục nhật ký gốc và đánh dấu nó là đã hoàn tác (undone) thay vì xóa nó.
+- **FR-011**: Hệ thống PHẢI cho phép hoàn tác (undo) chỉ với những thay đổi về người dùng được hỗ trợ (`role_changed`, `user_deactivated`, `user_updated`), có thể hoàn tác (`can_undo=true`) và chưa bị hoàn tác (`undone_at` is null).
+- **FR-012**: Hệ thống PHẢI ngăn chặn hoàn tác khi trạng thái của đối tượng không còn khớp với thay đổi đã ghi log, hoặc khi user mục tiêu không còn tồn tại (ví dụ: soft-deleted).
+- **FR-013**: Hệ thống PHẢI ngăn chặn admin hoàn tác các thay đổi trên chính tài khoản của họ (ngăn self-undo).
+- **FR-014**: Hệ thống PHẢI tạo ra một mục nhật ký audit mới (`change_reverted`) mỗi khi một thay đổi bị hoàn tác, và trả về cho client object `{ source_log, undo_log, target }`.
+- **FR-015**: Hệ thống PHẢI giữ nguyên mục nhật ký gốc và chỉ cập nhật metadata (`undone_at`, `undone_by`, `undo_log_id`) thay vì xóa nó.
 - **FR-016**: Hệ thống PHẢI cung cấp số liệu thống kê hoạt động cho tổng số nhật ký, nhật ký đáng ngờ và đăng nhập thất bại.
 
 ### Các thực thể chính (Key Entities)
@@ -126,6 +131,7 @@ Với tư cách là admin, tôi muốn hoàn tác các thay đổi về vai trò
 
 ## Giả định
 
+- Dữ liệu nhật ký Audit được lưu trữ vĩnh viễn trong cơ sở dữ liệu PostgreSQL chính mà không có cơ chế tự động xóa (retention policy vô hạn), chấp nhận sự gia tăng dung lượng dữ liệu theo thời gian.
 - Quyền truy cập vào nhật ký Audit chỉ dành cho admin.
 - Nhật ký Audit có tính chất nối thêm (append-only); việc xóa lịch sử nhật ký nằm ngoài phạm vi của tính năng này.
 - Chỉ một số thay đổi về vai trò/trạng thái người dùng được chọn lọc mới có thể hoàn tác trong phạm vi hiện tại.

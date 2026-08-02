@@ -24,7 +24,7 @@ Thiết kế backfill cho tính năng xem/sửa hồ sơ (profile) có xác th�
 
 **Mục tiêu Hiệu suất (Performance Goals)**: 95% profile loads hoàn thành dưới 3 giây; 95% thay đổi cập nhật hiển thị lên (sau khi refresh) mất dưới 5 giây.
 
-**Ràng buộc (Constraints)**: Bắt buộc xác thực (Auth); `password_hash` và các thông tin bảo mật auth (auth secrets) không bao giờ được trả về; target band score phải nằm trong khoảng 0.0-9.0 với bước nhảy 0.5; kích thước avatar tối đa 5 MB và phải thuộc các định dạng hình ảnh cho phép (allowed image MIME types).
+**Ràng buộc (Constraints)**: Bắt buộc xác thực (Auth); `password_hash` và các thông tin bảo mật auth (auth secrets) không bao giờ được trả về; target band score phải nằm trong khoảng 0.0-9.0 với bước nhảy 0.5; kích thước avatar tối đa 2 MB và chỉ cho phép các định dạng JPG, PNG, WebP.
 
 **Quy mô/Phạm vi (Scale/Scope)**: Tính năng quản lý hồ sơ áp dụng cho tất cả các role được xác thực (authenticated roles), với các mục tiêu học tập (learning goals) dành cho student.
 

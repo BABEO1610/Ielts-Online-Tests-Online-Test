@@ -8,6 +8,11 @@
 
 **Đầu vào**: Mô tả của người dùng: "Tạo tài liệu đặc tả tính năng (backfill) từ ứng dụng web đã hoàn thành cho chức năng quản trị và phân quyền người dùng, bao gồm các bộ bảo vệ vai trò (role guards), danh sách người dùng cho admin, tìm kiếm và bộ lọc, thay đổi vai trò/trạng thái, tự bảo vệ tài khoản của admin, quản lý phiên và thu hồi phiên."
 
+## Clarifications
+
+### Session 2026-08-02
+- Q: Nếu Admin hạ vai trò của một Giảng viên (Tutor) xuống thành Học viên (Student), các bài thi đang được giao (assign) cho Giảng viên đó sẽ ra sao? → A: Tự động gỡ bỏ (unassign) các bài chưa chấm để đưa về hàng đợi chung
+
 ## Kịch bản Người dùng & Kiểm thử *(bắt buộc)*
 
 ### Kịch bản 1 - Bảo vệ Các Khu vực Theo Vai trò (Độ ưu tiên: P1)
@@ -75,6 +80,7 @@ Với tư cách là admin, tôi muốn kiểm tra các phiên hoạt động và
 
 ### Các trường hợp ngoại lệ (Edge Cases)
 
+- Nếu một Giảng viên (Tutor) bị giáng quyền xuống Học viên (Student), mọi bài thi đang được giao (assigned) cho họ chưa chấm xong sẽ tự động bị gỡ bỏ (unassigned) và đưa về hàng đợi chung.
 - Người dùng không phải admin không thể truy cập quản lý người dùng, quản lý phiên hoặc các tính năng kiểm soát chỉ dành cho admin.
 - Admin không thể tự đổi vai trò hoặc trạng thái của chính mình.
 - Thay đổi vai trò sẽ chấm dứt các phiên hoạt động hiện tại của người bị thay đổi để tránh tình trạng quyền truy cập cũ còn sót lại.
@@ -102,6 +108,7 @@ Với tư cách là admin, tôi muốn kiểm tra các phiên hoạt động và
 - **FR-013**: Hệ thống PHẢI cho phép admin thu hồi một phiên hoạt động cụ thể.
 - **FR-014**: Hệ thống PHẢI lưu vết (record) việc thay đổi vai trò, trạng thái và thu hồi phiên quản trị vào nhật ký hệ thống (audit trail).
 - **FR-015**: Hệ thống PHẢI trả về các lỗi quyền truy cập rõ ràng khi người dùng không đủ quyền thực hiện một thao tác.
+- **FR-016**: Hệ thống PHẢI tự động thu hồi (unassign) các bài kiểm tra chưa chấm của Giảng viên và đưa vào hàng đợi chung nếu Giảng viên đó bị thay đổi vai trò xuống Học viên.
 
 ### Các thực thể chính (Key Entities)
 
