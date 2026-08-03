@@ -1,14 +1,45 @@
-# Feature Specification: Giao diện Thi Reading (feat-reading-ui)
+# Đặc tả tính năng: Giao diện Thi Reading (feat-reading-ui)
 
-**Feature Branch**: `feat/reading-ui`
+**Ngày tạo**: 2026-07-27
+**Trạng thái**: Draft
+**Phân loại**: Mỗi mục quy chuẩn được gắn nhãn `AS-BUILT`, `TARGET`, hoặc `NEEDS CLARIFICATION`.
 
-**Created**: 2026-07-27
+## 1. Tổng quan tính năng và bối cảnh nghiệp vụ
 
-**Status**: Draft
+IELTSZone cung cấp trang thi Reading với giao diện Split View 2 pane: bên trái hiển thị passage, bên phải hiển thị câu hỏi — hai pane cuộn độc lập. Học viên điền câu trả lời đa dạng loại (MCQ, fill-in-blank, True/False/NG, Matching, Short Answer) và đáp án được giữ nguyên trong local state khi điều hướng giữa các câu. Hỗ trợ Partial Practice (chọn từng Passage), Bottom Navigation, và ReviewModal tái sử dụng từ `feat-listening-ui`. Đồng hồ đếm ngược và auto-submit được dùng chung component `TimerBar` từ Listening.
 
-**Input**: Tách từ User Story 2 của `feat-objective-testing/SPEC.md` — Giao diện thi Reading với Split View, scroll độc lập, và hỗ trợ fill-in-blanks.
+**Input**: Tách từ User Story 2 của `feat-objective-testing/SPEC.md`.
 
-## User Scenarios & Testing *(mandatory)*
+## 2. Phạm vi
+
+- Split View 2 cột: pane trái (passage), pane phải (câu hỏi) — cuộn độc lập qua CSS `overflow-y: auto`.
+- Hỗ trợ đa dạng loại câu hỏi: MCQ, Multi-select, True/False/NG, Matching, Short Answer, Fill-in-blank.
+- Persistent local state cho toàn bộ đáp án trong session.
+- Partial Practice: chọn từng Passage qua `selectedPartIds`.
+- Bottom Navigation Bar: chuyển nhanh giữa các Passage đang làm.
+- ReviewModal: khi click câu hỏi, hệ thống tự switch sang đúng Passage chứa câu đó.
+- blockContent rendering: hiển thị hình ảnh/biểu đồ phía trên nhóm câu hỏi tương ứng.
+- Loading Skeleton khi tải đề và error boundary xử lý crash an toàn.
+- Tái sử dụng `ReviewModal`, `AutoSubmitModal`, `TimerBar` từ `feat-listening-ui`.
+
+## 3. Ngoài phạm vi
+
+- Backend chấm điểm và lưu kết quả (thuộc `feat-auto-grading`).
+- Trang xem lại lịch sử và kết quả (thuộc `feat-attempt-history`).
+- Giao diện Reading trên Mobile < 768px — ngoài scope v1.
+- Auto-save draft vào localStorage.
+- Audio player (thuộc `feat-listening-ui`).
+
+## 4. Tác nhân và tóm tắt phân quyền
+
+| Tác nhân | Hành vi được phép |
+|---|---|
+| Học viên đã xác thực | Truy cập trang thi, chọn Passage, làm bài, và nộp bài. |
+| Khách / chưa xác thực | Không được phép — trang thi yêu cầu được đăng nhập trước khi vào. |
+| Giảng viên / Admin | Không tương tác trực tiếp với giao diện này trong luồng học viên. |
+
+
+## 5. Câu chuyện người dùng và kiểm thử độc lập
 
 ### User Story 1 - Split View đọc bài và làm câu hỏi (Priority: P1)
 
@@ -40,13 +71,25 @@ Là một học viên, tôi muốn nhập câu trả lời văn bản vào các 
 
 ---
 
-### Edge Cases
+## 6. Trường hợp biên
 
 - Màn hình tablet dọc (< 1024px): Stack vertical — passage trên, câu hỏi dưới (không side-by-side).
 - Passage rất dài (> 1000 từ): Pane trái scroll mượt, không freeze UI.
 - Submit khi có câu fill-in-blank rỗng → Submit bình thường, backend chấm sai cho câu đó.
 
-## Requirements *(mandatory)*
+## 7. Quy tắc nghiệp vụ
+
+- **BR-READ-001 [AS-BUILT]**: Pane trái (passage) và pane phải (câu hỏi) PHẢI cuộn độc lập — scroll một pane không được ảnh hưởng pane kia.
+- **BR-READ-002 [AS-BUILT]**: Đáp án fill-in-blank PHẢI được giữ nguyên khi học viên điều hướng qua lại giữa các câu hỏi trong cùng session.
+- **BR-READ-003 [AS-BUILT]**: Khi click câu hỏi trong ReviewModal thuộc Passage khác với Passage đang hiển, hệ thống PHẢI tự switch sang Passage đúng rồi mới scroll tới câu.
+- **BR-READ-004 [AS-BUILT]**: Submit rỗng hoặc có câu fill-in-blank trống được chấp nhận bình thường — backend chấm sai cho câu đó, frontend không cảnh báo.
+- **BR-READ-005 [AS-BUILT]**: Trên màn hình < 1024px: stack vertical — passage trên, câu hỏi dưới (không side-by-side).
+- **BR-READ-006 [AS-BUILT]**: `ReviewModal`, `AutoSubmitModal`, và `TimerBar` được tái sử dụng từ `feat-listening-ui` — không tự viết lại.
+- **BR-READ-007 [AS-BUILT]**: blockContent (hình ảnh, biểu đồ) phải hiển thị ngay phía trên câu đầu tiên của block tương ứng — không hiển tách rời.
+- **BR-READ-008 [AS-BUILT]**: Mọi lỗi parse cấu trúc dữ liệu phải được catch an toàn — không được crash toàn bộ trang.
+
+## 8. Yêu cầu chức năng
+
 
 ### Functional Requirements
 
@@ -59,13 +102,21 @@ Là một học viên, tôi muốn nhập câu trả lời văn bản vào các 
 - **FR-007**: Hệ thống MUST xử lý hiển thị Loading Skeleton trong lúc gọi API lấy đề thi, và handle crash an toàn (catch-all) khi parse cấu trúc dữ liệu.
 - **FR-008**: Hệ thống MUST render nội dung phụ của câu hỏi (blockContent) như hình ảnh, biểu đồ ở ngay phía trên câu đầu tiên của block tương ứng.
 
-### Key Entities
+## 9. Yêu cầu phi chức năng
+
+- **NFR-READ-001 [AS-BUILT]**: Cuộn pane trái không làm pane phải dịch chuyển (kiểm tra bằng scroll event isolation).
+- **NFR-READ-002 [AS-BUILT]**: Fill-in-blank giữ đúng giá trị sau khi điều hướng qua lại 10 lần.
+- **NFR-READ-003 [AS-BUILT]**: Layout Split View hiển thị đúng trên màn hình 1024px+ không bị overflow.
+- **NFR-READ-004 [TARGET]**: Payload submit chứa đúng và đủ tất cả câu đã điền (MCQ + fill-in-blank).
+- **NFR-READ-005 [AS-BUILT]**: Passage dài (> 1000 từ): pane trái scroll mượt, không freeze UI.
+
+## 10. Thực thể chính
 
 - **`answers`**: Object local state `{ [questionId]: string | option | array }` — hỗ trợ tất cả các dạng câu hỏi.
 - **Split View panes**: Hai div với `height: 100vh`, `overflow-y: auto` — CSS Grid 2 cột.
 - **`ReviewModal` & `Bottom Nav Bar`** (shared): Điều hướng và Highlight câu đã điền / chưa điền.
 
-## Success Criteria *(mandatory)*
+## 11. Tiêu chí thành công
 
 ### Measurable Outcomes
 
@@ -74,9 +125,22 @@ Là một học viên, tôi muốn nhập câu trả lời văn bản vào các 
 - **SC-003**: Layout Split View hiển thị đúng trên màn hình 1024px+ không bị overflow.
 - **SC-004**: Payload submit chứa đúng và đủ tất cả câu đã điền (MCQ + fill-in-blank).
 
-## Assumptions
+## 12. Giả định
 
 - `ReviewModal.jsx`, `AutoSubmitModal.jsx` và `TimerBar.jsx` đã hoàn thành từ `feat-listening-ui`.
 - API `GET /api/v1/tests/:id/take` trả về cả passage text và danh sách câu hỏi đa dạng loại.
 - API `POST /api/v1/tests/:id/attempts` nhận đồng nhất payload `{ answers, timeSpent, practiceMode }`.
 - Học viên dùng Desktop hoặc Tablet — mobile < 768px ngoài scope v1.
+
+## 13. Phụ thuộc
+
+- **`feat-listening-ui`**: Cung cấp `ReviewModal.jsx`, `AutoSubmitModal.jsx`, `TimerBar.jsx` — sử dụng lại, không viết mới.
+- **`feat-auto-grading`**: Cung cấp `POST /api/v1/tests/:id/attempts` — endpoint submit bài.
+- **`GET /api/v1/tests/:id/take`**: API trả về cả passage text và danh sách câu hỏi đa dạng loại.
+- **`useLocation().state`**: React Router truyền `practiceMode`, `customTimeLimit`, `selectedPartIds` vào component.
+
+## 14. Câu hỏi mở
+
+1. **NEEDS CLARIFICATION**: Khi ReviewModal mở và học viên click câu thuộc Passage khác, có cần animation chuyển Passage hay switch ngay lập tức?
+2. **NEEDS CLARIFICATION**: Nếu `blockContent` là null/undefined cho một block, component render gì — bỏ qua im lặng hay hiển placeholder?
+3. **NEEDS CLARIFICATION**: Tablet dọc (768px – 1023px) có dùng layout stack vertical hay vẫn split horizontal?
