@@ -36,6 +36,9 @@ jobs:
 
             docker compose --env-file .env.production -f docker-compose.prod.yml up -d --remove-orphans
 
+            # Tự động dọn dẹp các Docker image và container rác (không sử dụng) để tránh đầy ổ cứng
+            docker system prune -f
+
             # Wait for containers to boot before verification
             sleep 10
             docker compose --env-file .env.production -f docker-compose.prod.yml ps
