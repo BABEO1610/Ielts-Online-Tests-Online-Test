@@ -62,6 +62,7 @@ frontend/
 ```
 
 **Quyết định Cấu trúc (Structure Decision)**: Duy trì việc thi hành (enforcement) cấp quyền ở cả hai tầng: sử dụng route guard ở frontend nhằm tối ưu UX, dùng middleware backend làm nguồn chân lý (source of truth). Logic danh sách người dùng và thay đổi (mutation) của admin tiếp tục được đặt trong admin routes và các services users/session.
+**Kiến trúc Backend (Backend Architecture)**: Controller quản trị (Admin Controller) sử dụng Dependency Injection pattern (factory function: `adminControllerFactory(usersService, AppError, sessionsService, contactsService, auditService)`) để dễ dàng unit test và decouple logic.
 
 ## Theo dõi Độ phức tạp (Complexity Tracking)
 
