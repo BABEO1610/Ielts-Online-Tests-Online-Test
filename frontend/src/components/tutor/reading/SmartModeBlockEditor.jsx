@@ -28,6 +28,14 @@ function SmartModeBlockEditor({ block, onChange }) {
 
     return (
       <div className="smart-mode-editor">
+        {poolOptions.length > 0 && (
+          <div className="mb-3 ps-3 border-start border-3 bg-light p-2 text-sm">
+            <strong>Danh sách lựa chọn (Options):</strong>
+            {poolOptions.map((choice, cIdx) => (
+              <div key={cIdx}><strong>{choice.label}.</strong> {choice.text}</div>
+            ))}
+          </div>
+        )}
         {questions.map((q, idx) => (
           <div key={q.id || idx} className="mb-3 p-3 border rounded bg-white">
             <div className="fw-bold mb-2">Question {q.questionOrder}</div>
