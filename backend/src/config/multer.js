@@ -26,6 +26,11 @@ const allowedMimes = [
   'application/octet-stream',      // fallback cho một số trình duyệt
 ];
 
+/**
+ * Chốt chặn số 1: Lọc file dựa vào đuôi file (MIME type) do trình duyệt gửi lên.
+ * Nếu phát hiện đuôi file lạ (không nằm trong danh sách), từ chối ngay lập tức (ném lỗi 422).
+ * Tránh việc load những file rác khổng lồ vào RAM của server.
+ */
 const fileFilter = (_req, file, cb) => {
   if (allowedMimes.includes(file.mimetype)) {
     cb(null, true);

@@ -116,9 +116,12 @@ const ResourceCard = ({ document, onEdit, onDelete, onViewDetail, isOwner }) => 
           )}
         </div>
 
-        {/* Kebab Menu — chỉ hiển thị cho chủ sở hữu */}
-        {isOwner && (
-          <div className="dropdown" onClick={(e) => e.stopPropagation()}>
+        {/* 📌 [SWIMLANE L1-B1 | STT 6] Button: ⋮ Kebab Menu (3 chấm)
+             Loại: <button> | Dòng gốc: L122–L133
+             Hiển thị: CHỈ cho chủ sở hữu (isOwner = doc.uploaded_by === currentUserId)
+             Action: mở Bootstrap dropdown (data-bs-toggle)
+             Chứa 2 item: Chỉnh sửa (L136) và Xóa (L145) */}
+        <div className="dropdown" onClick={(e) => e.stopPropagation()}>
             <button
               className="btn btn-light rounded-circle p-2 d-flex align-items-center justify-content-center border-0 shadow-none"
               style={{ width: '32px', height: '32px', backgroundColor: 'transparent' }}
@@ -133,21 +136,30 @@ const ResourceCard = ({ document, onEdit, onDelete, onViewDetail, isOwner }) => 
             </button>
             <ul className="dropdown-menu dropdown-menu-end shadow-sm border-0 rounded-4 p-2 mt-1" style={{ zIndex: 1050 }}>
               <li>
-                <button
-                  className="dropdown-item rounded-3 py-2 fw-medium"
-                  onClick={(e) => { e.stopPropagation(); onEdit(document); }}
-                >
-                  <i className="bi bi-pencil me-2 text-muted"></i>Chỉnh sửa
-                </button>
+                  {/* 📌 [SWIMLANE L1-B1 | STT 7] Button dropdown: Chỉnh sửa
+                       Loại: <button class="dropdown-item"> | Dòng gốc: L136–L141
+                       Action: onClick → onEdit(document) → navigate('/tutor/library/edit/:id')
+                       Ghi chú: e.stopPropagation() — ngăn card click phía sau */}
+                  <button
+                    className="dropdown-item rounded-3 py-2 fw-medium"
+                    onClick={(e) => { e.stopPropagation(); onEdit(document); }}
+                  >
+                    <i className="bi bi-pencil me-2 text-muted"></i>Chỉnh sửa
+                  </button>
               </li>
               <li><hr className="dropdown-divider my-1" /></li>
               <li>
-                <button
-                  className="dropdown-item text-danger rounded-3 py-2 fw-medium"
-                  onClick={(e) => { e.stopPropagation(); onDelete(document.id); }}
-                >
-                  <i className="bi bi-trash me-2"></i>Xóa
-                </button>
+                  {/* 📌 [SWIMLANE L1-B1 | STT 8] Button dropdown: Xóa
+                       Loại: <button class="dropdown-item text-danger"> | Dòng gốc: L145–L150
+                       Action: onClick → onDelete(document.id) → handleDeleteDocument(id)
+                               → window.confirm → deleteLibraryResource(id) → filter state
+                       Ghi chú: e.stopPropagation() — ngăn card click phía sau */}
+                  <button
+                    className="dropdown-item text-danger rounded-3 py-2 fw-medium"
+                    onClick={(e) => { e.stopPropagation(); onDelete(document.id); }}
+                  >
+                    <i className="bi bi-trash me-2"></i>Xóa
+                  </button>
               </li>
             </ul>
           </div>
@@ -329,6 +341,10 @@ const DocumentViewerModal = ({ document, onClose }) => {
             )}
           </div>
           <div className="d-flex gap-2">
+            {/* 📌 [SWIMLANE L1-B1 | STT 9] Button: Đóng (viewer modal)
+                 Loại: <button> | Dòng gốc: L332–L339
+                 Action: onClick → onClose → setSelectedDocument(null)
+                 Ghi chú: nằm trong DocumentViewerModal footer */}
             <button
               type="button"
               className="btn rounded-pill px-4 fw-medium"
@@ -337,6 +353,11 @@ const DocumentViewerModal = ({ document, onClose }) => {
             >
               Đóng
             </button>
+            {/* 📌 [SWIMLANE L1-B1 | STT 10] Link: Tải xuống (viewer modal)
+                 Loại: <a download> | Dòng gốc: L340–L353
+                 Action: tải file trực tiếp (browser native download)
+                 URL: Supabase URL + '?download=' hoặc URL thường
+                 Ghi chú: e.stopPropagation() — ngăn đóng modal */}
             <a
               href={url.includes('supabase.co') ? `${url}?download=` : url}
               download
@@ -393,6 +414,10 @@ const TutorLibraryView = ({
           </p>
         </div>
 
+        {/* 📌 [SWIMLANE L1-B1 | STT 1] Button: Upload tài liệu
+             Loại: <button> | Dòng gốc: L396–L418
+             Action: onClick → onUploadClick → navigate('/tutor/library/create')
+             Swimlane Node: Đầu tiên trong luồng Library — mở trang tạo mới */}
         <button
           onClick={onUploadClick}
           style={{
@@ -422,6 +447,11 @@ const TutorLibraryView = ({
       <div className="d-flex flex-wrap gap-3 mb-4">
         {/* Tab: Tất cả / Của tôi */}
         <div className="d-flex gap-2 me-2">
+          {/* 📌 [SWIMLANE L1-B1 | STT 2 & 3] Button tab: Tất cả / Của tôi
+               Loại: <button> | Dòng gốc: L426–L442
+               State: ownerTab ('all' | 'mine') — active tab tô nền đen (#000)
+               Action: onClick → setOwnerTab(tab) → filteredDocuments tự tính lại (L590)
+               'all' → 'Tất cả' | 'mine' → 'Của tôi' */}
           {['all', 'mine'].map((tab) => (
             <button
               key={tab}
@@ -450,6 +480,11 @@ const TutorLibraryView = ({
               <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
             </svg>
           </div>
+          {/* 📌 [SWIMLANE L1-B1 | STT 4] Input: Tìm kiếm tài liệu
+               Loại: <input type="text"> | Dòng gốc: L453–L460
+               State: searchQuery
+               Action: onChange → setSearchQuery → filteredDocuments tự lọc (L586–L588)
+               Lọc theo: title.includes(s) || description.includes(s) */}
           <input
             type="text"
             className="form-control shadow-none border-0 py-2 ps-5"
@@ -461,6 +496,11 @@ const TutorLibraryView = ({
         </div>
 
         <div style={{ minWidth: '200px' }}>
+          {/* 📌 [SWIMLANE L1-B1 | STT 5] Dropdown: Tất cả kỹ năng
+               Loại: <select> | Dòng gốc: L464–L477
+               State: selectedCategory (default: 'All')
+               Options: All, IELTS Academic, IELTS General, Listening, Reading, Writing, Speaking
+               Action: onChange → setSelectedCategory → filteredDocuments lọc theo category (L589) */}
           <select
             className="form-select shadow-none border-0 py-2 px-4"
             style={{ backgroundColor: '#efefef', borderRadius: '999px', fontSize: '15px', cursor: 'pointer' }}
@@ -596,6 +636,10 @@ const TutorLibraryPage = () => {
       {successMessage && (
         <div className="alert alert-success alert-dismissible mx-auto mt-4 mb-0" style={{ maxWidth: '1200px' }}>
           {successMessage}
+          {/* 📌 [SWIMLANE L1-B1 | STT 11] Button: ✕ btn-close (alert success)
+               Loại: <button class="btn-close"> | Dòng gốc: L599–L604
+               Action: onClick → setSuccessMessage(null) → ẩn banner
+               Hiển thị: sau khi upload thành công (navigate kèm location.state.message) */}
           <button
             type="button"
             className="btn-close"

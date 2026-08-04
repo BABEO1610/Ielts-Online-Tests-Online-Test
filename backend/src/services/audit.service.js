@@ -22,6 +22,9 @@ class AuditLogService {
      * @param {string|null} actor_id - The ID of the user performing the action.
      * @param {string} action - The action performed.
      * @param {string} target_table - The table being modified.
+     * Ghi lại lịch sử thao tác của hệ thống.
+     * Cơ chế Best-effort: Khối try/catch nội bộ sẽ nuốt lỗi nếu quá trình ghi log vào DB thất bại,
+     * để đảm bảo luồng nghiệp vụ chính của người dùng không bị sập theo.
      * @param {string|null} target_id - The ID of the affected record.
      * @param {object|null} old_value - The old value of the record.
      * @param {object|null} new_value - The new value of the record.
@@ -112,7 +115,11 @@ class AuditLogService {
 
         return formatAuditLogDetail(log);
     }
-
+    /**
+     * Thực thi việc hoàn tác (Undo) một lịch sử thao tác.
+     * Chốt chặn 1: Dùng lệnh SQL FOR UPDATE (Pessimistic Lock) để chống Race Condition khi có 2 admin cùng nhấn nút.
+     * Chốt chặn 2: Optimistic Verification - So sánh dữ liệu DB hiện tại với dữ liệu lúc bị sửa. Nếu khác nhau (đã bị người khác sửa xen ngang), từ chối hoàn tác (ném 409).
+     */
     static async undoChangeLog({ logId, actorId, ipAddress }) {
         const sourceLog = await getAuditLogById(pool, logId);
         if (!sourceLog) {
