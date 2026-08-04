@@ -154,6 +154,10 @@ const ResourceUploadModal = ({ isOpen, onClose, onSuccess }) => {
             <h5 className="modal-title fw-bold" id="uploadModalLabel" style={{ fontFamily: 'UberMove, system-ui, sans-serif', fontSize: '24px' }}>
               Upload tài liệu mới
             </h5>
+            {/* 📌 [SWIMLANE L1-B2 | STT 1] ✕ btn-close (header)
+                 Loại: <button> | Dòng gốc: L157
+                 Action: onClick → handleClose() → clearError() + onClose()
+                 Ghi chú: Đóng modal, reset toàn bộ form state */}
             <button type="button" className="btn-close" onClick={handleClose} aria-label="Close"></button>
           </div>
           
@@ -170,6 +174,10 @@ const ResourceUploadModal = ({ isOpen, onClose, onSuccess }) => {
                 <div className="col-md-8">
                   <div className="mb-3">
                     <label htmlFor="title" className="form-label fw-medium text-dark">Tiêu đề tài liệu <span className="text-danger">*</span></label>
+                    {/* 📌 [SWIMLANE L1-B2 | STT 2] Input: Tiêu đề tài liệu
+                         Loại: <input type="text"> | Dòng gốc: L173–L184
+                         State: formData.title | required, maxLength=500
+                         Action: onChange → handleChange → setFormData */}
                     <input 
                       type="text" 
                       className="form-control bg-light border-0 px-3 py-2" 
@@ -186,6 +194,10 @@ const ResourceUploadModal = ({ isOpen, onClose, onSuccess }) => {
                   
                   <div className="mb-3">
                     <label htmlFor="description" className="form-label fw-medium text-dark">Mô tả chi tiết</label>
+                    {/* 📌 [SWIMLANE L1-B2 | STT 3] Textarea: Mô tả chi tiết
+                         Loại: <textarea> | Dòng gốc: L189–L198
+                         State: formData.description | rows=4, optional
+                         Action: onChange → handleChange → setFormData */}
                     <textarea 
                       className="form-control bg-light border-0 px-3 py-2" 
                       id="description" 
@@ -202,6 +214,12 @@ const ResourceUploadModal = ({ isOpen, onClose, onSuccess }) => {
                 <div className="col-md-4">
                   <div className="mb-3">
                     <label htmlFor="resource_type" className="form-label fw-medium text-dark">Loại tài liệu</label>
+                    {/* 📌 [SWIMLANE L1-B2 | STT 4] Dropdown: Loại tài liệu
+                         Loại: <select> | Dòng gốc: L205–L215
+                         State: formData.resource_type (default: 'pdf')
+                         Options: 'pdf' → 'Tài liệu PDF' | 'audio' → 'File Audio (Nghe)'
+                         Side-effect: thay đổi giá trị này → re-validate file size (L100–L110)
+                                      và thay đổi accept attribute của fileInput (L247) */}
                     <select 
                       className="form-select bg-light border-0 px-3 py-2 form-select-lg" 
                       id="resource_type" 
@@ -217,6 +235,11 @@ const ResourceUploadModal = ({ isOpen, onClose, onSuccess }) => {
                   
                   <div className="mb-3">
                     <label className="form-label fw-medium text-dark d-block">Trạng thái</label>
+                    {/* 📌 [SWIMLANE L1-B2 | STT 5] Toggle Switch: Trạng thái công khai
+                         Loại: <input type="checkbox" role="switch"> | Dòng gốc: L221–L233
+                         State: formData.is_published (default: true)
+                         Hiện: true → 'Hiển thị công khai' | false → 'Đang ẩn'
+                         Action: onChange → handleChange → setFormData({ is_published: checked }) */}
                     <div className="form-check form-switch mt-2">
                       <input 
                         className="form-check-input" 
@@ -240,6 +263,12 @@ const ResourceUploadModal = ({ isOpen, onClose, onSuccess }) => {
                     <i className={`bi ${formData.resource_type === 'pdf' ? 'bi-file-earmark-pdf' : 'bi-file-earmark-music'} text-muted`} style={{ fontSize: '48px' }}></i>
                     <h6 className="fw-medium mt-3 mb-2 text-dark">Chọn file để tải lên</h6>
                     
+                    {/* 📌 [SWIMLANE L1-B2 | STT 7] Upload File — Input file ẩn
+                         Loại: <input type="file" hidden> | Dòng gốc: L243–L249
+                         id="fileInput" — được trigger bởi <label htmlFor="fileInput"> bên dưới
+                         accept: pdf → '.pdf' | audio → '.mp3,.wav,.m4a' (thay đổi theo resource_type)
+                         Action: onChange → handleFileChange → validate size → setFile(selectedFile)
+                         Validate: PDF ≤ 20MB | Audio ≤ 100MB (L79–L87) */}
                     <input 
                       type="file" 
                       className="d-none" 
@@ -248,6 +277,10 @@ const ResourceUploadModal = ({ isOpen, onClose, onSuccess }) => {
                       onChange={handleFileChange}
                     />
                     
+                    {/* 📌 [SWIMLANE L1-B2 | STT 6] Button: Duyệt file
+                         Loại: <label htmlFor="fileInput"> (giả button) | Dòng gốc: L251–L257
+                         Action: click → mở hộp thoại chọn file của OS (trigger input#fileInput)
+                         Ghi chú: KHÔNG phải <button>, là <label> styled as button */}
                     <label 
                       htmlFor="fileInput" 
                       className="btn btn-dark rounded-pill px-4 py-2 mt-2"
@@ -279,6 +312,10 @@ const ResourceUploadModal = ({ isOpen, onClose, onSuccess }) => {
             </div>
             
             <div className="modal-footer border-top-0 p-4 pt-0">
+              {/* 📌 [SWIMLANE L1-B2 | STT 8] Button: Hủy bỏ
+                   Loại: <button type="button"> | Dòng gốc: L282–L290
+                   Action: onClick → handleClose() → clearError() + onClose()
+                   State: disabled khi loading=true (đang upload) */}
               <button 
                 type="button" 
                 className="btn btn-light rounded-pill px-4 fw-medium" 
@@ -288,6 +325,12 @@ const ResourceUploadModal = ({ isOpen, onClose, onSuccess }) => {
               >
                 Hủy bỏ
               </button>
+              {/* 📌 [SWIMLANE L1-B2 | STT 9] Button: Lưu tài liệu ("Tải lên ngay")
+                   Loại: <button type="submit"> | Dòng gốc: L291–L307
+                   Action: submit form → handleSubmit() → new FormData() → uploadResource(data)
+                           → onSuccess() → handleClose()
+                   State: disabled khi (loading=true || file=null)
+                   UI: khi loading → hiện spinner + "Đang tải lên..." | bình thường → "Tải lên ngay" */}
               <button 
                 type="submit" 
                 className="btn btn-dark rounded-pill px-4 fw-medium d-flex align-items-center gap-2" 

@@ -47,6 +47,14 @@ const AdminActivityLogPage = () => {
 
       {/* Segmented filter */}
       <div className="d-flex gap-2 mb-3 flex-wrap">
+        {/* 📌 [SWIMLANE L3-B1 | STT 1, 2, 3] Button tab filter: Tất cả / Hành động thường / Khả nghi
+             Loại: <button class="btn-pill"> | Dòng gốc: L51–L58
+             State: filter ('all' | 'normal' | 'suspicious') — active tab dùng class 'btn-pill--dark'
+             Action: onClick → setFilter(key) → useEffect → load() fetch lại với params mới
+             Key points:
+             - 'suspicious' → gửi { severity: 'suspicious' } lên API
+             - 'normal' → lọc client-side: loại bỏ row có severity === 'suspicious'
+             - severity KHÔNG lưu DB, tính runtime dựa trên action type (Dòng swimlane ⭐) */}
         {FILTERS.map((f) => (
           <button
             key={f.key}

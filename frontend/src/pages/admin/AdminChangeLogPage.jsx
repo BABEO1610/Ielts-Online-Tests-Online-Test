@@ -145,12 +145,24 @@ const AdminChangeLogPage = () => {
             onChange={(event) => setActionQuery(event.target.value)}
             placeholder="Tìm theo hành động: đổi vai trò, hoàn tác, đăng xuất..."
           />
+          {/* 📌 [SWIMLANE L3-B2 | STT 1] Button: Tìm kiếm
+               Loại: <button type="submit"> | Dòng gốc: L148
+               Action: submit form → onSearch() → setAppliedActionQuery → load({ page:1, query })
+               Ghi chú: query được xử lý qua resolveActionFilter() — fuzzy match tiếng Việt */}
           <button type="submit" className="btn-pill btn-pill--dark" disabled={loading}>Tìm kiếm</button>
+          {/* 📌 [SWIMLANE L3-B2 | STT 2] Button: Xóa lọc
+               Loại: <button type="button"> | Dòng gốc: L149–L151
+               Action: onClick → clearSearch() → reset cả actionQuery + appliedActionQuery → load lại
+               State: disabled khi loading || (actionQuery && appliedActionQuery đều rỗng) */}
           <button type="button" className="btn-pill btn-pill--ghost" onClick={clearSearch} disabled={loading || (!actionQuery && !appliedActionQuery)}>
             Xóa lọc
           </button>
           <div className="ms-auto d-flex align-items-center gap-2">
             <span className="caption text-secondary">Mỗi trang</span>
+            {/* 📌 [SWIMLANE L3-B2 | STT 3] Dropdown: Mỗi trang (phân trang)
+                 Loại: <select> | Dòng gốc: L154–L158
+                 Options: 10, 20, 50 bản ghi/trang
+                 Action: onChange → changeLimit → load({ page:1, limit: nextLimit }) */}
             <select className="form-select" style={{ width: 92 }} value={meta.limit} onChange={changeLimit} disabled={loading}>
               <option value={10}>10</option>
               <option value={20}>20</option>
@@ -191,6 +203,11 @@ const AdminChangeLogPage = () => {
                         : <span className="pill pill--info">Đang áp dụng</span>}
                     </td>
                     <td className="text-end">
+                      {/* 📌 [SWIMLANE L3-B2 | STT 4] Button: Xem thay đổi
+                           Loại: <button class="btn-pill--ghost"> | Dòng gốc: L194–L196
+                           Action: onClick → openDetail(row) → fetchChangeLogDetail(row.id)
+                                   → setSelected(row+detail) → mở ChangeDetailModal
+                           State: disabled khi detailLoadingId === row.id (hiện 'Đang tải...') */}
                       <button className="btn-pill btn-pill--ghost" onClick={() => openDetail(row)} disabled={detailLoadingId === row.id}>
                         {detailLoadingId === row.id ? 'Đang tải...' : 'Xem thay đổi'}
                       </button>
@@ -206,9 +223,18 @@ const AdminChangeLogPage = () => {
           <span className="caption text-secondary me-auto">
             Trang {meta.page}/{totalPages} - {meta.total} log
           </span>
+          {/* 📌 [SWIMLANE L3-B2 | STT 5] Button: Trước (phân trang)
+               Loại: <button class="btn-pill--ghost"> | Dòng gốc: L209–L211
+               Action: onClick → changePage(page - 1) → load({ page: nextPage })
+               State: disabled khi loading || page <= 1 */}
           <button className="btn-pill btn-pill--ghost" type="button" onClick={() => changePage(meta.page - 1)} disabled={loading || meta.page <= 1}>
             Trước
           </button>
+          {/* 📌 [SWIMLANE L3-B2 | STT 6] Button: Số trang (phân trang)
+               Loại: <button class="btn-pill"> | Dòng gốc: L212–L222
+               Active page → 'btn-pill--dark' (tô đen) | Trang khác → 'btn-pill--ghost'
+               Action: onClick → changePage(page) → load({ page })
+               State: disabled khi loading || page === meta.page (trang hiện tại) */}
           {pageNumbers.map((page) => (
             <button
               key={page}
@@ -220,6 +246,10 @@ const AdminChangeLogPage = () => {
               {page}
             </button>
           ))}
+          {/* 📌 [SWIMLANE L3-B2 | STT 7] Button: Sau (phân trang)
+               Loại: <button class="btn-pill--ghost"> | Dòng gốc: L223–L225
+               Action: onClick → changePage(page + 1) → load({ page: nextPage })
+               State: disabled khi loading || page >= totalPages */}
           <button className="btn-pill btn-pill--ghost" type="button" onClick={() => changePage(meta.page + 1)} disabled={loading || meta.page >= totalPages}>
             Sau
           </button>
@@ -252,6 +282,10 @@ const ChangeDetailModal = ({ row, busy, onClose, onRevert }) => {
                 <h5 className="modal-title fw-bold">{row.action_label || actionLabel(row.action)}</h5>
                 <div className="caption text-secondary">{row.target_table} - {row.target_label}</div>
               </div>
+              {/* 📌 [SWIMLANE L3-B2 | STT 8] Button: ✕ btn-close (modal chi tiết)
+                   Loại: <button class="btn-close"> | Dòng gốc: L255
+                   Action: onClick → onClose → setSelected(null)
+                   State: disabled khi busy=true (đang thực hiện hoàn tác) */}
               <button type="button" className="btn-close" onClick={onClose} aria-label="Close" disabled={busy} />
             </div>
             <div className="modal-body">
@@ -281,8 +315,19 @@ const ChangeDetailModal = ({ row, busy, onClose, onRevert }) => {
               {row.reverted && <div className="api-success-message mt-3">Thay đổi này đã được hoàn tác.</div>}
             </div>
             <div className="modal-footer border-top-0 pt-0">
+              {/* 📌 [SWIMLANE L3-B2 | STT 9] Button: Đóng (modal footer)
+                   Loại: <button class="btn-pill--ghost"> | Dòng gốc: L284
+                   Action: onClick → onClose → setSelected(null)
+                   State: disabled khi busy=true */}
               <button type="button" className="btn-pill btn-pill--ghost" onClick={onClose} disabled={busy}>Đóng</button>
               {row.revertable && !row.reverted && (
+                {/* 📌 [SWIMLANE L3-B2 | STT 10] Button: Hoàn tác thay đổi ⭐
+                     Loại: <button class="btn-pill--dark"> | Dòng gốc: L286–L288
+                     Hiển thị: CHỈ khi row.revertable=true && row.reverted=false
+                     Action: onClick → onRevert(row) → revertChange(row.id) → POST /admin/logs/:id/undo
+                     Swimlane ⭐: Backend dùng SELECT FOR UPDATE (Pessimistic Lock) → chống Race Condition
+                                  + xác thực giá trị (Optimistic Check) → nếu sai → 409 Conflict
+                     UI: khi busy → hiện 'Đang hoàn tác...' | bình thường → 'Hoàn tác thay đổi' */}
                 <button type="button" className="btn-pill btn-pill--dark" onClick={onRevert} disabled={busy}>
                   {busy ? 'Đang hoàn tác...' : 'Hoàn tác thay đổi'}
                 </button>

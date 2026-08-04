@@ -221,7 +221,7 @@ function TutorWritingFormPage({ testId }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const [formData, setFormData] = useState({
-    title: '', description: '', difficulty: '', duration: 60,
+    title: '', description: '', difficulty: 'intermediate', duration: 60,
     testType: 'academic'
   });
 
