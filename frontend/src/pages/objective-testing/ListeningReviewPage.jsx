@@ -157,9 +157,24 @@ function ListeningReviewPage({ attemptDetail }) {
             {/* Block-level content (diagrams, notes) */}
             {activeSectionData?.blocks?.map((b, bIdx) => {
               const blockQs = allQuestions.filter(q => q.section === activeSection && (b.questions || []).some(bq => bq.id === q.id));
+              
+              // Check if content is actually a JSON array (sometimes wrapped in <p> tags by the DB/scraper)
+              let isRawJson = false;
+              if (b.content) {
+                try {
+                  const stripped = b.content.replace(/<[^>]*>?/gm, '').trim();
+                  if (stripped.startsWith('[') && stripped.endsWith(']')) {
+                    JSON.parse(stripped);
+                    isRawJson = true; // It's valid JSON array, do not render as HTML
+                  }
+                } catch (e) {
+                  // Not valid JSON, safe to render
+                }
+              }
+
               return (
                 <div key={b.id || bIdx} className="mb-5">
-                  {b.content && (!b.content.trim().startsWith('[') || !b.content.trim().endsWith(']')) && (
+                  {b.content && !isRawJson && (
                     <div className="mb-4 p-3 bg-light rounded shadow-sm">
                       <div dangerouslySetInnerHTML={{ __html: b.content }} />
                     </div>
