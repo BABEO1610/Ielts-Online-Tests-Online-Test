@@ -148,25 +148,37 @@ function TutorReadingFormPage({ testId }) {
       // Block-level options pool: stored in first question's options JSONB, or block.options
       let rawOpts = block.options || (block.questions?.[0]?.options) || [];
       if (typeof rawOpts === 'string') { try { rawOpts = JSON.parse(rawOpts); } catch { rawOpts = []; } }
-      rawOpts = Array.isArray(rawOpts) ? rawOpts : [];
+      
+      let choices = [];
+      if (rawOpts && typeof rawOpts === 'object' && !Array.isArray(rawOpts)) {
+         choices = rawOpts.choices || [];
+      } else if (Array.isArray(rawOpts)) {
+         choices = rawOpts;
+      }
 
-      const normalizedOpts = rawOpts.map((opt, oi) => ({
-        id: Date.now() + oi + 1,
+      const normalizedOpts = choices.map((opt, oi) => ({
+        id: opt.id || (Date.now() + oi + 1),
+        label: opt.label || String.fromCharCode(65 + oi),
         text: typeof opt === 'object' ? (opt.text || opt.label || '') : String(opt),
       }));
 
       const questions = (block.questions || []).map((q, qi) => {
-        // correctAnswer is the label (A, B, C...) or option text
-        const ca = q.correctAnswer || '';
-        // Try to find the option id matching by label letter
-        const letterIdx = ca.charCodeAt(0) - 65; // 'A'→0, 'B'→1...
-        const matchId = normalizedOpts[letterIdx]?.id || normalizedOpts.find(o => o.text === ca)?.id || '';
+        let ca = q.correctAnswer || '';
+        
+        // If the database has a numeric ID (legacy behavior) or another ID, map it to the label
+        // because SmartModeBlockEditor expects the label (e.g., 'A', 'B') as the value.
+        const matchedOpt = normalizedOpts.find(o => String(o.id) === String(ca));
+        if (matchedOpt && matchedOpt.label) {
+           ca = matchedOpt.label;
+        }
 
         return {
+          ...q,
           id: Date.now() + qi * 100,
           text: q.text || '',
-          correctAnswer: matchId,
+          correctAnswer: ca,
           explanation: q.explanation || '',
+          options: qi === 0 ? { choices: normalizedOpts } : {}
         };
       });
 

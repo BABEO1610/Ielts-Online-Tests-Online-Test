@@ -57,33 +57,41 @@ function AudioPlayer({ src, practiceMode }) {
     const audio = audioRef.current;
     if (!audio) return;
 
+    // Cơ chế "Chống tua" (Anti-Seeking): Lưu lại cái neo thời gian hợp lệ cuối cùng mỗi khi file chạy bình thường
     const onTimeUpdate = () => { lastTimeRef.current = audio.currentTime; setCurrentTime(audio.currentTime); };
-    const onLoaded    = () => setDuration(audio.duration || 0);
-    const onPlay      = () => setIsPlaying(true);
-    const onPause     = () => {
+    const onLoaded = () => setDuration(audio.duration || 0);
+    const onPlay = () => setIsPlaying(true);
+
+    // Lớp phòng thủ 1: Cơ chế "Chống dừng" (Anti-Pause)
+    // Bắt tín hiệu pause. Nếu đang thi thật, lập tức gọi play() ép chạy tiếp, phá mánh khóe dừng băng.
+    const onPause = () => {
       setIsPlaying(false);
       // Simulation guard: resume immediately if paused (tab-switch, devtools, etc.)
-      if (!practiceMode) audio.play().catch(() => {});
+      if (!practiceMode) audio.play().catch(() => { });
     };
-    const onSeeking   = () => {
+
+    // Lớp phòng thủ 2: Cơ chế "Chống tua" (Anti-Seeking)
+    // Bắt tín hiệu tua. Nếu đang thi thật, lấy mỏ neo (lastTimeRef) gán ngược lại, ép file giật ngược về vị trí cũ.
+    const onSeeking = () => {
       // Simulation guard: revert any seek attempt
       if (!practiceMode) audio.currentTime = lastTimeRef.current;
     };
 
-    audio.addEventListener('timeupdate',     onTimeUpdate);
+    audio.addEventListener('timeupdate', onTimeUpdate);
     audio.addEventListener('loadedmetadata', onLoaded);
-    audio.addEventListener('play',           onPlay);
-    audio.addEventListener('pause',          onPause);
-    audio.addEventListener('seeking',        onSeeking);
+    audio.addEventListener('play', onPlay);
+    audio.addEventListener('pause', onPause);
+    audio.addEventListener('seeking', onSeeking);
 
-    if (!practiceMode) audio.play().catch(() => {}); // auto-play for simulation
+    // Chế độ thi thật (Simulation Mode): Bắt đầu chạy ngay lập tức khi vào phòng thi
+    if (!practiceMode) audio.play().catch(() => { }); // auto-play for simulation
 
     return () => {
-      audio.removeEventListener('timeupdate',     onTimeUpdate);
+      audio.removeEventListener('timeupdate', onTimeUpdate);
       audio.removeEventListener('loadedmetadata', onLoaded);
-      audio.removeEventListener('play',           onPlay);
-      audio.removeEventListener('pause',          onPause);
-      audio.removeEventListener('seeking',        onSeeking);
+      audio.removeEventListener('play', onPlay);
+      audio.removeEventListener('pause', onPause);
+      audio.removeEventListener('seeking', onSeeking);
     };
   }, [practiceMode]);
 
@@ -117,6 +125,8 @@ function AudioPlayer({ src, practiceMode }) {
           </span>
         </div>
       ) : (
+        // Lớp phòng thủ 3: Thiết kế theo dạng "Vỏ bọc tàng hình" (Display-only UI)
+        // Trong chế độ thi thật, thẻ audio bị giấu hoàn toàn, chỉ hiển thị HTML giả (dấu chấm đỏ nhấp nháy chữ Playing).
         // Simulation: display-only — no controls whatsoever
         <div className="d-flex align-items-center gap-3 flex-wrap">
           <span
@@ -146,7 +156,7 @@ function ListeningTestPage() {
   const location = useLocation();
   const navigate = useNavigate();
   const { id } = useParams();
-  
+
   const practiceMode = location.state?.practiceMode || false;
   const customTimeLimit = location.state?.customTimeLimit || null;
   const selectedPartIds = location.state?.selectedPartIds || ['s1', 's2', 's3', 's4'];
@@ -203,7 +213,7 @@ function ListeningTestPage() {
   const submitTest = useCallback(async (isAutoSubmit = false) => {
     if (isSubmitting) return;
     setIsSubmitting(true);
-    
+
     // Tính thời gian thực tế user đã làm bài
     const timeSpentSeconds = Math.round((Date.now() - startTime) / 1000);
 
@@ -238,11 +248,11 @@ function ListeningTestPage() {
 
   const scrollToQuestion = useCallback((qNum) => {
     if (!testData || !testData.sections) return;
-    
+
     // Find which section this question belongs to
     let targetSectionName = null;
     for (const s of testData.sections) {
-      const hasQ = (s.blocks || []).some(b => 
+      const hasQ = (s.blocks || []).some(b =>
         (b.questions || []).some(q => q.questionOrder === qNum)
       );
       if (hasQ) {
@@ -254,7 +264,7 @@ function ListeningTestPage() {
     if (targetSectionName) {
       setActiveSection(targetSectionName);
       setCurrentQuestion(qNum);
-      
+
       // Delay slightly to let React render the new active section
       setTimeout(() => {
         const el = document.getElementById(`lq-${qNum}`);
@@ -308,7 +318,7 @@ function ListeningTestPage() {
         <div className="container" style={{ maxWidth: 900 }}>
           <div className="d-flex align-items-center gap-3">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="var(--ink)" stroke="none">
-              <path d="M12 3v18l-7-5H2V8h3l7-5zm10 9a8 8 0 01-2.3 5.7l-1.4-1.4A6 6 0 0020 12a6 6 0 00-1.7-4.3l1.4-1.4A8 8 0 0122 12zm-4 0a4 4 0 01-1.2 2.8l-1.4-1.4A2 2 0 0016 12a2 2 0 00-.6-1.4l1.4-1.4A4 4 0 0118 12z"/>
+              <path d="M12 3v18l-7-5H2V8h3l7-5zm10 9a8 8 0 01-2.3 5.7l-1.4-1.4A6 6 0 0020 12a6 6 0 00-1.7-4.3l1.4-1.4A8 8 0 0122 12zm-4 0a4 4 0 01-1.2 2.8l-1.4-1.4A2 2 0 0016 12a2 2 0 00-.6-1.4l1.4-1.4A4 4 0 0118 12z" />
             </svg>
             <span className="body-sm-strong">Listening Audio — {testData?.title}</span>
           </div>
@@ -358,10 +368,10 @@ function ListeningTestPage() {
             const partNum = index + 1;
             const isActive = activeSection === sectionName;
             const partQuestions = sections[sectionName] || [];
-            
+
             return (
-              <div 
-                key={sectionName} 
+              <div
+                key={sectionName}
                 className={`bottom-nav-tab ${isActive ? 'active' : ''}`}
                 onClick={() => setActiveSection(sectionName)}
               >
@@ -369,7 +379,7 @@ function ListeningTestPage() {
                 {isActive ? (
                   <div className="d-flex gap-2 ms-2">
                     {partQuestions.map(q => (
-                      <div 
+                      <div
                         key={q.id}
                         className={`q-circle ${answeredQuestions.includes(q.order) ? 'answered' : ''} ${currentQuestion === q.order ? 'current' : ''}`}
                         onClick={(e) => {
@@ -394,7 +404,7 @@ function ListeningTestPage() {
       <AutoSubmitModal isOpen={showAutoSubmit} />
 
       {/* Review Modal */}
-      <ReviewModal 
+      <ReviewModal
         isOpen={isReviewOpen}
         onClose={() => setIsReviewOpen(false)}
         questions={allQuestions}

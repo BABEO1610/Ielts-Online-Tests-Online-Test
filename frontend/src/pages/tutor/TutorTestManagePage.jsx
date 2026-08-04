@@ -11,6 +11,8 @@ const formatLabel = (value) => {
 function TutorTestManagePage() {
   const [tests, setTests] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [statusFilter, setStatusFilter] = useState('');
+  const [skillFilter, setSkillFilter] = useState('');
 
   const fetchTests = async () => {
     try {
@@ -60,6 +62,12 @@ function TutorTestManagePage() {
     }
   };
 
+  const filteredTests = tests.filter(t => {
+    if (statusFilter && t.status !== statusFilter) return false;
+    if (skillFilter && t.skill !== skillFilter) return false;
+    return true;
+  });
+
   return (
     <div className="container py-4" style={{ maxWidth: 1100 }}>
       <div className="d-flex justify-content-between align-items-center mb-4">
@@ -81,7 +89,7 @@ function TutorTestManagePage() {
              Loại: <select> | Dòng gốc: L76–L81
              Options: All Status, Published, Pending Review, Draft
              Ghi chú: chỉ là filter UI, chưa nối logic (defaultValue="") */}
-        <select id="filter-tutor-status" defaultValue="">
+        <select id="filter-tutor-status" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
           <option value="">All Status</option>
           <option value="published">Published</option>
           <option value="pending">Pending Review</option>
@@ -91,7 +99,7 @@ function TutorTestManagePage() {
              Loại: <select> | Dòng gốc: L82–L88
              Options: All Skills, Reading, Listening, Writing, Speaking
              Ghi chú: chỉ là filter UI, chưa nối logic (defaultValue="") */}
-        <select id="filter-tutor-skill" defaultValue="">
+        <select id="filter-tutor-skill" value={skillFilter} onChange={(e) => setSkillFilter(e.target.value)}>
           <option value="">All Skills</option>
           <option value="reading">Reading</option>
           <option value="listening">Listening</option>
@@ -124,8 +132,12 @@ function TutorTestManagePage() {
                 <tr>
                   <td colSpan="8" className="text-center py-4">No tests found. Create your first test!</td>
                 </tr>
+              ) : filteredTests.length === 0 ? (
+                <tr>
+                  <td colSpan="8" className="text-center py-4">No tests found matching the filters.</td>
+                </tr>
               ) : (
-                tests.map((t, idx) => (
+                filteredTests.map((t, idx) => (
                   <tr key={t.id} id={`tutor-row-${t.id}`}>
                     <td className="col-index">{idx + 1}</td>
                     <td><span className="test-title-cell">{t.title}</span></td>

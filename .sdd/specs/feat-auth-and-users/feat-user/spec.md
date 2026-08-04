@@ -81,34 +81,36 @@ Với tư cách là admin, tôi muốn kiểm tra các phiên hoạt động và
 ### Các trường hợp ngoại lệ (Edge Cases)
 
 - Nếu một Giảng viên (Tutor) bị giáng quyền xuống Học viên (Student), mọi bài thi đang được giao (assigned) cho họ chưa chấm xong sẽ tự động bị gỡ bỏ (unassigned) và đưa về hàng đợi chung.
-- Người dùng không phải admin không thể truy cập quản lý người dùng, quản lý phiên hoặc các tính năng kiểm soát chỉ dành cho admin.
-- Admin không thể tự đổi vai trò hoặc trạng thái của chính mình.
-- Thay đổi vai trò sẽ chấm dứt các phiên hoạt động hiện tại của người bị thay đổi để tránh tình trạng quyền truy cập cũ còn sót lại.
-- Trạng thái thay đổi thành inactive hoặc banned sẽ chấm dứt các phiên hoạt động hiện tại của người bị ảnh hưởng.
-- Các tìm kiếm hoặc lọc không có kết quả sẽ hiển thị trạng thái trống (empty state) thay vì bị lỗi.
-- Thu hồi một phiên không tồn tại hoặc đã bị thu hồi sẽ trả về kết quả lỗi rõ ràng.
-- Việc phân trang danh sách người dùng vẫn hợp lệ khi các bộ lọc làm giảm số lượng kết quả.
+- Người dùng không phải admin không thể truy cập quản lý người dùng, quản lý phiên hoặc các tính năng kiểm soát chỉ dành cho admin. Nếu cố truy cập route API sẽ nhận HTTP 403 `AUTH_PERM_001`; nếu truy cập UI sẽ bị `ProtectedRoute` điều hướng. Nếu user có role không xác định (ví dụ `user` legacy), cũng sẽ bị từ chối truy cập.
+- Admin không thể tự đổi vai trò hoặc trạng thái của chính mình. Cơ chế tự bảo vệ (self-protection) được thực thi ở cả tầng Controller và Service để đảm bảo an toàn tuyệt đối, trả về lỗi 403 `AUTH_PERM_001`.
+- Thay đổi vai trò hoặc trạng thái (thành inactive/banned) sẽ tự động gọi hàm `revokeAllSessionsForUser` để chấm dứt các phiên hoạt động hiện tại (thiết lập `revoked_at = NOW()`).
+- Các tìm kiếm (search) danh sách người dùng sử dụng `ILIKE` (case-insensitive) áp dụng cho cả `full_name` và `email`.
+- Các tìm kiếm hoặc lọc không có kết quả, hoặc khi admin yêu cầu trang phân trang (page) vượt quá tổng số bản ghi, sẽ trả về mảng rỗng và hiển thị trạng thái trống (empty state) thay vì bị lỗi. Mặc định phân trang là `page = 1, limit = 10`.
+- Thu hồi một phiên (session) thủ công bằng API `DELETE /admin/sessions/:id`. Nếu session không tồn tại hoặc đã bị thu hồi trước đó, API sẽ trả về HTTP 404 lỗi `SES_ADM_001`.
+- Khi thay đổi role/status mà giá trị truyền lên giống hệt giá trị hiện tại ở database, API vẫn thực hiện xử lý và ghi log bình thường.
+- API cập nhật role và status sử dụng method `PUT`. Trước khi cập nhật, service phải kiểm tra người dùng mục tiêu có tồn tại hay không (trả về 404 nếu không).
+- Danh sách active sessions được lấy từ view `v_active_sessions` (đã join với bảng users), không select trực tiếp từ bảng `user_sessions`. Device info hiển thị cho admin được parse từ chuỗi `user_agent`.
 
 ## Yêu cầu *(bắt buộc)*
 
 ### Yêu cầu chức năng
 
-- **FR-001**: Hệ thống PHẢI thực thi kiểm soát truy cập dựa trên vai trò cho các khu vực học viên, giảng viên và admin được bảo vệ.
-- **FR-002**: Hệ thống PHẢI từ chối cấp quyền truy cập khu vực quản lý người dùng admin cho những người dùng không phải admin.
-- **FR-003**: Hệ thống PHẢI cho phép admin xem danh sách người dùng có phân trang.
-- **FR-004**: Hệ thống PHẢI cho phép admin tìm kiếm người dùng theo tên hoặc email.
-- **FR-005**: Hệ thống PHẢI cho phép admin lọc người dùng theo vai trò và trạng thái tài khoản.
-- **FR-006**: Hệ thống PHẢI hiển thị vai trò người dùng, trạng thái, email, tên hiển thị và ngày tạo trong danh sách người dùng.
-- **FR-007**: Hệ thống PHẢI cho phép admin đổi vai trò của một người dùng khác.
-- **FR-008**: Hệ thống PHẢI cho phép admin đổi trạng thái tài khoản của một người dùng khác.
-- **FR-009**: Hệ thống PHẢI ngăn không cho admin thay đổi vai trò hoặc trạng thái của chính mình.
-- **FR-010**: Hệ thống PHẢI chấm dứt các phiên đang kích hoạt khi vai trò của một người dùng thay đổi.
-- **FR-011**: Hệ thống PHẢI chấm dứt các phiên đang kích hoạt khi trạng thái của người dùng trở thành inactive hoặc banned.
-- **FR-012**: Hệ thống PHẢI cho phép admin xem các phiên đang kích hoạt với thông tin người dùng, thiết bị, IP, kiểu đăng nhập, thời gian hoạt động và thời gian hết hạn.
-- **FR-013**: Hệ thống PHẢI cho phép admin thu hồi một phiên hoạt động cụ thể.
-- **FR-014**: Hệ thống PHẢI lưu vết (record) việc thay đổi vai trò, trạng thái và thu hồi phiên quản trị vào nhật ký hệ thống (audit trail).
-- **FR-015**: Hệ thống PHẢI trả về các lỗi quyền truy cập rõ ràng khi người dùng không đủ quyền thực hiện một thao tác.
-- **FR-016**: Hệ thống PHẢI tự động thu hồi (unassign) các bài kiểm tra chưa chấm của Giảng viên và đưa vào hàng đợi chung nếu Giảng viên đó bị thay đổi vai trò xuống Học viên.
+- **FR-001**: Hệ thống PHẢI thực thi kiểm soát truy cập dựa trên vai trò (`student`, `tutor`, `admin`). Backend sử dụng middleware `authorize` (hỗ trợ array roles), frontend sử dụng `ProtectedRoute`. Ngoài ra middleware `authenticate` cũng phải kiểm tra trạng thái active/inactive của user.
+- **FR-002**: Hệ thống PHẢI từ chối cấp quyền truy cập khu vực quản lý admin cho những người dùng không phải admin.
+- **FR-003**: Hệ thống PHẢI cho phép admin xem danh sách người dùng có phân trang (trả về meta data gồm `{ page, limit, total }`).
+- **FR-004**: Hệ thống PHẢI cho phép admin tìm kiếm người dùng theo tên hoặc email (truy vấn ILIKE).
+- **FR-005**: Hệ thống PHẢI cho phép admin lọc người dùng theo vai trò (`student`, `tutor`, `admin`) và trạng thái tài khoản (`pending`, `active`, `inactive`, `banned`).
+- **FR-006**: Hệ thống PHẢI hiển thị các trường: vai trò (`role`), trạng thái (`status`), `email`, tên hiển thị (`full_name`) và ngày tạo (`created_at`) trong danh sách người dùng. Trường `password_hash` PHẢI bị loại bỏ khỏi mọi response danh sách.
+- **FR-007**: Hệ thống PHẢI cho phép admin đổi vai trò của một người dùng khác (chỉ sang các vai trò: `student`, `tutor`, `admin`).
+- **FR-008**: Hệ thống PHẢI cho phép admin đổi trạng thái tài khoản của một người dùng khác (chỉ sang các trạng thái: `pending`, `active`, `inactive`, `banned`).
+- **FR-009**: Hệ thống PHẢI ngăn không cho admin thay đổi vai trò hoặc trạng thái của chính mình (actor id lấy từ `req.user.id`).
+- **FR-010**: Hệ thống PHẢI tự động chấm dứt các phiên đang kích hoạt (thiết lập `revoked_at = NOW()`) khi vai trò của một người dùng thay đổi.
+- **FR-011**: Hệ thống PHẢI tự động chấm dứt các phiên đang kích hoạt (thiết lập `revoked_at = NOW()`) khi trạng thái của người dùng trở thành inactive hoặc banned.
+- **FR-012**: Hệ thống PHẢI cho phép admin xem các phiên đang kích hoạt với thông tin: người dùng (`user`/`full_name`), `email`, thiết bị (`device` parse từ user_agent), IP (`ip_address`), kiểu đăng nhập (`is_oauth`/`oauth_provider`), thời gian hoạt động (`last_active_at`) và thời gian hết hạn (`expires_at`).
+- **FR-013**: Hệ thống PHẢI cho phép admin chủ động thu hồi một phiên hoạt động cụ thể (thiết lập `revoked_at = NOW()`).
+- **FR-014**: Hệ thống PHẢI lưu vết (record) việc thay đổi vai trò, trạng thái và thu hồi phiên quản trị vào nhật ký hệ thống (audit trail) kèm theo tham số scope `sensitive: true` và dữ liệu `old_data`, `new_data`.
+- **FR-015**: Hệ thống PHẢI trả về các lỗi quyền truy cập rõ ràng (HTTP 403, code `AUTH_PERM_001`) khi người dùng không đủ quyền thực hiện một thao tác.
+- **FR-016**: Hệ thống PHẢI tự động thu hồi (unassign) các bài kiểm tra chưa chấm của Giảng viên và đưa vào hàng đợi chung nếu Giảng viên đó bị thay đổi vai trò xuống Học viên. Logic này yêu cầu tương tác chéo module (cross-module interaction).
 
 ### Các thực thể chính (Key Entities)
 
@@ -123,16 +125,18 @@ Với tư cách là admin, tôi muốn kiểm tra các phiên hoạt động và
 ### Kết quả có thể đo lường
 
 - **SC-001**: 100% các trang chỉ dành cho admin từ chối truy cập từ các người dùng không phải admin.
-- **SC-002**: Admin có thể tìm thấy một người dùng qua email hoặc tên đầy đủ trong dưới 30 giây.
-- **SC-003**: Ít nhất 95% các tìm kiếm hoặc lọc danh sách người dùng hiển thị kết quả được cập nhật trong dưới 3 giây.
+- **SC-002**: Admin có thể tìm thấy một người dùng qua email hoặc tên đầy đủ trong dưới 30 giây (tính từ lúc bắt đầu nhập search keyword).
+- **SC-003**: Ít nhất 95% API search/filter danh sách người dùng trả về kết quả trong dưới 3 giây.
 - **SC-004**: 100% các thay đổi vai trò thành công đều được phản ánh trong danh sách người dùng sau khi tải lại trang.
-- **SC-005**: 100% các thay đổi trạng thái thành inactive hoặc banned thành công đều ngăn tài khoản bị ảnh hưởng tiếp tục truy cập.
-- **SC-006**: 100% các nỗ lực tự sửa vai trò/trạng thái của admin bị từ chối.
-- **SC-007**: Admin có thể thu hồi một phiên được chọn trong dưới 10 giây.
+- **SC-005**: 100% các thay đổi trạng thái thành inactive hoặc banned thành công đều ngăn tài khoản bị ảnh hưởng tiếp tục truy cập (thông qua authenticate middleware).
+- **SC-006**: 100% các nỗ lực tự sửa vai trò/trạng thái của admin bị từ chối ở cả API và UI.
+- **SC-007**: Admin có thể thu hồi một phiên được chọn trong dưới 10 giây (tính từ lúc nhấn nút revoke đến khi UI cập nhật lại danh sách).
 
 ## Giả định
 
-- Các vai trò được hỗ trợ trên nền tảng cố định cho tính năng này: học viên (student), giảng viên (tutor) và admin.
-- Trạng thái tài khoản bao gồm active, inactive, pending và banned.
-- Admin quản lý người dùng khác nhưng không trực tiếp tạo người dùng trong tính năng này; việc tạo tài khoản thuộc về xác thực (auth) hoặc các luồng quy trình admin khác.
-- Hành vi xem chi tiết audit log và hoàn tác thuộc về tính năng `feat-audit-log`, trong khi tính năng này chỉ yêu cầu tự động tạo log truy vết cho các hành động có đặc quyền.
+- Các vai trò được hỗ trợ trên nền tảng dành cho service layer là: `student`, `tutor` và `admin`. Database enum có thêm giá trị `user` nhưng đó là legacy và không hiển thị cho phép gán ở Admin UI.
+- Trạng thái tài khoản bao gồm `pending`, `active`, `inactive` và `banned`.
+- Admin quản lý người dùng khác nhưng không trực tiếp tạo người dùng trong tính năng này; việc tạo tài khoản thuộc về `feat-auth`.
+- Hành vi xem chi tiết audit log và hoàn tác thuộc về tính năng `feat-audit-log`, trong khi tính năng này phụ thuộc vào `AuditLogService` để tạo log truy vết cho các hành động có đặc quyền.
+- Việc kiểm soát quyền truy cập liên kết chặt chẽ với auth middleware được định nghĩa trong `feat-auth`.
+- Mọi API response của controller admin phải tuân thủ nghiêm ngặt định dạng chuẩn: `{ success, data, error, meta }`.
