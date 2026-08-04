@@ -24,14 +24,7 @@ import { testService } from '../../services/test.service';
 import { attemptService } from '../../services/attempt.service';
 import '../../styles/objective-testing.css';
 
-function renderBlockContent(content) {
-  if (!content) return null;
-  const isImageUrl = /^https?:\/\/.+\.(jpg|jpeg|png|gif|webp|svg)(\?.*)?$/i.test(content.trim());
-  if (isImageUrl) {
-    return <img src={content.trim()} alt="Diagram / Map" className="img-fluid rounded border mb-2" style={{ maxHeight: '400px', display: 'block', margin: '10px auto' }} />;
-  }
-  return <div dangerouslySetInnerHTML={{ __html: content }} />;
-}
+
 
 // ─── AudioPlayer ──────────────────────────────────────────────────────────────────────────────
 /**
