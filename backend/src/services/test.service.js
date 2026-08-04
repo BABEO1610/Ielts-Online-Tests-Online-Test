@@ -126,15 +126,9 @@ class TestService {
 
       // 1. Insert Test (with audio_url for listening tests)
       const testRes = await client.query(
-<<<<<<< Updated upstream
         `INSERT INTO mock_tests (title, description, skill, difficulty, duration_minutes, is_published, publish_at, created_by, audio_url, review_status, submitted_at)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'pending', CASE WHEN $10::boolean THEN NULL ELSE NOW() END) RETURNING id`,
         [title, description, skill, difficulty, duration, isPublished, publishAt || null, userId, audioUrl || null, isDraft]
-=======
-        `INSERT INTO mock_tests (title, description, skill, difficulty, duration_minutes, is_published, publish_at, created_by, audio_url)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
-        [title, description, skill, validDifficulty, duration, isPublished, publishAt || null, userId, audioUrl || null]
->>>>>>> Stashed changes
       );
       const testId = testRes.rows[0].id;
 
@@ -558,21 +552,12 @@ class TestService {
       await client.query('BEGIN');
 
       // 1. Update Test (including audio_url for listening tests)
-<<<<<<< Updated upstream
       // ponytail: reset review_status to pending so admin can see it again after tutor edits
       await client.query(
         `UPDATE mock_tests 
          SET title = $1, description = $2, skill = $3, difficulty = $4, duration_minutes = $5, is_published = $6, publish_at = $7, audio_url = $8, review_status = 'pending', submitted_at = CASE WHEN $9::boolean THEN NULL ELSE NOW() END, updated_at = NOW() 
          WHERE id = $10`,
         [title, description, skill, difficulty, duration, isPublished, publishAt || null, audioUrl || null, isDraft, testId]
-=======
-      const testRes = await client.query(
-        `UPDATE mock_tests 
-         SET title = $1, description = $2, skill = $3, difficulty = $4, duration_minutes = $5, 
-             is_published = $6, publish_at = $7, audio_url = $8
-         WHERE id = $9 RETURNING id`,
-        [title, description, skill, validDifficulty, duration, isPublished, publishAt || null, audioUrl || null, testId]
->>>>>>> Stashed changes
       );
 
       // 2. Delete existing nested records before rebuilding the test.
