@@ -28,8 +28,10 @@ const LIBRARY_BUCKET = process.env.SUPABASE_LIBRARY_BUCKET || 'ieltszone_library
 /**
  * Validate magic bytes của file (SEC-04)
  * file-type v19 là ESM-only → dùng dynamic import()
+ * Chốt chặn số 2: Đọc 4 byte vật lý đầu tiên của file (Magic Bytes) để xác minh định dạng thật.
+ * Chống việc user cố tình đổi đuôi file mã độc thành .pdf hoặc .mp3 để qua mặt hệ thống.
  * @param {Buffer} buffer - buffer của file
- * @returns {string} MIME type thực của file
+ * @returns {Promise<string>} MIME type thực sự của file
  */
 async function validateFileMagicBytes(buffer) {
   const { fileTypeFromBuffer } = await import('file-type');
@@ -146,7 +148,11 @@ async function getManagedResourceDetail(resourceId, userId, role) {
 }
 
 /**
- * Tạo tài liệu mới + upload file
+ * Xử lý luồng upload tài liệu chính:
+ * 1. Gọi validateFileMagicBytes để kiểm tra lõi file.
+ * 2. Upload file lên Cloud (Supabase).
+ * 3. Lưu thông tin (URL) vào Database.
+ * ĐIỂM QUAN TRỌNG (Compensation Transaction): Nếu lưu DB thất bại, hệ thống tự động xóa file trên Cloud để không tạo ra rác dữ liệu mồ côi.
  * @param {Object} fields - { title, description, category }
  * @param {Object} file - multer file object
  * @param {string} tutorId - UUID của tutor

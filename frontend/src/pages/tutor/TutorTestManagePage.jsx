@@ -67,18 +67,30 @@ function TutorTestManagePage() {
           <h1>Test management</h1>
           <p>Create, edit, and manage your mock tests.</p>
         </div>
+        {/* 📌 [SWIMLANE L2-B1 | STT 1] Button: + Create test
+             Loại: <Link> styled as button | Dòng gốc: L70–L72
+             Action: navigate → '/tutor/tests/new' (tạo đề mới)
+             id="btn-create-test" — điểm vào của luồng Exam Builder */}
         <Link to="/tutor/tests/new" className="button-primary" id="btn-create-test" style={{ width: 'auto', padding: '12px 28px', textDecoration: 'none', whiteSpace: 'nowrap' }}>
           + Create test
         </Link>
       </div>
 
       <div className="filter-bar">
+        {/* 📌 [SWIMLANE L2-B1 | STT 2] Dropdown: All Status
+             Loại: <select> | Dòng gốc: L76–L81
+             Options: All Status, Published, Pending Review, Draft
+             Ghi chú: chỉ là filter UI, chưa nối logic (defaultValue="") */}
         <select id="filter-tutor-status" defaultValue="">
           <option value="">All Status</option>
           <option value="published">Published</option>
           <option value="pending">Pending Review</option>
           <option value="draft">Draft</option>
         </select>
+        {/* 📌 [SWIMLANE L2-B1 | STT 3] Dropdown: All Skills
+             Loại: <select> | Dòng gốc: L82–L88
+             Options: All Skills, Reading, Listening, Writing, Speaking
+             Ghi chú: chỉ là filter UI, chưa nối logic (defaultValue="") */}
         <select id="filter-tutor-skill" defaultValue="">
           <option value="">All Skills</option>
           <option value="reading">Reading</option>
@@ -126,7 +138,18 @@ function TutorTestManagePage() {
                     <td className="body-sm text-nowrap" style={{ color: 'var(--body)' }}>{t.createdAt}</td>
                     <td>
                       <div className="tutor-table-actions">
+                        {/* 📌 [SWIMLANE L2-B1 | STT 4] Button: Edit
+                             Loại: <Link> | Dòng gốc: L129
+                             Action: navigate → '/tutor/tests/:id/edit'
+                             id="btn-edit-{id}" */}
                         <Link to={`/tutor/tests/${t.id}/edit`} className="table-action-btn" id={`btn-edit-${t.id}`}>Edit</Link>
+                        {/* 📌 [SWIMLANE L2-B1 | STT 5] Button: Delete
+                             Loại: <button class="danger"> | Dòng gốc: L130
+                             Action: onClick → handleDeleteTest(id)
+                                     → window.confirm → testService.deleteTest(id)
+                                     → filter state (xóa khỏi list)
+                             Swimlane: nếu FK có test_attempts → block xóa → UI hiện lỗi
+                             id="btn-delete-{id}" */}
                         <button className="table-action-btn danger" id={`btn-delete-${t.id}`} onClick={() => handleDeleteTest(t.id)}>Delete</button>
                       </div>
                     </td>
