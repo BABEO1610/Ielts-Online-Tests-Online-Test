@@ -170,6 +170,7 @@ function LoadingSkeleton() {
 
 // ─── Component chính ─────────────────────────────────────────────────────────
 function ReadingTestPage() {
+  // 1. Khối Khởi tạo & Trạng thái (Routing & State): Nhận ID đề thi và cấu hình phòng thi
   const { id: testId } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
@@ -184,7 +185,7 @@ function ReadingTestPage() {
     ? selectedPartIds.map((pid) => parseInt(pid.replace('p', ''), 10))
     : [1, 2, 3];
 
-  // ── Khai báo State ─────────────────────────────────────────────────────────
+  // (Tiếp Bước 1) Khai báo State: RAM của bài thi lưu trữ dữ liệu và câu trả lời
   const [testData, setTestData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -199,7 +200,7 @@ function ReadingTestPage() {
   const [startTime] = useState(Date.now());
 
 
-  // ── Lấy dữ liệu đề thi ──────────────────────────────────────────────────────
+  // 2. Khối Kéo dữ liệu (Data Fetching - useEffect) và Kỹ thuật chống Race Condition (biến cancelled)
   useEffect(() => {
     let cancelled = false;
     const fetchTest = async () => {
@@ -231,7 +232,7 @@ function ReadingTestPage() {
     return () => { cancelled = true; };
   }, [testId]);
 
-  // ── Làm phẳng dữ liệu ───────────────────────────────────────────────────────
+  // 3. Khối Băm & Ép phẳng dữ liệu (Data Normalization): Tách dữ liệu tổ chim thành 2 mảng phẳng (passages và questions)
   let passages = [], questions = [];
   try {
     if (testData) ({ passages, questions } = flattenTestData(testData, allowedPassageNumbers));
@@ -248,7 +249,7 @@ function ReadingTestPage() {
 
   const durationMinutes = testData?.duration || 60;
 
-  // ── Các hàm xử lý sự kiện ──────────────────────────────────────────────────
+  // 4. Khối Xử lý Sự kiện & Nộp bài (Event Handlers): Các hàm được bọc trong useCallback để tối ưu hiệu năng
   const handleAnswer = useCallback((qOrder, value) => {
     setAnswers((prev) => ({ ...prev, [qOrder]: value }));
   }, []);
@@ -302,13 +303,14 @@ function ReadingTestPage() {
     }
   }, [doSubmit, questions.length, answeredOrders.length]);
 
+  // 5. Khối Định vị & Cuộn trang (Cross-Navigation): Đồng bộ hóa hiển thị giữa Cột Trái và Cột Phải
   const scrollToQuestion = useCallback((qOrder) => {
     setCurrentQuestion(qOrder);
     const el = document.getElementById(`question-${qOrder}`);
     if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }, []);
 
-  // ── Các trạng thái render ───────────────────────────────────────────────────
+  // 6. Khối Lắp ráp Giao diện (Render): Ghép nối Split-View, TimerBar và Modal
   if (loading) return <LoadingSkeleton />;
 
   if (error) {

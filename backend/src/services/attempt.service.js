@@ -22,7 +22,7 @@ function normalizeAnswer(answer) {
  * - MCQ: exact label match ("A" === "A") after normalizing.
  * - Fill-in-blank: normalized exact match. Supports correct_answers JSONB array.
  * NO fuzzy matching.
- * (Hàm isAnswerCorrect: So sánh chính xác chuỗi đã normalize. Nếu DB là mảng JSONB thì duyệt mảng kiểm tra match từng phần tử)
+ * 1. Hàm isAnswerCorrect (Quy tắc chấm điểm): Xử lý JSONB Parsing, Multiple accepted answers và Exact Match.
  */
 function isAnswerCorrect(userAnswer, correctAnswer, correctAnswers) {
   const normalized = normalizeAnswer(userAnswer);
@@ -62,7 +62,7 @@ class AttemptService {
    * @param {boolean} practiceMode - true = untimed practice (still saved to DB with practice_mode=true)
    */
   static async submitAttempt(testId, userId, answers = {}, timeSpent = 0, practiceMode = false) {
-    // Bước 1: Verify test exists (Throw 404 nếu không có)
+    // BƯỚC 1: Kiểm tra tính hợp lệ (Verify Test). Tránh lỗi chấm nhầm mã đề.
     const testRes = await pool.query(
       `SELECT id, title, skill FROM mock_tests WHERE id = $1`,
       [testId]
@@ -73,7 +73,7 @@ class AttemptService {
       throw err;
     }
 
-    // Bước 2: Fetch Questions (lấy toàn bộ câu hỏi và ép ORDER BY q.question_order ASC)
+    // BƯỚC 2: Rút ruột Database (Fetch Questions). Ép buộc sắp xếp theo question_order ASC để chấm đúng thứ tự.
     //    Schema: questions.test_id = mock_tests.id (set in createReadingTest)
     const questionsRes = await pool.query(
       `SELECT
@@ -94,12 +94,12 @@ class AttemptService {
       throw err;
     }
 
-    // Bước 3: Grading Loop (chấm điểm từng câu bằng normalizeAnswer và isAnswerCorrect)
+    // BƯỚC 3: Vòng lặp Chấm điểm (Grading Loop). Lấy DB làm gốc để chống gian lận (thiếu câu/chèn câu).
     let rawScore = 0;
     const gradedAnswers = questions.map((q) => {
       const userAnswer = answers[q.question_order] || '';
 
-      // Parse correct_answers JSONB (stored as string or already object)
+      // Xử lý Dữ liệu Đa đáp án (JSONB Parsing): Khối try-catch cứu nguy lỗi ép kiểu String của PostgreSQL.
       let correctAnswersParsed = [];
       if (q.correct_answers) {
         try {
@@ -123,13 +123,13 @@ class AttemptService {
       };
     });
 
-    // Bước 4: Scoring (tính tổng điểm thô, quy đổi scale 40 và tính Band Score)
+    // BƯỚC 4: Quy đổi Band Score (Scoring). Kỹ thuật Dynamic Scaling xử lý hoàn hảo các đề thi thiếu câu hoặc Mini-test.
     const totalQuestions = questions.length || 40;
     const normalizedRawScore = Math.min(rawScore, 40);
     const scaledRawScore = totalQuestions > 0 ? Math.round((normalizedRawScore / totalQuestions) * 40) : 0;
     const bandScore = getBandScore(testRes.rows[0].skill, scaledRawScore);
 
-    // Bước 5: Database Transaction (BEGIN -> INSERT -> COMMIT/ROLLBACK)
+    // BƯỚC 5: Lưu trữ An toàn (Database Transaction). Bắt buộc dùng BEGIN/COMMIT để đảm bảo tính Toàn vẹn dữ liệu (Data Integrity). Tránh rác DB nếu rớt mạng.
     //    Tables: test_attempts, attempt_answers (from 013 + 014 migrations)
     const client = await pool.connect();
     try {
@@ -142,6 +142,7 @@ class AttemptService {
       const finalStatus = isObjective ? 'graded' : 'submitted';
       const finalBandScore = isObjective ? bandScore : null;
 
+      // 5.1 Tạo "Tờ bìa hồ sơ" (Bảng test_attempts) và dùng RETURNING id để lấy khóa chính
       const attemptRes = await client.query(
         `INSERT INTO test_attempts
            (test_id, user_id, mode, status, raw_score, total_questions, band_score, time_spent, practice_mode, submitted_at)
@@ -151,7 +152,7 @@ class AttemptService {
       );
       const attemptId = attemptRes.rows[0].id;
 
-      // Insert per-question answers
+      // 5.2 Kẹp "Giấy làm bài" vào Hồ sơ (Bảng attempt_answers) thông qua Khóa ngoại (attemptId)
       for (const ans of gradedAnswers) {
         await client.query(
           `INSERT INTO attempt_answers
