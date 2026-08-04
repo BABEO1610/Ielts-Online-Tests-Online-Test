@@ -3,6 +3,7 @@ import gradingService from '../services/grading.service';
 
 const TERMINAL = new Set(['completed', 'needs_review', 'failed']);
 
+// Class quản lý một phiên polling (hỏi dồn) ngầm xuống backend để kiểm tra kết quả chấm bài AI
 class SpeakingPollingSession {
   constructor(options) {
     Object.assign(this, options);
@@ -14,6 +15,7 @@ class SpeakingPollingSession {
     this.timerRef.current = window.setTimeout(() => this.poll(), delay);
   }
 
+  // Thực hiện một lần gọi API lấy trạng thái, nếu chưa xong thì tự động hẹn giờ gọi lại lần tiếp theo (thời gian chờ tăng dần để giảm tải server)
   async poll() {
     try {
       const next = await this.refresh(this.controller.signal);
@@ -57,6 +59,7 @@ class SpeakingPollingSession {
   }
 }
 
+// Custom hook React dùng cho màn hình Chờ kết quả, tự động polling trạng thái từ Backend
 const useSpeakingGrading = (groupId, { enabled = true } = {}) => {
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);

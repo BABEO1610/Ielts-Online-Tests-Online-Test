@@ -26,6 +26,7 @@ const ExamRecorder = forwardRef(({ partNumber, maxDuration = 45, onUploadComplet
     mountedRef.current = true;
     uploadOnStopRef.current = true;
     const initRecording = async () => {
+      // Hàm khởi tạo và bắt đầu quá trình thu âm (kết nối microphone, tạo MediaRecorder)
       try {
         const mimeType = typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported('audio/mp4')
           ? 'audio/mp4'
@@ -95,6 +96,7 @@ const ExamRecorder = forwardRef(({ partNumber, maxDuration = 45, onUploadComplet
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Hàm dọn dẹp bộ nhớ: Ngắt kết nối microphone và dừng các timer đang chạy ngầm
   const cleanup = () => {
     if (timerRef.current) clearInterval(timerRef.current);
     if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
@@ -109,6 +111,7 @@ const ExamRecorder = forwardRef(({ partNumber, maxDuration = 45, onUploadComplet
     stopRecording
   }));
 
+  // Hàm dừng ghi âm chủ động (khi người dùng bấm nút "Hoàn thành" hoặc hết giờ)
   const stopRecording = () => {
     if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
       mediaRecorderRef.current.stop();
@@ -116,6 +119,7 @@ const ExamRecorder = forwardRef(({ partNumber, maxDuration = 45, onUploadComplet
     }
   };
 
+  // Hàm đóng gói file ghi âm (Blob) và gửi lên backend/storage để lấy upload_token
   const uploadAudio = async (blob, durationMs) => {
     if (mountedRef.current) setStatus('uploading');
     try {

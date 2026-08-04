@@ -49,6 +49,7 @@ class SpeakingSubmissionService {
     return this.storage;
   }
 
+  // Tạo presigned URL và upload token để client có thể tải trực tiếp file âm thanh lên Storage
   async createAudioUpload(userId, body) {
     this.assertEnabled();
     requireUuid(userId, 'user_id');
@@ -83,6 +84,7 @@ class SpeakingSubmissionService {
     };
   }
 
+  // Xác thực tính hợp lệ của các upload token (chống giả mạo, kiểm tra hạn sử dụng)
   verifyTokens(userId, parts, allowExpired) {
     try {
       return parts.map((part) => verifyAudioUploadToken(part.uploadToken, {
@@ -98,6 +100,7 @@ class SpeakingSubmissionService {
     }
   }
 
+  // Kiểm tra vật lý trên Cloud Storage xem file âm thanh đã được tải lên đủ chưa, dung lượng và MIME type có khớp không
   async preflightObjects(uploads) {
     if (new Set(uploads.map((upload) => upload.object_key)).size !== uploads.length) {
       throw new AppError('Mỗi Part phải dùng một tệp âm thanh riêng.', 400, 'DUPLICATE_AUDIO_OBJECT');
@@ -131,6 +134,7 @@ class SpeakingSubmissionService {
     }
   }
 
+  // Lưu bài làm nộp cho AI vào database và đưa vào hàng đợi (queue) để AI chấm
   async persistAiSubmission(client, input) {
     const { userId, testId, parts, uploads, key } = input;
     await lockAudioObjects(client, uploads);
@@ -172,6 +176,7 @@ class SpeakingSubmissionService {
     return { ...toAsyncJob(job), replayed: true };
   }
 
+  // Xử lý nộp bài Speaking cho AI chấm (kiểm tra token, kiểm tra file storage, chống spam idempotency, lưu database)
   async submitFullSpeaking({ userId, testId, grader, parts, idempotencyKey }) {
     this.assertEnabled();
     requireUuid(userId, 'user_id');
@@ -193,6 +198,7 @@ class SpeakingSubmissionService {
     }));
   }
 
+  // Lưu bài làm nộp cho Tutor vào database
   async persistTutorSubmission(client, input) {
     const { userId, testId, parts, uploads, groupId } = input;
     await lockAudioObjects(client, uploads);
@@ -203,6 +209,7 @@ class SpeakingSubmissionService {
     return { speaking_group_id: groupId, status: 'pending', parts: inserted };
   }
 
+  // Xử lý nộp bài Speaking cho Tutor chấm (kiểm tra token, kiểm tra file storage, lưu database)
   async submitTutorSpeaking({ userId, testId, parts }) {
     this.assertEnabled();
     requireUuid(userId, 'user_id');
@@ -231,6 +238,7 @@ class SpeakingSubmissionService {
     if (!allowed) throw new AppError('Bạn không có quyền xem bài Speaking này.', 403, 'AUTH_PERM_001');
   }
 
+  // Truy vấn trạng thái hiện tại của quá trình AI chấm điểm (queued, processing, completed, failed, needs_review)
   async getStatus(groupId, user) {
     requireUuid(groupId, 'speakingGroupId');
     await this.assertGroupAccess(groupId, user);
@@ -271,6 +279,7 @@ class SpeakingSubmissionService {
     };
   }
 
+  // Yêu cầu AI chấm lại bài nếu hệ thống trước đó bị lỗi
   async retry({ groupId, userId, idempotencyKey }) {
     const { SpeakingGradingRetryService } = require('./speakingGradingRetry.service');
     return new SpeakingGradingRetryService({

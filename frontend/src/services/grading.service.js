@@ -21,6 +21,7 @@ const newIdempotencyKey = () => {
 
 const gradingService = {
   // EARS[Event]: WHEN user submits audio file THEN call upload endpoint with multipart/form-data
+  // Hàm tải file âm thanh lên server (lấy presigned URL rồi upload file nhị phân trực tiếp lên cloud storage)
   uploadAudio: async (audioBlob, { partNumber, durationMs } = {}) => {
     const contentType = String(audioBlob.type || '').split(';')[0].toLowerCase();
     if (!SPEAKING_MIME_TYPES.has(contentType)) {
@@ -72,6 +73,7 @@ const gradingService = {
   },
 
   // EARS[Event]: WHEN user submits full speaking test THEN send parts and grader preference
+  // Nộp bài thi Speaking hoàn chỉnh. Bao gồm cơ chế chống nộp trùng (Idempotency Key)
   submitFullSpeaking: async (data, idempotencyKey) => {
     const key = idempotencyKey || gradingService.getOrCreateSpeakingIdempotencyKey(data.test_id);
     const response = await api.post('/submissions/speaking/full', data, {
@@ -95,11 +97,13 @@ const gradingService = {
     return created;
   },
 
+  // Truy vấn trạng thái chấm bài ngầm của AI (polling) liên tục cho đến khi có kết quả
   getSpeakingGradingStatus: async (groupId, { signal } = {}) => {
     const response = await api.get(`/submissions/speaking/${groupId}/grading-status`, { signal });
     return response.data;
   },
 
+  // Gửi yêu cầu chấm lại bài AI nếu tiến trình trước đó gặp sự cố
   retrySpeakingGrading: async (groupId) => {
     const storageKey = `speaking:retry-idempotency:${groupId}`;
     const key = storage()?.getItem(storageKey) || newIdempotencyKey();

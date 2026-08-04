@@ -7,6 +7,7 @@ const { aiGradingConfig } = require('../config/aiGrading.config');
 const envelope = (data, meta = {}) => ({ success: true, data, error: null, meta });
 
 class SpeakingGradingController {
+  // Tạo URL ký sẵn (presigned URL) để client upload file âm thanh trực tiếp lên cloud storage
   static async createAudioUpload(req, res, next) {
     try {
       const data = await getSpeakingSubmissionService().createAudioUpload(req.user.id, req.body);
@@ -14,6 +15,7 @@ class SpeakingGradingController {
     } catch (error) { next(error); }
   }
 
+  // Nộp bài thi Speaking hoàn chỉnh (xử lý luồng nộp cho cả AI và Tutor)
   static async submitFull(req, res, next) {
     if (req.body?.grader === 'tutor' && req.body?.parts?.every((part) => part.upload_token)) {
       try {
@@ -53,6 +55,7 @@ class SpeakingGradingController {
     } catch (error) { next(error); }
   }
 
+  // Lấy trạng thái chấm bài AI hiện tại (đang chấm, lỗi, hoặc thành công trả về điểm)
   static async getStatus(req, res, next) {
     try {
       const data = await getSpeakingSubmissionService().getStatus(req.params.speakingGroupId, req.user);
@@ -60,6 +63,7 @@ class SpeakingGradingController {
     } catch (error) { next(error); }
   }
 
+  // Yêu cầu chấm lại (retry) nếu tiến trình chấm bài AI trước đó gặp lỗi
   static async retry(req, res, next) {
     try {
       if (req.user.role !== 'student') throw new AppError('Chỉ học viên được retry bài của mình.', 403, 'AUTH_PERM_001');
