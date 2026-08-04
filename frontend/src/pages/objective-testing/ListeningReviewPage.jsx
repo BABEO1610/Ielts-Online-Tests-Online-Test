@@ -161,14 +161,11 @@ function ListeningReviewPage({ attemptDetail }) {
               // Check if content is actually a JSON array (sometimes wrapped in <p> tags by the DB/scraper)
               let isRawJson = false;
               if (b.content) {
-                try {
-                  const stripped = b.content.replace(/<[^>]*>?/gm, '').trim();
-                  if (stripped.startsWith('[') && stripped.endsWith(']')) {
-                    JSON.parse(stripped);
-                    isRawJson = true; // It's valid JSON array, do not render as HTML
-                  }
-                } catch (e) {
-                  // Not valid JSON, safe to render
+                const textOnly = b.content.replace(/<[^>]*>?/gm, '').trim();
+                // If it starts with [ and contains "type", it's the raw JSON question payload.
+                // We avoid JSON.parse because HTML entities (like &nbsp;) might cause it to throw.
+                if (textOnly.startsWith('[') && textOnly.includes('"type"')) {
+                  isRawJson = true;
                 }
               }
 
