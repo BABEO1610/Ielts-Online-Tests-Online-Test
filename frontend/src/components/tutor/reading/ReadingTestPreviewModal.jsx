@@ -152,7 +152,18 @@ function PreviewCompletion({ question, qNum, answers, onAnswer }) {
 
 function PreviewMultiSelectMulti({ block, startNum, answers, onAnswer }) {
   const questions = block.questions || [];
-  const maxSelections = questions[0]?.options?.maxSelections || questions.length;
+  
+  // Parse block range to calculate default maxSelections if missing
+  const getCalculatedCount = () => {
+    if (block.rangeStart && block.rangeEnd) return parseInt(block.rangeEnd) - parseInt(block.rangeStart) + 1;
+    if (block.range) {
+      const m = block.range.match(/(\d+)\s*-\s*(\d+)/);
+      if (m) return parseInt(m[2]) - parseInt(m[1]) + 1;
+    }
+    return questions.length;
+  };
+  
+  const maxSelections = questions[0]?.options?.maxSelections || getCalculatedCount();
   const poolOptions = questions[0]?.options?.choices || [];
   
   // Collect answers for this group

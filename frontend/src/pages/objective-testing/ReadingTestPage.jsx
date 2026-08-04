@@ -390,7 +390,7 @@ function ReadingTestPage() {
                   }}
                   onClick={() => setCurrentQuestion(q.order)}
                 >
-                  {/* Tiêu đề câu hỏi */}
+                  {/* Tiêu đề `câu hỏi */}
                   <div className="d-flex align-items-center gap-2 mb-3">
                     <span
                       className="body-sm-strong d-flex align-items-center justify-content-center flex-shrink-0"

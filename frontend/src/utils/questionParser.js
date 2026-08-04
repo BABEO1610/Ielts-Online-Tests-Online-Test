@@ -350,14 +350,15 @@ export const parseSmartText = (rawText) => {
         const qNum = qNumStart + i;
         const ans = answers[i] || answers[0];
         
-        let norm = ans;
+        let norm = ans.trim();
         let up = norm.toUpperCase();
-        if (up === 'T' || up === 'TRUE') norm = 'TRUE';
-        else if (up === 'F' || up === 'FALSE') norm = 'FALSE';
-        else if (up === 'NG' || up === 'NOTGIVEN' || up === 'NOT GIVEN') norm = 'NOT GIVEN';
-        else if (up === 'Y' || up === 'YES') norm = 'YES';
-        else if (up === 'N' || up === 'NO') norm = 'NO';
+        if (up === 'TRUE') norm = 'TRUE';
+        else if (up === 'FALSE') norm = 'FALSE';
+        else if (up === 'NOTGIVEN' || up === 'NOT GIVEN') norm = 'NOT GIVEN';
+        else if (up === 'YES') norm = 'YES';
+        else if (up === 'NO') norm = 'NO';
         else if (norm.length === 1 && up.match(/[A-Z]/)) norm = up;
+        else if (up === 'NG') norm = 'NG';
 
         if (answerMap[qNum] !== undefined) {
            if (Array.isArray(answerMap[qNum])) {
@@ -598,6 +599,22 @@ export const parseSmartText = (rawText) => {
                choices.push({ id: charStr, label: charStr, text: `Paragraph/Option ${charStr}` });
              }
           }
+       }
+       
+       // If explicit options are provided in the text (e.g., A. Paragraph B), extract them
+       let explicitChoices = [];
+       const optRegex = /^([A-Z])[\.\)\-]\s*(.*)/;
+       for (const line of lines) {
+         const om = line.match(optRegex);
+         if (om) {
+           const charStr = om[1].toUpperCase();
+           if (!explicitChoices.find(c => c.id === charStr)) {
+              explicitChoices.push({ id: charStr, label: charStr, text: om[2].trim() });
+           }
+         }
+       }
+       if (explicitChoices.length > 0) {
+          choices = explicitChoices;
        }
 
        for (const line of lines) {
@@ -929,7 +946,17 @@ export const parseSmartText = (rawText) => {
          }
       } else {
         if (answerMap[qNum] !== undefined) {
-          const ans = Array.isArray(answerMap[qNum]) ? answerMap[qNum][0] : answerMap[qNum];
+          let ans = Array.isArray(answerMap[qNum]) ? answerMap[qNum][0] : answerMap[qNum];
+          
+          if (['TRUE_FALSE_NOT_GIVEN', 'YES_NO_NOT_GIVEN'].includes(block.type)) {
+             const up = typeof ans === 'string' ? ans.toUpperCase() : '';
+             if (up === 'T') ans = 'TRUE';
+             if (up === 'F') ans = 'FALSE';
+             if (up === 'Y') ans = 'YES';
+             if (up === 'N') ans = 'NO';
+             if (up === 'NG') ans = 'NOT GIVEN';
+          }
+          
           q.correctAnswer = ans;
           q.correctAnswers = Array.isArray(answerMap[qNum]) ? answerMap[qNum] : [ans];
           if (q.options) {
