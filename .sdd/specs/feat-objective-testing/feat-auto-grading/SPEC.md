@@ -6,148 +6,108 @@
 
 ## 1. Tổng quan tính năng và bối cảnh nghiệp vụ
 
-IELTSZone cần engine chấm điểm tự động cho bài thi trắc nghiệm (Reading & Listening). Khi học viên nộp bài, backend nhận payload câu trả lời, so khớp với đáp án trong DB, tính Band Score IELTS Academic theo thang chuẩn Cambridge, và lưu kết quả nguyên tử vào `test_attempts` + `attempt_answers`. Kết quả trả về ngay lập tức — không cần chờ giáo viên chấm tay. Với bài Writing/Speaking (chủ quan), engine không tính Band Score mà lưu trạng thái `submitted` để chờ chấm thủ công.
-
-**Input**: Tách từ User Story 3 của `feat-objective-testing/SPEC.md`.
+Hiện tại hệ thống chưa có cơ chế chấm điểm tự động cho bài thi trắc nghiệm (Reading & Listening), gây trễ trong trả kết quả, thiếu nhất quán do giáo viên chấm tay, và dễ tính sai Band Score.
+Tính năng này cung cấp một Engine chấm điểm tự động, hoạt động nhanh chóng, so khớp chính xác đáp án (bao gồm điền từ có khoảng trắng, chữ hoa, đáp án thay thế, v.v.), và tự động tính chuẩn Band Score dựa trên bảng IELTS Academic chuẩn.
 
 ## 2. Phạm vi
 
-- Chấm điểm tự động cho bài thi `skill = 'reading'` và `skill = 'listening'`.
-- Chuẩn hóa câu trả lời (normalize: trim, lowercase, strip punctuation) trước khi so khớp.
-- Hỗ trợ multiple accepted answers qua cột `correct_answers` (JSONB array).
-- Scale raw score về thang 40 câu khi bài thi có ít hơn 40 câu.
-- Lưu nguyên tử summary (`test_attempts`) và chi tiết từng câu (`attempt_answers`) trong một transaction.
-- Hỗ trợ `practiceMode` boolean — lưu vào `test_attempts.practice_mode`.
-- Validate input: `answers` (plain object), `timeSpent` (số không âm).
+- Endpoint nộp bài và chấm điểm API `POST /api/v1/tests/:id/attempts`.
+- Logic chuẩn hóa đáp án (trim, lowercase, punctuation).
+- Xử lý các quy tắc đáp án IELTS: ngoặc đơn (optional), dấu gạch chéo (alternative).
+- Tính điểm raw và quy đổi ra Band Score IELTS Academic.
+- Lưu trữ kết quả (test_attempts và attempt_answers) nguyên tử.
 
 ## 3. Ngoài phạm vi
 
-- Chấm điểm tự động Writing hoặc Speaking — luồng này chờ giáo viên chấm tay.
-- Giao diện frontend trang làm bài (thuộc `feat-reading-ui`, `feat-listening-ui`).
-- Lưu lịch sử và trang review chi tiết (thuộc `feat-attempt-history`).
-- Thông báo real-time kết quả qua WebSocket hay Socket.io trong v1.
+- Chấm điểm bài thi Speaking / Writing.
+- Đếm số từ cho câu Short Answer (giới hạn ở exact match sau chuẩn hóa).
+- Quản lý đề thi hay giao diện làm bài.
 
 ## 4. Tác nhân và tóm tắt phân quyền
 
 | Tác nhân | Hành vi được phép |
 |---|---|
-| Học viên đã xác thực | Gọi `POST /api/v1/tests/:id/attempts` để nộp bài và nhận kết quả của chính mình. |
-| Giảng viên (Tutor) | Không tương tác với engine này; chỉ chấm bài Writing/Speaking qua luồng riêng. |
-| Quản trị viên (Admin) | Không có quyền đặc biệt trong luồng chấm tự động; có thể xem log qua tầng vận hành. |
-| Khách / chưa xác thực | Không được phép — tất cả endpoint đều yêu cầu JWT hợp lệ. |
-
+| Học viên đã xác thực | Nộp bài thi của mình để hệ thống tự động chấm và nhận lại tổng điểm/Band. |
+| Hệ thống (Backend) | Đọc đáp án chuẩn, chuẩn hóa, tính điểm, ghi log vào database. |
 
 ## 5. Câu chuyện người dùng và kiểm thử độc lập
 
-### User Story 1 - Chấm điểm tự động khi học viên nộp bài (Priority: P1)
+### Câu chuyện 1 — Chấm điểm tự động khi học viên nộp bài (Ưu tiên: P1)
 
-Là một hệ thống (Backend), tôi muốn nhận payload câu trả lời từ Frontend, so khớp với đáp án đúng trong DB, tính điểm raw và Band Score IELTS Academic, sau đó lưu kết quả vào bảng `test_attempts` và trả về kết quả cho Frontend.
+Với tư cách hệ thống, tôi muốn nhận câu trả lời từ Frontend, so khớp với đáp án đúng trong DB, tính điểm và lưu kết quả.
 
-**Why this priority**: Đây là trái tim của hệ thống đánh giá — không có engine này thì không có kết quả thi.
+**Kiểm thử độc lập**: Gửi request với JSON payload `{ "answers": { "1": " Apples ", "2": "B" }, "timeSpent": 3600 }` → kiểm tra response chứa `bandScore` và `rawScore` đúng.
 
-**Independent Test**: Gửi `POST /api/v1/tests/:id/attempts` với JSON payload `{ "answers": { "1": " Apples ", "2": "B" }, "timeSpent": 3600 }` → kiểm tra response chứa `bandScore` và `rawScore` đúng. (Lưu ý: key của `answers` là `question_order` dạng số, không phải question ID.)
+**Kịch bản chấp nhận**:
 
-**Acceptance Scenarios**:
+1. **Cho trước** đáp án đúng là `"apples"`, **Khi** học viên gửi `" Apples "`, **Thì** hệ thống chuẩn hóa và chấm ĐÚNG.
+2. **Cho trước** đáp án đúng là `"transport/transportation"`, **Khi** học viên gửi `"transport"`, **Thì** hệ thống chấm ĐÚNG.
+3. **Cho trước** bài Reading có 40 câu, đúng 30 câu, **Khi** API tính điểm, **Thì** trả về `bandScore: 7.0` theo thang chuẩn.
 
-1. **Given** đáp án đúng là `"apples"`, **When** học viên gửi lên `" Apples "` (có khoảng trắng và in hoa), **Then** hệ thống `normalizeAnswer` trim + lowercase → chấm ĐÚNG.
-2. **Given** bài Reading có 40 câu, học viên trả lời đúng 30 câu, **When** API tính điểm, **Then** trả về `bandScore: 7.0` theo thang IELTS Academic chuẩn.
+### Câu chuyện 2 — Validate payload và xử lý lỗi (Ưu tiên: P1)
 
----
+Với tư cách hệ thống, tôi muốn reject các request thiếu hoặc sai format để bảo vệ DB.
 
-### User Story 2 - Validate payload và xử lý lỗi (Priority: P1)
+**Kiểm thử độc lập**: Gửi request thiếu field `answers` → API trả về `400 Bad Request`.
 
-Là một hệ thống (Backend), tôi muốn reject các request thiếu hoặc sai format để tránh dữ liệu rác vào DB.
+**Kịch bản chấp nhận**:
 
-**Why this priority**: Bảo vệ tính toàn vẹn DB và đảm bảo không lưu attempt rác.
-
-**Independent Test**: Gửi request thiếu field `answers` → API trả về `400 Bad Request` với error message rõ ràng.
-
-**Acceptance Scenarios**:
-
-1. **Given** request body không có field `answers`, **When** gọi `POST /api/v1/tests/:id/attempts`, **Then** response `400 Bad Request` với `{ success: false, error: "answers is required" }`.
-2. **Given** `testId` không tồn tại trong DB, **When** gọi API, **Then** response `404 Not Found`.
-
----
+1. **Cho trước** request body không có `answers`, **Khi** gọi API, **Thì** response `400 Bad Request`.
+2. **Cho trước** bài thi không có câu hỏi nào trong DB, **Khi** người dùng nộp bài, **Thì** trả về HTTP 400.
 
 ## 6. Trường hợp biên
 
-- `answers` là object rỗng `{}` → Submit bình thường, raw score = 0.
-- Câu trả lời là `null` hoặc `undefined` → `normalizeAnswer` trả về `""` → `isAnswerCorrect` trả `false` (unanswered = wrong).
-- `answers` là `null`, `Array`, hoặc primitive → Controller trả `400 INVALID_PAYLOAD`.
-- `timeSpent` âm hoặc không phải số → Controller trả `400 INVALID_PAYLOAD`.
-- DB timeout khi INSERT `test_attempts` hoặc `attempt_answers` → ROLLBACK transaction, pass error tới `errorHandler.js`, trả về 500.
-- Bài thi không có câu hỏi nào (`questions.length === 0`) → Service throw `400 Bad Request`.
-- Bài thi có `skill` không phải `reading`/`listening` (writing/speaking) → `getBandScore` trả `0.0`, không throw error; `status` = `'submitted'` (chờ chấm tay).
-- `correct_answers` là JSONB array → `isAnswerCorrect` so khớp với **bất kỳ** phần tử nào trong array (multiple accepted answers).
+- `answers` rỗng `{}` → Submit bình thường, raw score = 0, Band = 0.
+- `answers` là null/Array → Controller trả `400 INVALID_PAYLOAD`.
+- Bài thi `skill` là writing/speaking → không chấm điểm tự động, gán status `submitted`.
+- User double-click Nộp bài → Chống duplicate ở FE và/hoặc BE (idempotency).
 
 ## 7. Quy tắc nghiệp vụ
 
-- **BR-AG-001 [AS-BUILT]**: Chỉ học viên đã xác thực (`req.user.id`) mới có thể nộp bài; mọi attempt được gắn với `user_id` của người nộp — không thể nộp thay người khác.
-- **BR-AG-002 [AS-BUILT]**: Câu trả lời PHẢI được chuẩn hóa (trim + lowercase + strip punctuation) trước khi so khớp — chênh lệch chữ hoa/thường hoặc khoảng trắng thừa không bị phạt.
-- **BR-AG-003 [AS-BUILT]**: Nếu `correct_answers` (JSONB array) tồn tại, câu trả lời hợp lệ khi khớp với BẤT KỲ phần tử nào trong array sau normalize.
-- **BR-AG-004 [AS-BUILT]**: Band Score IELTS Reading và Listening được tra cứu từ bảng chuẩn Cambridge — không tính theo tỉ lệ tuyến tính. Skill khác (writing/speaking) trả `bandScore = 0.0`.
-- **BR-AG-005 [AS-BUILT]**: Bài thi có ít hơn 40 câu phải scale: `scaledRawScore = round((rawScore / totalQuestions) * 40)` trước khi tra bảng Band Score.
-- **BR-AG-006 [AS-BUILT]**: Toàn bộ ghi DB (INSERT `test_attempts` + `attempt_answers`) PHẢI nằm trong một transaction duy nhất — nếu bất kỳ bước nào lỗi thì ROLLBACK toàn bộ.
-- **BR-AG-007 [AS-BUILT]**: `correct_answer` KHÔNG được trả về trong response nộp bài (`POST /attempts`) — chỉ expose trong endpoint review chi tiết sau khi nộp.
-- **BR-AG-008 [AS-BUILT]**: Bài thi không có câu hỏi (`questions.length === 0`) bị từ chối với `400 Bad Request` — không được tạo attempt rỗng.
-- **BR-AG-009 [AS-BUILT]**: Mọi SQL query PHẢI dùng parameterized query (`$1, $2...`) — tuyệt đối không nối chuỗi SQL.
+- **BR-AG-001 [AS-BUILT]**: Hệ thống không phân biệt chữ hoa chữ thường, khoảng trắng thừa ở hai đầu, thay nhiều khoảng trắng bằng 1 khoảng trắng trước khi so khớp.
+- **BR-AG-002 [AS-BUILT]**: Đáp án chứa dấu `/` nghĩa là 1 trong các tùy chọn đều được chấp nhận.
+- **BR-AG-003 [AS-BUILT]**: Đáp án chứa ngoặc đơn `()` nghĩa là từ đó có thể có hoặc không.
+- **BR-AG-004 [AS-BUILT]**: Band Score dựa trên bảng chuẩn Cambridge. Reading và Listening khác nhau.
+- **BR-AG-005 [AS-BUILT]**: Nếu bài thi ít hơn 40 câu (partial test), điểm được scale `Raw_40 = round((Correct / Total) * 40)` rồi tra bảng.
+- **BR-AG-006 [AS-BUILT]**: Tuyệt đối không trả về `correct_answer` trong response nộp bài để ngăn gian lận.
 
 ## 8. Yêu cầu chức năng
 
-### Functional Requirements
+- **FR-AG-001 [AS-BUILT]**: Hệ thống MUST implement `normalizeAnswer(str)` để chuẩn hóa chuỗi.
+- **FR-AG-002 [AS-BUILT]**: Hệ thống MUST implement `isAnswerCorrect()` hỗ trợ logic mảng (dấu `/`) và từ tùy chọn (ngoặc đơn).
+- **FR-AG-003 [AS-BUILT]**: Hệ thống MUST implement `getBandScore(skill, rawScore)`.
+- **FR-AG-004 [AS-BUILT]**: Hệ thống MUST lưu `test_attempts` và `attempt_answers` trong một transaction nguyên tử duy nhất.
+- **FR-AG-005 [AS-BUILT]**: Hệ thống MUST xử lý lỗi payload (400 Bad Request) hoặc lỗi DB (500).
+- **FR-AG-006 [AS-BUILT]**: Hệ thống MUST KHÔNG trả về chi tiết đáp án chuẩn ngay sau khi chấm xong.
 
-- **FR-001**: Hệ thống MUST implement `normalizeAnswer(str)` trong `attempt.service.js`: trim → toLowerCase → strip leading/trailing punctuation → collapse internal spaces.
-- **FR-002**: Hệ thống MUST implement `isAnswerCorrect(userAnswer, correctAnswer, correctAnswers)`: so khớp sau normalize; hỗ trợ `correct_answers` JSONB array (multiple accepted answers).
-- **FR-003**: Hệ thống MUST implement `getBandScore(skill, rawScore)` tại `backend/src/utils/scoring.js` theo bảng tra cứu IELTS Academic chuẩn Cambridge — Reading và Listening có thang khác nhau; skill khác (writing/speaking) trả `0.0`.
-- **FR-004**: Hệ thống MUST lưu summary vào `test_attempts` VÀ per-question detail vào `attempt_answers` trong **một transaction duy nhất** với parameterized queries — KHÔNG nối chuỗi SQL.
-- **FR-005**: Hệ thống MUST validate: `answers` phải là plain object (không null/array); `timeSpent` phải là số không âm → 400 `INVALID_PAYLOAD` nếu vi phạm.
-- **FR-006**: Hệ thống MUST KHÔNG trả về `correct_answer` trong submit response (`POST /attempts`). (Chỉ expose trong review endpoint `GET /attempts/:id/detail` sau khi nộp.)
-- **FR-007**: Hệ thống MUST hỗ trợ `practiceMode: boolean` — lưu vào `test_attempts.practice_mode`; `status` = `'graded'` (objective) hoặc `'submitted'` (subjective).
-- **FR-008**: Hệ thống MUST scale raw score khi bài thi không đủ 40 câu: `scaledRawScore = round((rawScore / totalQuestions) * 40)`.
-- **FR-009**: Hệ thống MUST trả về response theo chuẩn AGENTS.md: `{ success, data: { attemptId, status, rawScore, totalQuestions, bandScore, correctCount, incorrectCount, timeSpent, practiceMode, message }, meta: null, error: null }`.
+## 9. Yêu cầu phi chức năng
 
-### 9. Yêu cầu phi chức năng
-
-- **NFR-AG-001 [AS-BUILT]**: Mọi endpoint phải xác thực JWT và enforce `user_id` ownership — không có endpoint nào public.
-- **NFR-AG-002 [AS-BUILT]**: Tất cả SQL query phải dùng parameterized query `$N` — không có SQL injection vector.
-- **NFR-AG-003 [AS-BUILT]**: Response theo chuẩn AGENTS.md: `{ success, data, error, meta }` — không trả về stack trace trong production.
-- **NFR-AG-004 [TARGET]**: API chấm 40 câu trả về kết quả `< 1000ms` (không tính latency mạng) tại staging load.
-- **NFR-AG-005 [TARGET]**: Test coverage ≥ 80% cho `attempt.service.js` và `scoring.js` — bao gồm happy path, edge case normalize, bảng Band Score đầy đủ 0–40, và ít nhất 1 error case mỗi validator.
-- **NFR-AG-006 [AS-BUILT]**: Log lỗi không được chứa giá trị câu trả lời của học viên hoặc đáp án đúng.
+- **NFR-AG-001 [AS-BUILT]**: Engine chấm điểm không chứa logic DB trực tiếp để dễ viết Unit Test.
+- **NFR-AG-002 [AS-BUILT]**: Chống SQL injection bằng tham số hóa (Parameterized Queries).
+- **NFR-AG-003 [AS-BUILT]**: API trả kết quả dưới 1000ms.
 
 ## 10. Thực thể chính
 
-- **`test_attempts`**: Summary — `user_id`, `test_id`, `mode`, `status`, `raw_score`, `total_questions`, `band_score`, `time_spent`, `practice_mode`, `submitted_at`.
-- **`attempt_answers`**: Per-question detail — `attempt_id`, `question_id`, `question_order`, `user_answer`, `is_correct`, `correct_answer`.
-- **`questions`**: Read-only — lấy `correct_answer`, `correct_answers` (JSONB), `question_order` để chấm bài.
-- **`mock_tests`**: Read-only — lấy `skill`, `title` để xác định thang Band Score.
+- **`test_attempts`**: Bảng tổng kết lần thi.
+- **`attempt_answers`**: Bảng chi tiết câu trả lời.
+- **`questions`**: Danh sách câu hỏi.
+- **`mock_tests`**: Đề thi.
 
 ## 11. Tiêu chí thành công
 
-### Measurable Outcomes
-
-- **SC-001**: API chấm điểm 40 câu trả về kết quả trong < 1000ms (không tính latency mạng).
-- **SC-002**: 100% câu trả lời chỉ thừa khoảng trắng nhưng đúng từ vựng → được chấm ĐÚNG.
-- **SC-003**: Band Score trả về khớp 100% với bảng IELTS Academic chuẩn Cambridge cho mọi raw score 0–40.
-- **SC-004**: Không có SQL injection vector — mọi query dùng parameterized `$N`.
+- **SC-AG-001 [AS-BUILT]**: 100% câu trả lời có khoảng trắng/chữ hoa chữ thường hợp lệ được chấm đúng.
+- **SC-AG-002 [AS-BUILT]**: Transaction DB được đảm bảo, không bao giờ có `test_attempts` mồ côi không có `attempt_answers`.
+- **SC-AG-003 [AS-BUILT]**: Response time < 1000ms.
 
 ## 12. Giả định
 
-- Database đã có bảng `questions` với cột `correct_answer`, `correct_answers` (JSONB) và `question_order` (từ `feat-content-builder`).
-- JWT middleware đã cung cấp `req.user.id` tại mọi route protected.
-- `errorHandler.js` middleware đã được setup và mount trong Express app.
-- Bảng Band Score IELTS Academic cho Reading và Listening là cố định — không thay đổi theo đề thi.
+- Bài học viên gửi không bị thay đổi định dạng key.
+- DB chứa đủ thông tin câu hỏi để chấm.
+- Hệ thống hỗ trợ xử lý mảng JSONB cho đáp án chuẩn (correct_answers).
 
 ## 13. Phụ thuộc
 
-- **feat-content-builder**: Cung cấp bảng `questions` với cột `correct_answer`, `correct_answers` (JSONB), `question_order`.
-- **feat-auth**: JWT middleware cung cấp `req.user.id` tại mọi protected route.
-- **errorHandler.js**: Middleware xử lý lỗi tập trung đã được mount trong Express app.
-- **PostgreSQL 16**: Hỗ trợ JSONB và transaction (`BEGIN/COMMIT/ROLLBACK`).
-- **`backend/src/utils/scoring.js`**: Module tra cứu Band Score chuẩn Cambridge — đọc-only, không có side effect.
+- Cần schema DB chuẩn bị sẵn từ `feat-content-builder`.
 
 ## 14. Câu hỏi mở
-
-1. **NEEDS CLARIFICATION**: Khi học viên thi cùng một `test_id` nhiều lần (re-attempt), hệ thống có giới hạn số lần thi không? Có ghi đè attempt cũ hay lưu tất cả?
-2. **NEEDS CLARIFICATION**: `timeSpent = 0` (học viên nộp ngay lập tức) có được phép không, hay cần validate minimum time?
-3. **NEEDS CLARIFICATION**: Chính sách hoàn trả/tính phí cho attempt khi DB ROLLBACK do lỗi hạ tầng — hạn mức attempt có bị tính hay không?
+- None.
