@@ -16,9 +16,9 @@ function ListeningReviewPage({ attemptDetail }) {
   const navigate = useNavigate();
   const { testId, testTitle, rawScore, totalQuestions, bandScore, answers } = attemptDetail;
 
-  const [testData, setTestData]         = useState(null);
-  const [loading, setLoading]           = useState(true);
-  const [error, setError]               = useState(null);
+  const [testData, setTestData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [activeSection, setActiveSection] = useState(null);
 
   // Map: questionId → answerDetail
@@ -98,12 +98,12 @@ function ListeningReviewPage({ attemptDetail }) {
     });
   });
 
-  const correctCount    = (answers || []).filter(a => a.isCorrect).length;
-  const incorrectCount  = (answers || []).filter(a => !a.isCorrect && a.userAnswer).length;
+  const correctCount = (answers || []).filter(a => a.isCorrect).length;
+  const incorrectCount = (answers || []).filter(a => !a.isCorrect && a.userAnswer).length;
   const unansweredCount = (answers || []).filter(a => !a.userAnswer).length;
 
   const activeSectionData = sections.find(s => `Section ${s.sectionNumber}` === activeSection);
-  const activeQuestions   = allQuestions.filter(q => q.section === activeSection);
+  const activeQuestions = allQuestions.filter(q => q.section === activeSection);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
@@ -128,7 +128,7 @@ function ListeningReviewPage({ attemptDetail }) {
         <div className="container" style={{ maxWidth: 900 }}>
           <div className="d-flex align-items-center gap-3 mb-1">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="var(--ink)">
-              <path d="M12 3v18l-7-5H2V8h3l7-5zm10 9a8 8 0 01-2.3 5.7l-1.4-1.4A6 6 0 0020 12a6 6 0 00-1.7-4.3l1.4-1.4A8 8 0 0122 12zm-4 0a4 4 0 01-1.2 2.8l-1.4-1.4A2 2 0 0016 12a2 2 0 00-.6-1.4l1.4-1.4A4 4 0 0118 12z"/>
+              <path d="M12 3v18l-7-5H2V8h3l7-5zm10 9a8 8 0 01-2.3 5.7l-1.4-1.4A6 6 0 0020 12a6 6 0 00-1.7-4.3l1.4-1.4A8 8 0 0122 12zm-4 0a4 4 0 01-1.2 2.8l-1.4-1.4A2 2 0 0016 12a2 2 0 00-.6-1.4l1.4-1.4A4 4 0 0118 12z" />
             </svg>
             <span className="body-sm-strong">Nghe lại Audio — {testData?.title}</span>
             <span className="badge bg-secondary ms-1" style={{ fontSize: 10 }}>Review Mode</span>
@@ -159,7 +159,7 @@ function ListeningReviewPage({ attemptDetail }) {
               const blockQs = allQuestions.filter(q => q.section === activeSection && (b.questions || []).some(bq => bq.id === q.id));
               return (
                 <div key={b.id || bIdx} className="mb-5">
-                  {b.content && (
+                  {b.content && (!b.content.trim().startsWith('[') || !b.content.trim().endsWith(']')) && (
                     <div className="mb-4 p-3 bg-light rounded shadow-sm">
                       <div dangerouslySetInnerHTML={{ __html: b.content }} />
                     </div>
