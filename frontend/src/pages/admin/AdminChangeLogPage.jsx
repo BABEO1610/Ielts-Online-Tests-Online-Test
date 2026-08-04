@@ -321,13 +321,13 @@ const ChangeDetailModal = ({ row, busy, onClose, onRevert }) => {
                    State: disabled khi busy=true */}
               <button type="button" className="btn-pill btn-pill--ghost" onClick={onClose} disabled={busy}>Đóng</button>
               {row.revertable && !row.reverted && (
-                {/* 📌 [SWIMLANE L3-B2 | STT 10] Button: Hoàn tác thay đổi ⭐
+                /* 📌 [SWIMLANE L3-B2 | STT 10] Button: Hoàn tác thay đổi ⭐
                      Loại: <button class="btn-pill--dark"> | Dòng gốc: L286–L288
                      Hiển thị: CHỈ khi row.revertable=true && row.reverted=false
                      Action: onClick → onRevert(row) → revertChange(row.id) → POST /admin/logs/:id/undo
                      Swimlane ⭐: Backend dùng SELECT FOR UPDATE (Pessimistic Lock) → chống Race Condition
                                   + xác thực giá trị (Optimistic Check) → nếu sai → 409 Conflict
-                     UI: khi busy → hiện 'Đang hoàn tác...' | bình thường → 'Hoàn tác thay đổi' */}
+                     UI: khi busy → hiện 'Đang hoàn tác...' | bình thường → 'Hoàn tác thay đổi' */
                 <button type="button" className="btn-pill btn-pill--dark" onClick={onRevert} disabled={busy}>
                   {busy ? 'Đang hoàn tác...' : 'Hoàn tác thay đổi'}
                 </button>
